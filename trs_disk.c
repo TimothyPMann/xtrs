@@ -154,7 +154,6 @@ typedef struct {
 #define JV1 1 /* compatible with Vavasour Model I emulator */
 #define JV3 3 /* compatible with Vavasour Model III/4 emulator */
 #define REAL 0
-#define NONE 2
 
 typedef struct {
   int writeprot;		  /* emulated write protect tab */
