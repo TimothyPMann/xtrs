@@ -369,8 +369,9 @@ directory as the floppy disk files diskM-U.
 Third, make sure an appropriate version of LDOS is in emulated floppy
 drive 0, and the supplied file \fIutility.dsk\fP is in another
 emulated floppy drive.  Boot LDOS.  If you are using Model I LDOS
-5.3.1, patch a bug in the FORMAT command by typing \fIPATCH
-FORMAT/CMD.UTILITY M1FORMAT/FIX\fP.  You need to apply this patch only
+5.3.1, patch a bug in the FORMAT command by typing 
+\fIPATCH FORMAT/CMD.UTILITY M1FORMAT/FIX\fP.
+You need to apply this patch only
 once.  It must not be applied to Model III or Model 4/4P LDOS.
 
 Fourth, type the following commands.  Here \fId\fP is the LDOS drive number
@@ -422,8 +423,9 @@ Shack CP/M 3.0 should work, but they have not yet been tested at this
 writing.  Any bugs should be reported.
 
 To get started, run the \fBmkdisk\fP program under Unix to create a
-blank hard drive (.hdv) file.  Typical usage would be: \fImkdisk -h
-mydisk.hdv\fP.  See the \fBmkdisk\fP(1) man page for other options.
+blank hard drive (.hdv) file.  Typical usage would be: 
+\fImkdisk -h mydisk.hdv\fP.
+See the \fBmkdisk\fP(1) man page for other options.
 
 Second, link the file to an appropriate name.  The WD1010 emulation
 supports up to four hard drives, with names of the form hardM-U, where
