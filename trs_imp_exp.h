@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Mon Jan 12 19:48:21 PST 1998 by mann */
+/* Last modified on Thu Apr  9 12:30:13 PDT 1998 by mann */
 
 /*
  * trs_imp_exp.h
@@ -17,6 +17,13 @@
  * fast, flexible ones use a set of emulator traps (instructions that
  * don't exist in a real Z-80).  The old ones should probably go away
  * at some point.
+ *
+ * ED28 emt_system
+ *         Before, HL => shell command, null terminated
+ *         After,  AF =  0 if OK, error number if not (Z flag affected)
+ *                 BC =  command exit status, normally 0 if OK
+ *
+ * ED29-ED2F reserved
  *
  * ED30 emt_open
  *         Before, HL => path, null terminated
@@ -138,6 +145,7 @@
 #define EO_TRUNC  01000
 #define EO_APPEND 02000
 
+extern void do_emt_system();
 extern void do_emt_open();
 extern void do_emt_close();
 extern void do_emt_read();

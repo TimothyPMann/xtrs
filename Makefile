@@ -36,51 +36,74 @@ HC_OBJECTS = \
 	hex2cmd.o
 
 SOURCES = \
-	z80.c \
-	main.c \
-	load_hex.c \
-	trs_memory.c \
-	trs_keyboard.c \
-	error.c \
+	cmd.c \
+	compile_rom.c \
 	debug.c \
 	dis.c \
-	trs_io.c \
+	error.c \
+	hex2cmd.c \
+	load_hex.c \
+	main.c \
+	mkdisk.c \
 	trs_cassette.c \
-	trs_xinterface.c \
 	trs_chars.c \
-	trs_printer.c \
 	trs_disk.c \
+	trs_imp_exp.c \
 	trs_interrupt.c \
-	trs_imp_exp.c
-
-CR_SOURCES = \
-	compile_rom.c
-
-MD_SOURCES = \
-	mkdisk.c
-
-HC_SOURCES = \
-	cmd.c \
-	hex2cmd.c
+	trs_io.c \
+	trs_keyboard.c \
+	trs_memory.c \
+	trs_printer.c \
+	trs_xinterface.c \
+	z80.c
 
 HEADERS = \
+	cmd.h \
 	config.h \
-	z80.h \
 	trs.h \
-	trs_iodefs.h \
 	trs_disk.h \
 	trs_imp_exp.h \
-	cmd.h
+	trs_iodefs.h \
+	z80.h
 
 MISC = \
-	README \
+	ChangeLog \
 	Makefile \
 	Makefile.local \
+	README \
+	README.tpm \
 	cassette \
+	cassette.man \
+	cassette.txt \
+	export.bas \
+	export.cmd \
+	export.lst \
+	export.z \
+	hardfmt.txt \
+	import.bas \
+	import.cmd \
+	import.lst \
+	import.z \
+	m1format.fix \
+	mkdisk.man \
+	mkdisk.txt \
+	settime.ccc \
+	settime.cmd \
+	settime.lst \
+	settime.z \
+	trs80-model1.bdf \
+	trs80-model3.bdf \
+	utility.dsk \
+	utility.jcl \
 	xtrs.man \
-	xtrs.man.txt
+	xtrs.txt \
+	xtrsemt.ccc \
+	xtrsemt.h \
+	xtrshard.dct \
+	xtrshard.lst \
+	xtrshard.z
 
-default:	xtrs mkdisk hex2cmd xtrs.man.txt mkdisk.man.txt
+default: xtrs mkdisk hex2cmd xtrs.txt mkdisk.txt cassette.txt
 
 # Local customizations for make variables are done in Makefile.local:
 include Makefile.local
@@ -89,13 +112,17 @@ CFLAGS = $(DEBUG) $(ENDIAN) $(DEFAULT_ROM) $(READLINE) $(DISKDIR) $(IFLAGS) \
 	-DKBWAIT -DHAVE_SIGIO
 LIBS = $(XLIB) $(READLINELIBS) $(EXTRALIBS)
 
-.SUFFIXES:	.z .cmd .dct
+.SUFFIXES:	.z .cmd .dct .man .txt
 .z.cmd:
 	zmac $<
 	hex2cmd $*.hex > $*.cmd
+	rm -f $*.hex
 .z.dct:
 	zmac $<
 	hex2cmd $*.hex > $*.dct
+	rm -f $*.hex
+.man.txt:
+	nroff -man $< > $*.txt
 
 xtrs:		$(OBJECTS)
 		$(CC) $(LDFLAGS) -o xtrs $(OBJECTS) $(LIBS)
@@ -119,20 +146,13 @@ saber_src:
 		#ignore SIGIO
 		#load $(LDFLAGS) $(CFLAGS) $(SOURCES) $(LIBS)
 
-tar:		$(SOURCES) $(CR_SOURCES) $(MF_SOURCES) $(HEADERS)
-		tar cvf xtrs.tar $(SOURCES) $(CR_SOURCES) $(MF_SOURCES) \
-			$(HEADERS) $(MISC)
+tar:		$(SOURCES) $(HEADERS)
+		tar cvf xtrs.tar $(SOURCES) $(HEADERS) $(MISC)
 		rm -f xtrs.tar.Z
 		compress xtrs.tar
 
-xtrs.man.txt:	xtrs.man
-		nroff -man xtrs.man > xtrs.man.txt
-
-mkdisk.man.txt:	mkdisk.man
-		nroff -man mkdisk.man > mkdisk.man.txt
-
 clean:
-		rm -f $(OBJECTS) $(MF_OBJECTS) $(CR_OBJECTS) $(HC_OBJECTS) \
+		rm -f $(OBJECTS) $(MD_OBJECTS) $(CR_OBJECTS) $(HC_OBJECTS) \
 			*~ xtrs mkdisk compile_rom hex2cmd trs_rom*.c
 
 link:	
@@ -144,7 +164,6 @@ install:
 		install -c -m 444 xtrs.man $(MANDIR)/man1/xtrs.1
 
 depend:
-	makedepend -- $(CFLAGS) -- \
-		$(SOURCES) $(CR_SOURCES) $(MF_SOURCES) $(HC_SOURCES)
+	makedepend -- $(CFLAGS) -- $(SOURCES)
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.

@@ -15,12 +15,17 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Sep 30 18:02:34 PDT 1997 by mann
+   Last modified on Wed Apr 15 21:33:37 PDT 1998 by mann
 */
 
 #include "trs.h"
 #include "z80.h"
 #include <string.h>
+
+#if __linux
+#include <sys/io.h>
+#include <asm/io.h>
+#endif
 
 #define CLOSE		0
 #define READ		1
@@ -115,19 +120,48 @@ static int assert_state(state)
     return 0;
 }
 
-void trs_cassette_out(value)
-{
-#ifdef CASSDEBUG
-    fprintf(stderr, 
-    "cass out %02x, pc %04x, stack %04x %04x %04x %04 x%04x %04x %04x %04x\n",
-	    value, REG_PC, mem_read_word(REG_SP), mem_read_word(REG_SP + 2),
-	    mem_read_word(REG_SP + 4), mem_read_word(REG_SP + 6),
-	    mem_read_word(REG_SP + 8), mem_read_word(REG_SP + 10),
-	    mem_read_word(REG_SP + 12), mem_read_word(REG_SP + 14));
-#endif
-    if (trs_model != 1) return; /* not implemented */
+/* ioport of the SoundBlaster command register. 0 means none */
+static unsigned int sb_address=0;
+static unsigned char sb_cass_volume[4];
+static unsigned char sb_sound_volume[2];
 
-    if(value & 4)
+/* try to initialize SoundBlaster. Usual ioport is 0x220 */
+void trs_sound_init(ioport, vol)
+    int ioport; int vol;
+{
+#if __linux
+    if(sb_address != 0) return;
+    if((ioport & 0xFFFFFF0F) != 0x200)
+    {
+        fprintf(stderr, "Error in the SoundBlaster IOPort\n");
+	return;
+    }
+    sb_address = ioport + 0xC; /* COMMAND address */
+    if(ioperm(ioport, 0x10, 1))
+    {
+        perror("Unable to access SoundBlaster");
+	sb_address = 0;
+    }
+    setuid(getuid());
+    if (vol < 0) vol = 0;
+    if (vol > 100) vol = 100;
+    /* Values in comments from Model I technical manual.  Model III/4 used
+       a different value for one resistor in the network, so these
+       voltages are not exactly right.  In particular 3 and 0 are no
+       longer almost identical, but as far as I know, 3 is still unused.
+    */
+    sb_cass_volume[0] = (vol*255)/200;  /* 0.46 V */
+    sb_cass_volume[1] = (vol*255)/100;  /* 0.85 V */
+    sb_cass_volume[2] = 0;              /* 0.00 V */
+    sb_cass_volume[3] = (vol*255)/200;  /* unused, but about 0.46 V */
+    sb_sound_volume[0] = 0;
+    sb_sound_volume[1] = (vol*255)/100;
+#endif
+}
+
+void trs_cassette_motor(value)
+{
+    if(value)
     {
 	/* motor on */
 	if(!cassette_motor)
@@ -144,8 +178,21 @@ void trs_cassette_out(value)
 	    cassette_motor = 0;
 	}
     }
+}
 
-    if((REG_PC == 0x0228) &&  /* writing bit to cassette */
+void trs_cassette_out(value)
+{
+#ifdef CASSDEBUG
+    fprintf(stderr, 
+    "cass out %02x, pc %04x, stack %04x %04x %04x %04 x%04x %04x %04x %04x\n",
+	    value, REG_PC, mem_read_word(REG_SP), mem_read_word(REG_SP + 2),
+	    mem_read_word(REG_SP + 4), mem_read_word(REG_SP + 6),
+	    mem_read_word(REG_SP + 8), mem_read_word(REG_SP + 10),
+	    mem_read_word(REG_SP + 12), mem_read_word(REG_SP + 14));
+#endif
+
+    if((trs_model == 1) &&
+       (REG_PC == 0x0228) &&  /* writing bit to cassette */
        (mem_read_word(REG_SP) == 0x01df) &&  /* called from write-bit */
        (mem_read_word(REG_SP + 2) == 0x026e)) /* called from write-byte */
     {
@@ -170,6 +217,38 @@ void trs_cassette_out(value)
 	REG_SP += 4;
 	REG_PC = 0x0279;
     }
+
+#if __linux
+    /* Do sound emulation */
+    if((cassette_motor == 0) && sb_address)
+    {
+	while (inb(sb_address) & 0x80)
+	    ;
+	outb(0x10, sb_address);
+	while (inb(sb_address) & 0x80)
+	    ;
+	outb(sb_cass_volume[value], sb_address);
+    }
+#endif /* linux */
+}
+
+
+/* Model 4 sound port */
+void
+trs_sound_out(value)
+{
+#if __linux
+    /* Do sound emulation */
+    if(sb_address)
+    {
+	while (inb(sb_address) & 0x80)
+	    ;
+	outb(0x10, sb_address);
+	while (inb(sb_address) & 0x80)
+	    ;
+	outb(sb_sound_volume[value], sb_address);
+    }
+#endif /* linux */
 }
 
 int trs_cassette_in(modesel)
@@ -241,3 +320,4 @@ int trs_cassette_in(modesel)
     /* default -- return all 1's plus the modesel mask */
     return modesel ? 0xff : 0xbf;
 }
+

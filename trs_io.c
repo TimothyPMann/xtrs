@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Sep 27 20:06:39 PDT 1997 by mann
+   Last modified on Sun Mar 22 23:01:07 PST 1998 by mann
 */
 
 #include "z80.h"
@@ -44,7 +44,8 @@ void z80_out(port, value)
 	    modesel = (value >> 3) & 1;
 	    trs_screen_expanded(modesel);
 	    /* do cassette emulation */
-	    trs_cassette_out(value & 0x7);
+            trs_cassette_motor((value >> 2) & 1);
+	    trs_cassette_out(value & 0x3);
 	    break;
 	  default:
 	    break;
@@ -75,6 +76,12 @@ void z80_out(port, value)
 		ctrlimage = value;
 	    }
 	    break;
+	  case 0x90:
+	  case 0x91:
+	  case 0x92:
+	  case 0x93:
+	    trs_sound_out(value & 1);
+	    break;
 	  case IMPEXP_CMD: /* 0xD0 */
 	    trs_impexp_cmd_write(value);
 	    break;
@@ -95,11 +102,13 @@ void z80_out(port, value)
 	  case 0xEE:
 	  case 0xEF:
 	    modeimage = value;
+            /* cassette motor is on D1 */
+            trs_cassette_motor((modeimage & 0x02) >> 1);
 	    /* screen mode select is on D2 */
 	    trs_screen_expanded((modeimage & 0x04) >> 2);
 	    /* clock speed is on D6; it affects timer HZ too */
 	    trs_timer_speed((modeimage & 0x40) >> 6);
-	    /* !! still to do: cassette motor, alt char set */
+	    /* !! still to do: alt char set */
 	    break;
 	  case TRSDISK3_COMMAND: /* 0xF0 */
 	    trs_disk_command_write(value);
@@ -129,8 +138,8 @@ void z80_out(port, value)
 	  case 0xFD:
 	  case 0xFE:
 	  case 0xFF:
-	    /* do cassette emulation (future) */
-	    /*!! trs_cassette_out(value);*/
+	    /* do cassette emulation */
+	    trs_cassette_out(value & 3);
 	    break;
 	  default:
 	    break;

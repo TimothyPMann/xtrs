@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Wed Mar 11 13:11:51 PST 1998 by mann */
+/* Last modified on Thu Apr  9 12:33:47 PDT 1998 by mann */
 
 /*
  * trs_imp_exp.c
@@ -39,6 +39,20 @@ typedef struct {
 } OpenDisk;
 #define MAX_OPENDISK 32
 OpenDisk od[MAX_OPENDISK];
+
+void do_emt_system()
+{
+  int res;
+  res = system(mem_pointer(REG_HL));
+  if (res == -1) {
+    REG_A = errno;
+    REG_F &= ~ZERO_MASK;
+  } else {
+    REG_A = 0;
+    REG_F |= ZERO_MASK;
+  }
+  REG_BC = res;
+}
 
 void do_emt_open()
 {

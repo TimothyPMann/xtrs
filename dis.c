@@ -950,7 +950,8 @@ static struct opcode minor[6][256] = {
 	undefined,		A_0,		/* ed26 */
 	undefined,		A_0,		/* ed27 */
 
-	undefined,		A_0,		/* ed28 */
+	/* xtrs emulator traps; not real Z80 instructions */
+	"emt_system",		A_0,		/* ed28 */
 	undefined,		A_0,		/* ed29 */
 	undefined,		A_0,		/* ed2a */
 	undefined,		A_0,		/* ed2b */
@@ -959,7 +960,6 @@ static struct opcode minor[6][256] = {
 	undefined,		A_0,		/* ed2e */
 	undefined,		A_0,		/* ed2f */
 
-	/* xtrs emulator traps; not real Z80 instructions */
 	"emt_open",		A_0,		/* ed30 */
 	"emt_close",		A_0,		/* ed31 */
 	"emt_read",		A_0,		/* ed32 */
@@ -977,6 +977,7 @@ static struct opcode minor[6][256] = {
 	"emt_ftruncate",	A_0,		/* ed3d */
 	"emt_opendisk",		A_0,		/* ed3e */
 	"emt_closedisk",	A_0,		/* ed3f */
+	/* end xtrs emulator traps */
 
 	"in	b,(c)",		A_0,		/* ed40 */
 	"out	(c),b",		A_0,		/* ed41 */

@@ -17,6 +17,8 @@ A printer is emulated by
 sending its output to standard output.  
 There is also a rudimentary emulation of cassette I/O
 that uses files for cassette tapes (Model I mode only).
+Crude sound support is available under Linux if you have 
+SoundBlaster-compatible hardware.
 
 The Z-80 emulator has a debugger called zbx.  It works sort of
 like dbx.  If you run with debugging turned on (see the options section for
@@ -89,16 +91,16 @@ In Model III or 4 mode, \fBxtrs\fP emulates the stock Model III/4 floppy
 controller, which used a WD1793 chip (software-compatible with the
 WD1791) to provide both single and double density.
 
-Four floppy drives are emulated, with storage in files named diskM-0,
-diskM-1, diskM-2, diskM-3, where X=1 for Model I mode, 3 for Model III
-mode, or 4 for Model 4 mode.  If a file of the required name is not
+Four 5.25-inch floppy drives are emulated, with storage in files named
+diskM-U, where M is the TRS-80 model (1, 3, or 4) and U is the drive
+unit number (0, 1, 2, or 3).  If a file of the required name is not
 found, a drive with no disk in it is emulated (but see below).  If the
 user does not have write permission for a floppy file, a write-protect
 tab is emulated.  To change floppies in an emulated drive, rename the
 existing file for the drive (if any), rename the new floppy file to
 the proper name, and hit function key F7 in the emulator.
 
-If you try to boot with no file named diskX-0 (that is, no disk in
+If you try to boot with no file named diskM-0 (that is, no disk in
 drive 0), \fBxtrs\fP emulates having no disk controller.  The behavior of a
 real machine with a disk controller in this case didn't seem useful to
 emulate faithfully: A real Model I hangs with a screen full of
@@ -134,9 +136,9 @@ with an intentional CRC error in the data field.  The original JV3
 format had a limit of 2901 total sectors, but \fBxtrs\fP allows up to 5802.
 If you format more than 2901 sectors on a disk image, however, other
 emulators may be unable to read the additional sectors.  An 80 track,
-double-sided, double-density (18 sector) 5-inch floppy will fit within
+double-sided, double-density (18 sector) 5.25-inch floppy will fit within
 the original 2901 sector limit; the extension to 5802 is primarily for
-future emulation of 8-inch drives.  
+emulation of 8-inch drives (see below).  
 
 The program \fBmkdisk\fP(1) makes a blank emulated floppy or "bulk
 erases" an existing one.  By default, mkdisk makes a JV3 floppy, but
@@ -153,8 +155,65 @@ the emulated WD1771 (available in Model I mode only), F8 is returned
 as FA.  In all other modes, F8 is returned as F8.  This trick makes
 the different operating systems perfectly compatible with each other,
 which is better than on a real Model I!
+.SH Emulated 8-inch floppy disks
+In addition to the four standard 5.25-inch drives, \fBxtrs\fP also
+emulates four 8-inch floppy drives.  There is no widely-accepted
+standard hardware interface for 8-inch floppies on the TRS-80, so \fBxtrs\fP
+emulates a pseudo-hardware interface of its own and provides a driver for it.
+
+Storage for the emulated 8-inch disks is in files named diskM-U, where
+M is the TRS-80 model number (1, 3, or 4) and U is a unit number (4,
+5, 6, or 7).  These files are in exactly the same JV3 format as 5.25-inch
+floppy files.  A new JV3 floppy can be formatted as either 5.25-inch or
+8-inch depending on whether you initially put it into a 5.25-inch or
+8-inch emulated drive.  The only difference between 5.25-inch and 8-inch
+emulated drives is that the emulator allows you to format more sectors
+per track in the latter.  Be careful not to put a 5.25-inch formatted
+emulated floppy into an 8-inch emulated drive or vice versa; the
+results are likely to be confusing.
+
+To use the emulated 8-inch drives, you'll need a driver.  Under LDOS
+or LS-DOS, use the program XTRS8/DCT supplied on the emulated floppy
+\fIutility.dsk\fP.  This driver is a very simple wrapper around the
+native LDOS/LS-DOS floppy driver.  Here are detailed instructions.
+
+First, make sure an appropriate version of LDOS is in emulated floppy
+drive 0, and the supplied file \fIutility.dsk\fP is in another
+emulated floppy drive.  Boot LDOS.  If you are using Model I LDOS, be
+sure FDUBL is running.
+
+Second, type the following commands.  Here \fId\fP is the LDOS drive
+number you want to use for the 8-inch drive and \fIu\fP is the
+unit number you chose when naming the file.  Most likely you will
+choose \fId\fP and \fIu\fP to be equal to reduce confusion.
+
+.nf
+    SYSTEM (DRIVE=\fId\fP,DRIVER="XTRS8",ENABLE)
+    Enter unit number ([4]-7): \fIu\fP
+.fi
+
+You can repeat these steps with different values of \fId\fP and
+\fIu\fP to have more than one 8-inch drive.  You might want to repeat
+four times using 4, 5, 6, and 7, or you might want to save some drive
+numbers for hard drives (see below).  You can now format and use
+emulated 8-
+
+Finally, it's a good idea to give the SYSTEM (SYSGEN) command (Model
+I/III) or SYSGEN command (Model 4).  This command saves the SYSTEM
+settings, so the 8-inch drives will be available again the next time
+you reboot or restart the emulator.  If you need to access an 8-inch
+drive after booting from a disk that hasn't been SYSGENed, simply use
+the same SYSTEM command again.
+
+In case you want to write your own driver for another TRS-80 operating
+system, here are details on the emulated pseudo-hardware.  The 8-inch
+drives are accessed through the normal floppy disk controller, exactly
+like 5.25-inch drives.  The four 5.25-inch drives have hardware select codes
+1, 2, 4, and 8, corresponding respectively to files diskM-0, -1, -2, and
+-3.  The four 8-inch drives have hardware select codes 3, 5, 6, and 7,
+corresponding respectively to files diskM-4, -5, -6, and -7.
 .SH Real floppy disks
-Under Linux only, any diskX-N file can be a symbolic link to a real
+Under Linux only, any diskM-U file can be a symbolic link to a real
 floppy disk drive, typically /dev/fd0 or /dev/fd1.  Most PCs should be
 able to read and write TRS-80 compatible floppies in this way.  Many
 PC floppy controllers cannot handle single density, however, and some
@@ -163,13 +222,30 @@ TRS-80, especially disks formatted by older TRS-80 operating systems.
 Use the -doublestep flag if you need to read 35-track or 40-track
 media in an 80-track drive.  If you need to write 35-track or 40-track
 media in an 80-track drive, bulk-erase the media first and format it
-in the 80-track drive.  Don't write to a disk with -doublestep if it
-has ever been written to in a real 40-track drive.
+in the 80-track drive.  Don't write to a disk in an 80-track drive if it
+has ever been written to in a 40-track drive.  The narrower head used
+in an 80-track drive cannot erase the full track width written by the
+head in a 40-track drive.
 
-Note: If you have a DD floppy drive (i.e, not a modern 1.2MB HD drive,
-but something like a 360K or 180K drive), use /dev/fd0d360 or
-/dev/fd1d360 instead of /dev/fd0 or /dev/fd1, and let mann@pa.dec.com
-know whether it works.  This has not been tested to date.
+If you link one of the 5.25-inch floppy files (diskM-0 through
+diskM-3) to a real floppy drive, TRS-80 programs will see it as a
+5.25-inch drive, but the actual drive can be either 3.5-inch or
+5.25-inch.  The drive will be operated in double density (or single
+density), not high density, so be sure to use the appropriate media.
+
+If you link one of the 8-inch floppy files (diskM-4 through diskM-7)
+to a real floppy drive, TRS-80 programs will see it as an 8-inch
+drive.  Again, you need to use the XTRS8/DCT driver described above to
+enable LDOS/LS-DOS to access an 8-inch drive.  The real drive can be
+either 3.5-inch, 5.25-inch, or 8-inch.  A 3.5-inch or 5.25-inch drive
+will be operated in high-density mode, using MFM recording if the
+TRS-80 is trying to do double density, FM recording if the TRS-80 is
+trying to do single density.  In this mode, these drives can hold as
+much data as a standard 8-inch drive.  In fact, a 5.25-inch HD drive
+holds exactly the same number of bits per track as an 8-inch drive; a
+3.5-inch HD drive can hold 20% more, but we waste that space when
+using one to emulate an 8-inch drive.  In both cases we also waste the
+top three tracks, since an 8-inch drive has only 77 tracks, not 80.
 
 If you try to access a real floppy drive with no disk in it,
 \fBxtrs\fP will print an error message, and the Z-80 program will get
@@ -298,6 +374,21 @@ net result is that some ticks may be late, but there are always the
 proper number of ticks per second.  For example, running in Model I
 mode on Intel Linux you'd see this pattern: (tick, 30ms, tick,
 20ms,...) instead of seeing ticks every 25ms.
+.SH Sound
+Crude sound support is available on Linux.  Unfortunately, the Linux
+sound drivers do not provide sufficiently low-level functionality, so the
+emulator must write directly to the hardware.  Thus in order for the
+sound support to work, you must have a true SoundBlaster-compatible
+sound card, and you must start \fBxtrs\fP as root.  (\fBxtrs\fP will
+disable its root privileges after sound initialization.)
+
+Sound support is off by default, but can be turned on with the -sb
+option described below.  When sound support is on, any data written to
+the TRS-80 cassette port when the cassette motor is off, and any data
+written to the Model 4 optional sound port, is copied to the
+SoundBlaster.  Sound frequencies will likely be quite far off, because
+TRS-80 sound depends on timing loops, and \fBxtrs\fP makes no attempt
+to emulate Z-80 instructions at the same speed as a real TRS-80.
 .SH Options
 Defaults for all options can be specified using the standard X resource
 mechanism, and the class name for \fBxtrs\fP is "Xtrs".
@@ -403,6 +494,11 @@ section for limitations.
 .TP
 .B \-nodoublestep
 Turn off double-step mode.  Linux only.  This is the default.
+.TP
+.B \-sb \fIportbase,vol\fP
+Enable sound support, using a SoundBlaster with I/O port base 
+at \fIportbase\fP, and playing sounds at \fIvol\fP percent of maximum
+volume.  A typical setting would be -sb 0x220,100.
 .SH Additional resources
 There are many other TRS-80 resources available on the Web, including
 shareware and freeware emulators that run under MSDOS and other
@@ -437,11 +533,7 @@ limitations even under Linux: Sectors must be 256 bytes long.
 difference between the PC and TRS-80 floppy controllers.)  Index holes
 are faked, not detected on the real disk.  Attempts to access a real
 drive with no disk in it are dealt with awkwardly (as documented
-above).  The code is not very thoroughly tested.  Read/write
-performance is poor; for example, the "verify" step of LDOS format
-seems to read only one sector per revolution.  It is unknown whether
-the real floppy support works on DD (360KB or 180KB) drives; it has
-been tested only on HD drives (1.2MB).
+above).  Read/write performance seems poor.
 
 The emulator arbitrarily limits both JV1 and JV3 disk images to 96
 tracks.  The limit could easily be increased to 255 or maybe 256, but
@@ -454,12 +546,16 @@ TRS-80 floppy disk controller and for the JV3 format.
 The extended JV3 limit of 5802 sectors is somewhat arbitrary as well.
 It could be raised by generalizing the code to permit more than two
 blocks of 2901.  Again, this does not seem too useful.  5802 sectors
-is already enough for a 3" HD (1.44MB) floppy, which the TRS-80 didn't
+is already enough for a 3.5-inch HD (1.44MB) floppy, which the TRS-80 didn't
 support anyway.
 
 The emulator guesses a romfile is in .hex format if its first byte is
 a colon (':'), so a raw binary ROM image can't start with that byte
 value.  In the future it would be nice to accept MODELA/III files too.
+
+The sound support is crude.  On at least some SoundBlaster
+compatibles, sounds play at too low a volume and are unaffected by the
+system mixer.
 
 If you discover other bugs, or write fixes for any of these, please let
 us know.  We expect to incorporate fixes into future releases.
@@ -470,9 +566,12 @@ Digital Equipment Corporation, and Timothy Mann <mann@pa.dec.com> of
 Digital Equipment Corporation.  See README and README.tpm for
 additional notes from the authors.
 
-Thanks to Al Petrofsky for supplying the TRS-80 fonts in bdf format.
-Thanks to Jeff Vavasour for designing and documenting the floppy disk
-file formats that \fBxtrs\fP and most other TRS-80 emulators use.
-Thanks to Matthew Reed for designing the hard disk file format used in
-his emulators and providing documentation so that \fBxtrs\fP could be
-compatible with it.
+We also thank the following people for their help.  The floppy
+disk file formats were designed by Jeff Vavasour, originally for his
+MSDOS-based TRS-80 emulators.  The hard disk file format was designed
+by Matthew Reed for his MSDOS-based TRS-80 emulators.  Al Petrofsky
+supplied the TRS-80 fonts in bdf format.  Roland Gerlach contributed
+several bug reports and fixes.  Fabio Ferrari contributed the sound
+support.  Ulrich Mueller added the -borderwidth option and ported the
+import, export, and settime utilities to Newdos/80.  Branden Robinson
+supplied cassette.man and fixed Makefile bugs.

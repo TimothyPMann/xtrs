@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Mon Dec  1 15:13:27 PST 1997 by mann
+   Last modified on Wed Apr 15 21:36:05 PDT 1998 by mann
 */
 
 /*
@@ -114,6 +114,9 @@ static XrmOptionDescRec opts[] = {
 {"-model3",     "*model",       XrmoptionNoArg,		(caddr_t)"3"},
 {"-model4",     "*model",       XrmoptionNoArg,		(caddr_t)"4"},
 {"-diskdir",    "*diskdir",     XrmoptionSepArg,	(caddr_t)NULL},
+#if __linux
+{"-sb",         "*sbioport",    XrmoptionSepArg,        (caddr_t)NULL},
+#endif /* linux */
 };
 
 static int num_opts = (sizeof opts / sizeof opts[0]);
@@ -195,6 +198,22 @@ int trs_parse_command_line(argc, argv, debug)
     XrmInitialize();
     /* parse command line options */
     XrmParseCommand(&command_db,opts,num_opts,program_name,&argc,argv);
+
+#if __linux
+    (void) sprintf(option, "%s%s", program_name, ".sbioport");
+    if (XrmGetResource(x_db, option, "Xtrs.SbIoPort", &type, &value))
+    {
+        char *next; int ioport, vol;
+	ioport = strtol(value.addr, &next, 0);
+	if(*next == ',')
+	{
+	    next++;
+	    vol=atoi(next);
+	    trs_sound_init(ioport, vol);  /* requires root privilege */
+	}
+    }
+    setuid(getuid());
+#endif /* linux */
 
     (void) sprintf(option, "%s%s", program_name, ".display");
     (void) XrmGetResource(command_db, option, "Xtrs.Display", &type, &value);

@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Mon Dec  1 15:24:07 PST 1997 by mann
+   Last modified on Sun Mar 22 23:09:14 PST 1998 by mann
 */
 
 /*
@@ -58,8 +58,11 @@ extern int x_poll_count;
 extern void trs_printer_write();
 extern int trs_printer_read();
 
+extern void trs_cassette_motor();
 extern void trs_cassette_out();
 extern int trs_cassette_in();
+extern void trs_sound_out();
+extern void trs_sound_init();
 
 extern int trs_rom_size;
 extern int trs_rom1_size;

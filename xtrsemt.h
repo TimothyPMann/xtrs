@@ -6,12 +6,13 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Sat Sep 20 13:51:37 PDT 1997 by mann */
+/* Last modified on Thu Apr  9 12:35:26 PDT 1998 by mann */
 
 #ifndef _TIME_T
 #include <time.h>
 #endif
 
+extern int emt_system(/* char *cmd */);
 extern int emt_open(/* char *fname, int oflag, int mode */);
 extern int emt_close(/* int fd */);
 extern int emt_read(/* int fd, char *buffer, int bytes */);
@@ -24,7 +25,7 @@ extern int emt_dclose(/* int dirfd */);
 extern int emt_dread(/* int dirfd, char *buffer, int bytes */);
 extern int emt_chdir(/* char *fname */);
 extern int emt_getcwd(/* char *buffer, int bytes */);
-extern void emt_misc(/* int func */);
+extern int emt_misc(/* int func */);
 extern int emt_ftruncate(/* int fd, long length */);
 extern int emt_opendisk(/* char *fname, int oflag, int mode */);
 extern int emt_closedisk(/* int fd */);
@@ -48,5 +49,4 @@ extern int emt_closedisk(/* int fd */);
 #define EMT_MISC_EXIT 1
 #define EMT_MISC_DEBUG 2
 #define EMT_MISC_RESET_BUTTON 3
-
-
+#define EMT_MISC_QUERY_DISK_CHANGE 4

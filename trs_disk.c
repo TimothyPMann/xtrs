@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Sat Feb 14 14:06:11 PST 1998 by mann */
+/* Last modified on Wed Apr 15 19:27:45 PDT 1998 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
@@ -159,7 +159,8 @@ typedef struct {
   int writeprot;		  /* emulated write protect tab */
   int phytrack;			  /* where are we really? */
   int emutype;
-  int inches;                     /* 5 or 8 */
+  int inches;                     /* 5 or 8, as seen by TRS-80 */
+  int real_rps;                   /* used only for emutype REAL */
   FILE* file;
   int unused_id;		  /* first unused index in id array */
   int last_used_id;		  /* last used index */
@@ -308,8 +309,8 @@ trs_disk_change(int drive)
     /* Real floppy drive */
     int fd;
     int reset_now = 0;
+    struct floppy_drive_params fdp;
     d->emutype = REAL;
-    d->inches = 5; /* i.e., not 8" */
     fd = open(diskname, O_ACCMODE|O_NDELAY);
     if (fd == -1) {
       perror(diskname);
@@ -325,6 +326,8 @@ trs_disk_change(int drive)
     }
     d->writeprot = 0;
     ioctl(fileno(d->file), FDRESET, &reset_now);
+    ioctl(fileno(d->file), FDGETDRVPRM, &fdp);
+    d->real_rps = fdp.rps;
   } else
 #endif
   {
@@ -588,12 +591,12 @@ type1_status()
   if (d->file == NULL) {
     state.status |= TRSDISK_INDEX;
   } else {
-    /* Simulate sector hole going by at 300 RPM */
+    /* Simulate index hole going by at 300, 360, or 3000 RPM */
     /* !! if (d->emutype == REAL) { check if disk in drive } */
     gettimeofday(&tv, NULL);
-    if (trs_disk_spinfast ? 
-	(tv.tv_usec % 20000) < 500 :
-        (tv.tv_usec % 200000) < 5000) {
+    if (trs_disk_spinfast ? (tv.tv_usec % 20000) < 500 /* 3000 RPM */ : 
+	d->inches == 5 ? (tv.tv_usec % 200000) < 5000 /* 300 RPM */ : 
+	(tv.tv_usec % 166666) < 4166 /* 360 RPM */) {
       state.status |= TRSDISK_INDEX;
     } else {
       state.status &= ~TRSDISK_INDEX;
@@ -1380,6 +1383,22 @@ trs_disk_command_write(unsigned char cmd)
 }
 
 /* Interface to real floppy drive */
+int
+real_rate(DiskState *d)
+{
+  if (d->inches == 5) {
+    if (d->real_rps == 5) {
+      return 2;
+    } else if (d->real_rps == 6) {
+      return 1;
+    }
+  } else if (d->inches == 8) {
+    return 0;
+  }
+  trs_disk_unimpl(state.currcommand, "real_rate internal error");
+  return 1;
+}
+
 void
 real_verify()
 {
@@ -1430,7 +1449,7 @@ real_seek()
   memset(&raw_cmd, 0, sizeof(raw_cmd));
   raw_cmd.length = 256;
   raw_cmd.data = NULL;
-  raw_cmd.rate = 0;
+  raw_cmd.rate = real_rate(d);
   raw_cmd.flags = FD_RAW_INTR;
   raw_cmd.cmd[i++] = FD_SEEK;
   raw_cmd.cmd[i++] = 0;
@@ -1465,7 +1484,7 @@ real_read()
 
   state.status = 0;
   memset(&raw_cmd, 0, sizeof(raw_cmd));
-  raw_cmd.rate = 1;
+  raw_cmd.rate = real_rate(d);
   raw_cmd.flags = FD_RAW_READ | FD_RAW_INTR;
   raw_cmd.cmd[i++] = state.density ? 0x46 : 0x06;
   raw_cmd.cmd[i++] = state.curside ? 4 : 0;
@@ -1531,7 +1550,7 @@ real_write()
 
   state.status = 0;
   memset(&raw_cmd, 0, sizeof(raw_cmd));
-  raw_cmd.rate = 1;
+  raw_cmd.rate = real_rate(d);
   raw_cmd.flags = FD_RAW_WRITE | FD_RAW_INTR;
   raw_cmd.cmd[i++] = ((state.currcommand & 
 		       (state.controller == TRSDISK_P1771 ? 0x03 : 0x01))
@@ -1590,7 +1609,7 @@ real_readadr()
 
   state.status = 0;
   memset(&raw_cmd, 0, sizeof(raw_cmd));
-  raw_cmd.rate = 1;
+  raw_cmd.rate = real_rate(d);
   raw_cmd.flags = FD_RAW_INTR;
   raw_cmd.cmd[i++] = state.density ? 0x4a : 0x0a;
   raw_cmd.cmd[i++] = state.curside ? 4 : 0;
@@ -1656,7 +1675,7 @@ real_writetrk()
 
   state.status = 0;
   memset(&raw_cmd, 0, sizeof(raw_cmd));
-  raw_cmd.rate = 1;
+  raw_cmd.rate = real_rate(d);
   raw_cmd.flags = FD_RAW_WRITE | FD_RAW_INTR;
   raw_cmd.cmd[i++] = 0x0d | (state.density ? 0x40 : 0x00);
   raw_cmd.cmd[i++] = state.curside ? 4 : 0;

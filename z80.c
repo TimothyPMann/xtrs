@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Mon Jan 12 19:37:36 PST 1998 by mann
+   Last modified on Thu Apr  9 12:38:18 PDT 1998 by mann
 */
 
 /*
@@ -2919,6 +2919,9 @@ static void do_ED_instruction()
 	break;
 
       /* Emulator traps -- not real Z-80 instructions */
+      case 0x28:        /* emt_system */
+	do_emt_system();
+	break;
       case 0x30:        /* emt_open */
 	do_emt_open();
 	break;

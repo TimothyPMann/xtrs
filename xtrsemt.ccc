@@ -6,12 +6,31 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Sat Sep 20 13:51:41 PDT 1997 by mann */
+/* Last modified on Thu Apr  9 12:52:06 PDT 1998 by mann */
 
 #include <errno.h>
 #ifndef _TIME_T
 #include <time.h>
 #endif
+
+int
+emt_system(cmd)
+     char *cmd;
+{
+#asm
+    POP AF		;save return address
+    POP HL		;cmd to HL
+    PUSH HL             ;restore stack
+    PUSH AF
+    DEFW 28EDH		;emt_system
+    LD H,B		;return exit status from BC
+    LD L,C
+    RET Z
+    LD B,0		;error code to errno
+    LD C,A
+    LD (ERRNO),BC
+#endasm
+}
 
 int
 emt_open(fname, oflag, mode)
@@ -291,7 +310,7 @@ emt_getcwd(buffer, bytes)
 #endasm
 }
 
-void
+int
 emt_misc(func)
      int func;
 {
@@ -301,8 +320,7 @@ emt_misc(func)
     PUSH HL
     PUSH AF
     LD A,L		;func to A
-    DEFW 3CEDH		;emt_misc
-    RET
+    DEFW 3CEDH		;emt_misc, return HL
 #endasm
 }
 
