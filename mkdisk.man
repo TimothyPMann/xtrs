@@ -45,7 +45,7 @@ The maximum size of a hard drive image is controlled by \fIcyl\fP and
 \fIsec\fP: it can be at most \fIcyl*sec\fP 256-byte sectors.  The
 image file starts out small and grows as you write to more cylinders.
 The allocation efficiency is controlled by the granule size: LDOS
-allocates file space in \fIgran\fP-sized units.  Therefore (1)
+allocates file space in granules.  Therefore (1)
 \fIgran\fP should always be set as large as possible and (2) reducing
 \fIsec\fP, thereby making the granules smaller, reduces wasted space
 due to fragmentation but limits the maximum size of the drive.
