@@ -82,6 +82,11 @@ XLIB = -lX11
 #EXTRALIBS = -lots
 #EXTRALIBS = -ldnet_stub
 
+# If you want xtrs to look for a global app-defaults file
+# at runtime in $APPDEFAULTS/Xtrs:
+
+APPDEFAULTS = -DAPPDEFAULTS='"/usr/X11/lib/X11/app-defaults"'
+
 # prefix directory
 
 PREFIX=/usr/local

@@ -93,11 +93,15 @@ MISC = \
 	cassette \
 	cassette.man \
 	cassette.txt \
+	cmddump.man \
+	cmddump.txt \
 	export.bas \
 	export.cmd \
 	export.lst \
 	export.z \
 	hardfmt.txt \
+	hex2cmd.man \
+	hex2cmd.txt \
 	import.bas \
 	import.cmd \
 	import.lst \
@@ -127,11 +131,11 @@ Z80CODE = export.cmd import.cmd settime.cmd xtrsmous.cmd \
 	xtrs8.dct xtrshard.dct \
 	fakerom.hex xtrsrom4p.hex
 
-MANPAGES = xtrs.txt mkdisk.txt cassette.txt
+MANPAGES = xtrs.txt mkdisk.txt cassette.txt cmddump.txt hex2cmd.txt 
 
 PROGS = xtrs mkdisk hex2cmd cmddump
 
-default: xtrs mkdisk hex2cmd cmddump $(MANPAGES)
+default: xtrs mkdisk hex2cmd cmddump manpages
 
 manpages: $(MANPAGES)
 
@@ -141,7 +145,7 @@ z80code: $(Z80CODE)
 include Makefile.local
 
 CFLAGS = $(DEBUG) $(ENDIAN) $(DEFAULT_ROM) $(READLINE) $(DISKDIR) $(IFLAGS) \
-       -DKBWAIT -DHAVE_SIGIO -DHRG1B
+       $(APPDEFAULTS) -DKBWAIT -DHAVE_SIGIO -DHRG1B
 LIBS = $(XLIB) $(READLINELIBS) $(EXTRALIBS)
 
 ZMACFLAGS = -h
@@ -209,6 +213,8 @@ install:
 		install -c -m 644 xtrs.man $(MANDIR)/man1/xtrs.1
 		install -c -m 644 cassette.man $(MANDIR)/man1/cassette.1
 		install -c -m 644 mkdisk.man $(MANDIR)/man1/mkdisk.1
+		install -c -m 644 mkdisk.man $(MANDIR)/man1/cmddump.1
+		install -c -m 644 mkdisk.man $(MANDIR)/man1/hex2cmd.1
 
 depend:
 	makedepend -- $(CFLAGS) -- $(SOURCES)
