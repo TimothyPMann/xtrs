@@ -704,15 +704,16 @@ also seems to help in some cases. Example command lines:
 
 .nf
     startx -- -bpp 8
-    xtrs -keystretch 2,1,2 -autodelay
+    xtrs -keystretch 10,1,5 -autodelay
 .fi
 
 If the keyboard seems to miss keystrokes entirely, you may need to
 increase the first number in the keystretch setting.  If you get an
 unwanted type-ahead effect, where keys that you hit after one screen
 is finished show up on the next screen, try reducing the first number,
-and set the last number equal to the first number.
-See -keystretch below for more information.
+and set the last number equal to the first number; you might need to
+go as low as 2,1,2 for some games.  See -keystretch below for more
+information.
 
 If you have a slow machine and the sound breaks up, it is possible
 that your machine is not fast enough to generate samples at the default
