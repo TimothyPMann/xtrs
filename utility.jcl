@@ -13,3 +13,5 @@ import -n settime.ccc settime/ccc:#D#
 import -n m1format.fix m1format/fix:#D#
 import xtrshard.dct xtrshard/dct:#D#
 import -n xtrshard.z xtrshard/z:#D#
+import xtrs8.dct xtrs8/dct:#D#
+import -n xtrs8.z xtrs8/z:#D#
