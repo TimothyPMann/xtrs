@@ -166,21 +166,28 @@ void trs_reset()
     trs_cassette_reset();
     trs_timer_speed(0);
     trs_disk_init(1);
-    trs_hard_init(1);
+    /* I'm told that the hard disk controller is enabled on powerup */
+    trs_hard_out(TRS_HARD_CONTROL,
+		 TRS_HARD_SOFTWARE_RESET|TRS_HARD_DEVICE_ENABLE);
     if (trs_model == 5) {
+        /* Switch in boot ROM */
 	z80_out(0x9C, 1);
     }
     if (trs_model >= 4) {
+        /* Turn off various memory map and video mode bits */
 	z80_out(0x84, 0);
-	z80_out(0x83, 0);
     }
     if (trs_model >= 3) {
+	grafyx_write_mode(0);
 	trs_interrupt_mask_write(0);
 	trs_nmi_mask_write(0);
     }
+    if (trs_model == 3) {
+        grafyx_m3_reset();
+    }
 #ifdef HRG1B
     if (trs_model == 1) {
-       hrg_onoff(0);           /* Switch off HRG1B hi-res graphics. */
+	hrg_onoff(0);		/* Switch off HRG1B hi-res graphics. */
     }
 #endif
     trs_kb_reset();  /* Part of keyboard stretch kludge */
@@ -267,9 +274,12 @@ int mem_read(int address)
 	return 0xff;
 
       case 0x30: /* Model III */
-	if (address >= VIDEO_START) return memory[address];
+	if (address >= RAM_START) return memory[address];
 	if (address == PRINTER_ADDRESS)	return trs_printer_read();
 	if (address < trs_rom_size) return memory[address];
+	if (address >= VIDEO_START) {
+	  return grafyx_m3_read_byte(address - VIDEO_START);
+	}
 	if (address >= KEYBOARD_START) return trs_kb_mem_read(address);
 	return 0xff;
 
@@ -365,9 +375,10 @@ void mem_write(int address, int value)
 	    memory[address] = value;
 	} else if (address >= VIDEO_START) {
 	    int vaddr = address + video_offset;
+	    if (grafyx_m3_write_byte(vaddr, value)) return;
 	    if (video[vaddr] != value) {
-		video[vaddr] = value;
-		video_write(vaddr, value);
+	      video[vaddr] = value;
+	      video_write(vaddr, value);
 	    }
 	} else if (address == PRINTER_ADDRESS) {
 	    trs_printer_write(value);
@@ -544,16 +555,14 @@ mem_block_transfer(Ushort dest, Ushort source, int direction, Ushort count)
 {
     int ret;
     /* special case for screen scroll */
-    if(trs_model <= 3 &&
+    if((trs_model <= 3 || (memory_map & 3) < 2) &&
        (dest == VIDEO_START) && (source == VIDEO_START + 0x40) &&
-       (count == 0x3c0) && (direction > 0))
+       (count == 0x3c0) && (direction > 0) && !grafyx_m3_active())
     {
 	/* scroll screen one line */
+        unsigned char *p = video, *q = video + 0x40;
 	video_scroll();
-
-	do
-	  memory[dest++] = ret = memory[source++];
-	while(count--);
+	do { *p++ = ret = *q++; } while (count--);
     }
     else
     {
