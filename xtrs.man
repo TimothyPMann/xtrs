@@ -471,6 +471,12 @@ Specifies which TRS-80 model to emulate.  Values accepted are 1 or I (Model
 I), 3 or III (Model III), 4 or IV (Model 4), and 4P or IVP (Model 4P).
 Model I is the default. 
 .TP
+.B \-delay \fId\fP
+A crude speed control.  After each Z-80 instruction, xtrs busy-waits
+for \fId\fP iterations around an empty loop.  A really smart C optimizer
+might delete this loop entirely, so it's possible that this option
+won't work if you compile xtrs with too high an optimization level.
+.TP
 .B \-resize
 In Model 4/4P mode, resize the X window whenever the emulated display
 mode changes between 64x16 and 80x24.
