@@ -310,6 +310,10 @@ Specifies the foreground color of the \fBxtrs\fP window.
 .B \-fg \fIcolor\fP
 Same as -foreground.
 .TP
+.B \-borderwidth \fIwidth\fP
+Put a border of \fIwidth\fP pixels
+around the TRS-80 display.  The default is 0.
+.TP
 .B \-usefont
 Use X fonts instead of the built-in character bitmaps.
 Some suitable fonts are supplied with \fBxtrs\fP; they are
