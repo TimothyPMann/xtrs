@@ -33,9 +33,9 @@ BUILT_IN_ROM3 = romimage.m3
 
 # If you want to debug the emulator, use the -g flag instead:
 
-#DEBUG = -O
+DEBUG = -O
 #DEBUG = -g -DKBDEBUG -DXDEBUG
-DEBUG = -g
+#DEBUG = -g
 
 # If you have gcc, and you want to use it:
 
