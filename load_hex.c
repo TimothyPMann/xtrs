@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Mon Jan 12 15:44:47 PST 1998 by mann
+   Last modified on Sat Apr 25 00:58:56 PDT 1998 by mann
 */
 
 #include "z80.h"
@@ -23,8 +23,7 @@
 
 #define BUFFER_SIZE 256
 
-static int hex_byte(string)
-    char *string;
+static int hex_byte(char *string)
 {
     char buf[3];
 
@@ -35,8 +34,7 @@ static int hex_byte(string)
     return(strtol(buf, (char **)NULL, 16));
 }
     
-int load_hex(file)
-    FILE *file;
+int load_hex(FILE *file)
 {
     char buffer[BUFFER_SIZE];
     char *b;
