@@ -78,13 +78,13 @@ position in the keyboard matrix (address bit 7, data bit 7).
 The keys [, \\, ], ^, _, {, |, }, and ~ also activate unused positions
 in the keyboard matrix (address bit 3, data bits 3-7).  With many
 TRS-80 keyboard drivers, these keys map to the corresponding ASCII
-characters.  With the Model 4 TRSDOS/LS-DOS 6 keyboard driver, the
-keys work but their shift state is reversed; use the -shiftbracket
-option to overcome this problem.  With some drivers, including the
-Model III ROM driver, the keys do nothing.  The Insert key is
-equivalent to underscore (address bit 3, data bit 7), so that a
-shifted underscore can be obtained; this maps to ASCII code 0x7f under
-some TRS-80 keyboard drivers.
+characters; with others, they do nothing.  In some cases you may find
+the shift state is reversed from what it should be; if you press [ but
+{ is displayed instead (etc.), see the -shiftbracket and
+-noshiftbracket options below to correct the problem.  The Insert key
+maps to the same position as underscore (address bit 3, data bit 7), 
+so that this key can be used both with and without shift pressed;
+with many TRS-80 keyboard drivers one of these maps to ASCII code 0x7f.
 
 On a German keyboard, the umlaut and "ess-tsett" keys should activate
 the corresponding characters used in the GENIE, a German Model I clone.
@@ -891,14 +891,14 @@ with different values for games if keyboard response seem sluggish.
 .TP
 .B \-shiftbracket
 Emulate [, \\, ], ^, and _ as shifted keys, and {, |, }, and ~ as
-unshifted.  This works well with the keyboard driver in Model 4 LS-DOS
-6.  With most other TRS-80 keyboard drivers, either the default
--noshiftbracket works better, or these keys do not work at all.
+unshifted.  This is the default in Model 4 and 4P modes, and it
+works well with the keyboard driver in Model 4 TRSDOS/LS-DOS 6.
 .TP
 .B \-noshiftbracket
 Emulate [, \\, ], ^, and _ as unshifted keys, and {, |, }, and ~ as
-shifted.  This is the default, and works well with most TRS-80
-keyboard drivers.
+shifted.  This is the default in Model I and III modes, and it
+works well with many TRS-80 keyboard drivers.  With some
+keyboard drivers these keys do not work at all, however.
 .TP
 .B \-doubler \fItype\fP
 Specify what type of double density adaptor to emulate (Model I mode only).

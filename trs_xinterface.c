@@ -606,6 +606,8 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
     } else if (strcmp(value.addr,"off") == 0) {
       trs_kb_bracket(False);
     }
+  } else {
+    trs_kb_bracket(trs_model >= 4);
   }
 
   return argc;
