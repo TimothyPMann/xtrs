@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Mon Jan 12 20:40:55 PST 1998 by mann */
+/* Last modified on Wed Mar 11 13:11:51 PST 1998 by mann */
 
 /*
  * trs_imp_exp.c
@@ -171,8 +171,11 @@ void do_emt_strerror()
     REG_F &= ~ZERO_MASK;
   } else if (REG_BC < size + 2) {
     REG_A = ERANGE;
-    REG_F |= ZERO_MASK;
+    REG_F &= ~ZERO_MASK;
     size = REG_BC - 1;
+  } else {
+    REG_A = 0;
+    REG_F |= ZERO_MASK;
   }
   memcpy(mem_pointer(REG_HL), msg, size);
   mem_write(REG_HL + size++, '\r');
