@@ -27,7 +27,7 @@ void debug(const char *fmt, ...)
 
   strcpy(xfmt, "debug: ");
   strcat(xfmt, fmt);
-  strcat(xfmt, "\n");
+  /*strcat(xfmt, "\n");*/
   va_start(args, fmt);
   vfprintf(stderr, xfmt, args);
   va_end(args);

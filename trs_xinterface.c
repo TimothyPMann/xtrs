@@ -20,6 +20,7 @@
 
 /*#define MOUSEDEBUG 1*/
 /*#define XDEBUG 1*/
+/*#define QDEBUG 1*/
 
 /*
  * trs_xinterface.c
@@ -227,7 +228,7 @@ static int key_immediate;
 /* dummy buffer for stat() call */
 struct stat statbuf;
 
-static void clear_key_queue()
+void clear_key_queue()
 {
   key_queue_head = 0;
   key_queue_entries = 0;
@@ -236,12 +237,12 @@ static void clear_key_queue()
 void queue_key(int state)
 {
   key_queue[(key_queue_head + key_queue_entries) % KEY_QUEUE_SIZE] = state;
-#if KBDEBUG
+#if QDEBUG
   debug("queue_key 0x%x", state);
 #endif
   if (key_queue_entries < KEY_QUEUE_SIZE) {
     key_queue_entries++;
-#if KBDEBUG
+#if QDEBUG
     debug("\n");
   } else {
     debug(" (overflow)\n");
@@ -258,7 +259,7 @@ int dequeue_key()
       rval = key_queue[key_queue_head];
       key_queue_head = (key_queue_head + 1) % KEY_QUEUE_SIZE;
       key_queue_entries--;
-#if KBDEBUG
+#if QDEBUG
       debug("dequeue_key 0x%x\n", rval);
 #endif
     }
@@ -483,8 +484,10 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
 
   (void) sprintf(option, "%s%s", program_name, ".keystretch");
   if (XrmGetResource(x_db, option, "Xtrs.Keystretch", &type, &value)) {
-    sscanf(value.addr, "%d,%d,%d",
-	   &stretch_amount, &stretch_poll, &stretch_heartbeat);
+    if (strchr(value.addr, ',')) {
+      fatal("-keystretch now takes only one argument; see man page");
+    }
+    stretch_amount = strtol(value.addr, NULL, 0);
   }
 
   (void) sprintf(option, "%s%s", program_name, ".microlabs");

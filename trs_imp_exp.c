@@ -480,13 +480,9 @@ void do_emt_misc()
     break;
   case 14:
     REG_HL = stretch_amount;
-    REG_BC = stretch_poll;
-    REG_DE = stretch_heartbeat;
     break;
   case 15:
     stretch_amount = REG_HL;
-    stretch_poll = REG_BC;
-    stretch_heartbeat = REG_DE;
     break;
   case 16:
     REG_HL = trs_disk_doubler;

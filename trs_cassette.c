@@ -1270,6 +1270,7 @@ trs_cassette_in()
 #if CASSDEBUG3
   debug("in  %ld\n", z80_state.t_count);
 #endif
+  if (cassette_motor) assert_state(READ);
   /* Heuristic to detect reading with Level 1 routines.  If the
      routine paused too long after resetting the flipflop before
      reading it again, assume it must be Level 1 code.  */

@@ -306,8 +306,6 @@ trs_timer_event(int signo)
   struct timeval tv;
   struct itimerval it;
 
-  if (!timer_on) return;
-
   gettimeofday(&tv, NULL);
   if (trs_autodelay) {
       static struct timeval oldtv;
@@ -344,10 +342,12 @@ trs_timer_event(int signo)
       oldtcount = z80_state.t_count;
   }
 
-  trs_timer_interrupt(1); /* generate */
-  trs_kb_heartbeat(); /* part of keyboard stretch kludge */
-  trs_disk_motoroff_interrupt(trs_disk_motoroff());
-#if HAVE_SIGIO
+  if (timer_on) {
+    trs_timer_interrupt(1); /* generate */
+    trs_disk_motoroff_interrupt(trs_disk_motoroff());
+    trs_kb_heartbeat(); /* part of keyboard stretch kludge */
+  }
+#if !HAVE_SIGIO
   x_poll_count = 0; /* be sure to flush X events */
 #endif
 

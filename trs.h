@@ -64,7 +64,8 @@ extern void trs_kb_heartbeat(void);
 extern void trs_xlate_keysym(int keysym);
 extern void queue_key(int key);
 extern int dequeue_key(void);
-extern int stretch_amount, stretch_poll, stretch_heartbeat;
+extern void clear_key_queue(void);
+extern int stretch_amount;
 
 extern void trs_get_event(int wait);
 extern volatile int x_poll_count;

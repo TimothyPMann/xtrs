@@ -39,7 +39,7 @@ static int rominimage = 0;  /* Model 4p */
 void z80_out(int port, int value)
 {
 #if PORTDEBUG1
-  debug("out (0x%02x), 0x%02x; pc 0x%04x", port, value, z80_state.pc.word);
+  debug("out (0x%02x), 0x%02x; pc 0x%04x\n", port, value, z80_state.pc.word);
 #endif
   /* First, ports common to all models */
   switch (port) {
@@ -296,7 +296,7 @@ int z80_in(int port)
 {
   /* First, ports common to all models */
 #if PORTDEBUG2
-  debug("in (0x%02x); pc %04x", port, z80_state.pc.word);
+  debug("in (0x%02x); pc %04x\n", port, z80_state.pc.word);
 #endif
 
   /* Support for a special HW real-time clock (TimeDate80?)

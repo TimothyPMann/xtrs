@@ -3004,7 +3004,7 @@ int z80_run(int continuous)
 	    x_poll_count = X_POLL_INTERVAL;
 	    trs_get_event(0);
 	}
-#ifndef HAVE_SIGIO
+#if !HAVE_SIGIO
 	/* If we aren't using SIGIO, we need to poll periodically.
 	   If we are using it, the SIGIO handler tells us when to poll
 	   by setting x_poll_count to 0 */

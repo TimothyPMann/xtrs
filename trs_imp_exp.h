@@ -200,13 +200,9 @@
  *         Before, HL = new delay
  *                 BC = autodelay flag (0 or 1)
  *    14 = query keystretch
- *         After,  HL = amount
- *                 BC = poll
- *                 DE = heartbeat
+ *         After,  HL = amount (in T-states)
  *    15 = set keystretch
- *         Before, HL = amount
- *                 BC = poll
- *                 DE = heartbeat
+ *         Before, HL = amount (in T-states)
  *    16 = query doubler
  *         After,  HL = 0 none, 1 Percom, 2 Tandy, 3 both
  *    17 = set doubler

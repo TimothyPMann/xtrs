@@ -700,23 +700,14 @@ machine is fast enough to run the emulation in real time and that you
 choose the right command line options.
 "Galaxy Invaders Plus" by Big 5 Software is particularly good.
 You will usually want to turn on autodelay,
-you'll often need to tweak the keystretch setting,
 and if your machine is slow you may need to reduce the sound sample rate.
 Running your X server in 8-bit/pixel mode
 also seems to help in some cases. Example command lines:
 
 .nf
     startx -- -bpp 8
-    xtrs -keystretch 10,1,5 -autodelay
+    xtrs -autodelay
 .fi
-
-If the keyboard seems to miss keystrokes entirely, you may need to
-increase the first number in the keystretch setting.  If you get an
-unwanted type-ahead effect, where keys that you hit after one screen
-is finished show up on the next screen, try reducing the first number,
-and set the last number equal to the first number; you might need to
-go as low as 2,1,2 for some games.  See -keystretch below for more
-information.
 
 If you have a slow machine and the sound breaks up, it is possible
 that your machine is not fast enough to generate samples at the default
@@ -876,20 +867,17 @@ but it can be useful for running games.
 .B \-noautodelay
 Turn off -autodelay. This is the default.
 .TP
-.B \-keystretch \fIamount,poll,heartbeat\fP
+.B \-keystretch \fIcycles\fP
 Fine-tune the keyboard behavior.  To prevent keystrokes from being
 lost, xtrs "stretches" the intervals between key transitions, so that
 the Z-80 program has time to see each transition before the next one
-occurs.  Whenever an emulated key goes up or down, xtrs sets a counter
-to \fIamount\fP.  While the counter is greater than zero, (1) any
-further key transitions are held in a queue instead of being passed
-immediately to the Z-80, (2) whenever the Z-80 program reads from the
-keyboard matrix, the counter is decremented by \fIpoll\fP, and (3)
-whenever a TRS-80 heartbeat interrupt is scheduled to occur (even if
-interrupts are disabled), the counter is decremented by
-\fIheartbeat\fP.  The default setting is "16,1,1"; this seems to work
-well with ordinary keyboard drivers, but you may want to experiment
-with different values for games if keyboard response seem sluggish.
+occurs.  Whenever the Z-80 program reads the keyboard matrix and
+sees an emulated key go up or down, xtrs waits \fIcycles\fP
+Z-80 clock cycles (T-states) before it allows the program to see
+another key transition.  Key transitions that are received during
+the waiting period or when the Z-80 program is not reading the keyboard
+are held in a queue.  The default stretch value is 4000 cycles; it
+should seldom if ever be necessary to change it.
 .TP
 .B \-shiftbracket
 Emulate [, \\, ], ^, and _ as shifted keys, and {, |, }, and ~ as

@@ -21,6 +21,7 @@
 #define TSTATEREV 1       /* Index holes timed by T-states, not real time */
 #define SIZERETRY 1       /* Retry in different sizes on real_read */
 #define REALRADLY 0       /* Read Address timing for real disks; nonworking */
+#define DMK_MARK_IAM 0    /* Mark IAMs in track header; poor idea */
 
 #include "z80.h"
 #include "trs.h"
@@ -52,6 +53,7 @@ int trs_disk_nocontroller = 0;
 int trs_disk_doubler = TRSDISK_BOTH;
 char *trs_disk_dir = DISKDIR;
 unsigned short trs_disk_changecount = 0;
+static int trs_disk_needchange = 0;
 float trs_disk_holewidth = 0.01;
 int trs_disk_truedam = 0;
 
@@ -99,6 +101,7 @@ FDCState state, other_state;
 #define FMT_GAP4    14
 #define FMT_DONE    15
 #define FMT_PREAM   16  /* DDEN DMK only -- just saw preamble to an AM */
+#define FMT_IPREAM  17  /* DDEN DMK only -- just saw preamble to an IAM */
 
 
 /* Gap 0+1 and gap 4 angular size, used in Read Address timing emulation.
@@ -388,9 +391,16 @@ trs_disk_getstep(int unit)
 }
 
 void
+trs_sigusr1(int signo)
+{
+  trs_disk_needchange = 1;
+}
+
+void
 trs_disk_init(int reset_button)
 {
   int i;
+  struct sigaction sa;
 
   state.status = TRSDISK_NOTRDY|TRSDISK_TRKZERO;
   state.track = 0;
@@ -417,6 +427,12 @@ trs_disk_init(int reset_button)
   trs_cancel_event();
 
   trs_disk_nocontroller = (trs_model < 5 && disk[0].file == NULL);
+
+  sa.sa_handler = trs_sigusr1;
+  sigemptyset(&sa.sa_mask);
+  sigaddset(&sa.sa_mask, SIGUSR1);
+  sa.sa_flags = SA_RESTART;
+  sigaction(SIGUSR1, &sa, NULL);
 }
 
 void
@@ -1238,15 +1254,21 @@ trs_disk_select_write(unsigned char data)
     break;
   }
 
+  /* If a drive was selected... */
   if (!(state.status & TRSDISK_NOTRDY)) {
     DiskState *d = &disk[state.curdrive];
 
-    /* A drive was selected; retrigger emulated motor timeout */
+    /* Retrigger emulated motor timeout */
     state.motor_timeout = z80_state.t_count +
       MOTOR_USEC * z80_state.clockMHz;
     trs_disk_motoroff_interrupt(0);
 
-    /* Also update our knowledge of whether there is a disk present */
+    /* If a SIGUSR1 disk change is pending, accept it here */
+    if (trs_disk_needchange) {
+      trs_disk_change_all();
+    }
+
+    /* Update our knowledge of whether there is a real disk present */
     if (d->emutype == REAL) real_check_empty(d);
   }
 }
@@ -1638,8 +1660,10 @@ trs_disk_data_write(unsigned char data)
 	case 0xf6:
 	  if (state.density) {
 	    data = 0xc2;
+	    state.format = FMT_IPREAM;
+	  } else {
+	    state.format = FMT_DATA;
 	  }
-	  state.format = FMT_DATA;
 	  break;
 	case 0xf7:
 	  data = state.crc >> 8;
@@ -1656,9 +1680,9 @@ trs_disk_data_write(unsigned char data)
 	    unsigned short idamp = d->u.dmk.curbyte +
 	      (state.density ? DMK_DDEN_FLAG : 0);
 	    if (d->u.dmk.nextidam >= DMK_TKHDR_SIZE) {
-	      error("DMK formatting too many sectors on track");
+	      error("DMK formatting too many address marks on track");
 	    } else if (d->u.dmk.curbyte > d->u.dmk.tracklen) {
-	      error("DMK sectors past end of track");
+	      error("DMK address mark past end of track");
 	    } else {
 	      d->u.dmk.buf[d->u.dmk.nextidam++] = idamp & 0xff;
 	      d->u.dmk.buf[d->u.dmk.nextidam++] = idamp >> 8;
@@ -1669,6 +1693,27 @@ trs_disk_data_write(unsigned char data)
 	    state.crc = 0xffff;
 	  }
 	  break;
+#if DMK_MARK_IAM
+	  /* Mark IAMs in the track header like IDAMs.  This turns
+	     out to cause bogus errors when doing Read Address commands
+	     both in current versions of David Keil's emulator and in
+	     xtrs 4.5a and earlier, so we disable it, at least for now. */
+	case 0xfc:
+	  if (!state.density || state.format == FMT_IPREAM) {
+	    unsigned short idamp = d->u.dmk.curbyte +
+	      (state.density ? DMK_DDEN_FLAG : 0);
+	    if (d->u.dmk.nextidam >= DMK_TKHDR_SIZE) {
+	      error("DMK formatting too many address marks on track");
+	    } else if (d->u.dmk.curbyte > d->u.dmk.tracklen) {
+	      error("DMK address mark past end of track");
+	    } else {
+	      d->u.dmk.buf[d->u.dmk.nextidam++] = idamp & 0xff;
+	      d->u.dmk.buf[d->u.dmk.nextidam++] = idamp >> 8;
+	    }
+	  }
+	  state.format = FMT_DATA;
+	  break;
+#endif
 	case 0xf8:
 	case 0xf9:
 	case 0xfa:
@@ -1676,8 +1721,10 @@ trs_disk_data_write(unsigned char data)
 	  if (!state.density) {
 	    state.crc = 0xffff;
 	  }
+	  state.format = FMT_DATA;
 	  break;
 	default:
+	  state.format = FMT_DATA;
 	  break;
 	}
 	d->u.dmk.buf[d->u.dmk.curbyte++] = data;
@@ -2808,7 +2855,8 @@ trs_disk_command_write(unsigned char cmd)
 	  if (idamp >= DMK_TRACKLEN_MAX) break;
 	  ib += (idamp - prev_idamp) *
 	    ((!prev_dden && (d->u.dmk.sden || d->u.dmk.ignden)) ? 2 : 1);
-	  if (ib > ia && dden == state.density) goto found;
+	  if (ib > ia && dden == state.density &&
+	      d->u.dmk.buf[idamp] == 0xfe) goto found;
 	}
 	/* Next ID (if any) is past the index hole */
 	ib = (d->inches ? TRKSIZE_DD : TRKSIZE_8DD);

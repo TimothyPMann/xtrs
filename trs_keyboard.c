@@ -20,8 +20,10 @@
 
 /*#define KBDEBUG 1*/
 /*#define JOYDEBUG 1*/
-#define KP_JOYSTICK 1  /* emulate joystick with keypad */
+#define KP_JOYSTICK 1         /* emulate joystick with keypad */
 /*#define KPNUM_JOYSTICK 1*/  /* emulate joystick with keypad + NumLock */
+#define SHIFT_F1_IS_F13 1     /* use if X reports Shift+F1..F8 as F13..F20 */
+/*#define SHIFT_F1_IS_F11 1*/ /* use if X reports Shift+F1..F10 as F11..F20 */
 
 #include "z80.h"
 #include "trs.h"
@@ -613,7 +615,12 @@ KeyTable function_key_table[] = {
 /* 0xffc5   XK_F8          */    { TK_NULL, TK_Neutral },
 /* 0xffc6   XK_F9          */    { TK_NULL, TK_Neutral },
 /* 0xffc7   XK_F10         */    { TK_NULL, TK_Neutral },
-/* In XFree86, XK_F11 to XK_F20 are produced for the shifted F1 to F10 keys */
+/* In some versions of XFree86, XK_F11 to XK_F20 are produced for the
+   shifted F1 to F10 keys, in some XK_F13 to XK_F20 are produced for
+   the shifted F1 to F8 keys, and in some the keysyms are not altered.
+   Arrgh.
+*/
+#if SHIFT_F1_IS_F11
 /* 0xffc8   XK_F11         */    { TK_F1, TK_Neutral },
 /* 0xffc9   XK_F12         */    { TK_F2, TK_Neutral },
 /* 0xffca   XK_F13         */    { TK_F3, TK_Neutral },
@@ -622,6 +629,25 @@ KeyTable function_key_table[] = {
 /* 0xffcd   XK_F16         */    { TK_0, TK_Neutral },
 /* 0xffce   XK_F17         */    { TK_NULL, TK_Neutral },
 /* 0xffcf   XK_F18         */    { TK_NULL, TK_Neutral },
+#elif SHIFT_F1_IS_F13
+/* 0xffc8   XK_F11         */    { TK_NULL, TK_Neutral },
+/* 0xffc9   XK_F12         */    { TK_NULL, TK_Neutral },
+/* 0xffca   XK_F13         */    { TK_F1, TK_Neutral },
+/* 0xffcb   XK_F14         */    { TK_F2, TK_Neutral },
+/* 0xffcc   XK_F15         */    { TK_F3, TK_Neutral },
+/* 0xffcd   XK_F16         */    { TK_CapsLock, TK_Neutral },
+/* 0xffce   XK_F17         */    { TK_AtSign, TK_Neutral },
+/* 0xffcf   XK_F18         */    { TK_0, TK_Neutral },
+#else
+/* 0xffc8   XK_F11         */    { TK_NULL, TK_Neutral },
+/* 0xffc9   XK_F12         */    { TK_NULL, TK_Neutral },
+/* 0xffca   XK_F13         */    { TK_NULL, TK_Neutral },
+/* 0xffcb   XK_F14         */    { TK_NULL, TK_Neutral },
+/* 0xffcc   XK_F15         */    { TK_NULL, TK_Neutral },
+/* 0xffcd   XK_F16         */    { TK_NULL, TK_Neutral },
+/* 0xffce   XK_F17         */    { TK_NULL, TK_Neutral },
+/* 0xffcf   XK_F18         */    { TK_NULL, TK_Neutral },
+#endif
 /* 0xffd0   XK_F19         */    { TK_NULL, TK_Neutral },
 /* 0xffd1   XK_F20         */    { TK_NULL, TK_Neutral },
 /* 0xffd2   XK_F21         */    { TK_NULL, TK_Neutral },
@@ -677,21 +703,18 @@ static int force_shift = TK_Neutral;
 static int joystate = 0;
 
 /* Avoid changing state too fast so keystrokes aren't lost. */
-static int stretch = 0;
-int stretch_amount = 16, stretch_poll = 1, stretch_heartbeat = 1;
+#define STRETCH_AMOUNT 4000
+static tstate_t key_stretch_timeout;
+int stretch_amount = STRETCH_AMOUNT;
 
 void trs_kb_reset()
 {
-    /* Be responsive right after a reset */
-    stretch = 0;
+  key_stretch_timeout = z80_state.t_count;
 }
 
 void trs_kb_heartbeat()
 {
-    /* Be responsive if we are polled rarely */
-    if (stretch > 0) {
-        stretch -= stretch_heartbeat;
-    }
+  /* Don't hold keys in queue too long (how?) */
 }
 
 void trs_kb_bracket(int shifted)
@@ -845,36 +868,51 @@ int trs_kb_mem_read(int address)
     int key = -1;
     int i, wait;
     static int recursion = 0;
+    static int timesseen;
 
     /* Prevent endless recursive calls to this routine (by mem_read_word
        below) if REG_SP happens to point to keyboard memory. */
     if (recursion) return 0;
 
-    stretch -= stretch_poll;
-    if (stretch < 0) {
+    /* After each key state change, impose a timeout before the next one
+       so that the Z-80 program doesn't miss any by polling too rarely,
+       and so that we don't tickle the bugs in some common TRS-80 keyboard
+       drivers that strike if two keys change simultaneously */
+    if (key_stretch_timeout - z80_state.t_count > TSTATE_T_MID) {
+
 	/* Check if we are in the system keyboard driver, called from
-           the wait-for-input routine.  The test below works on both
-           Model I and III and is insensitive to what keyboard driver
-           is being used, as long as it is called through the
-           wait-for-key routine at ROM address 0x0049 and has not
-           pushed too much on the stack yet when it first reads from
-           the key matrix.  The search is needed (at least) for
-           NEWDOS80, which pushes 2 extra bytes on the stack.
-	*/
+	   the wait-for-input routine.  If so, and there are no
+	   keystrokes queued, and the current state has been seen by
+	   at least 16 such reads, then trs_next_key will pause the
+	   process to avoid burning host CPU needlessly.
+
+	   The test below works on both Model I and III and is
+	   insensitive to what keyboard driver is being used, as long
+	   as it is called through the wait-for-key routine at ROM
+	   address 0x0049 and has not pushed too much on the stack yet
+	   when it first reads from the key matrix.  The search is
+	   needed (at least) for NEWDOS80, which pushes 2 extra bytes
+	   on the stack.  */
 	wait = 0;
-	recursion = 1;
-	for (i=0; i<=4; i+=2) {
+	if (timesseen++ >= 16) {
+	  recursion = 1;
+	  for (i=0; i<=4; i+=2) {
 	    if (mem_read_word(REG_SP + 2 + i) == 0x4015) {
-		wait = mem_read_word(REG_SP + 10 + i) == 0x004c;
-		break;
+	      wait = mem_read_word(REG_SP + 10 + i) == 0x004c;
+	      break;
 	    }
+	  }
+	  recursion = 0;
 	}
-	recursion = 0;
+	/* Get the next key */
 	key = trs_next_key(wait);
-	stretch = stretch_amount;
+	key_stretch_timeout = z80_state.t_count + stretch_amount;
     }
 
-    if (key >= 0) change_keystate(key);
+    if (key >= 0) {
+      change_keystate(key);
+      timesseen = 1;
+    }
     return kb_mem_value(address);
 }
 

@@ -121,7 +121,7 @@ trs_uart_init(int reset_button)
 {
   int err;
 #if UARTDEBUG
-  debug("trs_uart_init");
+  debug("trs_uart_init\n");
 #endif
   if (initialized == 1 && uart.fd != -1) close(uart.fd);
   if (trs_uart_name == NULL || trs_uart_name[0] == '\000') {
@@ -181,7 +181,7 @@ trs_uart_modem_in()
   if (initialized == 0) trs_uart_init(0);
   if (initialized == -1) return 0xff;
 #if UARTDEBUG2
-  debug("trs_uart_modem_in returns 0x%02x", uart.modem);
+  debug("trs_uart_modem_in returns 0x%02x\n", uart.modem);
 #endif
   return uart.modem;
 }
@@ -190,7 +190,7 @@ void
 trs_uart_reset_out(int value)
 {
 #if UARTDEBUG
-  debug("trs_uart_reset_out");
+  debug("trs_uart_reset_out\n");
 #endif
   if (initialized == 0) trs_uart_init(0);
   if (initialized == -1) {
@@ -205,7 +205,7 @@ trs_uart_switches_in()
   if (initialized == 0) trs_uart_init(0);
   if (initialized == -1) return 0xff;
 #if UARTDEBUG
-  debug("trs_uart_switches_in returns 0x%02x", uart.switches);
+  debug("trs_uart_switches_in returns 0x%02x\n", uart.switches);
 #endif
   return uart.switches;
 }
@@ -216,7 +216,7 @@ trs_uart_baud_out(int value)
   int err;
   int bits;
 #if UARTDEBUG
-  debug("trs_uart_baud_out 0x%02x", value);
+  debug("trs_uart_baud_out 0x%02x\n", value);
 #endif
 
   if (initialized == 1 && uart.baud == value) return;
@@ -233,7 +233,7 @@ trs_uart_baud_out(int value)
   uart.tstates = (z80_state.clockMHz * 1000000.0 * bits)
     / trs_uart_baud[TRS_UART_SNDBAUD(value)];
 #if UARTDEBUG
-  debug("total bits %d; tstates per word %d", bits, uart.tstates);
+  debug("total bits %d; tstates per word %d\n", bits, uart.tstates);
 #endif
 
   if (uart.fd != -1) {
@@ -266,7 +266,7 @@ trs_uart_check_avail()
     int rc;
     if (!(uart.fdflags & FNONBLOCK)) {
 #if UARTDEBUG
-      debug("trs_uart nonblocking");
+      debug("trs_uart nonblocking\n");
 #endif
       uart.fdflags |= FNONBLOCK;
       fcntl(uart.fd, F_SETFL, uart.fdflags);
@@ -278,7 +278,7 @@ trs_uart_check_avail()
 #if !UARTDEBUG2
     if (rc >= 0 || errno != EAGAIN)
 #endif
-      debug("trs_uart read returns %d, errno %d", rc, errno);
+      debug("trs_uart read returns %d, errno %d\n", rc, errno);
 #endif
     if (rc < 0) {
       if (errno != EAGAIN) {
@@ -294,7 +294,7 @@ trs_uart_check_avail()
     }
   }
 #if UARTDEBUG2
-  debug("trs_uart_check_avail returns %d", uart.bufleft);
+  debug("trs_uart_check_avail returns %d\n", uart.bufleft);
 #endif
   return uart.bufleft;
 }
@@ -310,7 +310,7 @@ trs_uart_status_in()
   trs_uart_check_avail();
 #if UARTDEBUG
   if (uart.status != oldstatus) {
-    debug("trs_uart_status_in returns 0x%02x", uart.status);
+    debug("trs_uart_status_in returns 0x%02x\n", uart.status);
     oldstatus = uart.status;
   }
 #endif
@@ -323,7 +323,7 @@ trs_uart_control_out(int value)
   int err;
   int cflag = HUPCL|CREAD|CLOCAL;
 #if UARTDEBUG
-  debug("trs_uart_control_out 0x%02x", value);
+  debug("trs_uart_control_out 0x%02x\n", value);
 #endif
   if (initialized == 1 && uart.control == value) return;
   if (initialized == 0) trs_uart_init(0);
@@ -384,7 +384,7 @@ trs_uart_data_in()
     }
   }
 #if UARTDEBUG
-  debug("trs_uart_data_in returns 0x%02x", uart.idata);
+  debug("trs_uart_data_in returns 0x%02x\n", uart.idata);
 #endif
   return uart.idata;
 }
@@ -395,7 +395,7 @@ trs_uart_data_out(int value)
   int err;
 
 #if UARTDEBUG
-  debug("trs_uart_data_out 0x%02x", value);
+  debug("trs_uart_data_out 0x%02x\n", value);
 #endif
   if (initialized == 0) trs_uart_init(0);
   if (initialized == -1) return;
@@ -410,7 +410,7 @@ trs_uart_data_out(int value)
       }
       /* Oops, here we didn't really want nonblocking i/o */
 #if UARTDEBUG
-      debug("trs_uart blocking");
+      debug("trs_uart blocking\n");
 #endif
       uart.fdflags &= ~FNONBLOCK;
       fcntl(uart.fd, F_SETFL, uart.fdflags);
