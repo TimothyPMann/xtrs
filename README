@@ -1,4 +1,4 @@
-README.tpm
+xtrs README
 Tim Mann <tim@tim-mann.org>
 1/12/98
 
@@ -28,3 +28,199 @@ to xtrs off the ground.
 Since then I've done much more. Check out my TRS-80 Web page at
 http://www.tim-mann.org/trs80.html for details!
 
+*************************************************************************
+
+Below is the original README file from xtrs 1.0.  It is outdated, but
+I've kept it for historical reasons and to credit the original authors.
+
+
+				   XTRS
+
+		  A TRS-80 Model I Emulator for X Windows
+
+		   by David Gingold <gingold@think.com>
+		   and Alec Wolman <wolman@crl.dec.com>
+
+				Version 1.0
+
+			       April 1, 1992
+
+
+
+WHAT IS XTRS?
+
+As computer scientists, we and our colleagues now and then experience a
+strange yet powerful desire to write some BASIC code on the computer system
+that was for many of us the first we owned or programmed: the TRS-80 Model
+I.  In our modern systems of networked workstations and window systems,
+this capability has been strangely neglected.  Xtrs is our attempt to fill
+this important void in our computing environment.
+
+Xtrs is an X Windows client which runs under Unix and emulates a TRS-80
+Model I.  Version 1.0 is our first release of this software; it provides a
+simple yet powerful Level II BASIC environment and cassette emulation.  We
+expect to provide some more sophisticated functionality in future releases.
+
+
+OBTAINING XTRS:
+
+If you have Internet access, you can get a copy of the latest xtrs software
+via anonymous FTP:
+
+	Host: think.com
+	Directory: /users/gingold/xtrs
+	File: xtrs-1.0.tar.Z
+
+We will also be posting the sources to alt.sources and perhaps to
+comp.sources.x.
+
+
+OBTAINING THE ROM:
+
+You will need a copy of the Level II ROM software in order to use xtrs.
+
+The Level II ROM software may be covered by copyrights; for this reason we
+are not distributing it with our xtrs software.  However, if you already
+own the Level II ROM software, then you can make yourself a copy of this
+for use with xtrs (as long as you obey the legal restrictions for its fair
+use).  You can get such a copy via anonymous FTP.
+
+Please do not make illegal copies of the ROM software.
+
+You already own a legal copy of the Level II ROM software if:
+- You own a TRS-80 Model I with Level II Basic,
+- You own a TRSDOS disk which has a copy of the ROM image on it, or
+- You own a copy of Farvour's "Microsoft Basic Decoded" which contains the
+  ROM code listing.
+
+If you have Internet access, you can get a copy of the ROM software via
+anonymous ftp:
+
+	Host: think.com
+	Directory: /users/gingold/xtrs/rom
+	File: level2rom.hex
+
+If you are obtaining the ROM software through other means (such as getting
+it directly out of your TRS-80), you'll need to end up with an ASCII file
+which is in what we believe to be an "Intel Hex" format -- this is a format
+used with PROM programmers.
+
+Our disclaimer: We have neither sought nor received permission from anybody
+to distribute copies of the ROM software.  We discourage your making
+illegal copies of this or any software.  Neither we nor our employers will
+accept any sort of responsibility if you illegaly copy the ROM software.
+We are not lawyers, and are in no position to advise you on what is legal.
+
+(For the legally curious: the TRS-80 we own has a copyright notice on the
+ROM PC board, but none on the ROMs themselves or within the software.  We
+don't know if Farvour had permission to publish the ROM code.)
+
+
+BUILDING THE PROGRAM:
+
+You can uncompress and extract the software from the tar file as follows:
+	
+	% uncompress xtrs-1.0.tar.Z
+	% tar xvf xtrs-1.0.tar
+
+You can then build the program using "make".  You will probably need to
+edit the file "Makefile.local" in order to compile the program properly.
+Notes in that file explain how to do this.
+
+It is possible either to compile the ROM image into the program or to keep
+the rom file separate, optionally specified on the command line.  The
+"Makefile.local" describes how to do this.
+
+If you would like to use the Gnu "readline" facility with the our built-in
+Z-80 debugger, you can get this software via anonymous FTP:
+
+	Host: athena-dist.mit.edu
+	File: /pub/gnu/readline-1.1.tar.Z
+
+
+RUNNING THE PROGRAM:
+
+See the manual page.
+
+
+DETAILS:
+
+Xtrs is built on top of a (mostly) full Z-80 emulator, with added routines
+to support keyboard and video I/O through an X Windows interface.  The
+hardware emulation is based on the TRS-80 Model I design.
+
+Xtrs supports 48K of RAM.  There is support for a rudimentary cassette I/O
+emulation which uses files for cassette tapes.  A printer is emulated by
+sending its output to standard output.  There is no support (yet) for a
+disk or a serial port.
+
+The speed of the emulator is pretty good.  On a decent Sun-4 compiled with
+gcc, it computes a little faster than the real thing.  Some operations
+(such as writing to the screen) will naturally be slower.
+
+The Z-80 emulator is written to be portable to most C environments.  It is
+possible to build a faster emulator by sacrificing this portability (such
+emulators have been built for 80x86 and 680x0 machines), but that wasn't
+our goal.  Memory accesses are handled through a function call interface,
+allowing us to cleanly emulate memory-mapped devices.
+
+The Z-80 emulator has a way-cool debugger called zbx.  It works sort of
+like dbx.  If you run with the -debug switch you'll enter the debugger, and
+you can type "help" for more information.
+
+Some Z-80 things are not supported: interrupts other than the non-maskable
+interrupt, other esoteric signals not used by the TRS-80, and any of the
+"undocumented" Z-80 instructions.  Reading the memory refresh register
+gives a pseudo-random value.  The execution speed of instructions bears no
+relationship to actual Z-80 timings.
+
+Special support in the emulator allows the program to block when waiting
+for information from the keyboard.  This will only work for programs which
+get keyboard input via the standard ROM calls.  We do similar tricks to
+make the cassette I/O work.
+
+
+BUGS:
+
+The manual page lists a few known bugs.
+
+If you discover bugs (or write fixes for any of these), please let us know
+(you can send us mail at the above addresses).  We expect to incorporate
+fixes into future releases.
+
+
+FUTURE ENHANCEMENTS:
+
+Here are some features we are thinking of adding to xtrs in the future:
+
+- A better name for the application.  We're not too happy with "xtrs".
+- An emulator for disk drives.
+- A mechanism for digitizing cassette tapes.
+- A nicer mechanism for controlling the cassette emulator.
+- A cut and paste mechanism in the X window.
+- An emulator for the serial port.
+- A Macintosh implementation.
+
+
+CREDITS:
+
+David Gingold <gingold@think.com> wrote the Z-80 emulator, zbx, and much of
+the TRS-80 emulation.
+
+Alec Wolman <wolman@crl.dec.com> wrote the X windows interface and some of
+the associated routines.
+
+Bruce Norskog is the suspected author of a program called "zdis" which was
+incorporated into the debugger to disassemble Z-80 instructions.
+
+Rodnay Zach's "Programming the Z-80" was the reference for implementing the
+Z-80 emulator.
+
+James Farvour's "Microsoft Basic Decoded and Other Mysteries" and George
+Blank's "Pathways through the ROM" helped us to debug the emulator and
+figure out how to make the gnarly keyboard and cassette hacks work.  Thanks
+go to David Librik and Marty Brilliant for providing these books.
+
+Jim Cathey, Charlie Gibbs, and Willi Kusche wrote SimCPM, a CPM simulator
+for the Amiga.  This was used (don't ask how) to help debug our Z-80
+emulator.
