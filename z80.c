@@ -15,28 +15,29 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Fri Dec 15 15:23:49 PST 2000 by mann
+   Last modified on Thu May  3 02:49:09 PDT 2001 by mann
 */
 
 /*
  * z80.c:  The guts of the Z-80 emulator.
  *
  * The Z-80 emulator should be general and complete enough to be
- * easily adapted to emulate any Z-80 machine, although it's only
- * really been tested with TRS-80 code.  The only thing we cheat a
- * little on is interrupt handling (modes 0 and 2 are not supported)
- * and the refresh register (reading it returns a random number;
- * writing it is ignored).  All of the documented Z-80 flags and
- * instructions are implemented.
+ * easily adapted to emulate any Z-80 machine.  All of the documented
+ * Z-80 flags and instructions are implemented.  The only documented
+ * features we cheat a little on are interrupt handling (modes 0 and 2
+ * are not supported) and the refresh register (reading it returns a
+ * random number; writing it is ignored).
  *
  * All of the undocumented instructions, flags, and features listed in
  * http://www.msxnet.org/tech/Z80/z80undoc.txt are implemented too,
- * with some minor exceptions.  Undocumented flag settings are not
- * handled correctly for the more or less bizarre cases 
- * bit n,(ix/iy+d), bit n,(hl), block in/out, and perhaps a few
- * others I didn't check carefully, and the R register is implemented 
- * with a pseudo-random number generator.  The emulator does pass the 
- * ZEXALL validator from Yaze.  
+ * with some minor exceptions.  There seems to be a disagreement about
+ * undocumented flag handling for "bit" instructions between
+ * z80undoc.txt and the ZEXALL validator from Yaze.  Since ZEXALL
+ * passes on both a real Z-80 and Yaze, but fails on my attempt to
+ * implement "bit n,r" according to z80undoc.txt, I've imitated Yaze's
+ * implementation.  On block in/out instructions, z80undoc.txt gives
+ * some very complicated rules for undocumented flag handling that I
+ * have not implemented.  
  */
 
 #include "z80.h"
@@ -577,25 +578,25 @@ static void do_cpir()
     T_COUNT(-5);
 }
 
-#if 0
-/* This passed ZEXALL, but gets UNDOC3 and UNDOC5 wrong according to
-   http://www.msxnet.org/tech/Z80/z80undoc.txt. */
+#if 1
+/* The following passes ZEXALL and matches Yaze, but if you believe
+   http://www.msxnet.org/tech/Z80/z80undoc.txt, it gets UNDOC3 and UNDOC5 wrong.
+   It remains to be seen which (if either) is really right. */
 static void do_test_bit(int op, int value, int bit)
 {
-    if (value & (1 << bit)) {
-      REG_F = (REG_F & CARRY_MASK) | HALF_CARRY_MASK
-	| (((op & 0x38) == 0x38) ? SIGN_MASK : 0);
-    } else {
-      REG_F = (REG_F & CARRY_MASK)
-	| OVERFLOW_MASK | HALF_CARRY_MASK | ZERO_MASK;
-    }
-    if ((op & 7) != 6) REG_F |= value & (UNDOC3_MASK | UNDOC5_MASK);
+    int result = value & (1 << bit);
+    REG_F = (REG_F & CARRY_MASK) | HALF_CARRY_MASK | (result & SIGN_MASK)
+      | (result ? 0 : (OVERFLOW_MASK | ZERO_MASK))
+      | (((op & 7) == 6) ? 0 : (value & (UNDOC3_MASK | UNDOC5_MASK)));
 }
 #else
-/* This corrects UNDOC3 and UNDOC5 for "bit n,r", but they are
-   still wrong for "bit n,(ix/iy+d)" and "bit n,(hl)".  The latter
-   cases would be a pain to fix, especially "bit n,(hl)" whose
-   behavior is complex and not even fully understood yet. */
+/* The following matches http://www.msxnet.org/tech/Z80/z80undoc.txt
+   for "bit n,r", but does not attempt to emulate the full weirdness
+   of "bit n,(ix/iy+d)" and "bit n,(hl)".  It fails ZEXALL even if
+   code is added to make the latter two instructions behave as in
+   the version that passes ZEXALL, leading me to think that z80undoc.txt
+   may be mistaken about "bit n,r".  This should be checked in detail
+   against a real Z-80, I suppose.  Ugh. */
 static void do_test_bit(int op, int value, int bit)
 {
     int result = value & (1 << bit);
