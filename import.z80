@@ -115,14 +115,14 @@ emt_write	equ 33edh
 emt_lseek	equ 34edh
 emt_strerror	equ 35edh
 
-EO_ACCMODE  equ     03
-EO_RDONLY   equ     00
-EO_WRONLY   equ     01
-EO_RDWR     equ     02
-EO_CREAT    equ   0100
-EO_EXCL     equ   0200
-EO_TRUNC    equ  01000
-EO_APPEND   equ  02000
+EO_ACCMODE  equ     3q
+EO_RDONLY   equ     0q
+EO_WRONLY   equ     1q
+EO_RDWR     equ     2q
+EO_CREAT    equ   100q
+EO_EXCL     equ   200q
+EO_TRUNC    equ  1000q
+EO_APPEND   equ  2000q
 
 iobsize	equ 8192		; must be divisible by 256
 
