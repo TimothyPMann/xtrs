@@ -1,13 +1,14 @@
 Free Model 4P mode boot ROM for xtrs - Version 0.02
 Copyright 1999, Peter W. Cervasio (cervasio@airmail.net)
+Modified by Tim Mann to create version 0.03, 3-19-99
 
 This software may be copied, modified, and used for any purpose
 without fee, provided that (1) the above copyright notice is
 retained, and (2) modified versions are clearly marked as having
 been modified, with the modifier's name and the date included.
 
-This is a freely available Model 4p mode boot ROM which can
-be used with Tim Mann's changes to xtrs in order to boot up
+This is a freely available Model 4P mode boot ROM which can
+be used with Tim Mann's version of xtrs in order to boot up
 LS-DOS 6.3.1.
 
 This code was written with the help of the LS-DOS 6.3.1 source
@@ -16,23 +17,21 @@ freely distribute (though he retains the copyright).  The Model
 4/4P technical reference manual proved invaluable, as well, even
 if I didn't make this do everything.
 
-This code does very minimal error checking.  I got it to the
-point where xtrs would boot up LS-DOS 6.3.1 and would reboot it
-when pressing F10 or typing "boot" at the LS-DOS command line.
+The code was tested with xtrs 3.3 on Linux 2.2.2 using an LS-DOS
+6.3.1 disk image.  I got it to the point where xtrs would boot up
+LS-DOS 6.3.1 and would reboot it when pressing F10 or typing
+"boot" at the LS-DOS command line.
 
-This is only useful for the Model 4P mode of operation, and it
-might not work for all operating systems.  It was tested with
-xtrs 3.3 on Linux 2.2.2 using an LS-DOS 6.3.1 disk image.  The
-ROM does not contain any code to access any sector other than
-track 0, sector 1.  It will not boot a Model III operating
-system, and is unable to load in a "MODELA/III" rom image from
-disk, like the real Model 4P ROM does.
+It is only useful for the Model 4P mode of operation, and it
+might not work for all operating systems.  The ROM does not
+contain any code to access any sector other than track 0, sector
+1.  It will not boot a Model III operating system, and is unable
+to load in a "MODELA/III" ROM image from disk, like the real
+Model 4P ROM does.  It assumes the boot sector is 256 bytes long.
 
-This was not tested in plain Model 4 mode.  If you want to use
+This ROM will not work in plain Model 4 mode.  If you want to use
 Model 4 mode, boot LS-DOS 6.3.1, export the MODELA/III file to
-unix, and set it up as a Model 3 and 4 ROM.  It was also not
-tested with a real Model 4 boot disk in a Linux floppy drive.  It
-would likely need more error trapping for that.
+Unix, and set it up as a Model 3 and 4 ROM.
 
 Features:
 =========
