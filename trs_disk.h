@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Thu Oct 15 14:28:21 PDT 1998 by mann */
+/* Last modified on Sat Jan  2 20:39:56 PST 1999 by mann */
 
 /*
  * Emulate Model-I or Model-III disk controller
@@ -32,6 +32,7 @@ extern int trs_disk_getsize(int unit);
 extern int trs_disk_doubler;
 extern char* trs_disk_dir;
 extern unsigned short trs_disk_changecount;
+extern int trs_disk_truedam;
 
 /* Values for trs_disk_doubler flag word */
 #define TRSDISK_NODOUBLER 0

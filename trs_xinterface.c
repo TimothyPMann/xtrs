@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Oct 24 18:11:30 PDT 1998 by mann
+   Last modified on Sat Jan  2 20:39:10 PST 1999 by mann
 */
 
 /*#define MOUSEDEBUG 1*/
@@ -124,6 +124,8 @@ static XrmOptionDescRec opts[] = {
 {"-sizemap",    "*sizemap",     XrmoptionSepArg,        (caddr_t)NULL},
 {"-stepmap",    "*stepmap",     XrmoptionSepArg,        (caddr_t)NULL},
 {"-charset",    "*charset",     XrmoptionSepArg,        (caddr_t)NULL},
+{"-truedam",    "*truedam",     XrmoptionNoArg,         (caddr_t)"on"},
+{"-notruedam",  "*truedam",     XrmoptionNoArg,         (caddr_t)"off"},
 #if __linux
 {"-sb",         "*sb",          XrmoptionSepArg,        (caddr_t)NULL},
 #endif /* linux */
@@ -492,6 +494,15 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
       exit (1);
     } else {
       trs_disk_setstep(i, s[i]);
+    }
+  }
+
+  (void) sprintf(option, "%s%s", program_name, ".truedam");
+  if (XrmGetResource(x_db, option, "Xtrs.Truedam", &type, &value)) {
+    if (strcmp(value.addr,"on") == 0) {
+      trs_disk_truedam = True;
+    } else if (strcmp(value.addr,"off") == 0) {
+      trs_disk_truedam = False;
     }
   }
 

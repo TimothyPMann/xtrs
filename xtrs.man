@@ -169,15 +169,15 @@ with the -1 flag it makes a JV1 floppy.  See the \fBmkdisk\fP man page
 for more information.
 
 Early Model I operating systems used an FA data address mark for the
-directory (a nonstandard value supported only by the WD1771, but not
-the WD1791/3), while later ones wrote F8 (for Model III/4/4P compatibility)
-but could read either.  To deal nicely with this problem, \fBxtrs\fP
-implements the following kludge.  On writing, any data address mark
-other than FB is recorded as F8.  On reading in single density with
-the emulated WD1771 (available in Model I mode only), F8 is returned
-as FA.  In all other modes, F8 is returned as F8.  This trick makes
-the different operating systems perfectly compatible with each other,
-which is better than on a real Model I!
+directory on single density disks (a nonstandard value supported only
+by the WD1771, but not the WD1791/3), while later ones wrote F8 (for
+Model III/4/4P compatibility) but could read either.  To deal nicely
+with this problem, \fBxtrs\fP implements the following kludge.  On
+writing in single density, an F8 data address mark is recorded as FA.
+On reading with an emulated WD1771 (available in Model I mode only),
+FA is returned as FA; on reading with a WD179x, FA is returned as F8.
+This trick makes the different operating systems perfectly compatible
+with each other, which is better than on a real Model I!
 
 TRS-80 programs that attempt to measure the rotational
 speed of their floppy disk drives using timing loops will get the
@@ -725,6 +725,19 @@ first four positions; even though the prompt suggests the unit number
 must be 4-7, numbers 0-3 are accepted. XTRS8 does not check whether
 the unit you've selected is really being emulated as an 8-inch drive,
 however; you'll simply get errors during FORMAT if you get this wrong.
+.TP
+.B \-truedam
+Turn off the single density data address mark remapping kludge
+described in the "Emulated floppy disks" section above.  With this
+option given, the distinction between F8 and FA data address marks
+is strictly observed on both writing and reading.  This option is
+probably not useful unless you need to deal with Model I disks that use
+the distinction as part of a copy-protection scheme.  See also 
+"Common File Formats for Emulated TRS-80 Floppy Disks", available
+at http://www.research.digital.com/SRC/personal/Tim_Mann/trs80/dskspec.html.
+.TP
+.B \-notruedam
+The opposite of -truedam.  This setting is the default.
 .TP
 .B \-sb \fIportbase,vol\fP
 Enable sound support, using a SoundBlaster with I/O port base 

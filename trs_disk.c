@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Wed Nov  4 18:56:23 PST 1998 by mann */
+/* Last modified on Sat Jan  2 19:05:47 PST 1999 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
@@ -44,6 +44,7 @@ int trs_disk_doubler = TRSDISK_BOTH;
 char *trs_disk_dir = DISKDIR;
 unsigned short trs_disk_changecount = 0;
 float trs_disk_holewidth = 0.01;
+int trs_disk_truedam = 0;
 
 typedef struct {
   /* Registers */
@@ -128,8 +129,13 @@ FDCState state, other_state;
 
 /* Values for flags below */
 #define JV3_DENSITY     0x80  /* 1=dden, 0=sden */
-#define JV3_LOCKED      0x40  /* doc says: high order DAM bit; really MBZ */
-#define JV3_DIRECTORY   0x20  /* dden: 1=deleted DAM (F8); sden: 1=F8 or FA */
+#define JV3_DAM         0x60  /* data address mark; values follow */
+#define JV3_DAMSDFB     0x00
+#define JV3_DAMSDFA     0x20
+#define JV3_DAMSDF9     0x40
+#define JV3_DAMSDF8     0x60
+#define JV3_DAMDDFB     0x00
+#define JV3_DAMDDF8     0x20
 #define JV3_SIDE        0x10  /* 0=side 0, 1=side 1 */
 #define JV3_ERROR       0x08  /* 0=ok, 1=CRC error */
 #define JV3_NONIBM      0x04  /* 0=normal, 1=short (for VTOS 3.0, xtrs only) */
@@ -1224,19 +1230,63 @@ trs_disk_data_write(unsigned char data)
     case FMT_GAP2:
       if ((data & 0xfc) == 0xf8) {
 	/* Found a DAM */
-	if ((data & 3) != 3) {
-          if (d->emutype == REAL) {
-	    /* !!Could implement this by issuing a Write Deleted later */
+        if (d->emutype == REAL) {
+	  /* !!Could implement this by issuing a Write Deleted later */
+	  if (data != 0xfb) {
 	    trs_disk_unimpl(state.currcommand,
 			    "format DAM != FB on real floppy");
+	  }
+	} else if (d->emutype == JV1) {
+          switch (data) {
+	  case 0xf9:
+	    trs_disk_unimpl(state.currcommand, "JV1 DAM cannot be F9");
+	    break;
+	  case 0xf8:
+	  case 0xfa:
+	    if (d->phytrack != 17) 
+	      trs_disk_unimpl(state.currcommand,
+			      "JV1 directory track must be 17");
+	    break;
+	  default: /* impossible */
+	  case 0xfb:
+	    break;
+	  }
+	} else /* JV3 */ {
+	  if (state.density) {
+	    /* Double density */
+	    switch (data) {
+	    case 0xf8:
+	      d->id[state.format_sec].flags |= JV3_DAMDDF8;
+	      break;
+	    case 0xf9:
+	    case 0xfa:
+	      trs_disk_unimpl(state.currcommand, "illegal double density DAM");
+	      break;
+	    default: /* impossible */
+	    case 0xfb:
+	      d->id[state.format_sec].flags |= JV3_DAMDDFB;
+	      break;
+	    }
 	  } else {
-	    /* Treat any non-FB DAM as a directory DAM */
-	    if (d->emutype == JV1) {
-	      if (d->phytrack != 17) 
-		trs_disk_unimpl(state.currcommand,
-				"JV1 directory track must be 17");
-	    } else {
-	      d->id[state.format_sec].flags |= JV3_DIRECTORY;
+	    /* Single density */
+	    switch (data) {
+	    case 0xf8:
+	      if (trs_disk_truedam) {
+		d->id[state.format_sec].flags |= JV3_DAMSDF8;
+	      } else {
+		d->id[state.format_sec].flags |= JV3_DAMSDFA;
+	      }
+	      break;
+	    case 0xf9:
+	      d->id[state.format_sec].flags |= JV3_DAMSDF9;
+	      break;
+	    case 0xfa:
+	      d->id[state.format_sec].flags |= JV3_DAMSDFA;
+	      break;
+	    default: /* impossible */
+	    case 0xfb:
+	      d->id[state.format_sec].flags |= JV3_DAMDDFB;
+	      break;
 	    }
 	  }
 	}
@@ -1452,11 +1502,51 @@ trs_disk_command_write(unsigned char cmd)
 	}
 	state.bytecount = JV1_SECSIZE;
       } else {
-	if (d->id[id_index].flags & JV3_DIRECTORY) {
-	  if (state.controller == TRSDISK_P1771) {
+	if (state.controller == TRSDISK_P1771) {
+	  switch (d->id[id_index].flags & JV3_DAM) {
+	  case JV3_DAMSDFB:
+	    state.status |= TRSDISK_1771_FB;
+	    break;
+	  case JV3_DAMSDFA:
 	    state.status |= TRSDISK_1771_FA;
-	  } else {
+	    break;
+	  case JV3_DAMSDF9:
+	    state.status |= TRSDISK_1771_F9;
+	    break;
+	  case JV3_DAMSDF8:
+	    state.status |= TRSDISK_1771_F8;
+	    break;
+	  }
+	} else if ((d->id[id_index].flags & JV3_DENSITY) == 0) {
+	  /* single density 179x */
+	  switch (d->id[id_index].flags & JV3_DAM) {
+	  case JV3_DAMSDFB:
+	    state.status |= TRSDISK_1791_FB;
+	    break;
+	  case JV3_DAMSDFA:
+	    if (trs_disk_truedam) {
+	      state.status |= TRSDISK_1791_FB;
+	    } else {
+	      state.status |= TRSDISK_1791_F8;
+	    }
+	    break;
+	  case JV3_DAMSDF9:
 	    state.status |= TRSDISK_1791_F8;
+	    break;
+	  case JV3_DAMSDF8:
+	    state.status |= TRSDISK_1791_F8;
+	    break;
+	  }
+	} else {
+	  /* double density 179x */
+	  switch (d->id[id_index].flags & JV3_DAM) {
+	  default: /*impossible*/
+	  case JV3_DAMDDFB:
+	    state.status |= TRSDISK_1791_FB;
+	    break;
+	  case JV3_DAMDDF8:
+	    state.status |= TRSDISK_1791_F8;
+	    break;
 	  }
 	}
 	if (d->id[id_index].flags & JV3_ERROR) {
@@ -1515,11 +1605,56 @@ trs_disk_command_write(unsigned char cmd)
       state.status |= TRSDISK_BUSY;
       trs_schedule_event(trs_disk_done, 0, 128);
     } else {
-      int dirdam = (state.controller == TRSDISK_P1771 ?
-		    (cmd & (TRSDISK_CBIT|TRSDISK_DBIT)) != 0 :
-		    (cmd & TRSDISK_DBIT) != 0);
+      int dam = 0;
+      if (state.controller == TRSDISK_P1771) {
+	switch (cmd & (TRSDISK_CBIT|TRSDISK_DBIT)) {
+	case 0:
+	  dam = JV3_DAMSDFB;
+	  break;
+	case 1:
+	  dam = JV3_DAMSDFA;
+	  break;
+	case 2:
+	  dam = JV3_DAMSDF9;
+	  break;
+	case 3:
+	  if (trs_disk_truedam) {
+	    dam = JV3_DAMSDF8;
+	  } else {
+	    dam = JV3_DAMSDFA;
+	  }
+	  break;
+	}
+      } else if (state.density == 0) {
+	/* 179x single */
+	switch (cmd & TRSDISK_DBIT) {
+	case 0:
+	  dam = JV3_DAMSDFB;
+	  break;
+	case 1:
+	  if (trs_disk_truedam) {
+	    dam = JV3_DAMSDF8;
+	  } else {
+	    dam = JV3_DAMSDFA;
+	  }
+	  break;
+	}
+      } else {
+	/* 179x double */
+	switch (cmd & TRSDISK_DBIT) {
+	case 0:
+	  dam = JV3_DAMDDFB;
+	  break;
+	case 1:
+	  dam = JV3_DAMDDF8;
+	  break;
+	}
+      }
+
       if (d->emutype == JV1) {
-	if (dirdam != (d->phytrack == 17)) {
+	if (dam == JV3_DAMSDF9) {
+	  trs_disk_unimpl(state.currcommand, "JV1 DAM cannot be F9");
+	} else if ((dam == JV3_DAMSDFB) == (d->phytrack == 17)) {
 	  trs_disk_unimpl(state.currcommand, "JV1 directory must be track 17");
 	  break;
 	}
@@ -1527,12 +1662,8 @@ trs_disk_command_write(unsigned char cmd)
       } else {
 	SectorId *sid = &d->id[id_index];
 	unsigned char newflags = sid->flags;
-	newflags &= ~JV3_ERROR; /* clear CRC error */
-	if (dirdam) {
-	  newflags |= JV3_DIRECTORY;
-	} else {
-	  newflags &= ~JV3_DIRECTORY;
-	}
+	newflags &= ~(JV3_ERROR|JV3_DAM); /* clear CRC error and DAM */
+	newflags |= dam;
 	if (newflags != sid->flags) {
 	  int c;
 	  fseek(d->file, idoffset(d, id_index) 
@@ -1908,6 +2039,7 @@ real_write()
   memset(&raw_cmd, 0, sizeof(raw_cmd));
   raw_cmd.rate = real_rate(d);
   raw_cmd.flags = FD_RAW_WRITE | FD_RAW_INTR;
+  /* Use F8 DAM for F8, F9, or FA */
   raw_cmd.cmd[i++] = ((state.currcommand & 
 		       (state.controller == TRSDISK_P1771 ? 0x03 : 0x01))
 		      ? 0x09 : 0x05) | (state.density ? 0x40 : 0x00);
