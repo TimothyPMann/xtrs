@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Wed Jan  3 11:15:17 PST 2001 by mann
+   Last modified on Tue May  1 20:32:35 PDT 2001 by mann
 */
 
 /*#define KBDEBUG 1*/
@@ -692,6 +692,26 @@ void trs_kb_heartbeat()
     if (stretch > 0) {
         stretch -= stretch_heartbeat;
     }
+}
+
+void trs_kb_bracket(int shifted)
+{
+  /* Set the shift state for the emulation of the "[ {", "\ |", 
+     "] }", "^ ~", and "_ DEL" keys.  Some Model 4 keyboard drivers
+     decode these with [ shifted and { unshifted, etc., while most
+     other keyboard drivers either ignore them or decode them with
+     [ unshifted and { shifted.  We default to the latter.  Note that
+     these keys didn't exist on real machines anyway.
+  */
+  int i;
+  for (i=0x5b; i<=0x5f; i++) {
+    ascii_key_table[i].shift_action =
+      shifted ? TK_ForceShift : TK_ForceNoShift;
+  }
+  for (i=0x7b; i<=0x7f; i++) {
+    ascii_key_table[i].shift_action =
+      shifted ? TK_ForceNoShift : TK_ForceShift;
+  }
 }
 
 /* Emulate joystick with the keypad */

@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Fri Dec 15 15:23:51 PST 2000 by mann
+   Last modified on Tue May  1 20:29:21 PDT 2001 by mann
 */
 
 /*
@@ -57,6 +57,7 @@ extern void trs_reset(int hard);
 extern void trs_exit(void);
 
 extern void trs_kb_reset(void);
+extern void trs_kb_bracket(int shifted);
 extern int trs_kb_mem_read(int address);
 extern int trs_next_key(int wait);
 extern void trs_kb_heartbeat(void);
