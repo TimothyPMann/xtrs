@@ -58,8 +58,8 @@
     "-trs80-model3-medium-r-normal--24-*-64-64-c-160-trs80-model3"
 #define DEF_USEFONT 0
 
-extern char trs_char_data[2][MAXCHARS][TRS_CHAR_HEIGHT];
-extern char trs_widechar_data[2][MAXCHARS][TRS_CHAR_HEIGHT][2];
+extern char trs_char_data[][MAXCHARS][TRS_CHAR_HEIGHT];
+extern char trs_widechar_data[][MAXCHARS][TRS_CHAR_HEIGHT][2];
 
 #define EVENT_MASK \
   ExposureMask | KeyPressMask | MapRequest | KeyReleaseMask | \
@@ -75,6 +75,7 @@ static int top_margin = 0;
 static int left_margin = 0;
 static int border_width = 2;
 static Pixmap trs_char[2][MAXCHARS];
+static Pixmap trs_box[2][64];
 static Display *display;
 static int screen;
 static Window window;
@@ -84,12 +85,12 @@ static GC gc_xor;
 static int currentmode = NORMAL;
 static int OrigHeight,OrigWidth;
 static int usefont = DEF_USEFONT;
-static int trsfont;
 static int cur_char_width = TRS_CHAR_WIDTH;
 static int cur_char_height = TRS_CHAR_HEIGHT;
 static int text80x24 = 0, screen640x240 = 0;
 static XFontStruct *myfont, *mywidefont, *curfont;
 static XKeyboardState repeat_state;
+static trs_charset;
 
 static XrmOptionDescRec opts[] = {
 {"-background",	"*background",	XrmoptionSepArg,	(caddr_t)NULL},
@@ -101,8 +102,6 @@ static XrmOptionDescRec opts[] = {
 {"-nofont",	"*usefont",	XrmoptionNoArg,		(caddr_t)"off"},
 {"-font",	"*font",	XrmoptionSepArg,	(caddr_t)NULL},
 {"-widefont",	"*widefont",	XrmoptionSepArg,	(caddr_t)NULL},
-{"-trsfont",	"*trsfont",	XrmoptionNoArg,		(caddr_t)"on"},
-{"-notrsfont",	"*trsfont",	XrmoptionNoArg,		(caddr_t)"off"},
 {"-display",	"*display",	XrmoptionSepArg,	(caddr_t)NULL},
 {"-debug",	"*debug",	XrmoptionNoArg,		(caddr_t)"on"},
 {"-nodebug",	"*debug",	XrmoptionNoArg,		(caddr_t)"off"},
@@ -128,6 +127,7 @@ static XrmOptionDescRec opts[] = {
 {"-doubler",    "*doubler",     XrmoptionSepArg,        (caddr_t)NULL},
 {"-sizemap",    "*sizemap",     XrmoptionSepArg,        (caddr_t)NULL},
 {"-stepmap",    "*stepmap",     XrmoptionSepArg,        (caddr_t)NULL},
+{"-charset",    "*charset",     XrmoptionSepArg,        (caddr_t)NULL},
 #if __linux
 {"-sb",         "*sb",          XrmoptionSepArg,        (caddr_t)NULL},
 #endif /* linux */
@@ -236,9 +236,8 @@ int trs_next_key(int wait)
 	rval = -1;
 	break;
       }
-      trs_pausing = 1;
+      trs_paused = 1;
       pause();			/* Wait for SIGALRM or SIGIO */
-      trs_pausing = 0;
       trs_get_event(0);
     }
     return rval;
@@ -344,6 +343,57 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
       fprintf(stderr, "%s: TRS-80 Model %s not supported\n",
 	      program_name, value.addr);
       exit(1);
+    }
+  }
+
+  /* !!Note: charset numbers must match trs_chars.c */
+  if (trs_model == 1) {
+    char *charset_name = "wider"; /* default */
+    (void) sprintf(option, "%s%s", program_name, ".charset");
+    if (XrmGetResource(x_db, option, "Xtrs.Charset", &type, &value)) {
+      charset_name = (char*) value.addr;
+    }
+    if (isdigit(*charset_name)) {
+      trs_charset = atoi(charset_name);
+    } else {
+      if (charset_name[0] == 'e'/*early*/) {
+	trs_charset = 0;
+	cur_char_width = 6;
+      } else if (charset_name[0] == 's'/*stock*/) {
+	trs_charset = 1;
+	cur_char_width = 6;
+      } else if (charset_name[0] == 'l'/*lcmod*/) {
+	trs_charset = 2;
+	cur_char_width = 6;
+      } else if (charset_name[0] == 'w'/*wider*/) {
+	trs_charset = 3;
+	cur_char_width = 8;
+      } else {
+	fprintf(stderr, "%s: unknown charset name %s\n",
+		program_name, value.addr);
+	exit(1);
+      }
+    }
+  } else /* trs_model > 1 */ {
+    char *charset_name = "international"; /* default */
+    (void) sprintf(option, "%s%s", program_name, ".charset");
+    if (XrmGetResource(x_db, option, "Xtrs.Charset", &type, &value)) {
+      charset_name = (char*) value.addr;
+    }
+    if (isdigit(*charset_name)) {
+      trs_charset = atoi(charset_name);
+    } else {
+      if (charset_name[0] == 'k'/*katakana*/) {
+	trs_charset = 4 + 3*(trs_model > 3);
+      } else if (charset_name[0] == 'i'/*international*/) {
+	trs_charset = 5 + 3*(trs_model > 3);
+      } else if (charset_name[0] == 'b'/*bold*/) {
+	trs_charset = 6 + 3*(trs_model > 3);
+      } else {
+	fprintf(stderr, "%s: unknown charset name %s\n",
+		program_name, value.addr);
+	exit(1);
+      }
     }
   }
 
@@ -546,17 +596,6 @@ void trs_screen_init()
       len = strlen(def_widefont);
       widefontname = malloc(len+1);
       strcpy(widefontname, def_widefont);
-    }
-    /* Set default (kludge) */
-    trsfont = (strncasecmp(fontname, "-trs80", 6) == 0);
-  }
-
-  (void) sprintf(option, "%s%s", program_name, ".trsfont");
-  if (XrmGetResource(x_db, option, "Xtrs.Trsfont", &type, &value)) {
-    if (strcmp(value.addr,"on") == 0) {
-      trsfont = 1;
-    } else if (strcmp(value.addr,"off") == 0) {
-      trsfont = 0;
     }
   }
 
@@ -887,6 +926,19 @@ void trs_screen_inverse(int flag)
   }
 }
 
+void trs_screen_alternate(int flag)
+{
+  int bit = flag ? ALTERNATE : 0;
+  int i;
+  if ((currentmode ^ bit) & ALTERNATE) {
+    currentmode ^= ALTERNATE;
+    for (i = 0; i < screen_chars; i++) {
+      if (trs_screen[i] >= 0xc0)
+	trs_screen_write_char(i,trs_screen[i],False);
+    }
+  }
+}
+
 void trs_screen_640x240(int flag)
 {
   if (flag == screen640x240) return;
@@ -955,19 +1007,19 @@ boxes_init(int foreground, int background, int width, int height, int expanded)
 
   bits[0].y = bits[1].y = 0;
   bits[0].height = bits[1].height =
-    bits[2].y = bits[3].y = cur_char_height / 3;
-  bits[4].y = bits[5].y = (cur_char_height * 2) / 3;
+    bits[2].y = bits[3].y = height / 3;
+  bits[4].y = bits[5].y = (height * 2) / 3;
   bits[2].height = bits[3].height = bits[4].y - bits[2].y;
-  bits[4].height = bits[5].height = cur_char_height - bits[4].y;
+  bits[4].height = bits[5].height = height - bits[4].y;
 
-  for (graphics_char = 128; graphics_char < 192; ++graphics_char) {
-    trs_char[expanded][graphics_char] =
+  for (graphics_char = 0; graphics_char < 64; ++graphics_char) {
+    trs_box[expanded][graphics_char] =
       XCreatePixmap(display, window, width, height,
 		    DefaultDepth(display, screen));
 
     /* Clear everything */
     XSetForeground(display, gc, background);
-    XFillRectangle(display, trs_char[expanded][graphics_char],
+    XFillRectangle(display, trs_box[expanded][graphics_char],
 		   gc, 0, 0, width, height);
 
     /* Set the bits */
@@ -978,28 +1030,14 @@ boxes_init(int foreground, int background, int width, int height, int expanded)
 	cur_bits[p++] = bits[bit];
       }
     }
-    XFillRectangles(display, trs_char[expanded][graphics_char],
+    XFillRectangles(display, trs_box[expanded][graphics_char],
 		    gc, cur_bits, p);
   }
 }
 
 void bitmap_init(unsigned long foreground, unsigned long background)
 {
-  if(!usefont) {
-    /* Initialize from built-in font bitmaps. */
-    int i;
-	
-    for (i = 0; i < MAXCHARS; i++) {
-      trs_char[0][i] =
-	XCreateBitmapFromData(display,window,
-			      trs_char_data[trs_model != 1][i],
-			      TRS_CHAR_WIDTH,TRS_CHAR_HEIGHT);
-      trs_char[1][i] =
-	XCreateBitmapFromData(display,window,
-			      (char*)trs_widechar_data[trs_model!=1][i],
-			      TRS_CHAR_WIDTH*2,TRS_CHAR_HEIGHT);
-    }
-  } else if (!trsfont) {
+  if (usefont) {
     int dwidth, dheight;
 
     boxes_init(foreground, background,
@@ -1013,6 +1051,24 @@ void bitmap_init(unsigned long foreground, unsigned long background)
       dheight = mywidefont->ascent + mywidefont->descent;
     }
     boxes_init(foreground, background, dwidth, dheight, 1);
+  } else {
+    /* Initialize from built-in font bitmaps. */
+    int i;
+	
+    for (i = 0; i < MAXCHARS; i++) {
+      trs_char[0][i] =
+	XCreateBitmapFromData(display,window,
+			      trs_char_data[trs_charset][i],
+			      TRS_CHAR_WIDTH,TRS_CHAR_HEIGHT);
+      trs_char[1][i] =
+	XCreateBitmapFromData(display,window,
+			      (char*)trs_widechar_data[trs_charset][i],
+			      TRS_CHAR_WIDTH*2,TRS_CHAR_HEIGHT);
+    }
+    boxes_init(foreground, background,
+	       cur_char_width, TRS_CHAR_HEIGHT, 0);
+    boxes_init(foreground, background,
+	       cur_char_width*2, TRS_CHAR_HEIGHT, 1);
   }
 }
 
@@ -1079,8 +1135,29 @@ void trs_screen_write_char(int position, int char_index, Bool doflush)
   col = position - (row * row_chars);
   destx = col * cur_char_width + left_margin;
   desty = row * cur_char_height + top_margin;
-  if (usefont) {
-    if (trs_model == 1 && !trsfont) {
+
+  if (trs_model == 1 && char_index >= 0xc0) {
+    /* On Model I, 0xc0-0xff is another copy of 0x80-0xbf */
+    char_index -= 0x40;
+  }
+  if (char_index >= 0x80 && char_index <= 0xbf && !(currentmode & INVERSE)) {
+    /* Use graphics character bitmap instead of font */
+    switch (currentmode & EXPANDED) {
+    case NORMAL:
+      XCopyArea(display,
+		trs_box[0][char_index-0x80],window,gc,0,0,
+		cur_char_width,cur_char_height,destx,desty);
+      break;
+    case EXPANDED:
+      /* use expanded graphics character bitmap instead of font */
+      XCopyArea(display,
+		trs_box[1][char_index-0x80],window,gc,0,0,
+		cur_char_width*2,cur_char_height,destx,desty);
+      break;
+    } 
+  } else if (usefont) {
+    /* Draw character using a font */
+    if (trs_model == 1) {
 #ifndef UPPERCASE
       /* Emulate Radio Shack lowercase mod.  The replacement character
 	 generator ROM had another copy of the uppercase characters in
@@ -1088,51 +1165,30 @@ void trs_screen_write_char(int position, int char_index, Bool doflush)
 	 Level II ROM that stores such values instead of uppercase. */
       if (char_index < 0x20) char_index += 0x40;
 #endif
-      if (char_index >= 0x80) char_index &= 0xbf;
     }
-    if(!trsfont && char_index >= 0x80 && char_index <= 0xbf) {
-      /* use graphics character bitmap instead of font */
-      plane = 1;
-      switch (currentmode) {
-      case NORMAL:
-	XCopyArea(display,
-		  trs_char[0][char_index],window,gc,0,0,
-		  cur_char_width,cur_char_height,destx,desty);
-	break;
-      case EXPANDED:
-	XCopyArea(display,
-		  trs_char[1][char_index],window,gc,0,0,
-		  cur_char_width*2,cur_char_height,destx,desty);
-	break;
-      case INVERSE:
-	XCopyArea(display,
-		  trs_char[0][char_index & 0x7f], window,
-		  (char_index & 0x80) ? gc_inv : gc, 0, 0,
-		  cur_char_width,cur_char_height,destx,desty);
-	break;
-      case EXPANDED+INVERSE:
-	XCopyArea(display,
-		  trs_char[1][char_index & 0x7f], window,
-		  (char_index & 0x80) ? gc_inv : gc, 0, 0,
-		  cur_char_width*2,cur_char_height,destx,desty);
-	break;
-      }
+    if (trs_model > 1 && char_index >= 0xc0 &&
+	(currentmode & (ALTERNATE+INVERSE)) == 0) {
+      char_index -= 0x40;
+    }
+    desty += curfont->ascent;
+    if (currentmode & INVERSE) {
+      temp_char = (char)(char_index & 0x7f);
+      XDrawImageString(display, window,
+		       (char_index & 0x80) ? gc_inv : gc,
+		       destx, desty, &temp_char, 1);
     } else {
-      desty += curfont->ascent;
-      if (currentmode & INVERSE) {
-	temp_char = (char)(char_index & 0x7f);
-	XDrawImageString(display, window,
-			 (char_index & 0x80) ? gc_inv : gc,
-			 destx, desty, &temp_char, 1);
-      } else {
-	temp_char = (char)char_index;
-	XDrawImageString(display, window, gc,
-			 destx, desty, &temp_char, 1);
-      }
+      temp_char = (char)char_index;
+      XDrawImageString(display, window, gc,
+		       destx, desty, &temp_char, 1);
     }
   } else {
+    /* Draw character using a builtin bitmap */
+    if (trs_model > 1 && char_index >= 0xc0 &&
+	(currentmode & (ALTERNATE+INVERSE)) == 0) {
+      char_index -= 0x40;
+    }
     plane = 1;
-    switch (currentmode) {
+    switch (currentmode & ~ALTERNATE) {
     case NORMAL:
       XCopyPlane(display,trs_char[0][char_index],
 		 window,gc,0,0,TRS_CHAR_WIDTH,

@@ -200,7 +200,7 @@ trs_timer_event(int signo)
 #else
       static unsigned long oldtcount;
 #endif
-      if (!trs_pausing) {
+      if (!trs_paused) {
 	int toofast = (z80_state.t_count - oldtcount) >
 	  ((tv.tv_sec*1000000 + tv.tv_usec) -
 	   (oldtv.tv_sec*1000000 + oldtv.tv_usec))*z80_state.clockMHz;
@@ -221,6 +221,7 @@ trs_timer_event(int signo)
 	  }
 	}
       }
+      trs_paused = 0;
       oldtv = tv;
       oldtcount = z80_state.t_count;
   }

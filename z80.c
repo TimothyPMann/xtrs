@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Mon Sep 28 12:29:16 PDT 1998 by mann
+   Last modified on Sat Oct 24 17:13:02 PDT 1998 by mann
 */
 
 /*
@@ -2206,12 +2206,14 @@ static void do_indexed_instruction(Ushort *ixp)
 	/* same for FD, except uses IY */
 
       case 0x8E:	/* adc a, (ix + offset) */
-	do_adc_byte(mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff));
+	do_adc_byte(mem_read((*ixp + (signed char) mem_read(REG_PC++))
+			     & 0xffff));
 	T_COUNT(19);
 	break;
 
       case 0x86:	/* add a, (ix + offset) */
-	do_add_byte(mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff));
+	do_add_byte(mem_read((*ixp + (signed char) mem_read(REG_PC++))
+			     & 0xffff));
 	T_COUNT(19);
 	break;
 
@@ -2229,12 +2231,13 @@ static void do_indexed_instruction(Ushort *ixp)
 	break;
 
       case 0xA6:	/* and (ix + offset) */
-	do_and_byte(mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff));
+	do_and_byte(mem_read((*ixp + (signed char) mem_read(REG_PC++))
+			     & 0xffff));
 	T_COUNT(19);
 	break;
 
       case 0xBE:	/* cp (ix + offset) */
-	do_cp(mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff));
+	do_cp(mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff));
 	T_COUNT(19);
 	break;
 
@@ -2242,7 +2245,7 @@ static void do_indexed_instruction(Ushort *ixp)
         {
 	  Ushort address;
 	  Uchar value;
-	  address = *ixp + (char) mem_read(REG_PC++);
+	  address = *ixp + (signed char) mem_read(REG_PC++);
 	  value = mem_read(address) - 1;
 	  mem_write(address, value);
 	  do_flags_dec_byte(value);
@@ -2269,7 +2272,7 @@ static void do_indexed_instruction(Ushort *ixp)
         {
 	  Ushort address;
 	  Uchar value;
-	  address = *ixp + (char) mem_read(REG_PC++);
+	  address = *ixp + (signed char) mem_read(REG_PC++);
 	  value = mem_read(address) + 1;
 	  mem_write(address, value);
 	  do_flags_inc_byte(value);
@@ -2288,66 +2291,66 @@ static void do_indexed_instruction(Ushort *ixp)
 	break;
 
       case 0x7E:	/* ld a, (ix + offset) */
-	REG_A = mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff);
+	REG_A = mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff);
 	T_COUNT(19);
 	break;
       case 0x46:	/* ld b, (ix + offset) */
-	REG_B = mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff);
+	REG_B = mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff);
 	T_COUNT(19);
 	break;
       case 0x4E:	/* ld c, (ix + offset) */
-	REG_C = mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff);
+	REG_C = mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff);
 	T_COUNT(19);
 	break;
       case 0x56:	/* ld d, (ix + offset) */
-	REG_D = mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff);
+	REG_D = mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff);
 	T_COUNT(19);
 	break;
       case 0x5E:	/* ld e, (ix + offset) */
-	REG_E = mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff);
+	REG_E = mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff);
 	T_COUNT(19);
 	break;
       case 0x66:	/* ld h, (ix + offset) */
-	REG_H = mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff);
+	REG_H = mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff);
 	T_COUNT(19);
 	break;
       case 0x6E:	/* ld l, (ix + offset) */
-	REG_L = mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff);
+	REG_L = mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff);
 	T_COUNT(19);
 	break;
 
       case 0x36:	/* ld (ix + offset), value */
-	mem_write(*ixp + (char) mem_read(REG_PC), mem_read((REG_PC+1)&0xffff));
+	mem_write(*ixp + (signed char) mem_read(REG_PC), mem_read((REG_PC+1)&0xffff));
 	REG_PC += 2;
 	T_COUNT(19);
 	break;
 
       case 0x77:	/* ld (ix + offset), a */
-	mem_write(*ixp + (char) mem_read(REG_PC++), REG_A);
+	mem_write(*ixp + (signed char) mem_read(REG_PC++), REG_A);
 	T_COUNT(19);
 	break;
       case 0x70:	/* ld (ix + offset), b */
-	mem_write(*ixp + (char) mem_read(REG_PC++), REG_B);
+	mem_write(*ixp + (signed char) mem_read(REG_PC++), REG_B);
 	T_COUNT(19);
 	break;
       case 0x71:	/* ld (ix + offset), c */
-	mem_write(*ixp + (char) mem_read(REG_PC++), REG_C);
+	mem_write(*ixp + (signed char) mem_read(REG_PC++), REG_C);
 	T_COUNT(19);
 	break;
       case 0x72:	/* ld (ix + offset), d */
-	mem_write(*ixp + (char) mem_read(REG_PC++), REG_D);
+	mem_write(*ixp + (signed char) mem_read(REG_PC++), REG_D);
 	T_COUNT(19);
 	break;
       case 0x73:	/* ld (ix + offset), e */
-	mem_write(*ixp + (char) mem_read(REG_PC++), REG_E);
+	mem_write(*ixp + (signed char) mem_read(REG_PC++), REG_E);
 	T_COUNT(19);
 	break;
       case 0x74:	/* ld (ix + offset), h */
-	mem_write(*ixp + (char) mem_read(REG_PC++), REG_H);
+	mem_write(*ixp + (signed char) mem_read(REG_PC++), REG_H);
 	T_COUNT(19);
 	break;
       case 0x75:	/* ld (ix + offset), l */
-	mem_write(*ixp + (char) mem_read(REG_PC++), REG_L);
+	mem_write(*ixp + (signed char) mem_read(REG_PC++), REG_L);
 	T_COUNT(19);
 	break;
 
@@ -2375,7 +2378,7 @@ static void do_indexed_instruction(Ushort *ixp)
 	break;
 
       case 0xB6:	/* or (ix + offset) */
-	do_or_byte(mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff));
+	do_or_byte(mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff));
 	T_COUNT(19);
 	break;
 
@@ -2392,26 +2395,26 @@ static void do_indexed_instruction(Ushort *ixp)
 	break;
 
       case 0x9E:	/* sbc a, (ix + offset) */
-	do_sbc_byte(mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff));
+	do_sbc_byte(mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff));
 	T_COUNT(19);
 	break;
 
       case 0x96:	/* sub a, (ix + offset) */
-	do_sub_byte(mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff));
+	do_sub_byte(mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff));
 	T_COUNT(19);
 	break;
 
       case 0xAE:	/* xor (ix + offset) */
-	do_xor_byte(mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff));
+	do_xor_byte(mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff));
 	T_COUNT(19);
 	break;
 
       case 0xCB:
         {
-	  char offset;
+	  signed char offset;
 	  Uchar sub_instruction;
 
-	  offset = (char) mem_read(REG_PC++);
+	  offset = (signed char) mem_read(REG_PC++);
 	  sub_instruction = mem_read(REG_PC++);
 
 	  switch(sub_instruction)
@@ -3445,9 +3448,9 @@ int z80_run(int continuous)
 	    /* Zaks says no flag changes. */
 	    if(--REG_B != 0)
 	    {
-		Uchar byte_value;
-		byte_value = mem_read(REG_PC++);
-		REG_PC += (char) byte_value;
+		signed char byte_value;
+		byte_value = (signed char) mem_read(REG_PC++);
+		REG_PC += byte_value;
 		T_COUNT(13);
 	    }
 	    else
@@ -3691,9 +3694,9 @@ int z80_run(int continuous)
 	    
 	  case 0x18:	/* jr offset */
 	  {
-	      Uchar byte_value;
-	      byte_value = mem_read(REG_PC++);
-	      REG_PC += (char) byte_value;
+	      signed char byte_value;
+	      byte_value = (signed char) mem_read(REG_PC++);
+	      REG_PC += byte_value;
 	  }
 	    T_COUNT(12);
 	    break;
@@ -3701,9 +3704,9 @@ int z80_run(int continuous)
 	  case 0x20:	/* jr nz, offset */
 	    if(!ZERO_FLAG)
 	    {
-		Uchar byte_value;
-		byte_value = mem_read(REG_PC++);
-		REG_PC += (char) byte_value;
+		signed char byte_value;
+		byte_value = (signed char) mem_read(REG_PC++);
+		REG_PC += byte_value;
 		T_COUNT(12);
 	    }
 	    else
@@ -3715,9 +3718,9 @@ int z80_run(int continuous)
 	  case 0x28:	/* jr z, offset */
 	    if(ZERO_FLAG)
 	    {
-		Uchar byte_value;
-		byte_value = mem_read(REG_PC++);
-		REG_PC += (char) byte_value;
+		signed char byte_value;
+		byte_value = (signed char) mem_read(REG_PC++);
+		REG_PC += byte_value;
 		T_COUNT(12);
 	    }
 	    else
@@ -3729,9 +3732,9 @@ int z80_run(int continuous)
 	  case 0x30:	/* jr nc, offset */
 	    if(!CARRY_FLAG)
 	    {
-		Uchar byte_value;
-		byte_value = mem_read(REG_PC++);
-		REG_PC += (char) byte_value;
+		signed char byte_value;
+		byte_value = (signed char) mem_read(REG_PC++);
+		REG_PC += byte_value;
 		T_COUNT(12);
 	    }
 	    else
@@ -3743,9 +3746,9 @@ int z80_run(int continuous)
 	  case 0x38:	/* jr c, offset */
 	    if(CARRY_FLAG)
 	    {
-		Uchar byte_value;
-		byte_value = mem_read(REG_PC++);
-		REG_PC += (char) byte_value;
+		signed char byte_value;
+		byte_value = (signed char) mem_read(REG_PC++);
+		REG_PC += byte_value;
 		T_COUNT(12);
 	    }
 	    else

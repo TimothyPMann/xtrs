@@ -24,7 +24,7 @@
 #include "load_cmd.h"
 
 int trs_model = 1;
-int trs_pausing = 0;
+int trs_paused = 1;
 int trs_autodelay = 0;
 
 static void check_endian()
@@ -34,7 +34,7 @@ static void check_endian()
     x.byte.high = 0;
     if(x.word != 1)
     {
-	fatal("Program compiled with wrong ENDIAN value -- adjust the Makefile.local, recompile, and try again.");
+	fatal("Program compiled with wrong ENDIAN value -- adjust the Makefile.local, type \"rm *.o\", recompile, and try again.");
     }
 }
 

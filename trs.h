@@ -27,9 +27,10 @@
 #define NORMAL 0
 #define EXPANDED 1
 #define INVERSE 2
+#define ALTERNATE 4
 
 extern int trs_model; /* 1, 3, 4, 5(=4p) */
-extern int trs_pausing;
+extern int trs_paused;
 extern int trs_autodelay;
 
 extern int trs_parse_command_line(int argc, char **argv, int *debug);
@@ -38,6 +39,7 @@ extern void trs_screen_init(void);
 extern void trs_screen_write_char(int position, int char_index, int doflush);
 extern void trs_screen_write_chars(int *locations, int *values, int count);
 extern void trs_screen_expanded(int flag);
+extern void trs_screen_alternate(int flag);
 extern void trs_screen_80x24(int flag);
 extern void trs_screen_inverse(int flag);
 extern void trs_screen_scroll(void);

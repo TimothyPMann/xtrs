@@ -512,12 +512,39 @@ In Model 4/4P mode, always keep the X window large enough for 80x24
 characters, putting a blank margin around the outside when the emulated
 display mode is 64x16.  This is the default.
 .TP
+.B \-charset \fIname\fP
+Select among several sets of built-in character bitmaps.
+
+In Model I mode, four sets are available. The default, \fIwider\fP, is
+a modified Model III set with characters 8 pixels wide; it looks
+better on a modern computer screen with square pixels than the real
+Model I fonts, which were 6 pixels wide. \fIlcmod\fP is the character
+set in the replacement character generator that was supplied with the
+Radio Shack lower case modification.  (It was reconstructed partly
+from memory and may have some minor bit errors.)  \fIstock\fP is the
+character set in the stock character generator supplied with most
+upper case only machines. Since \fIxtrs\fP currently always emulates
+the extra bit of display memory needed to support lower case, this
+character set gives you the authentic, unpleasant effect that real
+Model I users saw when they tried to do homebrew lower case
+modifications without replacing the character generator: lower case
+letters appear at an inconsistent height, and if you are using the
+Level II BASIC ROM display driver, upper case letters are replaced by
+meaningless symbols.  Finally, \fIearly\fP is the same as stock, but
+with the standard ASCII characters [, \\, ], and ^ in the positions
+where most Model I's had directional arrows.  This was the default
+programming in the Motorola character generator ROM that Radio Shack
+used, and a few early machines were actually shipped with this ROM.
+
+In Model III, 4, and 4P modes, three sets are available:
+\fIkatakana\fP is an early set with Japanese Katakana characters in
+the alternate character positions. \fIinternational\fP (the default) is
+a later set with accented Roman letters in the alternate positions.
+\fIbold\fP is a bold set from a character generator ROM found in one
+Model III, origin uncertain.
+.TP
 .B \-usefont
 Use X fonts instead of the built-in character bitmaps.
-Some suitable fonts are supplied with \fBxtrs\fP; they are
-exactly the same as the built-in bitmaps, but drawing performance
-may be better when using fonts.  See the \fBxset\fP(1) man page for
-documentation on how to install fonts in your X server.
 .TP
 .B \-nofont
 Use the built-in character bitmaps, not a X font.  This is the default.
@@ -531,16 +558,6 @@ The default uses the supplied fonts.
 If -usefont is also given,
 use the specified X font for double width characters.
 The default uses the supplied fonts, scaled to double width.
-.TP
-.B \-trsfont
-Use the specified X fonts for TRS-80 graphics blocks as well as
-characters.  Meaningful only if -usefont is given.  This is the
-default if the X font name begins with ``-trs80''.
-.TP
-.B \-notrsfont
-Draw TRS-80 graphics blocks as bitmaps even if X fonts are being used
-for characters.  This is the
-default if the X font name does not begin with ``-trs80''.
 .TP
 .B \-microlabs
 In Model 4/4P mode, emulate the Micro Labs Grafyx Solution hi-res
@@ -665,14 +682,12 @@ could be made to work there too.
 
 Serial ports are not emulated.
 
-The Model III/4/4P alternate character set is not emulated.
-
-Some features of the disk controller are not currently emulated.  (1)
-Force Interrupt with condition bits 0x01, 0x02, or 0x04 is not
-implemented.  (2) Read Track is not implemented.  (3) The
-multiple-sector flags in Read and Write are not implemented.  Certain
-errors (such as Lost Data) cannot occur, which makes disk diagnostic
-programs that try to generate them on purpose unhappy.
+Some features of the disk controller are not currently emulated: Force
+Interrupt with condition bits 0x01, 0x02, or 0x04 is not
+implemented. Read Track is not implemented. The multiple-sector flags
+in Read and Write are not implemented.  Certain errors (such as Lost
+Data) cannot occur, which makes disk diagnostic programs that try to
+generate them on purpose unhappy.
 
 Real physical floppy disks are supported only under Linux, because
 Unix does not provide a portable interface to the low-level floppy
@@ -686,11 +701,11 @@ floppy. However, \fBxtrs\fP can read and write to such floppies if
 they are already formatted (perhaps by a real TRS-80).
 
 The emulator arbitrarily limits both JV1 and JV3 disk images to 96
-tracks.  The limit could easily be increased to 255 or maybe 256, but
+tracks.  The limit could easily be increased to 255, but
 that would probably not be useful with existing TRS-80 operating
 systems, which don't expect floppies to have so many tracks.  For
 example, LDOS 5.3.1 allows at most 95 tracks on a floppy, though it
-allows more on hard drives.  256 tracks is an absolute maximum for the
+allows more on hard drives.  255 tracks is an absolute maximum for the
 TRS-80 floppy disk controller and for the JV3 format.
 
 The extended JV3 limit of 5802 sectors is somewhat arbitrary as well.
@@ -717,10 +732,10 @@ We also thank the following people for their help.  The floppy disk
 file formats were designed by Jeff Vavasour, originally for his
 MSDOS-based TRS-80 emulators.  The hard disk file format was designed
 by Matthew Reed for his MSDOS-based TRS-80 emulators.  Al Petrofsky
-supplied the TRS-80 fonts in bdf format.  Roland Gerlach contributed
-the CP/M import and export programs as well as several bug reports
-and fixes for the emulator itself.  Fabio Ferrari contributed the
-sound support.  Ulrich Mueller added the -borderwidth option and
+and Todd P. Cromwell III supplied font data.  Roland Gerlach
+contributed the CP/M import and export programs as well as several bug
+reports and fixes for the emulator itself.  Fabio Ferrari contributed
+the sound support.  Ulrich Mueller added the -borderwidth option and
 ported the import, export, and settime utilities to Newdos/80.
 Branden Robinson supplied the cassette man page and fixed Makefile
 bugs.  Mark McDougall provided documentation for the Micro Labs Grafyx

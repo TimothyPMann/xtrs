@@ -24,7 +24,7 @@
 #include "trs_disk.h"
 
 static int modesel = 0;     /* Model I */
-static int modeimage = 0;   /* Model III/4/4p */
+static int modeimage = 0x8; /* Model III/4/4p */
 static int ctrlimage = 0;   /* Model 4/4p */
 static int rominimage = 0;  /* Model 4p */
 
@@ -136,9 +136,10 @@ void z80_out(int port, int value)
             trs_cassette_motor((modeimage & 0x02) >> 1);
 	    /* screen mode select is on D2 */
 	    trs_screen_expanded((modeimage & 0x04) >> 2);
+	    /* alternate char set is on D3 */
+	    trs_screen_alternate(!((modeimage & 0x08) >> 3));
 	    /* clock speed is on D6; it affects timer HZ too */
 	    trs_timer_speed((modeimage & 0x40) >> 6);
-	    /* !! still to do: alt char set */
 	    break;
 	  case TRSDISK3_COMMAND: /* 0xF0 */
 	    trs_disk_command_write(value);

@@ -16,6 +16,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 #include "load_cmd.h"
 
 #define STATE_NORMAL 0
