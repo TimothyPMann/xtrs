@@ -1,0 +1,201 @@
+README.tpm
+Tim Mann <mann@pa.dec.com>
+10/28/96
+
+As computer scientists, we always long for something bigger and better
+than what we have now.  Give us a megabyte, and we want a gigabyte.
+Give us an emulated TRS-80 Model I with Level II BASIC and cassette,
+and we long for the Expansion Interface and four happily spinning
+floppy disk drives!
+
+This is a snapshot of the work I've been doing on xtrs to add these
+niceties.  The documentation is lagging far behind the implementation;
+in fact, this file and the code are the only documentation so far.
+
+My main additions to xtrs-1.0 have been floppy disk emulation, timer
+interrupt emulation, a kludge to import and export data to the host
+system, and a bunch of bug fixes and minor improvements.
+
+This project has been a real (48KB?) trip down memory lane for me.  I
+worked as a programmer for Logical Systems, who produced LDOS, during
+1980-81 before I went to grad school.  I no longer own a TRS-80, but I
+recently found a box in my storage closet containing all my hardware
+manuals, schematics, ROM disassemblies, and even the assembly listing
+for a version of the LDOS Percom Doubler driver that I helped write.
+
+At some point it would be fun to convert this code into a Model III or
+Model 4 emulator.  I don't have the technical data for those systems,
+however.
+
+* Floppy disk emulation
+
+xtrs emulates a Radio Shack Expansion Interface with the Percom
+Doubler or Radio Shack Doubler installed.  The Doubler provided
+double-density disk access by allowing either the stock WD1771 FDC
+chip or a WD1791 chip to be selected under program control.  At
+powerup the 1771 is selected, so operating systems with no Doubler
+driver see a stock system.  The emulator pretends to be both a Percom
+and Radio Shack Doubler at the same time -- it responds to the special
+commands of both -- so a driver for either should work.  Under LDOS,
+use the command "FDUBL" (newer versions of LDOS), or "PDUBL" or
+"RDUBL" (older versions) to install the driver.  I'm less sure that
+the Radio Shack Doubler emulation is correct, though it does work with
+LDOS.  Try a Percom Doubler driver if a Radio Shack Doubler driver
+gives problems.
+
+Four floppy drives are emulated, with storage in files named disk0,
+disk1, disk2, disk3.  If a file of the required name is not found, a
+drive with no disk in it is emulated.  If the user does not have write
+permission for a floppy file, a write-protect tab is emulated.  To
+change floppies in an emulated drive, rename the existing file for the
+drive (if any), rename the new floppy file to the proper name, and hit
+ctrl-D (for "disk change") in the emulator.
+
+Due to a limitation of the original Model I hardware, drive :3 cannot
+be double-sided.  (Actually, in the original Model I, you could not
+have a drive :3 if any drive in the system was double-sided, but the
+emulator is able to be more forgiving.)
+
+The floppy image files can be of either of two types: JV1, compatible
+with Jeff Vavasour's popular shareware Model I emulator for the PC; or
+JV3, compatible with Vavasour's commercial Model III/4 emulator.  JV1
+supports only single density, single sided, with directory on track
+17.  Use FORMAT (DIR=17) to format these under LDOS.  JV3 is much more
+flexible, though it still does not support everything the real
+controllers could do.  I recommend using JV3 for all the disk images
+you create, unless you need to exchange images with someone who is
+using the Vavasour Model I emulator.  The emulator uses a heuristic to
+decide which type of image it is looking at in each drive, as neither
+type has a "magic number" or signature.
+
+The program mkfloppy makes a blank emulated floppy or "bulk erases" an
+existing one.  See the top of mkfloppy.c for documentation and more
+information on the capabilities of JV1 and JV3.
+
+Some features of the disk controller are not emulated, but could be
+added without too much difficulty: (1) The FDC does not generate
+interrupts.  This feature existed but was basically useless on the
+Model I, and I believe that no operating systems used it.  At any
+rate, I know LDOS didn't, and NEWDOS 80 seems to run without it in
+limited testing.  (2) Force Interrupt with nonzero condition bits is
+not implemented. (3) Read Address is not implemented.  (4) Read Track
+is not implemented.  (5) The multiple-sector flags in Read and Write
+are not implemented.
+
+The floppy disk emulation is fairly extensively tested with LDOS
+5.3.1, very lightly tested with TRSDOS 2.3 and NEWDOS 80. Under LDOS,
+I got as far as making an 80-track, double-sided, double-density
+system disk with a single-density SOLE boot track, copying the whole
+system onto it, and booting and running with it.  This was a pretty
+stringent test and shook out lots of bugs!  Under TRSDOS 2.3 and
+NEWDOS 80, I just checked that I could boot and run a few simple
+commands.  NEWDOS 80 did shake out one bug that didn't bother LDOS.
+
+There is no support for real physical floppy disks.  It seems too
+non-portable to try to put this directly into the emulator.  Also,
+today's controllers often cannot handle the formats that were
+generated by the old 1771s and 1791s.  If you have disks to convert,
+Vavasour's Model 4 emulator for the PC has some programs that seem to
+do the best that can be done.  His Model I emulator has a pair of
+programs that can be used to transfer disk images between a real Model
+I and a PC through their parallel ports.  Also, Computer News 80 has a
+mail-order service that will convert disks for you.
+
+* Timer interrupt emulation
+
+The emulator supports only interrupt mode 1.  It will complain if your
+program enables interrupts after powerup without executing an IM 1
+instruction first.  All Model I software does this, as the Model I
+peripherals required IM 1.
+
+The Model I had a 40 Hz (25 ms) "heartbeat" interrupt.  The emulator
+approximates this rather well even on a system where clock ticks come
+at some frequency that isn't divisible by 40 Hz (e.g., 100 Hz on Intel
+Linux), as long as the frequency is not slower than 40 Hz.  The
+emulator has a notion of the absolute time at which each tick is
+supposed to occur, and it asks the host system to wake it up at each
+of those times.  The net result is that some ticks may be late, but
+there are always a total of 40 ticks per second.  For example, on
+Intel Linux you'd see this pattern: (tick, 30ms, tick, 20ms, ...).
+
+The debugger has some extra support to keep interrupts from making
+life intolerable.  The "step" command suppresses the normal test for a
+pending interrupt at the end of each instruction.  A "stepint" command
+is available if you really want to allow an interrupt.  If you do this
+while the emulated CPU has interrupts enabled, you'll usually find
+that your next emulated instruction is at 0038H (the IM 1 interrupt
+vector).  New commands "timeroff" and "timeron" let you turn the
+emulated timer off entirely, which is useful while tracing (for
+example).  None of these features interfere with the emulated IFF1 and
+IFF2 (interrupt enable flip-flop) state.
+
+Note: Currently there is a bug in GNU readline() that makes it
+incompatible with my timer interrupt implementation.  Readline thinks
+that it is always supposed to clean up its state and exit when a
+SIGALRM comes in, but in fact, I handle the signal and continue the
+read system call.  I've reported this bug to readline's maintainer.
+
+* Data import/export
+
+This is a major kludge.  I added the ability to write a string into a
+specific I/O port, have the emulator pass it as a filename to the
+Unix fopen() library function, and either provide input or read output
+on the I/O port.
+
+The BASIC programs imptest.bas and exptest.bas exercise the feature.
+They work, but are hideously slow.  I also wrote a Z-80 assembly 
+language version of the importer, import.cmd.  This might run only
+under LDOS.  It's much faster than the BASIC version, but still 
+rather leisurely.
+
+A faster alternative would be to provide a hook in the emulator that
+imports or exports larger blocks of data for each Z-80 instruction.
+
+A much faster method would be to write Unix utilities to copy files
+directly to/from emulated floppy files.  This would also be more work,
+as it amounts to rewriting part of the TRS-80 DOS in C.  Writing
+operating system code is part of my TRS-80 experience I'm not eager to
+relive.  Vavasour's Model I emulator has such utilities for the JV1
+format, but they run only under MS-DOS or MS Windows.
+
+* Bug fixes and miscellany
+
+I fixed bugs in the instructions RRC, INC IX, and INC IY.
+
+I got the emulator running under Linux.  Now it might have minor
+problems elsewhere, on less ANSI- and POSIX-compliant systems.
+
+I added a bunch of missing key combinations to the keyboard emulation,
+such as shift-uparrow, shift-break, shift-zero (emulated with ctrl-T),
+shift-@ (ctrl-P or Pause key).  Most of these are used for various
+things by BASIC and/or LDOS.  The LDOS use of Clear as a ctrl key is
+also supported, if you use your Alt or Meta key (and have it mapped as
+X modifier Mod1).  The keyboard support in the emulator really needs a
+rework; it's pretty kludgey right now.
+
+I fixed up the KBWAIT feature to work fairly well with the LDOS
+keyboard drivers.  This feature tries to avoid burning host CPU cycles
+when the emulated program is sitting in a loop polling the keyboard.
+NEWDOS 80 fools it, though.  (The keyboard does work under NEWDOS 80,
+but it eats the CPU.)
+
+I put in a silly kludge that lets LDOS know the correct date whenever
+it boots up.  It simulates the case where you just rebooted LDOS
+without power cycling and the date was left in memory.  Unfortunately
+LDOS doesn't provide a way to do this trick with the time of day.
+
+I noticed a few bugs in the disassembler that I didn't fix.
+Instructions that start "fd cb" are not disassembled.  For instance,
+RES 6,(IY).  Fortunately they are emulated correctly, or at least the
+documented ones are.  The LD (BC),A instruction is printed as LD BC,A.
+
+The Z-80 HALT instruction (which is really a wait-for-interrupt
+instruction) is not emulated correctly, and I didn't change it.  The
+instruction has rather odd general-case behavior on the Z-80, and it
+would be fun to write a correct emulation of it.  On the Model I,
+however, the HALT output from the Z-80 chip is wired to the reset
+button circuit, so executing HALT has exactly the same effect as if
+the user had pushed the boot button.  (It resets external devices via
+the SYSRES line on the bus, and issues an NMI to the Z-80.)  The LDOS
+"BOOT" command takes advantage of this feature.  The emulator,
+however, simply exits on HALT.

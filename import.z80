@@ -1,0 +1,132 @@
+;; import.z
+;; Use xtrs 1.0.tpm2 import feature to copy a file from Unix to TRS-80
+;; Timothy Mann, 10/30/96
+;; Last modified on Tue Dec 17 13:06:19 PST 1996 by mann
+
+@fspec  equ 441ch
+@init   equ 4420h
+@param  equ 4476h
+@logot  equ 447bh
+@write  equ 4439h
+@close  equ 4428h
+@error  equ 4409h
+@exit   equ 402dh
+@abort  equ 4030h       
+
+impctrl equ 0d0h
+impstat equ 0d0h
+impdata equ 0d1h
+
+	org 5200h
+import: ld a, (hl)              ; scan over Unix filename
+        cp ' '		        ; first skip spaces
+	jr c, usage             ; error if line ends here
+        jr nz, unix1
+        inc hl
+	jr import
+unix1:  ld (uname+1), hl        ; save pointer
+unix2:	inc hl                  ; now scan for end of Unix name
+        ld a, (hl)
+	cp ' '
+	jr c, usage
+        jr nz, unix2
+	ld (hl), 0              ; NUL terminate
+        inc hl
+	ld de, dcb              ; ready to get LDOS filename from (HL)
+        call @fspec
+        jr nz, usage
+        push hl                 ; save position in command line
+        ld hl, iobuf
+        ld de, dcb
+        ld b, 0
+        call @init              ; open the file
+        pop hl
+        jr z, openok
+        call @error
+        jp @abort
+openok: ld de, prmtbl           ; ready to parse command line
+        call @param
+        jr z, prmok             ; go if OK
+usage:  ld hl, usager           ; error message and exit
+        call @logot
+        jp @abort
+prmok:  xor a			; reset import/export state machine
+	out (impctrl), a
+	inc a			; request import
+	out (impctrl), a
+uname:	ld hl, $-$              ; ready to pass command to unix
+cloop:  ld a, (hl)              ; get next command char
+        and a			; check for end
+        out (impdata), a        ; feed to emulator
+        jr z, cmddun
+	inc hl
+        jr cloop
+cmddun:
+dloop:  in a, (impstat)         ; get status
+        and a
+        jr z, cmdok             ; go if OK
+        ld hl, cmder            ; error message and exit
+        call @logot
+        jp @abort
+cmdok:  ld a, (nlparam)		; check for NL feature
+	ld c, 0dh		; init to do nothing
+	and a
+	jr z, iloop
+	ld c, 0ah		; translate 0ah -> 0dh
+iloop:  ld hl, iobuf            ; outer loop reading unix output
+        ld b, 0
+iilp:   in a, (impdata)         ; inner loop
+        and a
+        jr nz, noteof
+        in a, (impstat)         ; really end of file?
+        cp 0ffh
+        jr z, zero              ; go if really a zero data byte
+        and a
+        jr z, eof               ; go if really eof
+        ld hl, imper            ; really a read error
+        call @logot
+        jp @abort
+zero:   xor a
+noteof: cp c			; translate?
+	jr nz, noxlat
+	ld a, 0dh
+noxlat: ld (hl), a              ; save the byte
+        inc hl
+        djnz iilp
+        ld de, dcb              ; write 256 bytes to file
+        call @write
+        jr z, iloop             ; back for more
+        call @error             ; oops, i/o error
+        jp @abort
+eof:    ld de, dcb              ; write last sector of file
+        ld hl, iobuf
+        call @write
+        jr z, eofok
+        call @error             ; oops, i/o error
+        jp @abort
+eofok:  xor a                   ; compute EOF offset
+        sub b
+        ld (dcb+8), a
+        ld de, dcb
+        call @close             ; close the file
+        jr z, closok
+        call @error             ; oops, i/o error
+        jp @abort
+closok: jp @exit                ; all is well
+
+prmtbl: 
+        defb 'NL    '
+        defw nlparam
+        defb 0    
+
+nlparam:
+	defw 0
+
+usager: defb 'Usage: IMPORT unixfile tofile (NL=y/n)', 0dh
+cmder: defb 'Error writing command to Unix', 0dh
+imper: defb 'Error reading output from Unix', 0dh        
+
+dcb:   defs 32   
+iobuf: defs 256  
+        
+        end import

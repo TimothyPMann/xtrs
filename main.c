@@ -12,8 +12,15 @@
  * The software may be modified for your own purposes, but modified versions
  * must retain this notice.
  */
+
+/*
+   Modified by Timothy Mann, 1996
+   Last modified on Tue Dec 17 12:59:51 PST 1996 by mann
+*/
+
 #include "z80.h"
 #include "trs.h"
+#include "trs_disk.h"
 
 static void check_endian()
 {
@@ -70,9 +77,11 @@ main(argc, argv)
     }
 	
     mem_init();
+    trs_disk_init();
 #ifdef XTRASH
     argc = trs_screen_init(argc,argv,&debug);
 #endif
+    trs_timer_init();
 
     if(instrument)
     {
@@ -94,7 +103,9 @@ main(argc, argv)
     {
 	z80_reset();
 	z80_run(TRUE);	/* run continuously */
-	printf("Z-80 Halted.\n");
+	printf("Z-80 Halted.\n");  /* TPM: on a real Model I, executing a
+				      HALT instruction is equivalent
+				      to pressing the reset button */
 	exit(0);
     }
 }

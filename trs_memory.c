@@ -12,6 +12,12 @@
  * The software may be modified for your own purposes, but modified versions
  * must retain this notice.
  */
+
+/*
+   Modified by Timothy Mann, 1996
+   Last modified on Tue Dec 17 13:06:20 PST 1996 by mann
+*/
+
 /*
  * trs_memory.c -- memory emulation functions for the TRS-80 emulator
  *
@@ -23,6 +29,8 @@
 #include "z80.h"
 #include "trs.h"
 #include <malloc.h>
+#include <stdlib.h>
+#include "trs_disk.h"
 
 uchar *memory;
 
@@ -31,10 +39,14 @@ uchar *memory;
 #define ROM_START	(0x0000)
 #define IO_START	(0x3000)
 #define KEYBOARD_START	(0x3800)
-#define MORE_IO_START	(0x3900)
+/*!!#define MORE_IO_START	(0x3900)*/
+#define MORE_IO_START	(0x3c00)
 #define VIDEO_START	(0x3c00)
 #define RAM_START	(0x4000)
 #define PRINTER_ADDRESS	(0x37E8)
+
+/* Interrupt latch register in EI */
+#define TRS_INTLATCH(addr) (((addr)&~3) == 0x37e0)
 
 /*
  * Macros to determine quickly if an address is writeable or readable
@@ -169,9 +181,11 @@ void trs_exit()
 
 void trs_reset()
 {
-    /* Signal an interrupt. */
-    z80_state.interrupt = TRUE;
-    printf("Interrupt.\n");
+    /* Reset devices (SYSRES on system bus) as at power-up --TPM */
+    trs_disk_init();
+    /* Signal a nonmaskable interrupt. */
+    z80_state.nmi = TRUE;
+    printf("Nonmaskable interrupt.\n");
 }
 
 void mem_init()
@@ -196,113 +210,75 @@ void mem_write_rom(address, value)
     memory[address] = value;
 }
 
-#ifdef INSTRUMENT
-int mem_read(address)
-    int address;
-{
-    int rval;
-
-    address &= 0xffff;
-    if(READABLE(address))
-    {
-	/* read from ROM, video, or RAM */
-	rval = memory[address];
-    }
-    else if((address >= KEYBOARD_START) && (address < MORE_IO_START))
-    {
-	/* read from the keyboard */
-	rval = trs_kb_mem_read(address);
-    }
-    else
-    {
-	/* read from any of the I/O space */
-	rval = 0xFF;
-    }
-
-    instrument_mem_read(address, rval);
-
-    return rval;
-}
-
-void mem_write(address, value)
+/* Called by load_hex */
+void hex_data(address, value)
     int address;
     int value;
 {
-    address &= 0xffff;
-
-    instrument_mem_write(address, value);
-
-    if(WRITEABLE(address))
-    {
-	/* write to RAM */
-	memory[address] = value;
-    }
-    else if((address >= VIDEO_START) && (address < RAM_START))
-    {
-	/*
-	 * Video write.  Hack here to make up for the missing bit 6
-	 * video ram, emulating the gate in Z30.
-	 */
-	if(value & 0xa0)
-	  value &= 0xbf;
-	else
-	  value |= 0x40;
-
-	memory[address] = value;
-
-	video_write(address - VIDEO_START, value);
-    }
+    mem_write_rom(address, value);
 }
 
-/*
- * Words are stored with the low-order byte in the lower address.
- */
-int mem_read_word(address)
+/* Called by load_hex */
+void hex_transfer_address(address)
     int address;
 {
-    int rval;
-    uchar *m;
-
-    address &= 0xffff;
-    rval = mem_read(address++);
-    rval |= mem_read(address) << 8;
-    return rval;
+    /* Ignore */
 }
 
-void mem_write_word(address, value)
-    int address;
-{
-    uchar *m;
-
-    address &= 0xffff;
-    mem_write(address++, value & 0xff);
-    mem_write(address, value >> 8);
-}
-#else    
+#ifdef INSTRUMENT
+#define RETURN rval =
+#else
+#define RETURN return
+#endif
 
 int mem_read(address)
     int address;
 {
+    int rval;
     address &= 0xffff;
     if(READABLE(address))
     {
 	/* read from ROM, video, or RAM */
-	return(memory[address]);
+	RETURN(memory[address]);
     }
     else if((address >= KEYBOARD_START) && (address < MORE_IO_START))
     {
 	/* read from the keyboard */
-	return trs_kb_mem_read(address);
+	RETURN trs_kb_mem_read(address);
+    }
+    else if(address == TRSDISK_STATUS)
+    {
+        RETURN trs_disk_status_read();
+    }
+    else if(address == TRSDISK_TRACK)
+    {
+        RETURN trs_disk_track_read();
+    }
+    else if(address == TRSDISK_SECTOR)
+    {
+        RETURN trs_disk_sector_read();
+    }
+    else if(address == TRSDISK_DATA)
+    {
+        RETURN trs_disk_data_read();
+    }
+    else if(TRS_INTLATCH(address))
+    {
+        RETURN trs_interrupt_latch_read();
     }
     else if(address == PRINTER_ADDRESS)
     {
-	return trs_printer_read();
+	RETURN trs_printer_read();
     }
     else
     {
 	/* read from any of the I/O space */
-	return 0xFF;
+	RETURN 0xFF;
     }
+#ifdef INSTRUMENT
+    instrument_mem_read(address, rval);
+    return rval;
+#endif
 }
 
 void mem_write(address, value)
@@ -311,6 +287,10 @@ void mem_write(address, value)
 {
     address &= 0xffff;
 
+#ifdef INSTRUMENT
+    instrument_mem_write(address, value);
+#endif INSTRUMENT
+
     if(WRITEABLE(address))
     {
 	/* write to RAM */
@@ -318,6 +298,7 @@ void mem_write(address, value)
     }
     else if((address >= VIDEO_START) && (address < RAM_START))
     {
+#ifdef UPPERCASE
 	/*
 	 * Video write.  Hack here to make up for the missing bit 6
 	 * video ram, emulating the gate in Z30.
@@ -326,7 +307,7 @@ void mem_write(address, value)
 	  value &= 0xbf;
 	else
 	  value |= 0x40;
-
+#endif
 	/*
 	 * Speed hack -- check to see if the character has actually changed.
 	 * Only call the video emulator if it has.
@@ -337,6 +318,26 @@ void mem_write(address, value)
 
 	    video_write(address - VIDEO_START, value);
 	}
+    }
+    else if(address == TRSDISK_COMMAND)
+    {
+        trs_disk_command_write(value);
+    }
+    else if(address == TRSDISK_TRACK)
+    {
+        trs_disk_track_write(value);
+    }
+    else if(address == TRSDISK_SECTOR)
+    {
+        trs_disk_sector_write(value);
+    }
+    else if(address == TRSDISK_DATA)
+    {
+        trs_disk_data_write(value);
+    }
+    else if(TRSDISK_SELECT(address))
+    {
+        trs_disk_select_write(value);
     }
     else if(address == PRINTER_ADDRESS)
     {
@@ -355,6 +356,7 @@ int mem_read_word(address)
 
     address &= 0xffff;
 
+#ifndef INSTRUMENT
     if(READABLE_WORD(address))
     {
 	m = memory + address;
@@ -363,6 +365,7 @@ int mem_read_word(address)
 	return rval;
     }
     else
+#endif
     {
 	rval = mem_read(address++);
 	rval |= mem_read(address) << 8;
@@ -377,6 +380,7 @@ void mem_write_word(address, value)
 
     address &= 0xffff;
 
+#ifndef INSTRUMENT
     if(WRITEABLE_WORD(address))
     {
 	m = memory + address;
@@ -384,12 +388,12 @@ void mem_write_word(address, value)
 	*m = value >> 8;
     }
     else
+#endif
     {
 	mem_write(address++, value & 0xff);
 	mem_write(address, value >> 8);
     }
 }
-#endif
 
 /*
  * Block move instructions, for LDIR and LDDR instructions.

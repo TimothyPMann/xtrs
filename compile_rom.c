@@ -13,6 +13,11 @@
  * must retain this notice.
  */
 
+/*
+   Modified by Timothy Mann, 1996
+   Last modified on Tue Dec 17 13:06:21 PST 1996 by mann
+*/
+
 #include "z80.h"
 
 static int highest_address = 0;
@@ -33,8 +38,8 @@ static void load_rom(filename)
     fclose(program);
 }
 
-/* Called by load_hex -- hack, hack */
-void mem_write_rom(address, value)
+/* Called by load_hex */
+void hex_data(address, value)
     int address;
     int value;
 {
@@ -43,6 +48,12 @@ void mem_write_rom(address, value)
     memory[address] = value;
     if(highest_address < address)
       highest_address = address;
+}
+
+void hex_transfer_address(address)
+     int address;
+{
+    /* Ignore */
 }
 
 void error(string)

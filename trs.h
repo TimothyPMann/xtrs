@@ -14,8 +14,14 @@
  */
 
 /*
+   Modified by Timothy Mann, 1996
+   Last modified on Tue Dec 17 13:00:14 PST 1996 by mann
+*/
+
+/*
  * trs.h
  */
+
 typedef enum {
     NORMAL = 0,
     EXPANDED = 1
@@ -44,3 +50,10 @@ extern unsigned char trs_rom[];
 extern void trs_load_compiled_rom();
 extern void trs_load_rom(/*char *filename*/);
 
+extern unsigned char trs_interrupt_latch_read();
+extern void trs_timer_init();
+extern void trs_timer_off();
+extern void trs_timer_on();
+
+extern void trs_disk_change(/*int drive*/);
+extern void trs_disk_change_all();

@@ -13,8 +13,14 @@
  * must retain this notice.
  */
 
+/*
+   Modified by Timothy Mann, 1996
+   Last modified on Tue Dec 17 13:06:21 PST 1996 by mann
+*/
+
 #include "z80.h"
 #include "trs.h"
+#include "trs_imp_exp.h"
 
 static int modesel = 0;
 
@@ -37,6 +43,14 @@ void z80_out(port, value)
 	/* do cassette emulation */
 	trs_cassette_out(value & 0x7);
     }
+    else if(port == IMPEXP_CMD)
+    {
+        trs_impexp_cmd_write(value);
+    }
+    else if(port == IMPEXP_DATA)
+    {
+        trs_impexp_data_write(value);
+    }
     return;
 }
 
@@ -48,6 +62,14 @@ int z80_in(port)
     if(port == 0xFF)
     {
 	return trs_cassette_in(modesel);
+    }
+    else if(port == IMPEXP_STATUS)
+    {
+        return trs_impexp_status_read();
+    }
+    else if(port == IMPEXP_DATA)
+    {
+        return trs_impexp_data_read();
     }
 
     /* other ports -- unmapped */

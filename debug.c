@@ -13,9 +13,15 @@
  * must retain this notice.
  */
 
+/*
+   Modified by Timothy Mann, 1996
+   Last modified on Tue Dec 17 12:58:51 PST 1996 by mann
+*/
+
 #include "z80.h"
 
 #include <malloc.h>
+#include <stdlib.h>
 #include <signal.h>
 
 #ifdef READLINE
@@ -303,6 +309,7 @@ void debug_shell()
 
     while(!done)
     {
+        int sig_mask;
 	printf("\n");
 	disassemble(REG_PC);
 
@@ -334,6 +341,7 @@ void debug_shell()
 	if(fgets(input, MAXLINE, stdin) == NULL)
 	  done = 1;
 #endif
+
 	if(sscanf(input, "%s", command))
 	{
 	    if(!strcmp(command, "help") || !strcmp(command, "?"))
@@ -431,6 +439,10 @@ void debug_shell()
 	    }
 	    else if(!strcmp(command, "step"))
 	    {
+		z80_run(-1);
+	    }
+	    else if(!strcmp(command, "stepint"))
+	    {
 		z80_run(0);
 	    }
 	    else if(!strcmp(command, "stop"))
@@ -487,6 +499,16 @@ void debug_shell()
 		    printf("Tracing disabled.\n");
 		}
 	    }
+	    else if(!strcmp(command, "timeroff"))
+	    {
+	        /* Turn off emulated real time clock interrupt */
+	        trs_timer_off();
+            }
+	    else if(!strcmp(command, "timeron"))
+	    {
+	        /* Turn off emulated real time clock interrupt */
+	        trs_timer_on();
+            }
 	    else
 	    {
 		int start_address, end_address, num_bytes;
@@ -525,12 +547,18 @@ Running:\n\
     cont\n\
         Continue execution.\n\
     step\n\
-        Execute one instruction.\n\
+        Execute one instruction, disallowing interrupts.\n\
+    stepint\n\
+        Execute one instruction, allowing an interrupt afterwards.\n\
     next\n\
         Execute one instruction.  If the instruction is a CALL, continue\n\
         until the return.  (Not implemented.)\n\
     reset\n\
         Reset the Z-80.\n\
+    timeroff\n\
+        Disable the emulated TRS-80 real time clock interrupt.\n\
+    timeron\n\
+        Enable the emulated TRS-80 real time clock interrupt.\n\
 Printing:\n\
     dump\n\
         Print the values of the Z-80 registers.\n\

@@ -13,6 +13,11 @@
  * must retain this notice.
  */
 
+/*
+   Modified by Timothy Mann, 1996
+   Last modified on Tue Dec 17 12:59:14 PST 1996 by mann
+*/
+
 #include "z80.h"
 
 #define BUFFER_SIZE 256
@@ -59,18 +64,24 @@ void load_hex(file)
 	    b += 2;
 
 	    /* the data */
-	    while(num_bytes--)
+	    if(num_bytes == 0)
 	    {
-		value = hex_byte(b);  b += 2;
-		mem_write_rom(address++, value);
-		check += value;
-	    }
+		/* Transfer address */
+		hex_transfer_address(address);
+	    } else {
+		while(num_bytes--)
+		{
+		    value = hex_byte(b);  b += 2;
+		    hex_data(address++, value);
+		    check += value;
+		}
 
-	    /* the checksum */
-	    value = hex_byte(b);
-	    if(((0x100 - check) & 0xff) != value)
-	    {
-		error("bad checksum from hex file");
+		/* the checksum */
+		value = hex_byte(b);
+		if(((0x100 - check) & 0xff) != value)
+		{
+		    error("bad checksum from hex file");
+		}
 	    }
 	}
     }

@@ -13,15 +13,24 @@
  * must retain this notice.
  */
 
+/*
+   Modified by Timothy Mann, 1996
+   Last modified on Tue Dec 17 13:06:19 PST 1996 by mann
+*/
+
 #include "config.h"
 #include <stdio.h>
 #include <ctype.h>
 
+#ifndef TRUE
 #define TRUE	(1)
 #define FALSE	(0)
+#endif
 
+#if 0
 typedef unsigned short ushort;
 typedef unsigned char uchar;
+#endif
 
 struct twobyte
 {
@@ -61,7 +70,24 @@ struct z80_state_struct
     uchar iff1, iff2;
     uchar interrupt_mode;
 
-    int interrupt;	/* used to signal an interrupt */
+    /* To signal a maskable interrupt, set irq TRUE.  The CPU does not
+     * turn off irq; the external device must do that when
+     * appropriately tickled by some IO port or memory address that it
+     * decodes.  This matches a real Z-80: INT is level triggered.
+     *
+     * There is no support as yet for fetching an interrupt vector or
+     * RST instruction from the interrupting device, as this gets
+     * rather complex when there can be more than one device with an
+     * interrupt pending.  So you'd better use interrupt_mode 1 only
+     * (which is what the TRS-80 does.
+     */
+    int irq;
+
+    /* To signal a nonmaskable interrupt, set nmi to TRUE.
+       In this case the CPU sets it to FALSE when it receives the
+       interrupt.  In a real Z-80, NMI is edge-triggered, so this
+       behavior is correct.  */
+    int nmi;
 };
 
 #define Z80_ADDRESS_LIMIT	(1 << 16)
@@ -171,4 +197,3 @@ extern int z80_int();
 extern int disassemble();
 extern void debug_init();
 extern void debug_shell();
-

@@ -13,7 +13,13 @@
  * must retain this notice.
  */
 
+/*
+   Modified by Timothy Mann, 1996
+   Last modified on Tue Dec 17 13:00:27 PST 1996 by mann
+*/
+
 #include "z80.h"
+#include <string.h>
 
 #define CLOSE		0
 #define READ		1

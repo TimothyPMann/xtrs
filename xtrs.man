@@ -1,0 +1,114 @@
+
+.TH xtrs 1
+.SH Name
+xtrs \- TRS-80 Model I Emulator for the X Window System
+.SH Syntax
+.B xtrs
+.I [options]
+.SH Description
+\fIxtrs\fP is built on top of a Z-80 emulator, with added routines to support
+keyboard and video I/O through an X interface.  The hardware
+emulation is based on the TRS-80 Model I design.
+
+\fIxtrs\fP supports 48K of RAM. 
+There is support for rudimentary cassette I/O
+emulation which uses files for cassette tapes.  A printer is emulated by
+sending its output to standard output.
+
+The Z-80 emulator has a debugger called zbx.  It works sort of
+like dbx.  If you run with debugging turned on (see the options section for
+how to do this), you'll enter the debugger, and
+you can type "help" for more information.
+
+Special support in the emulator allows the program to block when waiting
+for information from the keyboard.  This will only work for programs which
+get keyboard input via the standard ROM calls.  We do similar tricks to
+make the cassette I/O work.
+
+When running \fIxtrs\fP, the following special keys are used to
+control it: Ctrl-C is the "break" key (for those keyboards that don't
+have a break key), Ctrl-L is the "clear" key, Ctrl-R is the reset
+button, and Ctrl-Q exits the program.  The Break key, Clear key, and
+arrow keys are all mapped appropriately if they are present. 
+
+To control the cassette, a file called "TRS-CASSETTE-CONTROL" in the
+current directory keeps track of what file is currently "loaded" as
+the cassette tape and the current position within that file.  The
+"cassette" shell script provides a way to manipulate this file; typing
+"help" shows its commands.  You may use this script to load and
+position cassette tape files.  The operation works very much like an
+actual tape recorder.
+
+For printer support, any text sent to the TRS-80's printer (using LPRINT
+or LLIST, for example) is sent to the standard output.
+.SH Options
+Defaults for all options can be specified using the standard X resource
+mechanism, and the class name for \fIxtrs\fP is "Xtrs".
+.TP
+.B \-background \fIcolor\fP
+.IP 
+Specifies the background color of the \fIxtrs\fP window.
+.TP
+.B \-bg \fIcolor\fP
+.IP 
+Same as -background.
+.TP
+.B \-foreground \fIcolor\fP
+.IP 
+Specifies the foreground color of the \fIxtrs\fP window.
+.TP
+.B \-fg \fIcolor\fP
+.IP 
+Same as -foreground.
+.TP
+.B \-usefont
+.IP 
+Use a X font instead of the built-in font.  This is the default, if no
+arguments or resources are set.
+.TP
+.B \-nofont
+.IP 
+Use the built-in font, instead of a X font.
+.TP
+.B \-display \fIdisplay\fP
+.IP 
+Set your X display to \fIdisplay\fP, instead of the default which is to
+use the DISPLAY environment variable.
+.TP
+.B \-debug
+.IP 
+Enter zbx, the z80 debugger.
+.TP
+.B \-romfile \fIfilename\fP
+.IP 
+Use the romfile specified by \fIfilename\fP.  \fIxtrs\fP will complain if
+it cannot locate a romfile.  If you compile the romfile in to the executable,
+then this option is useless.  You may also specify a default location at 
+compile time, and then override it using this option.
+.SH Bugs
+We have run \fIxtrs\fP on DEC MIPS and Sun SPARC workstations.  We
+think it should work with most BSD compatible Unix implementations.
+
+There are probably bugs in the Z-80 emulator which we haven't found yet.
+We haven't run the emulator with anything besides the Level II ROM so far.
+It's even possible that we forgot to implement a few instructions.
+
+We don't quite draw the right character set.  Instead of the four arrows
+you get '[', '\', ']', and '^'.  Sorry, we didn't notice this until
+recently.
+
+The "reset" button (through control-r) doesn't interrupt the cassette
+loader.
+
+The keyboard emulation isn't perfect.  Sometimes a key won't be recognized
+immediately until another key is pressed.  Programs which poll the keyboard
+for input may not work well, due to a nasty interaction with auto-repeat in
+some X servers (try turning off your auto-repeat if this is a problem).
+
+If you discover other bugs, or write fixes for any of these, please let
+us know.  We expect to incorporate fixes into future releases.
+.SH Authors
+David Gingold <gingold@think.com>, Thinking Machines Corporation
+.br
+Alec Wolman <wolman@crl.dec.com>, Digital Equipment Corporation
+

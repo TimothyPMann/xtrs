@@ -12,6 +12,12 @@
  * The software may be modified for your own purposes, but modified versions
  * must retain this notice.
  */
+
+/*
+   Modified by Timothy Mann, 1996
+   Last modified on Tue Dec 17 13:06:20 PST 1996 by mann
+*/
+
 /*
  * trs_xinterface.c
  *
@@ -24,6 +30,8 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <malloc.h>
+#include <string.h>
+#include <stdlib.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
@@ -34,6 +42,7 @@
 
 #include "trs_iodefs.h"
 #include "trs.h"
+#include "z80.h"
 
 #define DEF_FONT "fixed"
 
@@ -68,6 +77,9 @@ static XrmOptionDescRec opts[] = {
 
 static int num_opts = (sizeof opts / sizeof opts[0]);
 
+static int key_state = 0;
+
+#ifdef KBQUEUE
 /*
  * Key event queueing routines:
  */
@@ -75,8 +87,6 @@ static int num_opts = (sizeof opts / sizeof opts[0]);
 static int key_queue[KEY_QUEUE_SIZE];
 static int key_queue_head;
 static int key_queue_entries;
-
-static int key_state = 0;
 
 static void clear_key_queue()
 {
@@ -108,6 +118,17 @@ static int dequeue_key()
     return rval;
 }
 
+#ifdef BAD_IDEA
+static int peek_key_queue()
+{
+    if(key_queue_entries > 0)
+	return key_queue[key_queue_head];
+    else
+        return key_state;
+}
+#endif
+#endif
+
 /* Private routines */
 void bitmap_init();
 void screen_init();
@@ -133,13 +154,22 @@ int *debug;
     XGCValues gcvals;
     char *fontname;
     int len;
+    char *xrms;
+    char *program_name;
+
+    program_name = strrchr(argv[0], '/');
+    if (program_name == NULL) {
+      program_name = argv[0];
+    } else {
+      program_name++;
+    }
     
     XrmInitialize();
     /* parse command line options */
-    XrmParseCommand(&command_db,opts,num_opts,argv[0],&argc,argv);
+    XrmParseCommand(&command_db,opts,num_opts,program_name,&argc,argv);
 
-    (void) sprintf(option, "%s%s", argv[0], ".display");
-    (void) XrmGetResource(command_db, option, "Xtrash.Display", &type, &value);
+    (void) sprintf(option, "%s%s", program_name, ".display");
+    (void) XrmGetResource(command_db, option, "Xtrs.Display", &type, &value);
     /* open display */
     if ( (display = XOpenDisplay (value.addr)) == NULL) {
 	printf("Unable to open display.");
@@ -147,14 +177,18 @@ int *debug;
     }
 
     /* get defaults from server */
-    x_db = XrmGetStringDatabase(XResourceManagerString(display));
-
-    XrmMergeDatabases(command_db,&x_db);
+    xrms = XResourceManagerString(display);
+    if (xrms != NULL) {
+      x_db = XrmGetStringDatabase(xrms);
+      XrmMergeDatabases(command_db,&x_db);
+    } else {
+      x_db = command_db;
+    }
 
     screen = DefaultScreen(display);
     color_map = DefaultColormap(display,screen);
 
-    (void) sprintf(option, "%s%s", argv[0], ".foreground");
+    (void) sprintf(option, "%s%s", program_name, ".foreground");
     if (XrmGetResource(x_db, option, "Xtrs.Foreground", &type, &value))
     {
 	/* printf("foreground is %s\n",value.addr); */
@@ -165,7 +199,7 @@ int *debug;
 	fore_pixel = WhitePixel(display, screen);
     }
 
-    (void) sprintf(option, "%s%s", argv[0], ".background");
+    (void) sprintf(option, "%s%s", program_name, ".background");
     if (XrmGetResource(x_db, option, "Xtrs.Background", &type, &value))
     {
 	XParseColor(display, color_map, value.addr, &cdef);
@@ -175,7 +209,7 @@ int *debug;
 	back_pixel = BlackPixel(display, screen);
     }
 
-    (void) sprintf(option, "%s%s", argv[0], ".debug");
+    (void) sprintf(option, "%s%s", program_name, ".debug");
     if (XrmGetResource(x_db, option, "Xtrs.Debug", &type, &value))
     {
 	if (strcmp(value.addr,"on") == 0) {
@@ -183,7 +217,7 @@ int *debug;
 	}
     }
 
-    (void) sprintf(option, "%s%s", argv[0], ".usefont");
+    (void) sprintf(option, "%s%s", program_name, ".usefont");
     if (XrmGetResource(x_db, option, "Xtrs.Usefont", &type, &value))
     {
 	if (strcmp(value.addr,"on") == 0) {
@@ -194,7 +228,7 @@ int *debug;
     }
 
     if (usefont) {
-	(void) sprintf(option, "%s%s", argv[0], ".font");
+	(void) sprintf(option, "%s%s", program_name, ".font");
 	if (XrmGetResource(x_db, option, "Xtrs.Font", &type, &value))
 	{
 	    len = strlen(value.addr);
@@ -213,20 +247,22 @@ int *debug;
 	trs_load_compiled_rom();
     } else {
 	/* try resources */
-	(void) sprintf(option, "%s%s", argv[0], ".romfile");
+	(void) sprintf(option, "%s%s", program_name, ".romfile");
 	if (XrmGetResource(x_db, option, "Xtrs.Romfile", &type, &value)) {
 	    trs_load_rom(value.addr);
 	} else {
 #ifdef DEFAULT_ROM
 	    trs_load_rom(DEFAULT_ROM);
 #else
-	    fprintf(stderr,"%s: rom file not specified!\n",argv[0]);
+	    fprintf(stderr,"%s: rom file not specified!\n",program_name);
 	    exit(-1);
 #endif
 	}
     }
 
+#ifdef KBQUEUE
     clear_key_queue(); /* init the key queue */
+#endif
 
     /* setup root window, and gc */
     root_window = DefaultRootWindow(display);
@@ -242,7 +278,7 @@ int *debug;
 
     if (usefont) {
 	if ((myfont = XLoadQueryFont(display,fontname)) == NULL) {
-	    fprintf(stderr,"%s: Can't open font %s!\n",argv[0],fontname);
+	    fprintf(stderr,"%s: Can't open font %s!\n",program_name,fontname);
 	    exit(-1);
 	}
 	XSetFont(display,gc,myfont->fid);
@@ -255,7 +291,7 @@ int *debug;
     window = XCreateSimpleWindow(display, root_window, 400, 400,
 				 OrigWidth, OrigHeight, 1, foreground,
 				 background);
-    XStoreName(display,window,argv[0]);
+    XStoreName(display,window,program_name);
     XSelectInput(display, window, ExposureMask | KeyPressMask | MapRequest |
 		 KeyReleaseMask | StructureNotifyMask | ResizeRedirectMask );
     XMapWindow(display, window);
@@ -282,10 +318,10 @@ void trs_event(signo)
     int signo;
 {
     fd_set rd_mask;
-    int fd,nfds,nfound;
+    int fd,nfds,nfound,sig_mask;
     struct timeval zero_timeout,*timeout;
 
-    sigblock(sigmask(SIGIO));
+    sig_mask = sigblock(sigmask(SIGIO));
     zero_timeout.tv_sec = 0;
     zero_timeout.tv_usec = 0;
 
@@ -297,7 +333,8 @@ void trs_event(signo)
 	nfds = fd + 1;
 	nfound = select(nfds,&rd_mask,NULL,NULL,timeout);
 	if (nfound == 0) {
-	    sigsetmask(0);
+	    signal(SIGIO, trs_event);
+	    sigsetmask(sig_mask);
 	    return;
 	}
 	(void) get_event();
@@ -356,40 +393,111 @@ XEvent get_event()
 		    else
 			key_state = (int) key;
 		    break;
+	        case XK_t:
+		    if (event.xkey.state & ControlMask)
+		        /* ctrl-t is shift-0 (caps lock under LDOS) */
+			key_state = '0' | 0x80; 
+		    else
+			key_state = (int) key;
+		    break;
+	        case XK_d:
+		    if (event.xkey.state & ControlMask)
+		        /* ctrl-d checks for a disk change */
+		        trs_disk_change_all();
+		    else
+			key_state = (int) key;
+		    break;
+	        case XK_p:
+		    if (event.xkey.state & ControlMask)
+		        /* ctrl-p is shift-@ (pause in BASIC) */
+			key_state = '@' | 0x80; 
+		    else
+			key_state = (int) key;
+		    break;
 		case XK_Break:
+		case XK_Escape:
 		    key_state = 0x3;
+		    if (event.xkey.state & ShiftMask)
+		      key_state |= 0x80;
 		    break;
 		case XK_Return:
 		case XK_KP_Enter:
 		    key_state = 0x0d;
+		    if (event.xkey.state & ShiftMask)
+		      key_state |= 0x80;
 		    break;
 		case XK_Up:
 		    key_state = 0x11;
+		    if (event.xkey.state & ShiftMask)
+		      key_state |= 0x80;
 		    break;
 		case XK_Down:
 		    key_state = 0x12;
+		    if (event.xkey.state & ShiftMask)
+		      key_state |= 0x80;
 		    break;
 		case XK_Left:
 		case XK_BackSpace:
 		case XK_Delete:
 		    key_state = 0x13;
+		    if (event.xkey.state & ShiftMask)
+		      key_state |= 0x80;
 		    break;
 		case XK_Right:
+		case XK_Tab:
 		    key_state = 0x14;
+		    if (event.xkey.state & ShiftMask)
+		      key_state |= 0x80;
 		    break;
+	        case XK_Alt_L:
+	        case XK_Alt_R:
+	        case XK_Meta_L:
+	        case XK_Meta_R:
 		case XK_Clear:
+		case XK_Home:
 		    key_state = 0x7f;
+		    if (event.xkey.state & ShiftMask)
+		      key_state |= 0x80;
 		    break;
+	        case XK_Pause:
+		    key_state = '@' | 0x80;
+                    break;
 		default:
-		    if(key < 0x80)
-			key_state = (int) key;
+		    if(key < 0x80) {
+			/* Kludge, nice for TRS80 ROM keyboard driver:
+			   CapsLock *on* undoes driver's caps/lc reversal.
+		        */
+		        if(((event.xkey.state & (ShiftMask|LockMask))
+			    == (ShiftMask|LockMask))
+			   && key >= 'A' && key <= 'Z') {
+			    key_state = (int) key + 0x20;
+			} else {
+			    key_state = (int) key;
+			}
+		    }
 		    break;
 	    }
+	    if(event.xkey.state & Mod1Mask) key_state |= 0x100;
+#ifdef KBQUEUE
 	    queue_key(key_state);
+#endif
 	    break;
 	case KeyRelease:
 	    (void) XLookupString((XKeyEvent *)&event,buf,10,&key,&status);
 	    key_state = 0;
+	    switch (key) {
+	        case XK_Alt_L:
+	        case XK_Alt_R:
+	        case XK_Meta_L:
+	        case XK_Meta_R:
+		    break;
+		default:
+		    if(event.xkey.state & Mod1Mask) key_state |= 0x100;    
+		    break;
+	    }
+#ifdef KBQUEUE
+	    queue_key(key_state);
+#endif
 	    break;
 	default:
 #ifdef XDEBUG	    
@@ -495,6 +603,14 @@ Bool doflush;
     char temp_char;
 
     trs_screen[position] = char_index;
+#ifndef UPPERCASE
+    /* Emulate Radio Shack lowercase mod.  The replacement character
+       generator ROM had another copy of the uppercase characters in
+       the control character positions, to compensate for a bug in the
+       Level II ROM that stores such values instead of uppercase.
+    */
+    if (char_index < 0x20) char_index += 0x40;
+#endif
     row = position / ROW_LENGTH;
     col = position - (row * ROW_LENGTH);
     destx = col * cur_char_width;
@@ -503,7 +619,7 @@ Bool doflush;
 	if(char_index >= 128) {
 	    /* a graphics character */
 	    plane = 1;
-	    XCopyArea(display,trs_char[char_index],window,gc,0,0,
+	    XCopyArea(display,trs_char[char_index&0xbf],window,gc,0,0,
 		      cur_char_width,cur_char_height,destx,desty);
 	} else {
 	    desty += myfont->ascent;
@@ -549,47 +665,38 @@ int trs_kb_poll()
 {
     /* if (key_state != 0)
 	printf("key is %d\n",key_state); */
+    return key_state;
+}
 
-    /* Flush the queued keys and just return the current key state. */
-    clear_key_queue();
-    return(key_state);
+int trs_next_key_nowait()
+{
+#ifdef KBQUEUE
+    int rval;
+    if((rval = dequeue_key()) >= 0) return rval;
+#endif
+    return key_state;
 }
 
 int trs_next_key()
 {
-    XEvent event;
-    fd_set rd_mask;
-    int fd,nfds;
+#if KBWAIT
     int rval;
-
-    /* I don't think this is quite right -- if a key comes in between
-       when we try to dequeue and when we block, we'll block unnecessarily. */
-
-    if((rval = dequeue_key()) < 0)
+    for(;;) 
     {
-	sigblock(sigmask(SIGIO));
-	
-	while (Death && Taxes) {
-	    FD_ZERO(&rd_mask);
-	    fd = ConnectionNumber(display);
-	    FD_SET(fd,&rd_mask);
-	    nfds = fd + 1;
-	    /* block till something happens */
-	    (void) select(nfds,&rd_mask,NULL,NULL,NULL);
-	    event = get_event();
-#ifdef DEBUG
-	    fprintf(stderr, "%d\n", event.type);
+#if KBQUEUE
+        if((rval = dequeue_key()) >= 0) break;
+#else
+	if((rval = key_state) > 0) break;
 #endif
-	    if (event.type == KeyPress) {
-#ifdef DEBUG
-		fprintf(stderr, "Key!\n");
-#endif
-		break;
-	    }
-	}
-	sigsetmask(0);
-
-	rval = dequeue_key();
+        if(z80_state.irq && z80_state.iff1)
+        {
+	  rval = key_state;
+	  break;
+        }
+        pause();
     }
     return rval;
+#else
+    return key_state;
+#endif
 }

@@ -14,6 +14,11 @@
  */
 
 /*
+   Modified by Timothy Mann, 1996
+   Last modified on Tue Dec 17 13:06:19 PST 1996 by mann
+*/
+
+/*
  * z80.c:  The guts of the Z-80 emulator.
  *
  * The Z-80 emulator should be general and complete enough to be easily
@@ -260,8 +265,8 @@ static void do_flags_dec_byte(value)
 {
     uchar clear, set;
 
-    clear = ~(OVERFLOW_MASK | HALF_CARRY_MASK
-	      | ZERO_MASK | SIGN_MASK);
+    clear = (uchar) ~(OVERFLOW_MASK | HALF_CARRY_MASK
+		      | ZERO_MASK | SIGN_MASK);
     set = SUBTRACT_MASK;
 
     if(value == 0x7f)
@@ -281,8 +286,8 @@ static void do_flags_inc_byte(value)
 {
     uchar clear, set;
 
-    clear = ~(SUBTRACT_MASK | OVERFLOW_MASK
-	      | HALF_CARRY_MASK | ZERO_MASK | SIGN_MASK);
+    clear = (uchar) ~(SUBTRACT_MASK | OVERFLOW_MASK
+		      | HALF_CARRY_MASK | ZERO_MASK | SIGN_MASK);
     set = 0;
 
     if(value == 0x80)
@@ -309,8 +314,8 @@ static void do_and_byte(value)
 
     result = (REG_A &= value);
 
-    clear = ~(CARRY_MASK | SUBTRACT_MASK | PARITY_MASK
-	      | ZERO_MASK | SIGN_MASK);
+    clear = (uchar) ~(CARRY_MASK | SUBTRACT_MASK | PARITY_MASK
+		      | ZERO_MASK | SIGN_MASK);
     set = HALF_CARRY_MASK;
 
     if(parity(result))
@@ -331,7 +336,7 @@ static void do_or_byte(value)
 
     result = (REG_A |= value);
 
-    clear = ~(CARRY_MASK | SUBTRACT_MASK | PARITY_MASK
+    clear = (uchar) ~(CARRY_MASK | SUBTRACT_MASK | PARITY_MASK
 	      | HALF_CARRY_MASK | ZERO_MASK | SIGN_MASK);
     set = 0;
 
@@ -353,8 +358,8 @@ static void do_xor_byte(value)
 
     result = (REG_A ^= value);
 
-    clear = ~(CARRY_MASK | SUBTRACT_MASK | PARITY_MASK
-	      | HALF_CARRY_MASK | ZERO_MASK | SIGN_MASK);
+    clear = (uchar) ~(CARRY_MASK | SUBTRACT_MASK | PARITY_MASK
+		      | HALF_CARRY_MASK | ZERO_MASK | SIGN_MASK);
     set = 0;
 
     if(parity(result))
@@ -545,7 +550,7 @@ static void do_test_bit(value, bit)
 {
     uchar clear, set;
 
-    clear = ~(SIGN_MASK | ZERO_MASK | OVERFLOW_MASK | SUBTRACT_MASK);
+    clear = (uchar) ~(SIGN_MASK | ZERO_MASK | OVERFLOW_MASK | SUBTRACT_MASK);
     set = HALF_CARRY_MASK;
 
     if((value & (1 << bit)) == 0)
@@ -565,8 +570,8 @@ static int rl_byte(value)
     uchar clear, set;
     int result;
 
-    clear = ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
-	      SUBTRACT_MASK | CARRY_MASK);
+    clear = (uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
+		      SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
     if(CARRY_FLAG)
@@ -603,7 +608,7 @@ static int rr_byte(value)
     uchar clear, set;
     int result;
 
-    clear = ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
+    clear = (uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
 	      SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
@@ -640,8 +645,8 @@ static int rlc_byte(value)
     uchar clear, set;
     int result;
 
-    clear = ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
-	      SUBTRACT_MASK | CARRY_MASK);
+    clear = (uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
+		      SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
     if(value & 0x80)
@@ -672,8 +677,8 @@ static int rrc_byte(value)
     uchar clear, set;
     int result;
 
-    clear = ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
-	      SUBTRACT_MASK | CARRY_MASK);
+    clear = (uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
+		      SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
     if(value & 0x1)
@@ -683,7 +688,12 @@ static int rrc_byte(value)
     }
     else
     {
+#if 0
+        /* oops! */
 	result = (value << 1);
+#else
+	result = (value >> 1);
+#endif
     }
 
     if(result & 0x80)
@@ -789,8 +799,8 @@ static int sla_byte(value)
     uchar clear, set;
     int result;
 
-    clear = ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
-	      SUBTRACT_MASK | CARRY_MASK);
+    clear = (uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
+		      SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
     result = value << 1;
@@ -815,8 +825,8 @@ static int sra_byte(value)
     uchar clear, set;
     int result;
 
-    clear = ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
-	      SUBTRACT_MASK | CARRY_MASK);
+    clear = (uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
+		      SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
     if(value & 0x80)
@@ -847,8 +857,8 @@ static int srl_byte(value)
     uchar clear, set;
     int result;
 
-    clear = ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
-	      SUBTRACT_MASK | CARRY_MASK);
+    clear = (uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
+		      SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
     result = value >> 1;
@@ -931,8 +941,8 @@ static void do_ld_a_i()
 {
     uchar clear, set;
 
-    clear = ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | OVERFLOW_MASK |
-	      SUBTRACT_MASK);
+    clear = (uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | OVERFLOW_MASK |
+		      SUBTRACT_MASK);
     set = 0;
 
     REG_A = REG_I;
@@ -952,8 +962,8 @@ static void do_ld_a_r()
 {
     uchar clear, set;
 
-    clear = ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | OVERFLOW_MASK |
-	      SUBTRACT_MASK);
+    clear = (uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | OVERFLOW_MASK |
+		      SUBTRACT_MASK);
     set = 0;
 
     /* Fetch a random value. */
@@ -1094,8 +1104,8 @@ static void do_rld()
     int old_value, new_value;
     uchar clear, set;
 
-    clear = ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
-	      SUBTRACT_MASK);
+    clear = (uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
+		      SUBTRACT_MASK);
     set = 0;
 
     old_value = mem_read(REG_HL);
@@ -1125,8 +1135,8 @@ static void do_rrd()
     int old_value, new_value;
     uchar clear, set;
 
-    clear = ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
-	      SUBTRACT_MASK);
+    clear = (uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
+		      SUBTRACT_MASK);
     set = 0;
 
     old_value = mem_read(REG_HL);
@@ -1218,8 +1228,8 @@ static int in_with_flags(port)
     int value;
     uchar clear, set;
 
-    clear = ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK |
-	      PARITY_MASK | SUBTRACT_MASK);
+    clear = (uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK |
+		      PARITY_MASK | SUBTRACT_MASK);
     set = 0;
 
     value = z80_in(port);
@@ -1304,12 +1314,11 @@ static void do_di()
 
 static void do_ei()
 {
-    /*
-     * This is supposed to enable interrupts after the next instruction,
-     * but since we're not doing anything about interrupts anyway, it
-     * just doesn't matter.
-     */
-    z80_state.iff1 = 1;
+    /* Enable interrupts after the *next* instruction.  The bogus
+       value "2" is corrected by our caller at the end of the
+       current instruction.
+    */
+    z80_state.iff1 = 2;
 }
 
 static void do_im0()
@@ -1325,6 +1334,27 @@ static void do_im1()
 static void do_im2()
 {
     z80_state.interrupt_mode = 2;
+}
+
+static void do_int()
+{
+    /* handle a maskable interrupt */
+    REG_SP -= 2;
+    mem_write_word(REG_SP, REG_PC);
+    z80_state.iff1 = 0;
+    switch (z80_state.interrupt_mode) {
+    case 0:
+      /* REG_PC = get_irq_vector() & 0x38; */
+      error("interrupt in im0 not supported");
+      break;
+    case 1:
+      REG_PC = 0x38;
+      break;
+    case 2:
+      /* REG_PC = REG_I << 8 + get_irq_vector(); */
+      error("interrupt in im2 not supported");
+      break;
+    }
 }
 
 static void do_nmi()
@@ -2190,7 +2220,10 @@ static void do_indexed_instruction(ixp)
 	break;
 
       case 0x23:	/* inc ix */
-	(*ixp)--;
+#ifdef OOPS
+	(*ixp)--;  /* amazing we got far with this mistake! --tpm */
+#endif
+	(*ixp)++;
 	break;
 
       case 0xE9:	/* jp (ix) */
@@ -2641,22 +2674,15 @@ static void do_ED_instruction()
 /* #define MEM_READ(a) (((((a) - 0x3000) & 0xffff) >= 0xc00) ? memory[a] : mem_read(a)) */
 
 int z80_run(continuous)
-    int continuous;	/* zero if we only want to do a single step */
+    int continuous;  /* 1= continuous, 0= singlestep,
+			-1= singlestep and disallow interrupts */
 {
     uchar instruction;
     ushort address; /* generic temps */
+    int delay_enable, ret = 0;
 
     /* loop to do a z80 instruction */
     do {
-	/* Check for an interrupt */
-	if(z80_state.interrupt)
-	{
-	    /* Only handle the NMI right now. */
-	    do_nmi();
-	    z80_state.interrupt = FALSE;
-	    printf("Interrupt acknowledged.\n");
-	}
-
 	instruction = mem_read(REG_PC++);
 	/* instruction = MEM_READ(REG_PC);  REG_PC++; */
 	
@@ -3043,7 +3069,9 @@ int z80_run(continuous)
 	    
 	  case 0x76:	/* halt */
 	    REG_PC--;	/* don't increment PC past this instruction */
-	    return 1;
+	    if (continuous > 0) continuous = 0;
+	    ret = 1;
+	    break;
 
 	  case 0xDB:	/* in a, (port) */
 	    REG_A = z80_in(mem_read(REG_PC++));
@@ -3803,8 +3831,28 @@ int z80_run(continuous)
 	    disassemble(REG_PC);
 	    error("unsupported instruction");
 	}
-    } while (continuous);
-    return 0;
+
+	/* Check for an interrupt.  We do this at the bottom because
+	   it makes it easier to delay reenabling interrupts to the
+	   end of the instruction *following* an EI, as we should. */
+	if((delay_enable = (z80_state.iff1 == 2)))
+	  z80_state.iff1 = 1;
+	if (continuous >= 0)
+        {
+	    if(z80_state.nmi)
+	    {
+	        /* Handle the NMI first */
+	        do_nmi();
+	        z80_state.nmi = FALSE;
+	        printf("Nonmaskable interrupt acknowledged.\n");
+	    }
+	    if(z80_state.irq && z80_state.iff1 == 1 && !delay_enable)
+            {
+	        do_int();
+	    }
+	}
+    } while (continuous > 0);
+    return ret;
 }
 
 
@@ -3815,7 +3863,7 @@ void z80_reset()
     z80_state.iff1 = 0;
     z80_state.iff2 = 0;
     z80_state.interrupt_mode = 0;
-    z80_state.interrupt = FALSE;
+    z80_state.irq = z80_state.nmi = FALSE;
 
     /* z80_state.r = 0; */
     srand(time(NULL));  /* Seed the RNG, for reading the refresh register */

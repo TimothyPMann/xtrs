@@ -15,7 +15,7 @@ while($done != 1)
 	echo "Position:    " $control[2]
 	echo ""
 	echo -n "Command: "
-	set command = $<
+	set command = "$<"
 	set command = ( $command )
 
 	if($#command < 1) then
