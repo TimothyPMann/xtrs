@@ -192,7 +192,7 @@ clean:
 			$(PROGS) compile_rom
 
 veryclean: clean
-		rm -f $(Z80CODE) $(MANPAGES)
+		rm -f $(Z80CODE) $(MANPAGES) *.lst
 
 link:	
 		rm -f xtrs

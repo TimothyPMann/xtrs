@@ -58,22 +58,33 @@ each of which represents cassette data in a different format.
 format is fairly compact and is compatible with other TRS-80 emulators
 that have cassette support.  This format represents the bit stream
 that (the emulator thinks) the TRS-80 cassette routines were trying to
-save to the tape, not the actual electrical signals on the tape.  On
-writing, the emulator monitors the values that the TRS-80 software is
-sending to the cassette port and their timing, auto-recognizes whether
-a 500-bps or 1500-bps format is being written, decodes the signals
-into a string of 0 and 1 bits, packs the bits into bytes, and writes
-them to the cas file.  (250 bps, used by Level 1 Basic, is currently
-not supported.)  On reading, the emulator auto-detects whether
-software is trying to read at 500 or 1500 bps and encodes the 0's and
-1's back into the signals that the TRS-80 software is expecting.
+save to the tape, not the actual electrical signals on the tape.  
 
-This somewhat roundabout method should work with most TRS-80 cassette
-routines that read/write signals compatible with the ROM cassette
-routines, but will fail with routines that are too different.  Note
-that you can't read a 500-bps cas image at 1500 bps or vice versa;
-1500 bps uses a different bit pattern in the leader and writes an
-extra zero bit between every two data bytes.
+On writing, the emulator monitors the values that the TRS-80 software is
+sending to the cassette port and their timing, auto-recognizes whether
+a 250-bps, 500-bps, or 1500-bps format is being written, decodes the
+signals into a string of 0 and 1 bits, packs the bits into bytes, and
+writes them to the cas file.  On reading, the emulator auto-detects
+whether software is trying to read at 250, 500, or 1500 bps and
+encodes the 0's and 1's back into the signals that the TRS-80 software
+is expecting.  This somewhat roundabout method should work with most
+TRS-80 cassette routines that read and write signals compatible with the
+ROM cassette routines, but it may fail with custom routines that are
+too different.
+
+Note that generally nothing useful will happen if you try to write a
+cas image at one speed and read it at another.  There are differences
+in the actual bit streams that standard TRS-80 software records at
+each of the three different speeds, not just differences in encoding
+the electrical signals on the tape.  Thus an incoming bit stream that
+was originally recorded at one speed will not be understood when read
+back in at a different speed.  For example, Level 2 Basic programs are
+tokenized, while Level 1 Basic programs are not, and the two Basic
+implementations record different binary information at the start of
+the program and between lines.  Also, when a file is saved at 1500
+bps, standard TRS-80 software puts an extra 0 bit after every 8 data
+bits, and these extra bits are packed into the cas file along with the
+data bits.
 
 .I cpt
 format (for "cassette pulse train") encodes the exact values and
