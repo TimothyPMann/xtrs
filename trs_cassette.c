@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Oct 10 20:22:08 PDT 1998 by mann
+   Last modified on Mon Mar 22 20:49:18 PST 1999 by mann
 */
 
 #include "trs.h"
@@ -294,12 +294,16 @@ int trs_cassette_in(int modesel)
   if (REG_PC == 0x0245) {
     if (mem_read_word(REG_SP + 4) == 0x029b) {
       /* this is a read from the code which reads the header */
+      trs_paused = 1;  /* disable speed measurement for this round */
 	    
       if (!assert_state(READ)) {
 	int nextbyte;
 		
 	do {
-	  if (z80_state.nmi) return 0; /* allow reboot */
+	  /* Allow reboot */
+	  trs_get_event(0);
+	  if (z80_state.nmi) return 0;
+	  /* Search for the start byte */
 	  nextbyte = fgetc(cassette_file);
 	} while(nextbyte != 0xa5);
 

@@ -11,13 +11,26 @@
 
 # If you would like the TRS-80 ROM to be built into the application,
 # use the following lines (with the appropriate file names).  You can
-# get a ROM image from a real TRS-80 with moderate effort, if you have 
-# one.  There are also Web sites with TRS-80 ROMs that can be downloaded, 
-# but none are included with this package due to copyright concerns.
+# get a ROM image from a real TRS-80 with moderate effort, if you have
+# one.  There are also Web sites with TRS-80 ROMs that can be
+# downloaded, but none are included with this package due to copyright
+# concerns.  As another alternative, for -model III or 4, you can
+# export the MODELA/III file from a Model III or 4 TRSDOS or
+# LDOS/LS-DOS diskette and use it as BUILT_IN_ROM3.
 
+# The default ROM for -model I, III and 4 (fakerom.hex) just prints a
+# message saying that you don't have a ROM.  The default ROM for
+# -model 4P (xtrsrom4p.hex) is a free minimal ROM that can boot a
+# Model 4 mode operating system (such as TRSDOS/LDOS 6); source code
+# is included in this package.  This ROM cannot boot a Model III mode
+# operating system.
+
+# for -model I
 BUILT_IN_ROM = fakerom.hex
+# for -model III and -model 4
 BUILT_IN_ROM3 = fakerom.hex
-BUILT_IN_ROM4P = fakerom.hex
+# for -model 4P
+BUILT_IN_ROM4P = xtrsrom4p.hex
 
 # If you would like the application to load a default ROM file at startup
 # time, use these lines (with the appropriate file names).  The default file

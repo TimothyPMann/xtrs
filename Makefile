@@ -120,7 +120,7 @@ default: xtrs mkdisk hex2cmd cmddump xtrs.txt mkdisk.txt cassette.txt
 
 z80code: export.cmd import.cmd settime.cmd xtrsmous.cmd \
 	xtrs8.dct xtrshard.dct \
-	fakerom.hex
+	fakerom.hex xtrsrom4p.hex
 
 # Local customizations for make variables are done in Makefile.local:
 include Makefile.local
@@ -129,7 +129,7 @@ CFLAGS = $(DEBUG) $(ENDIAN) $(DEFAULT_ROM) $(READLINE) $(DISKDIR) $(IFLAGS) \
 	-DKBWAIT -DHAVE_SIGIO
 LIBS = $(XLIB) $(READLINELIBS) $(EXTRALIBS)
 
-.SUFFIXES:	.z .cmd .dct .man .txt
+.SUFFIXES:	.z .cmd .dct .man .txt .hex
 .z.cmd:
 	zmac $<
 	hex2cmd $*.hex > $*.cmd
@@ -138,6 +138,8 @@ LIBS = $(XLIB) $(READLINELIBS) $(EXTRALIBS)
 	zmac $<
 	hex2cmd $*.hex > $*.dct
 	rm -f $*.hex
+.z.hex:
+	zmac $<
 .man.txt:
 	nroff -man $< > $*.txt
 
