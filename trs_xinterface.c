@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Fri Dec 15 15:23:50 PST 2000 by mann
+   Last modified on Tue May  1 21:39:24 PDT 2001 by mann
 */
 
 /*#define MOUSEDEBUG 1*/
@@ -144,6 +144,8 @@ static XrmOptionDescRec opts[] = {
 {"-scale4",     "*scale",       XrmoptionNoArg,         (caddr_t)"4"},
 {"-serial",     "*serial",      XrmoptionSepArg,        (caddr_t)NULL},
 {"-switches",   "*switches",    XrmoptionSepArg,        (caddr_t)NULL},
+{"-shiftbracket","*shiftbracket",XrmoptionNoArg,        (caddr_t)"on"},
+{"-noshiftbracket","*shiftbracket",XrmoptionNoArg,      (caddr_t)"off"},
 #if __linux
 {"-sb",         "*sb",          XrmoptionSepArg,        (caddr_t)NULL},
 #endif /* linux */
@@ -303,12 +305,13 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
   char option[512];
   char *type;
   XrmValue value;
-  char *xrms;
+  char *xrms, *tmp;
   int stepdefault, i, s[8];
 
   title = program_name; /* default */
 
   XrmInitialize();
+
   /* parse command line options */
   XrmParseCommand(&command_db,opts,num_opts,program_name,&argc,argv);
 
@@ -328,6 +331,20 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
   } else {
     x_db = command_db;
   }
+
+  /* get defaults from $HOME/.Xdefaults and $HOME/Xtrs */
+  if ((tmp = getenv("HOME"))) {
+    sprintf(option, "%s/%s", tmp, ".Xdefaults");
+    XrmCombineFileDatabase(option, &x_db, False);
+    sprintf(option, "%s/%s", tmp, "Xtrs");
+    XrmCombineFileDatabase(option, &x_db, False);
+  }
+
+  /* get defaults from /usr/X11/lib/X11/app-defaults/Xtrs */
+#ifdef APPDEFAULTS
+  sprintf(option, "%s/%s", APPDEFAULTS, "Xtrs");
+  XrmCombineFileDatabase(option, &x_db, False);
+#endif
 
   (void) sprintf(option, "%s%s", program_name, ".scale");
   if (XrmGetResource(x_db, option, "Xtrs.Scale", &type, &value)) 
@@ -580,6 +597,15 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
   (void) sprintf(option, "%s%s", program_name, ".switches");
   if (XrmGetResource(x_db, option, "Xtrs.serial", &type, &value)) {
       trs_uart_switches = strtol(value.addr, NULL, 0);
+  }
+
+  (void) sprintf(option, "%s%s", program_name, ".shiftbracket");
+  if (XrmGetResource(x_db, option, "Xtrs.Shiftbracket", &type, &value)) {
+    if (strcmp(value.addr,"on") == 0) {
+      trs_kb_bracket(True);
+    } else if (strcmp(value.addr,"off") == 0) {
+      trs_kb_bracket(False);
+    }
   }
 
   return argc;
@@ -860,7 +886,7 @@ void trs_screen_init()
 			       background);
 #if XDEBUG
     debug("XCreateSimpleWindow(%d, %d)\n", OrigWidth, OrigHeight);
-#endif XDEBUG
+#endif /*XDEBUG*/
   trs_fix_size(window, OrigWidth, OrigHeight);
   XStoreName(display,window,title);
   XSelectInput(display, window, EVENT_MASK);
@@ -1101,7 +1127,7 @@ void trs_screen_640x240(int flag)
     XFlush(display);
 #if XDEBUG
     debug("XResizeWindow(%d, %d)\n", OrigWidth, OrigHeight);
-#endif XDEBUG
+#endif /*XDEBUG*/
   } else {
     left_margin = cur_char_width * (80 - row_chars)/2 + border_width;
     if (usefont) {
