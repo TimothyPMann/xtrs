@@ -1,35 +1,3 @@
-Return-Path: ulm@a1i15.kph.uni-mainz.de 
-Delivery-Date: Mon, 23 Feb 98 07:28:03 -0800
-Return-Path: ulm@a1i15.kph.uni-mainz.de
-Received: by src-mail.pa.dec.com; id AA03471; Mon, 23 Feb 98 07:27:40 -0800
-Received: from mail1.digital.com by pobox1.pa.dec.com (5.65v3.2/1.1.10.5/07Nov97-1157AM)
-	id AA07059; Mon, 23 Feb 1998 07:27:35 -0800
-Received: from a1i15.kph.uni-mainz.de (a1i15.kph.uni-mainz.de [134.93.134.92])
-	by mail1.digital.com (8.8.8/8.8.8/WV1.0c) with ESMTP id HAA28166
-	for <mann@pa.dec.com>; Mon, 23 Feb 1998 07:26:34 -0800 (PST)
-Received: (from ulm@localhost)
-	by a1i15.kph.uni-mainz.de (8.8.5/8.8.5) id QAA03516;
-	Mon, 23 Feb 1998 16:26:21 +0100
-Message-Id: <199802231526.QAA03516@a1i15.kph.uni-mainz.de>
-From: Ulrich Mueller <ulm@kph.uni-mainz.de>
-To: Tim Mann <mann@pa.dec.com>
-Subject: settime.z for xtrs-1.9
-Date: Mon, 23 Feb 1998 16:26:21 +0100
-
-Hi again,
-
-below I include an assembly language version of settime. If you like
-it, you may include it in the xtrs distribution. It should run under
-Newdos/80 and under LDOS 5 and 6.
-
-I did not get the C version of settime running under Newdos. I would
-guess the program misses run-time libraries. (But since I never used
-Misosys C before, I did not really investigate what the problem is.)
-
-Best regards
-Ulrich
-
---- cut here --- cut here --- cut here --- cut here --- cut here ---
 ;; settime.z
 ;;
 ;; Read date and time from xtrs 1.9 emulator trap and set
@@ -43,7 +11,8 @@ Ulrich
 ;; marked as having been modified, with the modifier's name and
 ;; the date included.  
 ;;
-;; Last modified on Sun Feb 22 21:27:13 CET 1998 by ulm
+;; Last modified on Thu Mar 19 13:54:45 PST 1998 by mann
+;;      modified on Sun Feb 22 21:27:13 CET 1998 by ulm
 
 ;; Model I/III addresses
 @exit	equ 402dh
@@ -195,9 +164,3 @@ model3:	ld de, startj
 	ret
 
 	end settime
---- cut here --- cut here --- cut here --- cut here --- cut here ---
-
--- 
-Ulrich Mueller, Inst. fuer Kernphysik, Univ. Mainz, D-55099 Mainz
-ulm@kph.uni-mainz.de, Phone +49 6131 39-5812, Fax -2964
-
