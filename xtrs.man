@@ -20,6 +20,8 @@ There is also a rudimentary emulation of cassette I/O
 that uses files for cassette tapes (Model I mode only).
 Crude sound support is available under Linux if you have 
 SoundBlaster-compatible hardware.
+In Model 4/4P mode, the Micro Labs Grafyx Solution hi-res card is emulated;
+software written for the Radio Shack graphics card should also work.
 
 The Z-80 emulator has a debugger called zbx.  It works sort of
 like dbx.  If you run with debugging turned on (see the options section for
@@ -607,4 +609,6 @@ supplied the TRS-80 fonts in bdf format.  Roland Gerlach contributed
 several bug reports and fixes.  Fabio Ferrari contributed the sound
 support.  Ulrich Mueller added the -borderwidth option and ported the
 import, export, and settime utilities to Newdos/80.  Branden Robinson
-supplied the cassette man page and fixed Makefile bugs.
+supplied the cassette man page and fixed Makefile bugs.  Mark McDougall
+provided documentation for the Micro Labs Grafyx Solution card.
+
