@@ -6,10 +6,11 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Tue Dec 17 13:06:19 PST 1996 by mann */
+/* Last modified on Tue Sep 30 14:02:22 PDT 1997 by mann */
 
 #include <stdio.h>
 #include "cmd.h"
+#include "z80.h"
 
 char *program_name;
 

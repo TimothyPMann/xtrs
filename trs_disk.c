@@ -5,10 +5,10 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Wed Sep 24 18:26:57 PDT 1997 by mann */
+/* Last modified on Tue Sep 30 14:18:37 PDT 1997 by mann */
 
 /*
- * Emulate Model I or III disk controller
+ * Emulate Model I or III/4 disk controller
  */
 
 /*#define DISKDEBUG 1*/
@@ -19,11 +19,14 @@
 #include <stdio.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define NDRIVES 8
 
 int trs_disk_spinfast = 0;
 int trs_disk_nocontroller = 0;
+char *trs_disk_dir = DISKDIR;
 
 typedef struct {
   /* Registers */
@@ -248,7 +251,7 @@ sort_ids(int drive)
 void
 trs_disk_change(int drive)
 {
-  char diskname[16];
+  char diskname[1024];
   DiskState *d = &disk[drive];  
   struct stat st;
   int c;
@@ -257,7 +260,7 @@ trs_disk_change(int drive)
     c = fclose(d->file);
     if (c == EOF) state.status |= TRSDISK_WRITEFLT;
   }
-  sprintf(diskname, "disk%d-%d", trs_model, drive);
+  sprintf(diskname, "%s/disk%d-%d", trs_disk_dir, trs_model, drive);
   d->file = fopen(diskname, "r+");
   if (d->file == NULL) {
     d->file = fopen(diskname, "r");
@@ -488,7 +491,6 @@ search_adr()
 void
 verify()
 {
-  int ok;
   DiskState *d = &disk[state.curdrive];
   if (d->emutype == JV1) {
     if (state.density == 1) {

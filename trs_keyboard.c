@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Mon Sep  1 18:02:55 PDT 1997 by mann
+   Last modified on Tue Sep 30 13:31:31 PDT 1997 by mann
 */
 
 #include "z80.h"
@@ -525,6 +525,19 @@ static void change_keystate(key)
 {
     int key_down;
     KeyTable* kt;
+    int i;
+
+    if (key == 0x10000) {
+	/* force all keys up */
+	for (i=0; i<7; i++) {
+	    keystate[i] = 0;
+	}
+	force_shift = 0;
+#ifdef KBDEBUG
+	fprintf(stderr, "change_keystate: forced all keys up\n");
+#endif
+	return;
+    }
 
     key_down = (key & 0x10000) == 0;
     if (key & 0xff00) {

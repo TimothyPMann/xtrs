@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Aug 23 14:21:45 PDT 1997 by mann
+   Last modified on Tue Sep 30 13:40:12 PDT 1997 by mann
 */
 
 #include "z80.h"
@@ -107,7 +107,7 @@ static void write_norom_output(which)
     printf("unsigned char trs_rom%s[1];\n", which);
 }
 
-main(argc, argv)
+void main(argc, argv)
     int argc;
     char *argv[];
 {

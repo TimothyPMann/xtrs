@@ -2080,7 +2080,7 @@ int disassemble(pc)
     printf ("%04x\t", addr);
     switch (code->args) {
       case 2:
-	printf (code->name, mem_read(pc + 1), mem_read(pc));
+	printf (code->name, mem_read((pc + 1) & 0xffff), mem_read(pc));
 	pc += 2;
 	break;
       case 1:
@@ -2088,7 +2088,7 @@ int disassemble(pc)
 	pc += 1;
 	break;
       case 3: /* 1 arg before instruction */
-	printf (code->name, mem_read(pc - 2));
+	printf (code->name, mem_read((pc - 2) & 0xffff));
         break;
       case 0:
 	printf (code->name);

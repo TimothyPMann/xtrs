@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Aug 23 14:50:44 PDT 1997 by mann
+   Last modified on Tue Sep 30 13:15:25 PDT 1997 by mann
 */
 
 #include "z80.h"
@@ -74,53 +74,25 @@ void trs_load_compiled_rom(size, rom)
     }
 }
 
-main(argc, argv)
+int main(argc, argv)
     int argc;
     char *argv[];
 {
     int debug = FALSE;
-    int instrument = FALSE;
-    int i = 0;
 
     check_endian();
 
-    for (i = 1; i < argc; i++) {
-	if (!strcmp(argv[i],"-debug")) {
-	    debug = TRUE;
-	} else if (!strcmp(argv[i],"-instrument")) {
-	    instrument = TRUE;
-	} else if (!strcmp(argv[i],"-spinfast")) {
-	    /* Kludge -- make index hole go by at 10x normal frequency.
-               This makes NEWDOS 80 somewhat happier.  NEWDOS 80
-               apparently looks to see if a drive contains a disk by
-               polling for some fixed number of iterations, looking
-               for an index hole to go by.  But it seems we emulate
-               the instructions in the loop too fast, so that sometimes
-               no hole has gone by yet when NEWDOS 80 gives up.
-	    */
-	    trs_disk_spinfast = TRUE;
-        } else if (!strcmp(argv[i],"-model1")) {
-	    trs_model = 1;
-        } else if (!strcmp(argv[i],"-model3")) {
-	    trs_model = 3;
-	}
+    argc = trs_parse_command_line(argc, argv, &debug);
+    if (argc > 1) {
+      fprintf(stderr, "%s: erroneous argument %s\n", argv[0], argv[1]);
+      exit(1);
     }
-	
     mem_init();
     trs_disk_init(0);
-    argc = trs_screen_init(argc,argv,&debug);
+    trs_screen_init();
     trs_timer_init();
 
-    if(instrument)
-    {
-#ifdef INSTRUMENT
-	printf("Running in instrument mode.\n");
-	instrument_run(1);
-#else
-	error("instrument mode is not supported in this version");
-#endif
-    }
-    else if(debug)
+    if(debug)
     {
 	printf("Entering debugger.\n");
 	debug_init();
@@ -131,10 +103,8 @@ main(argc, argv)
     {
 	z80_reset();
 	z80_run(TRUE);	/* run continuously */
-	printf("Z-80 Halted.\n");  /* TPM: on a real Model I, executing a
-				      HALT instruction is equivalent
-				      to pressing the reset button */
-	exit(0);
+	/* not reached */
     }
+    exit(0);
 }
 

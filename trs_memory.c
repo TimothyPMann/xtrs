@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Wed Aug 27 17:36:02 PDT 1997 by mann
+   Last modified on Tue Sep 30 18:33:50 PDT 1997 by mann
 */
 
 /*
@@ -32,11 +32,22 @@
 #include <stdlib.h>
 #include "trs_disk.h"
 
-Uchar *memory;
+Uchar memory[0x20001]; /* +1 so strings from mem_pointer are NUL-terminated */
+Uchar *rom;
 int trs_rom_size;
+Uchar *video;
+int trs_video_size;
 
-#define MEMORY_SIZE	Z80_ADDRESS_LIMIT
+int memory_map = 0;
+int bank_offset[2];
+#define VIDEO_PAGE_0 0
+#define VIDEO_PAGE_1 1024
+int video_page = VIDEO_PAGE_0;
 
+#define MAX_ROM_SIZE	(0x3800)
+#define MAX_VIDEO_SIZE	(0x0800)
+
+/* Locations for Model I, Model III, and Model 4 map 0 */
 #define ROM_START	(0x0000)
 #define IO_START	(0x3000)
 #define KEYBOARD_START	(0x3800)
@@ -47,23 +58,6 @@ int trs_rom_size;
 
 /* Interrupt latch register in EI (Model 1) */
 #define TRS_INTLATCH(addr) (((addr)&~3) == 0x37e0)
-
-/*
- * Macros to determine quickly if an address is writeable or readable
- * directly from the memory buffer.  Readable addresses are rom, video,
- * or ram.  Writable addresses are ram only.  Words are handled such that
- * they are guaranteed to be entirely within the right space.
- */
-
-#define WRITEABLE(address) \
-  ((address) >= RAM_START)
-#define READABLE(address) \
-  (((Ushort) ((address) - trs_rom_size)) >= (VIDEO_START - trs_rom_size))
-
-#define WRITEABLE_WORD(address) \
-  (((Ushort) ((address) + 1)) >= (RAM_START + 1))
-#define READABLE_WORD(address) \
-  (((Ushort) ((address)+1 - trs_rom_size)) >= (VIDEO_START+1 - trs_rom_size))
 
 /*SUPPRESS 53*/
 /*SUPPRESS 112*/
@@ -106,18 +100,7 @@ static void video_write(location, value)
 
 static void video_scroll()
 {
-    /*
-     * Fix here when scrolling works.
-     */
     trs_screen_scroll();
-#ifdef notdef
-    int i;
-
-    for(i = 0; i < 0x3c0; ++i)
-    {
-	video_write(i, memory[i + VIDEO_START + 0x40]);
-    }
-#endif
 }
 
 static void cache_video_writes()
@@ -137,6 +120,42 @@ static void uncache_video_writes()
     video_cache_on = 0;
 }
 
+void mem_video_page(which)
+     int which;
+{
+    video_page = which ? VIDEO_PAGE_1 : VIDEO_PAGE_0;
+}
+
+void mem_bank(command)
+     int command;
+{
+    switch (command) {
+      case 0:
+	bank_offset[0] = 0 << 15;
+	bank_offset[1] = 0 << 15;
+	break;
+      case 2:
+	bank_offset[0] = 0 << 15;
+	bank_offset[1] = 1 << 15;
+	break;
+      case 3:
+	bank_offset[0] = 0 << 15;
+	bank_offset[1] = 2 << 15;
+	break;
+      case 6:
+	bank_offset[0] = 1 << 15;
+	bank_offset[1] = 0 << 15;
+	break;
+      case 7:
+	bank_offset[0] = 2 << 15;
+	bank_offset[1] = 0 << 15;
+	break;
+      default:
+	fprintf(stderr, "unknown mem_bank command %d\n", command);
+	break;
+    }
+}
+
 void trs_exit()
 {
     exit(0);
@@ -144,18 +163,42 @@ void trs_exit()
 
 void trs_reset()
 {
-    /* Reset devices (SYSRES on system bus) as at power-up --TPM */
+    /* Reset devices (Model I SYSRES, Model III/4 RESET) */
     trs_disk_init(1);
+    if (trs_model >= 4) {
+	z80_out(0x84, 0);
+    }
+    if (trs_model >= 3) {
+	trs_interrupt_mask_write(0);
+	trs_nmi_mask_write(0);
+    }
     /* Signal a nonmaskable interrupt. */
     trs_reset_button_interrupt(1);
     /* Part of keyboard stretch kludge */
     trs_kb_reset();
 }
 
+void mem_map(which)
+     int which;
+{
+    memory_map = which + (trs_model << 4);
+}
+
 void mem_init()
 {
-    memory = (Uchar *) malloc(MEMORY_SIZE);
-    bzero(memory, MEMORY_SIZE);
+    if (trs_model <= 3) {
+	rom = &memory[ROM_START];
+	video = &memory[VIDEO_START];
+	trs_video_size = 1024;
+    } else {
+	/* +1 so strings from mem_pointer are NUL-terminated */
+	rom = (Uchar *) calloc(MAX_ROM_SIZE+1, 1);
+	video = (Uchar *) calloc(MAX_VIDEO_SIZE+1, 1);
+	trs_video_size = MAX_VIDEO_SIZE;
+    }
+    mem_map(0);
+    mem_bank(0);
+    video_page = 0;
     video_cache_on = 0;
 }
 
@@ -168,7 +211,7 @@ void mem_write_rom(address, value)
 {
     address &= 0xffff;
 
-    memory[address] = value;
+    rom[address] = value;
 }
 
 /* Called by load_hex */
@@ -186,60 +229,68 @@ void hex_transfer_address(address)
     /* Ignore */
 }
 
-#ifdef INSTRUMENT
-#define RETURN rval =
-#else
-#define RETURN return
-#endif
-
 int mem_read(address)
     int address;
 {
-    int rval;
-    address &= 0xffff;
-    if(READABLE(address))
-    {
-	/* read from ROM, video, or RAM */
-	RETURN(memory[address]);
+    /*address &= 0xffff;   caller must guarantee this now */
+
+    switch (memory_map) {
+      case 0x10:
+	/* Model I */
+	if (address >= VIDEO_START) return memory[address];
+	if (address < trs_rom_size) return memory[address];
+	if (address == TRSDISK_DATA) return trs_disk_data_read();
+	if (TRS_INTLATCH(address)) return trs_interrupt_latch_read();
+	if (address == TRSDISK_STATUS) return trs_disk_status_read();
+	if (address == PRINTER_ADDRESS)	return trs_printer_read();
+	if (address == TRSDISK_TRACK) return trs_disk_track_read();
+	if (address == TRSDISK_SECTOR) return trs_disk_sector_read();
+	if (address >= KEYBOARD_START) return trs_kb_mem_read(address);
+	return 0xff;
+
+      case 0x30:
+	/* Model III */
+	if (address >= VIDEO_START) return memory[address];
+	if (address == PRINTER_ADDRESS)	return trs_printer_read();
+	if (address < trs_rom_size) return memory[address];
+	if (address >= KEYBOARD_START) return trs_kb_mem_read(address);
+	return 0xff;
+
+      case 0x40:
+	/* Model 4 map 0 */
+	if (address >= RAM_START) {
+	    return memory[address + bank_offset[address>>15]];
+	}
+	if (address == PRINTER_ADDRESS) return trs_printer_read();
+	if (address < trs_rom_size) return rom[address];
+	if (address >= VIDEO_START) {
+	    return video[(address-VIDEO_START)|video_page];
+	}
+	if (address >= KEYBOARD_START) return trs_kb_mem_read(address);
+	return 0xff;
+
+      case 0x41:
+	if (address >= RAM_START || address < KEYBOARD_START) {
+	    return memory[address + bank_offset[address>>15]];
+	}
+	if (address >= VIDEO_START) {
+	    return video[(address-VIDEO_START)|video_page];
+	}
+	if (address >= KEYBOARD_START) return trs_kb_mem_read(address);
+	return 0xff;
+
+      case 0x42:
+	if (address < 0xf400) {
+	    return memory[address + bank_offset[address>>15]];
+	}
+	if (address >= 0xf800) return video[address-0xf800];
+	return trs_kb_mem_read(address);
+
+      case 0x43:
+	return memory[address + bank_offset[address>>15]];
     }
-    else if((address >= KEYBOARD_START) && (address < MORE_IO_START))
-    {
-	/* read from the keyboard */
-	RETURN trs_kb_mem_read(address);
-    }
-    else if(address == TRSDISK_STATUS)
-    {
-        RETURN trs_disk_status_read();
-    }
-    else if(address == TRSDISK_TRACK)
-    {
-        RETURN trs_disk_track_read();
-    }
-    else if(address == TRSDISK_SECTOR)
-    {
-        RETURN trs_disk_sector_read();
-    }
-    else if(address == TRSDISK_DATA)
-    {
-        RETURN trs_disk_data_read();
-    }
-    else if(TRS_INTLATCH(address))
-    {
-        RETURN trs_interrupt_latch_read();
-    }
-    else if(address == PRINTER_ADDRESS)
-    {
-	RETURN trs_printer_read();
-    }
-    else
-    {
-	/* read from any of the I/O space */
-	RETURN 0xFF;
-    }
-#ifdef INSTRUMENT
-    instrument_mem_read(address, rval);
-    return rval;
-#endif
+    /* not reached */
+    return 0xff;
 }
 
 void mem_write(address, value)
@@ -248,61 +299,101 @@ void mem_write(address, value)
 {
     address &= 0xffff;
 
-#ifdef INSTRUMENT
-    instrument_mem_write(address, value);
-#endif INSTRUMENT
-
-    if(WRITEABLE(address))
-    {
-	/* write to RAM */
-	memory[address] = value;
-    }
-    else if((address >= VIDEO_START) && (address < RAM_START))
-    {
-#ifdef UPPERCASE
-	/*
-	 * Video write.  Hack here to make up for the missing bit 6
-	 * video ram, emulating the gate in Z30.
-	 */
-	if(value & 0xa0)
-	  value &= 0xbf;
-	else
-	  value |= 0x40;
-#endif
-	/*
-	 * Speed hack -- check to see if the character has actually changed.
-	 * Only call the video emulator if it has.
-	 */
-	if(memory[address] != value)
-	{
+    switch (memory_map) {
+      case 0x10:
+	/* Model I */
+	if (address >= RAM_START) {
 	    memory[address] = value;
-
-	    video_write(address - VIDEO_START, value);
+	} else if (address >= VIDEO_START) {
+	    int vaddr = (address-VIDEO_START)|video_page;
+#ifdef UPPERCASE
+	    /*
+	     * Video write.  Hack here to make up for the missing bit 6
+	     * video ram, emulating the gate in Z30.
+	     */
+	    if (trs_model == 1) {
+		if(value & 0xa0)
+		  value &= 0xbf;
+		else
+		  value |= 0x40;
+	    }
+#endif
+	    if (video[vaddr] != value) {
+		video[vaddr] = value;
+		video_write(vaddr, value);
+	    }
+	} else if (address == PRINTER_ADDRESS) {
+	    trs_printer_write(value);
+	} else if (address == TRSDISK_DATA) {
+	    trs_disk_data_write(value);
+	} else if (address == TRSDISK_STATUS) {
+	    trs_disk_command_write(value);
+	} else if (address == TRSDISK_TRACK) {
+	    trs_disk_track_write(value);
+	} else if (address == TRSDISK_SECTOR) {
+	    trs_disk_sector_write(value);
+	} else if (TRSDISK_SELECT(address)) {
+	    trs_disk_select_write(value);
 	}
-    }
-    else if(address == TRSDISK_COMMAND)
-    {
-        trs_disk_command_write(value);
-    }
-    else if(address == TRSDISK_TRACK)
-    {
-        trs_disk_track_write(value);
-    }
-    else if(address == TRSDISK_SECTOR)
-    {
-        trs_disk_sector_write(value);
-    }
-    else if(address == TRSDISK_DATA)
-    {
-        trs_disk_data_write(value);
-    }
-    else if(TRSDISK_SELECT(address))
-    {
-        trs_disk_select_write(value);
-    }
-    else if(address == PRINTER_ADDRESS)
-    {
-	trs_printer_write(value);
+	break;
+
+      case 0x30:
+	/* Model III */
+	if (address >= RAM_START) {
+	    memory[address] = value;
+	} else if (address >= VIDEO_START) {
+	    int vaddr = (address-VIDEO_START)|video_page;
+	    if (video[vaddr] != value) {
+		video[vaddr] = value;
+		video_write(vaddr, value);
+	    }
+	} else if (address == PRINTER_ADDRESS) {
+	    trs_printer_write(value);
+	}
+	break;
+
+      case 0x40:
+	/* Model 4 map 0 */
+	if (address >= RAM_START) {
+	    memory[address + bank_offset[address>>15]] = value;
+	} else if (address >= VIDEO_START) {
+	    int vaddr = (address-VIDEO_START)|video_page;
+	    if (video[vaddr] != value) {
+		video[vaddr] = value;
+		video_write(vaddr, value);
+	    }
+	} else if (address == PRINTER_ADDRESS) {
+	    trs_printer_write(value);
+	}
+	break;
+
+      case 0x41:
+	if (address >= RAM_START || address < KEYBOARD_START) {
+	    memory[address + bank_offset[address>>15]] = value;
+	} else if (address >= VIDEO_START) {
+	    int vaddr = (address-VIDEO_START)|video_page;
+	    if (video[vaddr] != value) {
+		video[vaddr] = value;
+		video_write(vaddr, value);
+	    }
+	}
+	break;
+
+      case 0x42:
+	if (address < 0xf400) {
+	    memory[address + bank_offset[address>>15]] = value;
+	} else if (address >= 0xf800) {
+	    int vaddr = address - 0xf800;
+	    if (video[vaddr] != value) {
+		video[vaddr] = value;
+		video_write(vaddr, value);
+	    }
+	}
+	break;
+
+      case 0x43:
+	memory[address + bank_offset[address>>15]] = value;
+	break;
     }
 }
 
@@ -313,47 +404,75 @@ int mem_read_word(address)
     int address;
 {
     int rval;
-    Uchar *m;
 
-    address &= 0xffff;
-
-#ifndef INSTRUMENT
-    if(READABLE_WORD(address))
-    {
-	m = memory + address;
-	rval = *m++;
-	rval |= *m << 8;
-	return rval;
-    }
-    else
-#endif
-    {
-	rval = mem_read(address++);
-	rval |= mem_read(address) << 8;
-	return rval;
-    }
+    rval = mem_read(address++);
+    rval |= mem_read(address & 0xffff) << 8;
+    return rval;
 }
 
 void mem_write_word(address, value)
     int address;
 {
-    Uchar *m;
+    mem_write(address++, value & 0xff);
+    mem_write(address, value >> 8);
+}
 
+/*
+ * Get a pointer to the given address.  Note that there is no checking
+ * whether the next virtual address is physically contiguous.  The
+ * caller is responsible for making sure his strings don't span 
+ * memory map boundaries.
+ */
+Uchar *mem_pointer(address)
+     int address;
+{
     address &= 0xffff;
 
-#ifndef INSTRUMENT
-    if(WRITEABLE_WORD(address))
-    {
-	m = memory + address;
-	*m++ = value & 0xff;
-	*m = value >> 8;
+    switch (memory_map) {
+      case 0x10:
+	/* Model I */
+	if (address >= VIDEO_START) return &memory[address];
+	if (address < trs_rom_size) return &rom[address];
+	return NULL;
+
+      case 0x30:
+	/* Model III */
+	if (address >= VIDEO_START) return &memory[address];
+	if (address < trs_rom_size) return &rom[address];
+	return NULL;
+
+      case 0x40:
+	/* Model 4 map 0 */
+	if (address >= RAM_START) {
+	    return &memory[address + bank_offset[address>>15]];
+	}
+	if (address < trs_rom_size) return &rom[address];
+	if (address >= VIDEO_START) {
+	    return &video[(address-VIDEO_START)|video_page];
+	}
+	return NULL;
+
+      case 0x41:
+	if (address >= RAM_START || address < KEYBOARD_START) {
+	    return &memory[address + bank_offset[address>>15]];
+	}
+	if (address >= VIDEO_START) {
+	    return &video[(address-VIDEO_START)|video_page];
+	}
+	return NULL;
+
+      case 0x42:
+	if (address < 0xf400) {
+	    return &memory[address + bank_offset[address>>15]];
+	}
+	if (address >= 0xf800) return &video[address-0xf800];
+	return NULL;
+
+      case 0x43:
+	return &memory[address + bank_offset[address>>15]];
     }
-    else
-#endif
-    {
-	mem_write(address++, value & 0xff);
-	mem_write(address, value >> 8);
-    }
+    /* not reached */
+    return NULL;
 }
 
 /*
@@ -372,7 +491,8 @@ void mem_block_transfer(dest, source, direction, count)
     Ushort count;
 {
     /* special case for screen scroll */
-    if((dest == VIDEO_START) && (source == VIDEO_START + 0x40) &&
+    if(trs_model <= 3 &&
+       (dest == VIDEO_START) && (source == VIDEO_START + 0x40) &&
        (count == 0x3c0) && (direction > 0))
     {
 	/* scroll screen one line */

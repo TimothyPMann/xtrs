@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Thu Sep 25 18:07:18 PDT 1997 by mann
+   Last modified on Tue Sep 30 18:16:23 PDT 1997 by mann
 */
 
 /*
@@ -43,8 +43,13 @@
  *
  * There are undoubtedly bugs in the emulator.  If you discover any,
  * please do send a report.  */
+
 #include "z80.h"
 #include "trs.h"
+#include "trs_imp_exp.h"
+#include <stdlib.h>  /* for rand() */
+#include <unistd.h>  /* for pause() */
+#include <time.h>    /* for time() */
 
 /*
  * Keep Saber quiet.
@@ -135,11 +140,6 @@ static int parity(value)
 	1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1
     };
 
-#ifdef INSTRUMENT
-    /* For testing against the other simulator, note that parity has
-       been calculated. */
-    instrument_parity_calculated();
-#endif
     return(parity_table[value]);
 }
 
@@ -2215,11 +2215,11 @@ static void do_indexed_instruction(ixp)
 	/* same for FD, except uses IY */
 
       case 0x8E:	/* adc a, (ix + offset) */
-	do_adc_byte(mem_read(*ixp + (char) mem_read(REG_PC++)));
+	do_adc_byte(mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff));
 	break;
 
       case 0x86:	/* add a, (ix + offset) */
-	do_add_byte(mem_read(*ixp + (char) mem_read(REG_PC++)));
+	do_add_byte(mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff));
 	break;
 
       case 0x09:	/* add ix, bc */
@@ -2236,11 +2236,11 @@ static void do_indexed_instruction(ixp)
 	break;
 
       case 0xA6:	/* and (ix + offset) */
-	do_and_byte(mem_read(*ixp + (char) mem_read(REG_PC++)));
+	do_and_byte(mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff));
 	break;
 
       case 0xBE:	/* cp (ix + offset) */
-	do_cp(mem_read(*ixp + (char) mem_read(REG_PC++)));
+	do_cp(mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff));
 	break;
 
       case 0x35:	/* dec (ix + offset) */
@@ -2287,29 +2287,29 @@ static void do_indexed_instruction(ixp)
 	break;
 
       case 0x7E:	/* ld a, (ix + offset) */
-	REG_A = mem_read(*ixp + (char) mem_read(REG_PC++));
+	REG_A = mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff);
 	break;
       case 0x46:	/* ld b, (ix + offset) */
-	REG_B = mem_read(*ixp + (char) mem_read(REG_PC++));
+	REG_B = mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff);
 	break;
       case 0x4E:	/* ld c, (ix + offset) */
-	REG_C = mem_read(*ixp + (char) mem_read(REG_PC++));
+	REG_C = mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff);
 	break;
       case 0x56:	/* ld d, (ix + offset) */
-	REG_D = mem_read(*ixp + (char) mem_read(REG_PC++));
+	REG_D = mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff);
 	break;
       case 0x5E:	/* ld e, (ix + offset) */
-	REG_E = mem_read(*ixp + (char) mem_read(REG_PC++));
+	REG_E = mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff);
 	break;
       case 0x66:	/* ld h, (ix + offset) */
-	REG_H = mem_read(*ixp + (char) mem_read(REG_PC++));
+	REG_H = mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff);
 	break;
       case 0x6E:	/* ld l, (ix + offset) */
-	REG_L = mem_read(*ixp + (char) mem_read(REG_PC++));
+	REG_L = mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff);
 	break;
 
       case 0x36:	/* ld (ix + offset), value */
-	mem_write(*ixp + (char) mem_read(REG_PC), mem_read(REG_PC + 1));
+	mem_write(*ixp + (char) mem_read(REG_PC), mem_read((REG_PC+1)&0xffff));
 	REG_PC += 2;
 	break;
 
@@ -2355,7 +2355,7 @@ static void do_indexed_instruction(ixp)
 	break;
 
       case 0xB6:	/* or (ix + offset) */
-	do_or_byte(mem_read(*ixp + (char) mem_read(REG_PC++)));
+	do_or_byte(mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff));
 	break;
 
       case 0xE1:	/* pop ix */
@@ -2369,15 +2369,15 @@ static void do_indexed_instruction(ixp)
 	break;
 
       case 0x9E:	/* sbc a, (ix + offset) */
-	do_sbc_byte(mem_read(*ixp + (char) mem_read(REG_PC++)));
+	do_sbc_byte(mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff));
 	break;
 
       case 0x96:	/* sub a, (ix + offset) */
-	do_sub_byte(mem_read(*ixp + (char) mem_read(REG_PC++)));
+	do_sub_byte(mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff));
 	break;
 
       case 0xAE:	/* xor (ix + offset) */
-	do_xor_byte(mem_read(*ixp + (char) mem_read(REG_PC++)));
+	do_xor_byte(mem_read((*ixp + (char) mem_read(REG_PC++)) & 0xffff));
 	break;
 
       case 0xCB:
@@ -2391,107 +2391,131 @@ static void do_indexed_instruction(ixp)
 	  switch(sub_instruction)
 	  {
 	    case 0x46:	/* bit 0, (ix + offset) */
-	      do_test_bit(mem_read(*ixp + offset), 0);
+	      do_test_bit(mem_read((*ixp + offset) & 0xffff), 0);
 	      break;
 	    case 0x4E:	/* bit 1, (ix + offset) */
-	      do_test_bit(mem_read(*ixp + offset), 1);
+	      do_test_bit(mem_read((*ixp + offset) & 0xffff), 1);
 	      break;
 	    case 0x56:	/* bit 2, (ix + offset) */
-	      do_test_bit(mem_read(*ixp + offset), 2);
+	      do_test_bit(mem_read((*ixp + offset) & 0xffff), 2);
 	      break;
 	    case 0x5E:	/* bit 3, (ix + offset) */
-	      do_test_bit(mem_read(*ixp + offset), 3);
+	      do_test_bit(mem_read((*ixp + offset) & 0xffff), 3);
 	      break;
 	    case 0x66:	/* bit 4, (ix + offset) */
-	      do_test_bit(mem_read(*ixp + offset), 4);
+	      do_test_bit(mem_read((*ixp + offset) & 0xffff), 4);
 	      break;
 	    case 0x6E:	/* bit 5, (ix + offset) */
-	      do_test_bit(mem_read(*ixp + offset), 5);
+	      do_test_bit(mem_read((*ixp + offset) & 0xffff), 5);
 	      break;
 	    case 0x76:	/* bit 6, (ix + offset) */
-	      do_test_bit(mem_read(*ixp + offset), 6);
+	      do_test_bit(mem_read((*ixp + offset) & 0xffff), 6);
 	      break;
 	    case 0x7E:	/* bit 7, (ix + offset) */
-	      do_test_bit(mem_read(*ixp + offset), 7);
+	      do_test_bit(mem_read((*ixp + offset) & 0xffff), 7);
 	      break;
 
 	    case 0x86:	/* res 0, (ix + offset) */
-	      mem_write(*ixp + offset, mem_read(*ixp + offset) & ~(1 << 0));
+	      mem_write(*ixp + offset,
+			mem_read((*ixp + offset) & 0xffff) & ~(1 << 0));
 	      break;
 	    case 0x8E:	/* res 1, (ix + offset) */
-	      mem_write(*ixp + offset, mem_read(*ixp + offset) & ~(1 << 1));
+	      mem_write(*ixp + offset,
+			mem_read((*ixp + offset) & 0xffff) & ~(1 << 1));
 	      break;
 	    case 0x96:	/* res 2, (ix + offset) */
-	      mem_write(*ixp + offset, mem_read(*ixp + offset) & ~(1 << 2));
+	      mem_write(*ixp + offset,
+			mem_read((*ixp + offset) & 0xffff) & ~(1 << 2));
 	      break;
 	    case 0x9E:	/* res 3, (ix + offset) */
-	      mem_write(*ixp + offset, mem_read(*ixp + offset) & ~(1 << 3));
+	      mem_write(*ixp + offset,
+			mem_read((*ixp + offset) & 0xffff) & ~(1 << 3));
 	      break;
 	    case 0xA6:	/* res 4, (ix + offset) */
-	      mem_write(*ixp + offset, mem_read(*ixp + offset) & ~(1 << 4));
+	      mem_write(*ixp + offset,
+			mem_read((*ixp + offset) & 0xffff) & ~(1 << 4));
 	      break;
 	    case 0xAE:	/* res 5, (ix + offset) */
-	      mem_write(*ixp + offset, mem_read(*ixp + offset) & ~(1 << 5));
+	      mem_write(*ixp + offset,
+			mem_read((*ixp + offset) & 0xffff) & ~(1 << 5));
 	      break;
 	    case 0xB6:	/* res 6, (ix + offset) */
-	      mem_write(*ixp + offset, mem_read(*ixp + offset) & ~(1 << 6));
+	      mem_write(*ixp + offset,
+			mem_read((*ixp + offset) & 0xffff) & ~(1 << 6));
 	      break;
 	    case 0xBE:	/* res 7, (ix + offset) */
-	      mem_write(*ixp + offset, mem_read(*ixp + offset) & ~(1 << 7));
+	      mem_write(*ixp + offset,
+			mem_read((*ixp + offset) & 0xffff) & ~(1 << 7));
 	      break;
 	      
 	    case 0x16:	/* rl (ix + offset) */
-	      mem_write(*ixp + offset, rl_byte(mem_read(*ixp + offset)));
+	      mem_write(*ixp + offset,
+			rl_byte(mem_read((*ixp + offset) & 0xffff)));
 	      break;
 
 	    case 0x06:	/* rlc (ix + offset) */
-	      mem_write(*ixp + offset, rlc_byte(mem_read(*ixp + offset)));
+	      mem_write(*ixp + offset,
+			rlc_byte(mem_read((*ixp + offset) & 0xffff)));
 	      break;
 
 	    case 0x1E:	/* rr (ix + offset) */
-	      mem_write(*ixp + offset, rr_byte(mem_read(*ixp + offset)));
+	      mem_write(*ixp + offset,
+			rr_byte(mem_read((*ixp + offset) & 0xffff)));
 	      break;
 
 	    case 0x0E:	/* rrc (ix + offset) */
-	      mem_write(*ixp + offset, rrc_byte(mem_read(*ixp + offset)));
+	      mem_write(*ixp + offset,
+			rrc_byte(mem_read((*ixp + offset) & 0xffff)));
 	      break;
 
 	    case 0xC6:	/* set 0, (ix + offset) */
-	      mem_write(*ixp + offset, mem_read(*ixp + offset) | (1 << 0));
+	      mem_write(*ixp + offset,
+			mem_read((*ixp + offset) & 0xffff) | (1 << 0));
 	      break;
 	    case 0xCE:	/* set 1, (ix + offset) */
-	      mem_write(*ixp + offset, mem_read(*ixp + offset) | (1 << 1));
+	      mem_write(*ixp + offset,
+			mem_read((*ixp + offset) & 0xffff) | (1 << 1));
 	      break;
 	    case 0xD6:	/* set 2, (ix + offset) */
-	      mem_write(*ixp + offset, mem_read(*ixp + offset) | (1 << 2));
+	      mem_write(*ixp + offset,
+			mem_read((*ixp + offset) & 0xffff) | (1 << 2));
 	      break;
 	    case 0xDE:	/* set 3, (ix + offset) */
-	      mem_write(*ixp + offset, mem_read(*ixp + offset) | (1 << 3));
+	      mem_write(*ixp + offset,
+			mem_read((*ixp + offset) & 0xffff) | (1 << 3));
 	      break;
 	    case 0xE6:	/* set 4, (ix + offset) */
-	      mem_write(*ixp + offset, mem_read(*ixp + offset) | (1 << 4));
+	      mem_write(*ixp + offset,
+			mem_read((*ixp + offset) & 0xffff) | (1 << 4));
 	      break;
 	    case 0xEE:	/* set 5, (ix + offset) */
-	      mem_write(*ixp + offset, mem_read(*ixp + offset) | (1 << 5));
+	      mem_write(*ixp + offset,
+			mem_read((*ixp + offset) & 0xffff) | (1 << 5));
 	      break;
 	    case 0xF6:	/* set 6, (ix + offset) */
-	      mem_write(*ixp + offset, mem_read(*ixp + offset) | (1 << 6));
+	      mem_write(*ixp + offset,
+			mem_read((*ixp + offset) & 0xffff) | (1 << 6));
 	      break;
 	    case 0xFE:	/* set 7, (ix + offset) */
-	      mem_write(*ixp + offset, mem_read(*ixp + offset) | (1 << 7));
+	      mem_write(*ixp + offset,
+			mem_read((*ixp + offset) & 0xffff) | (1 << 7));
 	      break;
 
 	    case 0x26:	/* sla (ix + offset) */
-	      mem_write(*ixp + offset, sla_byte(mem_read(*ixp + offset)));
+	      mem_write(*ixp + offset,
+			sla_byte(mem_read((*ixp + offset) & 0xffff)));
 	      break;
 	    case 0x2E:	/* sra (ix + offset) */
-	      mem_write(*ixp + offset, sra_byte(mem_read(*ixp + offset)));
+	      mem_write(*ixp + offset,
+			sra_byte(mem_read((*ixp + offset) & 0xffff)));
 	      break;
 	    case 0x36:	/* sll (ix + offset) [undocumented] */
-	      mem_write(*ixp + offset, sll_byte(mem_read(*ixp + offset)));
+	      mem_write(*ixp + offset,
+			sll_byte(mem_read((*ixp + offset) & 0xffff)));
 	      break;
 	    case 0x3E:	/* srl (ix + offset) */
-	      mem_write(*ixp + offset, srl_byte(mem_read(*ixp + offset)));
+	      mem_write(*ixp + offset,
+			srl_byte(mem_read((*ixp + offset) & 0xffff)));
 	      break;
 	      
 	    default:
@@ -2956,7 +2980,7 @@ int z80_run(continuous)
 {
     Uchar instruction;
     Ushort address; /* generic temps */
-    int delay_enable, ret = 0;
+    int ret = 0;
 
     /* loop to do a z80 instruction */
     do {
@@ -3356,7 +3380,21 @@ int z80_run(continuous)
 	    
 	  case 0x76:	/* halt */
 	    REG_PC--;	/* don't increment PC past this instruction */
+#if OLDWAY
 	    if (continuous > 0) continuous = 0;
+#else
+	    if (trs_model == 1) {
+		/* Z-80 HALT output is tied to reset button circuit */
+		trs_reset();
+	    } else {
+		/* Really halt (i.e., wait for interrupt) */
+		if (continuous > 0 &&
+		    !(z80_state.nmi && !z80_state.nmi_seen) &&
+		    !(z80_state.irq && z80_state.iff1)) {
+		    pause();
+		}
+	    }
+#endif
 	    ret = 1;
 	    break;
 

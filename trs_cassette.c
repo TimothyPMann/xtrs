@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Wed Sep 24 18:27:48 PDT 1997 by mann
+   Last modified on Tue Sep 30 18:02:34 PDT 1997 by mann
 */
 
 #include "trs.h"
@@ -150,7 +150,7 @@ void trs_cassette_out(value)
        (mem_read_word(REG_SP + 2) == 0x026e)) /* called from write-byte */
     {
 	if((mem_read_word(REG_SP + 12) == 0x028d) && /* from write-leader */
-	   (mem_read(REG_SP + 9) == 0xff)) /* start of leader */
+	   (mem_read((REG_SP + 9) & 0xffff) == 0xff)) /* start of leader */
 	{
 	    if(assert_state(WRITE))
 	    {

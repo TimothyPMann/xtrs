@@ -81,7 +81,8 @@
  *
  * ED3A emt_chdir
  *   Warning: Changing the working directory will change where the disk*-*
- *   files are found on the next disk-change command!
+ *   files are found on the next disk-change command, unless -diskdir has
+ *   been specified as an absolute pathname.
  *         Before, HL => path, null terminated
  *         After,  AF =  0 if OK, error number if not (Z flag affected)
  *

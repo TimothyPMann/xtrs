@@ -13,10 +13,7 @@
  * must retain this notice.
  */
 
-#define SCREENCHARS 1024
 #define MAXCHARS 256
 #define TRS_CHAR_WIDTH 8
 #define TRS_CHAR_HEIGHT 24
-#define ROW_LENGTH 64
-#define COL_LENGTH 16
 

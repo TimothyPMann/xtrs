@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Thu Sep 25 19:40:54 PDT 1997 by mann
+   Last modified on Tue Sep 30 17:44:40 PDT 1997 by mann
 */
 
 /*
@@ -23,8 +23,6 @@
  *
  * X Windows interface for TRS-80 simulator
  */
-
-#define XDEBUG 1
 
 #include <stdio.h>
 #include <fcntl.h>
@@ -34,6 +32,7 @@
 #include <malloc.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
@@ -45,6 +44,7 @@
 #include "trs_iodefs.h"
 #include "trs.h"
 #include "z80.h"
+#include "trs_disk.h"
 
 #define DEF_FONT1 \
     "-trs80-model1-medium-r-normal--24-*-64-64-c-80-trs80-model1"
@@ -59,14 +59,25 @@
 extern char trs_char_data[2][MAXCHARS][TRS_CHAR_HEIGHT];
 extern char trs_widechar_data[2][MAXCHARS][TRS_CHAR_HEIGHT][2];
 
+#define EVENT_MASK \
+  ExposureMask | KeyPressMask | MapRequest | KeyReleaseMask | \
+  StructureNotifyMask | LeaveWindowMask
+
 /* Private data */
-static int trs_screen[SCREENCHARS];
+static unsigned char trs_screen[2048];
+static int screen_chars = 1024;
+static int row_chars = 64;
+static int col_chars = 16;
+static int resize = 0;
+static int top_margin = 0;
+static int left_margin = 0;
 static Pixmap trs_char[2][MAXCHARS];
 static Display *display;
 static int screen;
 static Window window;
 static GC gc;
-static ScreenMode currentmode = NORMAL;
+static GC gc_inv;
+static int currentmode = NORMAL;
 static int OrigHeight,OrigWidth;
 static int usefont = DEF_USEFONT;
 static int trsfont;
@@ -87,8 +98,18 @@ static XrmOptionDescRec opts[] = {
 {"-notrsfont",	"*trsfont",	XrmoptionNoArg,		(caddr_t)"off"},
 {"-display",	"*display",	XrmoptionSepArg,	(caddr_t)NULL},
 {"-debug",	"*debug",	XrmoptionNoArg,		(caddr_t)"on"},
+{"-nodebug",	"*debug",	XrmoptionNoArg,		(caddr_t)"off"},
 {"-romfile",	"*romfile",	XrmoptionSepArg,	(caddr_t)NULL},
 {"-romfile3",	"*romfile3",	XrmoptionSepArg,	(caddr_t)NULL},
+{"-resize",	"*resize",	XrmoptionNoArg,		(caddr_t)"on"},
+{"-noresize",	"*resize",	XrmoptionNoArg,		(caddr_t)"off"},
+{"-spinfast",   "*spinfast",    XrmoptionNoArg,         (caddr_t)"on"},
+{"-nospinfast", "*spinfast",    XrmoptionNoArg,         (caddr_t)"off"},
+{"-model",      "*model",       XrmoptionSepArg,	(caddr_t)NULL},
+{"-model1",     "*model",       XrmoptionNoArg,		(caddr_t)"1"},
+{"-model3",     "*model",       XrmoptionNoArg,		(caddr_t)"3"},
+{"-model4",     "*model",       XrmoptionNoArg,		(caddr_t)"4"},
+{"-diskdir",    "*diskdir",     XrmoptionSepArg,	(caddr_t)NULL},
 };
 
 static int num_opts = (sizeof opts / sizeof opts[0]);
@@ -146,27 +167,19 @@ void screen_init();
 void trs_event_init();
 void trs_event();
 
-/* exits if something really bad happens */
-int trs_screen_init(argc,argv,debug)
-int argc;
-char **argv;
-int *debug;
+static XrmDatabase x_db = NULL;
+static XrmDatabase command_db = NULL;
+static char *program_name;
+
+int trs_parse_command_line(argc, argv, debug)
+     int argc;
+     char **argv;
+     int *debug;
 {
-    Window root_window;
-    unsigned long fore_pixel, back_pixel, foreground, background;
-    XrmDatabase x_db = NULL;
-    XrmDatabase command_db = NULL;
     char option[512];
     char *type;
     XrmValue value;
-    Colormap color_map;
-    XColor cdef;
-    XGCValues gcvals;
-    char *fontname;
-    char *widefontname;
-    int len;
     char *xrms;
-    char *program_name;
 
     program_name = strrchr(argv[0], '/');
     if (program_name == NULL) {
@@ -196,6 +209,69 @@ int *debug;
       x_db = command_db;
     }
 
+    (void) sprintf(option, "%s%s", program_name, ".debug");
+    if (XrmGetResource(x_db, option, "Xtrs.Debug", &type, &value))
+    {
+	if (strcmp(value.addr,"on") == 0) {
+	    *debug = True;
+	} else if (strcmp(value.addr,"off") == 0) {
+	    *debug = False;
+	}
+    }
+
+    (void) sprintf(option, "%s%s", program_name, ".spinfast");
+    if (XrmGetResource(x_db, option, "Xtrs.Spinfast", &type, &value))
+    {
+	if (strcmp(value.addr,"on") == 0) {
+	    trs_disk_spinfast = True;
+	} else if (strcmp(value.addr,"off") == 0) {
+	    trs_disk_spinfast = False;
+	}
+    }
+
+    (void) sprintf(option, "%s%s", program_name, ".model");
+    if (XrmGetResource(x_db, option, "Xtrs.Model", &type, &value))
+    {
+      if (strcmp(value.addr, "1") == 0 ||
+	  strcasecmp(value.addr, "I") == 0) {
+	trs_model = 1;
+      } else if (strcmp(value.addr, "3") == 0 ||
+		 strcasecmp(value.addr, "III") == 0) {
+	trs_model = 3;
+      } else if (strcmp(value.addr, "4") == 0 ||
+		 strcasecmp(value.addr, "IV") == 0) {
+	trs_model = 4;
+      } else {
+	  fprintf(stderr, "%s: TRS-80 Model %s not supported\n",
+		  program_name, value.addr);
+	  exit(1);
+      }
+    }
+
+    (void) sprintf(option, "%s%s", program_name, ".diskdir");
+    if (XrmGetResource(x_db, option, "Xtrs.Diskdir", &type, &value))
+    {
+        trs_disk_dir = strdup(value.addr);
+    }
+
+    return argc;
+}
+
+/* exits if something really bad happens */
+void trs_screen_init()
+{
+    Window root_window;
+    unsigned long fore_pixel, back_pixel, foreground, background;
+    char option[512];
+    char *type;
+    XrmValue value;
+    Colormap color_map;
+    XColor cdef;
+    XGCValues gcvals;
+    char *fontname = NULL;
+    char *widefontname = NULL;
+    int len;
+
     screen = DefaultScreen(display);
     color_map = DefaultColormap(display,screen);
 
@@ -218,14 +294,6 @@ int *debug;
 	back_pixel = cdef.pixel;
     } else {
 	back_pixel = BlackPixel(display, screen);
-    }
-
-    (void) sprintf(option, "%s%s", program_name, ".debug");
-    if (XrmGetResource(x_db, option, "Xtrs.Debug", &type, &value))
-    {
-	if (strcmp(value.addr,"on") == 0) {
-	    *debug = True;
-	}
     }
 
     (void) sprintf(option, "%s%s", program_name, ".usefont");
@@ -278,6 +346,16 @@ int *debug;
 	}
     }
 
+    (void) sprintf(option, "%s%s", program_name, ".resize");
+    if (XrmGetResource(x_db, option, "Xtrs.Resize", &type, &value))
+    {
+	if (strcmp(value.addr,"on") == 0) {
+	    resize = 1;
+	} else if (strcmp(value.addr,"off") == 0) {
+	    resize = 0;
+	}
+    }
+
     if (trs_model == 1) {
 	/* try resources first */
 	(void) sprintf(option, "%s%s", program_name, ".romfile");
@@ -314,7 +392,6 @@ int *debug;
     /* setup root window, and gc */
     root_window = DefaultRootWindow(display);
 
-    /* gc = XCreateGC(display, root_window, 0, NULL); */
     gcvals.graphics_exposures = False;
     gc = XCreateGC(display, root_window, GCGraphicsExposures, &gcvals);
 
@@ -322,6 +399,10 @@ int *debug;
     XSetBackground(display, gc, back_pixel);
     foreground = fore_pixel;
     background = back_pixel;
+
+    gc_inv = XCreateGC(display, root_window, GCGraphicsExposures, &gcvals);
+    XSetForeground(display, gc_inv, back_pixel);
+    XSetBackground(display, gc_inv, fore_pixel);
 
     if (usefont) {
 	if ((myfont = XLoadQueryFont(display,fontname)) == NULL) {
@@ -339,15 +420,20 @@ int *debug;
 	cur_char_height = myfont->ascent + myfont->descent;
     }
 
-    OrigWidth = cur_char_width * ROW_LENGTH;
-    OrigHeight = cur_char_height * COL_LENGTH;
+    if (trs_model == 4 && !resize) {
+      OrigWidth = cur_char_width * 80;
+      left_margin = cur_char_width * (80 - row_chars)/2;
+      OrigHeight = cur_char_height * 24;
+      top_margin = cur_char_height * (24 - col_chars)/2;
+    } else {
+      OrigWidth = cur_char_width * row_chars;
+      OrigHeight = cur_char_height * col_chars;
+    }
     window = XCreateSimpleWindow(display, root_window, 400, 400,
 				 OrigWidth, OrigHeight, 1, foreground,
 				 background);
     XStoreName(display,window,program_name);
-    XSelectInput(display, window, ExposureMask | KeyPressMask | MapRequest |
-		 KeyReleaseMask | StructureNotifyMask | ResizeRedirectMask |
-		 LeaveWindowMask );
+    XSelectInput(display, window, EVENT_MASK | ResizeRedirectMask);
     XMapWindow(display, window);
 
     bitmap_init(foreground, background);
@@ -358,8 +444,6 @@ int *debug;
 #ifdef HAVE_SIGIO
     trs_event_init();
 #endif
-
-    return(argc);
 }
 
 #ifdef HAVE_SIGIO
@@ -406,7 +490,6 @@ void trs_get_event(wait)
     char buf[10];
     XComposeStatus status;
     XWindowChanges xwc;
-    int trs_key;
 
     do {
 	if (wait) {
@@ -425,13 +508,20 @@ void trs_get_event(wait)
 
 	  case ResizeRequest:
 #ifdef XDEBUG
-	    fprintf(stderr,"ResizeRequest\n");
+	    fprintf(stderr,"ResizeRequest w %d-->%d, h %d-->%d\n",
+		    OrigWidth, event.xresizerequest.width,
+		    OrigHeight, event.xresizerequest.height);
 #endif
-	    xwc.width = OrigWidth;
-	    xwc.height = OrigHeight;
-	    XConfigureWindow(display,event.xresizerequest.window,
-			     (CWWidth | CWHeight),&xwc);
+            if (event.xresizerequest.width != OrigWidth ||
+		event.xresizerequest.height != OrigHeight) {
+	      xwc.width = OrigWidth;
+	      xwc.height = OrigHeight;
+	      XConfigureWindow(display,event.xresizerequest.window,
+			       (CWWidth | CWHeight),&xwc);
+	    }
+#ifdef DO_XFLUSH
 	    XFlush(display);
+#endif
 	    break;
 
 	  case ConfigureNotify:
@@ -527,13 +617,14 @@ void trs_get_event(wait)
     } while (!wait);
 }
 
-void trs_screen_mode_select(mode)
-    ScreenMode mode;
+void trs_screen_expanded(flag)
+    int flag;
 {
-    if (currentmode != mode) {
-	currentmode = mode;
+    int bit = flag ? EXPANDED : 0;
+    if ((currentmode ^ bit) & EXPANDED) {
+	currentmode ^= EXPANDED;
 	if (usefont) {
-	    curfont = (mode == NORMAL ? myfont : mywidefont);
+	    curfont = (flag ? mywidefont : myfont);
 	    XSetFont(display,gc,curfont->fid);
 	}
 	XClearWindow(display,window);
@@ -541,13 +632,54 @@ void trs_screen_mode_select(mode)
     }
 }
 
+void trs_screen_inverse(flag)
+     int flag;
+{
+    int bit = flag ? INVERSE : 0;
+    int i;
+    if ((currentmode ^ bit) & INVERSE) {
+	currentmode ^= INVERSE;
+	for (i = 0; i < screen_chars; i++) {
+	    if (trs_screen[i] & 0x80)
+	      trs_screen_write_char(i,trs_screen[i],False);
+	}
+    }
+}
+
+void trs_screen_80x24(flag)
+     int flag;
+{
+    /* Called only on an actual change */
+    if (flag) {
+	row_chars = 80;
+	col_chars = 24;
+    } else {
+	row_chars = 64;
+	col_chars = 16;
+    }
+    screen_chars = row_chars * col_chars;
+    if (resize) {
+      OrigWidth = cur_char_width * row_chars;
+      OrigHeight = cur_char_height * col_chars;;
+      XSelectInput(display, window, EVENT_MASK);
+      XResizeWindow(display, window, OrigWidth, OrigHeight);
+      XFlush(display);
+      XSelectInput(display, window, EVENT_MASK | ResizeRedirectMask);
+    } else {
+      left_margin = cur_char_width * (80 - row_chars)/2;
+      top_margin = cur_char_height * (24 - col_chars)/2;
+      if (left_margin || top_margin) XClearWindow(display,window);
+    }
+    trs_screen_refresh();
+}
+
 void screen_init()
 {
     int i;
 
-    /* initially, screen is blank (i.e. full of 32's) */
-    for (i = 0; i < SCREENCHARS; i++)
-	trs_screen[i] = 32;
+    /* initially, screen is blank (i.e. full of spaces) */
+    for (i = 0; i < sizeof(trs_screen); i++)
+	trs_screen[i] = ' ';
 }
 
 void boxes_init(foreground, background, width, height, expanded)
@@ -632,10 +764,12 @@ void trs_screen_refresh()
 {
     int i;
 
-    for (i = 0; i < SCREENCHARS; i++) {
+    for (i = 0; i < screen_chars; i++) {
 	trs_screen_write_char(i,trs_screen[i],False);
     }
+#ifdef DO_XFLUSH
     XFlush(display);
+#endif
 }
 
 void trs_screen_write_char(position, char_index, doflush)
@@ -648,11 +782,16 @@ Bool doflush;
     char temp_char;
 
     trs_screen[position] = char_index;
-    if (currentmode == EXPANDED && (position & 1)) return;
-    row = position / ROW_LENGTH;
-    col = position - (row * ROW_LENGTH);
-    destx = col * cur_char_width;
-    desty = row * cur_char_height;
+    if (position >= screen_chars) {
+      return;
+    }
+    if ((currentmode & EXPANDED) && (position & 1)) {
+      return;
+    }
+    row = position / row_chars;
+    col = position - (row * row_chars);
+    destx = col * cur_char_width + left_margin;
+    desty = row * cur_char_height + top_margin;
     if (usefont) {
 	if (trs_model == 1 && !trsfont) {
 #ifndef UPPERCASE
@@ -667,47 +806,84 @@ Bool doflush;
 	if(!trsfont && char_index >= 0x80 && char_index <= 0xbf) {
 	    /* use graphics character bitmap instead of font */
 	    plane = 1;
-	    if (currentmode == NORMAL) {
-	      XCopyArea(display,
-			trs_char[0][char_index],window,gc,0,0,
-			cur_char_width,cur_char_height,destx,desty);
-	    } else {
-	      XCopyArea(display,
-			trs_char[1][char_index],window,gc,0,0,
-			cur_char_width*2,cur_char_height,destx,desty);
+	    switch (currentmode) {
+	      case NORMAL:
+		XCopyArea(display,
+			  trs_char[0][char_index],window,gc,0,0,
+			  cur_char_width,cur_char_height,destx,desty);
+		break;
+	      case EXPANDED:
+		XCopyArea(display,
+			  trs_char[1][char_index],window,gc,0,0,
+			  cur_char_width*2,cur_char_height,destx,desty);
+		break;
+	      case INVERSE:
+		XCopyArea(display,
+			  trs_char[0][char_index & 0x7f], window,
+			  (char_index & 0x80) ? gc_inv : gc, 0, 0,
+			  cur_char_width,cur_char_height,destx,desty);
+		break;
+	      case EXPANDED+INVERSE:
+		XCopyArea(display,
+			  trs_char[1][char_index & 0x7f], window,
+			  (char_index & 0x80) ? gc_inv : gc, 0, 0,
+			  cur_char_width*2,cur_char_height,destx,desty);
+		break;
 	    }
 	} else {
-	    XFontStruct *font;
 	    desty += curfont->ascent;
-	    temp_char = (char)char_index;
-	    XDrawImageString(display,window,gc,destx,desty,&temp_char,1);
+	    if (currentmode & INVERSE) {
+		temp_char = (char)(char_index & 0x7f);
+		XDrawImageString(display, window,
+				 (char_index & 0x80) ? gc_inv : gc,
+				 destx, desty, &temp_char, 1);
+	    } else {
+		temp_char = (char)char_index;
+		XDrawImageString(display, window, gc,
+				 destx, desty, &temp_char, 1);
+	    }
 	}
     } else {
         plane = 1;
-	if (currentmode == NORMAL) {
+	switch (currentmode) {
+	  case NORMAL:
 	    XCopyPlane(display,trs_char[0][char_index],
 		       window,gc,0,0,TRS_CHAR_WIDTH,
 		       TRS_CHAR_HEIGHT,destx,desty,plane);
-	} else {
+	    break;
+	  case EXPANDED:
 	    XCopyPlane(display,trs_char[1][char_index],
 		       window,gc,0,0,TRS_CHAR_WIDTH*2,
 		       TRS_CHAR_HEIGHT,destx,desty,plane);
+	    break;
+	  case INVERSE:
+	    XCopyPlane(display,trs_char[0][char_index & 0x7f],window,
+		       (char_index & 0x80) ? gc_inv : gc,
+		       0,0,TRS_CHAR_WIDTH,TRS_CHAR_HEIGHT,destx,desty,plane);
+	    break;
+	  case EXPANDED+INVERSE:
+	    XCopyPlane(display,trs_char[1][char_index & 0x7f],window,
+		       (char_index & 0x80) ? gc_inv : gc,
+		       0,0,TRS_CHAR_WIDTH*2,TRS_CHAR_HEIGHT,destx,desty,plane);
+	    break;
 	}
     }
+#ifdef DO_XFLUSH
     if (doflush)
 	XFlush(display);
+#endif
 }
 
- /* Copy lines 1 through 15 to lines 0 through 14.  Doesn't need to
-    clear line 15. */
+ /* Copy lines 1 through col_chars-1 to lines 0 through col_chars-2.
+    Doesn't need to clear line col_chars-1. */
 void trs_screen_scroll()
 {
     int i = 0;
 
     XCopyArea(display,window,window,gc,0,cur_char_height,
-	      (cur_char_width*ROW_LENGTH),(cur_char_height*COL_LENGTH),0,0);
-    for (i = 64; i < SCREENCHARS; i++)
-	trs_screen[i-64] = trs_screen[i];
+	      (cur_char_width*row_chars),(cur_char_height*col_chars),0,0);
+    for (i = row_chars; i < screen_chars; i++)
+	trs_screen[i-row_chars] = trs_screen[i];
 }
 
 void trs_screen_write_chars(locations, values, count)
@@ -719,7 +895,9 @@ int count;
     {
         trs_screen_write_char(*locations++, *values++ , False);
     }
+#ifdef DO_XFLUSH
     XFlush(display);
+#endif
 }
 
 int trs_next_key(wait)

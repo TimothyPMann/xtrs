@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Sat Sep 20 13:13:47 PDT 1997 by mann */
+/* Last modified on Tue Sep 30 13:47:25 PDT 1997 by mann */
 
 /*
  * trs_imp_exp.c
@@ -21,12 +21,13 @@
 #include <time.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <fcntl.h>
 #include "trs_imp_exp.h"
 #include "z80.h"
+#include "trs.h"
 
 /* New emulator traps */
-
-extern Uchar *memory;
 
 #define MAX_OPENDIR 32
 DIR *dir[MAX_OPENDIR] = { NULL, };
@@ -34,7 +35,7 @@ DIR *dir[MAX_OPENDIR] = { NULL, };
 void do_emt_open()
 {
     int fd;
-    fd = open(&memory[REG_HL], REG_BC, REG_DE);
+    fd = open(mem_pointer(REG_HL), REG_BC, REG_DE);
     if (fd >= 0) {
 	REG_A = 0;
 	REG_F |= ZERO_MASK;
@@ -67,7 +68,7 @@ void do_emt_read()
         REG_BC = 0xFFFF;
 	return;
     }
-    size = read(REG_DE, &memory[REG_HL], REG_BC);
+    size = read(REG_DE, mem_pointer(REG_HL), REG_BC);
     if (size >= 0) {
 	REG_A = 0;
 	REG_F |= ZERO_MASK;
@@ -88,7 +89,7 @@ void do_emt_write()
         REG_BC = 0xFFFF;
 	return;
     }
-    size = write(REG_DE, &memory[REG_HL], REG_BC);
+    size = write(REG_DE, mem_pointer(REG_HL), REG_BC);
     if (size >= 0) {
 	REG_A = 0;
 	REG_F |= ZERO_MASK;
@@ -110,7 +111,7 @@ void do_emt_lseek()
     }
     offset = 0;
     for (i=REG_HL; i<8; i++) {
-	offset = offset + (memory[REG_HL + i] << i*8);
+	offset = offset + (mem_read(REG_HL + i) << i*8);
     }
     offset = lseek(REG_DE, offset, REG_BC);
     if (offset != (off_t) -1) {
@@ -121,7 +122,7 @@ void do_emt_lseek()
 	REG_F &= ~ZERO_MASK;
     }
     for (i=REG_HL; i<8; i++) {
-	memory[REG_HL + i] = offset & 0xff;
+	mem_write(REG_HL + i, offset & 0xff);
 	offset >>= 8;
     }
 }
@@ -147,9 +148,9 @@ void do_emt_strerror()
 	REG_F |= ZERO_MASK;
 	size = REG_BC - 1;
     }
-    memcpy(&memory[REG_HL], msg, size);
-    memory[REG_HL + size++] = '\r';
-    memory[REG_HL + size] = '\0';
+    memcpy(mem_pointer(REG_HL), msg, size);
+    mem_write(REG_HL + size++, '\r');
+    mem_write(REG_HL + size, '\0');
     if (errno == 0) {
 	REG_BC = size;
     } else {
@@ -211,7 +212,7 @@ void do_emt_opendir()
 	REG_A = EMFILE;
 	return;
     }
-    dir[i] = opendir(&memory[REG_HL]);
+    dir[i] = opendir(mem_pointer(REG_HL));
     if (dir[i] == NULL) {
 	REG_DE = 0xffff;
 	REG_A = errno;
@@ -274,7 +275,7 @@ void do_emt_readdir()
 	REG_BC = 0xFFFF;
 	return;
     }
-    strcpy(&memory[REG_HL], result->d_name);
+    strcpy(mem_pointer(REG_HL), result->d_name);
     REG_A = 0;
     REG_F |= ZERO_MASK;
     REG_BC = size;
@@ -282,7 +283,7 @@ void do_emt_readdir()
 
 void do_emt_chdir()
 {
-    int ok = chdir(&memory[REG_HL]);
+    int ok = chdir(mem_pointer(REG_HL));
     if (ok < 0) {
 	REG_A = errno;
 	REG_F &= ~ZERO_MASK;
@@ -301,7 +302,7 @@ void do_emt_getcwd()
 	REG_BC = 0xFFFF;
 	return;
     }
-    result = getcwd(&memory[REG_HL], REG_BC);
+    result = getcwd(mem_pointer(REG_HL), REG_BC);
     if (result == NULL) {
 	REG_A = errno;
 	REG_F &= ~ZERO_MASK;
@@ -442,7 +443,6 @@ trs_impexp_data_write(unsigned char data)
 unsigned char
 trs_impexp_data_read()
 {
-    int c;
     switch (ch.cmd) {
       case IMPEXP_CMD_RESET:
       case IMPEXP_CMD_EOF:

@@ -15,31 +15,41 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Aug 23 14:44:05 PDT 1997 by mann
+   Last modified on Tue Sep 30 13:45:02 PDT 1997 by mann
 */
 
 /*
  * trs.h
  */
 
-typedef enum {
-    NORMAL = 0,
-    EXPANDED = 1
-} ScreenMode;
+#include "z80.h"
 
-extern int trs_model; /* 1 or 3 */
+#define NORMAL 0
+#define EXPANDED 1
+#define INVERSE 2
 
-extern int trs_screen_init();
+extern int trs_model; /* 1, 3, 4 */
+
+extern int trs_parse_command_line(/* int argc, char **argv, int *debug */);
+
+extern void trs_screen_init();
 extern void trs_screen_write_char(/*int position, int char_index, Bool doflush*/);
-extern void trs_screen_write_chars(/*int *locations, int *values,int count*/);
-extern void trs_screen_mode_select(/*ScreenMode mode*/);
+extern void trs_screen_write_chars(/*int *locations, int *values, int count*/);
+extern void trs_screen_expanded(/*int flag*/);
+extern void trs_screen_80x24(/*int flag*/);
+extern void trs_screen_inverse(/*int flag*/);
 extern void trs_screen_scroll();
 extern void trs_screen_refresh();
-extern void trs_refresh();
+
 extern void trs_reset();
 extern void trs_exit();
-extern void trs_get_event(/*int wait*/);
+
+extern void trs_kb_reset();
+extern int trs_kb_mem_read(/* int address */);
 extern int trs_next_key(/*int wait*/);
+extern void trs_kb_heartbeat();
+
+extern void trs_get_event(/*int wait*/);
 extern int x_poll_count;
 
 extern void trs_printer_write();
@@ -58,10 +68,24 @@ extern void trs_load_compiled_rom(/*int size, unsigned char rom[]*/);
 extern void trs_load_rom(/*char *filename*/);
 
 extern unsigned char trs_interrupt_latch_read();
+extern unsigned char trs_nmi_latch_read();
+extern void trs_interrupt_mask_write(/*unsigned char*/);
+extern void trs_nmi_mask_write(/*unsigned char*/);
+extern void trs_reset_button_interrupt(/*int state*/);
+extern void trs_disk_intrq_interrupt(/*int state*/);
+extern void trs_disk_drq_interrupt(/*int state*/);
+extern void trs_timer_interrupt(/*int state*/);
 extern void trs_timer_init();
 extern void trs_timer_off();
 extern void trs_timer_on();
+extern void trs_timer_speed(/* int flag */);
 
 extern void trs_disk_change(/*int drive*/);
 extern void trs_disk_change_all();
 
+extern Uchar *mem_pointer(/*int address*/);
+extern void mem_video_page(/* int which */);
+extern void mem_bank(/* int which */);
+extern void mem_map(/* int which */);
+
+extern void trs_debug();

@@ -23,6 +23,11 @@ BUILT_IN_ROM3 = romimage.m3
 #               -DDEFAULT_ROM3='"/usr/local/lib/romimage.m3"'
 # DEFAULT_ROM = -DDEFAULT_ROM='"level2rom.hex"' -DDEFAULT_ROM3='"romimage.m3"'
 
+# If you would like to change where xtrs looks for disk?-? files, edit
+# this line.  "." of course means the current working directory.
+
+DISKDIR = -DDISKDIR='"."'
+
 # If you have the GNU readline package (the README file tells you where to
 # get it) and would like to use it with the built-in Z-80 debugger, use
 # these lines.   **WARNING: the current version of GNU readline is 
@@ -36,6 +41,7 @@ BUILT_IN_ROM3 = romimage.m3
 DEBUG = -O
 #DEBUG = -g -DKBDEBUG -DXDEBUG
 #DEBUG = -g
+#DEBUG = -Wall
 
 # If you have gcc, and you want to use it:
 
@@ -44,6 +50,7 @@ DEBUG = -O
 # If you need a different path for libraries:
 
 LDFLAGS = -L/usr/X11/lib
+#LDFLAGS = -non_shared -L/usr/X11/lib
 
 # If you need a different path for include files:
 
@@ -55,10 +62,14 @@ XLIB = -lX11
 
 # Use this if you need yet more libraries:
 
-# EXTRALIBS = -ldnet
-# EXTRALIBS = -lots
+#EXTRALIBS = -ldnet
+#EXTRALIBS = -lots
+#EXTRALIBS = -ldnet_stub
 
 # Set these to where you want installed stuff to go, if you install them.
 
 BINDIR = /usr/local/bin
 MANDIR = /usr/local/man
+
+# If you are building in a subdirectory:
+#VPATH = ..

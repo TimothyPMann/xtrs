@@ -1,15 +1,16 @@
 .TH xtrs 1
 .SH Name
-xtrs \- TRS-80 Model I/III Emulator for the X Window System
+xtrs \- TRS-80 Model I/III/4 Emulator for the X Window System
 .SH Syntax
 .B xtrs
 .I [options]
 .SH Description
 \fIxtrs\fP is built on top of a Z-80 emulator, with added routines to support
-keyboard and video I/O through an X interface.  The hardware
-emulation is based on the TRS-80 Model I and Model III designs.
+keyboard and video I/O through an X interface.
+The hardware emulation can operate as a TRS-80 Model I, Model III, or Model 4.
 
-\fIxtrs\fP supports 48K of RAM. 
+\fIxtrs\fP supports 48K of RAM in Model I or Model III mode,
+128K in Model 4 mode. 
 Floppy disks are emulated using files to store the data.
 A printer is emulated by
 sending its output to standard output.  
@@ -23,9 +24,10 @@ you can type "help" for more information.
 
 Special support in the emulator allows the program to block when
 waiting for information from the keyboard.  This will work only for
-programs that wait for keyboard input using the standard ROM call; the
-emulator decides whether to block the Z-80 program when it tries to
-read from the keyboard memory by pattern-matching its stack.
+programs that wait for keyboard input using the standard Model I/III
+ROM call; the emulator decides whether to block the Z-80 program when
+it tries to read from the keyboard memory by pattern-matching its
+stack.
 
 The following keys have special meanings to \fIxtrs\fP:
 
@@ -47,7 +49,7 @@ signals a disk change in the emulated floppy drives (see below).  F8
 exits the program.  F9 requests entry to the debugger if it is active.
 F10 is the reset button.
 
-In Model III mode, the left and right shift keys are distinct; in
+In Model III and 4 modes, the left and right shift keys are distinct; in
 Model I mode, they are the same.  The F11 or F14 key activates the
 position in the TRS-80 keyboard matrix that corresponds to the Model
 III/4 right shift key (address bit 7, data bit 1) even in Model I mode.
@@ -82,24 +84,24 @@ commands of both -- so a driver for either should work.  Under LDOS,
 use the command "FDUBL" (newer versions of LDOS), or "PDUBL" or
 "RDUBL" (older versions) to install the driver.
 
-In Model III mode, xtrs emulates the stock Model III floppy
+In Model III or 4 mode, xtrs emulates the stock Model III/4 floppy
 controller, which used a WD1793 chip (software-compatible with the
 WD1791) to provide both single and double density.
 
 Four floppy drives are emulated, with storage in files named diskX-0,
-diskX-1, diskX-2, diskX-3, where X=1 for Model I mode, X=3 for Model
-III mode.  If a file of the required name is not found, a drive with
-no disk in it is emulated (but see below).  If the user does not have
-write permission for a floppy file, a write-protect tab is emulated.
-To change floppies in an emulated drive, rename the existing file for
-the drive (if any), rename the new floppy file to the proper name, and
-hit function key F7 in the emulator.
+diskX-1, diskX-2, diskX-3, where X=1 for Model I mode, 3 for Model III
+mode, or 4 for Model 4 mode.  If a file of the required name is not
+found, a drive with no disk in it is emulated (but see below).  If the
+user does not have write permission for a floppy file, a write-protect
+tab is emulated.  To change floppies in an emulated drive, rename the
+existing file for the drive (if any), rename the new floppy file to
+the proper name, and hit function key F7 in the emulator.
 
 If you try to boot with no disk in drive 0, xtrs emulates having no
 disk controller.  The behavior of a real machine with a disk
-controller in this case didn't seem useful to emulate faithfully:
-A real Model I hangs with a screen full of garbage; a real Model III
-goes into a retry loop printing "Diskette?" on the screen and
+controller in this case didn't seem useful to emulate faithfully: A
+real Model I hangs with a screen full of garbage; a real Model III or
+4 goes into a retry loop printing "Diskette?" on the screen and
 rechecking whether you've inserted one.
 
 Due to a limitation of the original Model I hardware, drive :3 cannot
@@ -110,10 +112,10 @@ double-sided, but the emulator is able to be more forgiving.
 The floppy image files can be of either of two types: JV1, compatible
 with Jeff Vavasour's popular freeware Model I emulator for the PC; or
 JV3, a compatible extension of a format first used in Vavasour's
-commercial Model III/4 emulator.  Both types work in both Model I and
-Model III mode.  The emulator uses a heuristic to decide which type of
-image it is looking at in each drive, as neither type has a "magic
-number" or signature.
+commercial Model III/4 emulator.  Both types work in xtrs regardless
+of what model it is emulating.  A heuristic is used to decide which
+type of image is in a drive, as neither type has a "magic number" or
+signature.
 
 JV1 supports only single density, single sided, with directory on
 track 17.  Sectors must be 256 bytes long.  Use FORMAT (DIR=17) to
@@ -141,7 +143,7 @@ existing one.  By default, mkfloppy makes a JV3 floppy, but with the
 
 Early Model I operating systems used an FA data address mark for the
 directory (a nonstandard value supported only by the WD1771, but not
-the WD1791/3), while later ones wrote F8 (for Model III compatibility)
+the WD1791/3), while later ones wrote F8 (for Model III/4 compatibility)
 but could read either.  To deal nicely with this problem, xtrs
 implements the following kludge.  On writing, any data address mark
 other than FB is recorded as F8.  On reading in single density with
@@ -234,8 +236,8 @@ Enter zbx, the z80 debugger.
 .B \-romfile3 \fIfilename3\fP
 .IP 
 Use the romfile specified by \fIfilename\fP in Model I mode, or the
-romfile specified by \fIfilename3\fP in Model III mode.  A romfile can
-be either a raw binary dump or in Intel hex format.
+romfile specified by \fIfilename3\fP in Model III and Model 4 mode.  
+A romfile can be either a raw binary dump or in Intel hex format.
 If you do
 not set this option or the corresponding X resource, a default
 established at compile time is used (if any); see Makefile.local for
@@ -248,6 +250,21 @@ Emulate a TRS-80 Model I.  This is the default.
 .B \-model3
 .IP
 Emulate a TRS-80 Model III.
+.TP
+.B \-model4
+.IP
+Emulate a TRS-80 Model 4.
+.TP
+.B \-resize
+.IP 
+In Model 4 mode, resize the X window whenever the emulated display
+mode changes between 64x16 and 80x24.
+.TP
+.B \-noresize
+.IP 
+In Model 4 mode, always keep the X window large enough for 80x24
+characters, putting a blank margin around the outside when the emulated
+display mode is 64x16.  This is the default.
 .TP
 .B \-spinfast
 .IP
@@ -271,16 +288,16 @@ http://www.research.digital.com/SRC/personal/Tim_Mann/trs80.html.
 .SH Bugs
 There may be bugs in the Z-80 emulator which we haven't found yet.
 Some of the more bizarre undocumented Z-80 instructions are not
-implemented.  The HALT instruction causes an exit from the emulator.
+implemented.
 
-Cassette emulation does not work in Model III mode.  Even in Model I
-mode, it works only for programs that use the Level II ROM routines to
-access the cassette; the emulator looks for access to the cassette
-port from specific PC values to activate the feature.
+Cassette emulation does not work in Model III or 4 mode.  Even in
+Model I mode, it works only for programs that use the Level II ROM
+routines to access the cassette; the emulator looks for access to the
+cassette port from specific PC values to activate the feature.
 
 Serial ports are not emulated.
 
-The Model III alternate character set is not emulated.
+The Model III/4 alternate character set is not emulated.
 
 Some features of the disk controller are not currently emulated.  (1)
 Force Interrupt with condition bits 0x01, 0x02, or 0x04 is not

@@ -15,10 +15,11 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Dec 17 12:59:14 PST 1996 by mann
+   Last modified on Tue Sep 30 13:09:02 PDT 1997 by mann
 */
 
 #include "z80.h"
+#include <stdlib.h>
 
 #define BUFFER_SIZE 256
 

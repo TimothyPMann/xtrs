@@ -15,15 +15,17 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Wed Sep  3 01:27:47 PDT 1997 by mann
+   Last modified on Tue Sep 30 17:58:39 PDT 1997 by mann
 */
 
 #include "z80.h"
+#include "trs.h"
 
 #include <malloc.h>
 #include <stdlib.h>
 #include <signal.h>
 #include <errno.h>
+#include <string.h>
 
 #ifdef READLINE
 #include <readline/readline.h>
@@ -222,7 +224,7 @@ static void print_memory(address, num_bytes)
 	printf("%.4x:\t", address);
 	for(i = 0; i < bytes_to_print; ++i)
 	{
-	    printf("%.2x ", mem_read(address + i));
+	    printf("%.2x ", mem_read((address + i) & 0xffff));
 	}
 	for(i = bytes_to_print; i < 16; ++i)
 	{
@@ -231,7 +233,7 @@ static void print_memory(address, num_bytes)
 	printf("    ");
 	for(i = 0; i < bytes_to_print; ++i)
 	{
-	    byte = mem_read(address + i);
+	    byte = mem_read((address + i) & 0xffff);
 	    if(isprint(byte))
 	    {
 		printf("%c", byte);
@@ -374,7 +376,11 @@ void debug_shell()
 	    {
 		int i;
 
-		if(sscanf(input, "delete %d", &i) != 1)
+		if(!strcmp(input, "delete *"))
+		{
+		    clear_all_traps();
+		}
+		else if(sscanf(input, "delete %d", &i) != 1)
 		{
 		    printf("A trap must be specified.\n");
 		}
@@ -386,7 +392,7 @@ void debug_shell()
 	    else if(!strcmp(command, "list"))
 	    {
 		int x, y;
-		Ushort start, end;
+		Ushort start, end = 0;
 		int lines = 0;
 
 		if(sscanf(input, "list %x , %x", &x, &y) == 2)
@@ -689,7 +695,8 @@ Traps:\n\
     clear\n\
         Delete the trap at the current address.\n\
     delete <n>\n\
-        Delete trap n.\n\
+    delete *\n\
+        Delete trap n, or all traps.\n\
     stop at <address>\n\
         Set a breakpoint at the specified hex address.\n\
     trace <address>\n\

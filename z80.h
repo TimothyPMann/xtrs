@@ -15,8 +15,11 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Sep 20 18:28:25 PDT 1997 by mann
+   Last modified on Tue Sep 30 18:01:50 PDT 1997 by mann
 */
+
+#ifndef _Z80_H
+#define _Z80_H
 
 #include "config.h"
 #include <stdio.h>
@@ -185,11 +188,9 @@ struct z80_state_struct
 extern struct z80_state_struct z80_state;
 
 extern void z80_reset();
-extern int z80_i();
 extern int z80_run();
 extern void mem_init();
-extern int mem_read();
-extern int mem_read_signed();
+extern int mem_read(/* int address */);  /* 0 <= address <= 0xffff REQUIRED */
 extern void mem_write();
 extern void mem_write_rom();
 extern int mem_read_word();
@@ -198,7 +199,9 @@ extern void mem_block_transfer();
 extern int load_hex(); /* returns highest address loaded + 1 */
 extern void error();
 extern void z80_out();
-extern int z80_int();
+extern int z80_in();
 extern int disassemble();
 extern void debug_init();
 extern void debug_shell();
+
+#endif

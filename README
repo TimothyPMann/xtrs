@@ -1,18 +1,20 @@
 README.tpm
 Tim Mann <mann@pa.dec.com>
-8/5/97
+9/27/97
 
 As computer scientists, we always long for something bigger and better
 than what we have now.  Give us a megabyte, and we want a gigabyte.
 Give us an emulated TRS-80 Model I with Level II BASIC and cassette,
 and we long for the Expansion Interface and floppy disk drives.  Give
-us that, and we want a Model III!
+us that, and we want a Model III.  Give us a Model III, and we want a
+Model 4!
 
 This is a snapshot of the work I've been doing on xtrs to add these
 niceties.  My main additions over xtrs-1.0 have been floppy disk
 emulation, timer interrupt emulation, a kludge to import and export
-data to the host system, Model III mode, a rewrite of the keyboard
-handling, and a bunch of bug fixes and minor improvements.
+data to the host system, Model III mode, Model 4 mode, a rewrite of
+the keyboard handling, support for most of the undocumented Z-80
+instructions, and a bunch of bug fixes and minor improvements.
 
 This project has been a real (48KB?) trip down memory lane for me.  I
 worked as a programmer for Logical Systems, who produced LDOS, during
@@ -22,9 +24,6 @@ hardware manuals, schematics, ROM disassemblies, and even the assembly
 listing for a version of the LDOS Percom Doubler driver that I helped
 write.
 
-At some point it would be fun to extend this code to emulate a Model 4
-or 4P.  I don't have the technical data for those systems, however.
-
 ****
 Technical information omitted from the man page
 ****
@@ -33,20 +32,21 @@ Technical information omitted from the man page
 
 The emulator supports only interrupt mode 1.  It will complain if your
 program enables interrupts after powerup without executing an im 1
-instruction first.  All Model I and III software does this, as these
+instruction first.  All Model I/III/4 software does this, as these
 machines supported only im 1.
 
 The Model I had a 40 Hz "heartbeat" interrupt, while the Model III
-used 30 Hz.  The emulator approximates this rather well even on a
-system where clock ticks come at some frequency that isn't divisible
-by the emulated frequency (e.g., 100 Hz on Intel Linux), as long as
-the true frequency is not slower than the emulated frequency.  The
-emulator has a notion of the absolute time at which each tick is
-supposed to occur, and it asks the host system to wake it up at each
-of those times.  The net result is that some ticks may be late, but
-there are always the proper number of ticks per second.  For example,
-running in Model I mode on Intel Linux you'd see this pattern: (tick,
-30ms, tick, 20ms, ...) instead of seeing ticks every 25ms.
+used 30 Hz, and the Model 4 could run at either 30 Hz or 60 Hz.  The
+emulator approximates this rather well even on a system where clock
+ticks come at some frequency that isn't divisible by the emulated
+frequency (e.g., 100 Hz on Intel Linux), as long as the true frequency
+is not slower than the emulated frequency.  The emulator has a notion
+of the absolute time at which each tick is supposed to occur, and it
+asks the host system to wake it up at each of those times.  The net
+result is that some ticks may be late, but there are always the proper
+number of ticks per second.  For example, running in Model I mode on
+Intel Linux you'd see this pattern: (tick, 30ms, tick, 20ms, ...)
+instead of seeing ticks every 25ms.
 
 The debugger has some extra support to keep interrupts from making
 life intolerable.  The "step" command suppresses the normal test for a
@@ -88,6 +88,7 @@ I put in a silly kludge that lets LDOS know the correct date whenever
 it boots up.  It simulates the case where you just rebooted LDOS
 without power cycling and the date was left in memory.  Unfortunately
 LDOS doesn't provide a way to do this trick with the time of day.
+This doesn't work (yet?) on the Model 4.
 
 * Bug fix history
 
@@ -127,6 +128,8 @@ I did some work on the KBWAIT feature, which tries to avoid burning
 host CPU cycles when the emulated program is sitting in a loop polling
 the keyboard.  It now works in a lot more cases.
 
-The correct character bitmaps are now used.
+More accurate character bitmaps are now used, contributed by Al
+Petrofsky.  The Model I bitmaps are still not the real ones, which
+used a 5x7 matrix, not 7x8.
 
 The halt instruction is now emulated correctly.

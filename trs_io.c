@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Sep 23 14:53:42 PDT 1997 by mann
+   Last modified on Sat Sep 27 20:06:39 PDT 1997 by mann
 */
 
 #include "z80.h"
@@ -23,7 +23,9 @@
 #include "trs_imp_exp.h"
 #include "trs_disk.h"
 
-static int modesel = 0;
+static int modesel = 0;   /* Model I */
+static int modeimage = 0; /* Model III/4 */
+static int ctrlimage = 0; /* Model 4 */
 
 /*ARGSUSED*/
 void z80_out(port, value)
@@ -40,7 +42,7 @@ void z80_out(port, value)
 	  case 0xFF:
 	    /* screen mode select is on D3 line */
 	    modesel = (value >> 3) & 1;
-	    trs_screen_mode_select(modesel ? EXPANDED : NORMAL);
+	    trs_screen_expanded(modesel);
 	    /* do cassette emulation */
 	    trs_cassette_out(value & 0x7);
 	    break;
@@ -49,6 +51,30 @@ void z80_out(port, value)
 	}
     } else {
 	switch (port) {
+	  case 0x84:
+	  case 0x85:
+	  case 0x86:
+	  case 0x87:
+	    if (trs_model >= 4) {
+		int changes = value ^ ctrlimage;
+		if (changes & 0x80) {
+		    mem_video_page((value & 0x80) >> 7);
+		}
+		if (changes & 0x70) {
+		    mem_bank((value & 0x70) >> 4);
+		}
+		if (changes & 0x08) {
+		    trs_screen_inverse((value & 0x08) >> 3);
+		}
+		if (changes & 0x04) {
+		    trs_screen_80x24((value & 0x04) >> 2);
+		}
+		if (changes & 0x03) {
+		    mem_map(value & 0x03);
+		}
+		ctrlimage = value;
+	    }
+	    break;
 	  case IMPEXP_CMD: /* 0xD0 */
 	    trs_impexp_cmd_write(value);
 	    break;
@@ -68,10 +94,12 @@ void z80_out(port, value)
 	  case 0xED:
 	  case 0xEE:
 	  case 0xEF:
-	    /* screen mode select is on D2 line */
-	    modesel = (value >> 2) & 1;
-	    trs_screen_mode_select(modesel ? EXPANDED : NORMAL);
-	    /*!! more to do*/
+	    modeimage = value;
+	    /* screen mode select is on D2 */
+	    trs_screen_expanded((modeimage & 0x04) >> 2);
+	    /* clock speed is on D6; it affects timer HZ too */
+	    trs_timer_speed((modeimage & 0x40) >> 6);
+	    /* !! still to do: cassette motor, alt char set */
 	    break;
 	  case TRSDISK3_COMMAND: /* 0xF0 */
 	    trs_disk_command_write(value);
@@ -151,7 +179,7 @@ int z80_in(port)
 	    return trs_printer_read();
 	  case 0xFF:
 	    /* !!Add cassette bits, etc., later */
-	    return modesel << 2;
+	    return modeimage;
 	  default:
 	    break;
 	}

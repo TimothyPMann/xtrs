@@ -85,7 +85,7 @@ default:	xtrs mkfloppy hex2cmd xtrs.man.txt
 # Local customizations for make variables are done in Makefile.local:
 include Makefile.local
 
-CFLAGS = $(DEBUG) $(ENDIAN) $(DEFAULT_ROM) $(READLINE) $(IFLAGS) \
+CFLAGS = $(DEBUG) $(ENDIAN) $(DEFAULT_ROM) $(READLINE) $(DISKDIR) $(IFLAGS) \
 	-DKBWAIT -DHAVE_SIGIO
 LIBS = $(XLIB) $(READLINELIBS) $(EXTRALIBS)
 
