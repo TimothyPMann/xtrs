@@ -143,9 +143,8 @@ typedef struct {
 
 /* Arbitrary maximum on tracks, chosen because LDOS can use at most 95 */
 #define MAXTRACKS     96
-
-#define REAL_SECSIZE 256  /* !!temporary limitation */
 #define JV1_SECSIZE 256
+#define MAXSECSIZE 1024
 
 /* Max bytes per unformatted track. */
 /* Select codes 1, 2, 4, 8 are emulated 5" drives, disk?-0 to disk?-3 */
@@ -179,7 +178,8 @@ typedef struct {
   int phytrack;			  /* where are we really? */
   int emutype;
   int inches;                     /* 5 or 8, as seen by TRS-80 */
-  int real_rps;                   /* used only for emutype REAL */
+  int real_rps;                   /* phys rotations/sec; emutype REAL only */
+  int real_size_code;             /* most recent sector size; REAL only */
   FILE* file;
   int free_id[4];		  /* first free id, if any, of each size */
   int last_used_id;		  /* last used index */
@@ -189,7 +189,7 @@ typedef struct {
   int offset[JV3_SECSMAX + 1];    /* offset into file for each id */
   short sorted_id[JV3_SECSMAX + 1];
   short track_start[MAXTRACKS][JV3_SIDES];
-  unsigned char buf[REAL_SECSIZE];
+  unsigned char buf[MAXSECSIZE];
 } DiskState;
 
 DiskState disk[NDRIVES];
@@ -479,6 +479,7 @@ trs_disk_change(int drive)
     ioctl(fileno(d->file), FDRESET, &reset_now);
     ioctl(fileno(d->file), FDGETDRVPRM, &fdp);
     d->real_rps = fdp.rps;
+    d->real_size_code = 1; /* initial guess: 256 bytes */
   } else
 #endif
   {
@@ -900,7 +901,7 @@ trs_disk_data_read(void)
     if (state.bytecount > 0) {
       int c;
       if (d->emutype == REAL) { 
-	c = d->buf[REAL_SECSIZE - state.bytecount];
+	c = d->buf[size_code_to_size(d->real_size_code) - state.bytecount];
       } else {
 	c = getc(disk[state.curdrive].file);
 	if (c == EOF) {
@@ -925,23 +926,12 @@ trs_disk_data_read(void)
     break;
   case TRSDISK_READADR:
     if (state.bytecount <= 0) break;
-    if (state.last_readadr >= 0) {
-      if (d->emutype == REAL) {
-	switch (state.bytecount) {
-	case 6:
-	  state.sector = d->phytrack; /*sic*/
-	  /* fall through */
-	case 5:
-	case 4:
-	case 3:
-	  state.data = d->buf[6 - state.bytecount];
-	  break;
-	case 2:
-	case 1:
-	  state.data = 0;     /* CRC not emulated */
-	  break;
-	}
-      } else if (d->emutype == JV1) {
+    if (d->emutype == REAL) {
+      state.sector = d->phytrack; /*sic*/
+      state.data = d->buf[6 - state.bytecount];
+
+    } else if (state.last_readadr >= 0) {
+      if (d->emutype == JV1) {
 	switch (state.bytecount) {
 	case 6:
 	  state.data = d->phytrack;
@@ -1015,7 +1005,7 @@ trs_disk_data_write(unsigned char data)
   case TRSDISK_WRITE:
     if (state.bytecount > 0) {
       if (d->emutype == REAL) {
-	d->buf[REAL_SECSIZE - state.bytecount] = data;
+	d->buf[size_code_to_size(d->real_size_code) - state.bytecount] = data;
 	state.bytecount--;
 	if (state.bytecount <= 0) {
 	  real_write();
@@ -1106,11 +1096,11 @@ trs_disk_data_write(unsigned char data)
       state.format = FMT_SIZEID;
       break;
     case FMT_SIZEID:
+      if (data > 0x03) {
+	trs_disk_unimpl(state.currcommand, "invalid sector size");
+      }
       if (d->emutype == JV3) {
 	int id_index;
-	if (data > 0x03) {
-	  trs_disk_unimpl(state.currcommand, "invalid sector size");
-	}
 	id_index = alloc_sector(d, data);
 	if (id_index == -1) {
 	  /* Data structure full */
@@ -1128,12 +1118,16 @@ trs_disk_data_write(unsigned char data)
 	  ((data & 3) ^ 1);
 	state.format_sec = id_index;
 
+      } else if (d->emutype == REAL) {
+	d->buf[d->nblocks++] = data;
+	if (d->real_size_code != -1 && d->real_size_code != data) {
+	  trs_disk_unimpl(state.currcommand,
+			  "varying sector size on same track on real floppy");
+	}
+	d->real_size_code = data;
       } else {
 	if (data != 0x01) {
 	  trs_disk_unimpl(state.currcommand, "sector size != 256");
-	}
-	if (d->emutype == REAL) {
-	  d->buf[d->nblocks++] = data;
 	}
       }
       state.format = FMT_GAP2;
@@ -1164,7 +1158,7 @@ trs_disk_data_write(unsigned char data)
 	} else if (d->emutype == JV1) {
 	  state.format_bytecount = JV1_SECSIZE;
 	} else if (d->emutype == REAL) {
-	  state.format_bytecount = REAL_SECSIZE;
+	  state.format_bytecount = size_code_to_size(d->real_size_code);
 	}
 	state.format = FMT_DATA;
       }
@@ -1425,7 +1419,7 @@ trs_disk_command_write(unsigned char cmd)
     if (d->emutype == REAL) {
       state.status = TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
-      state.bytecount = REAL_SECSIZE;
+      state.bytecount = size_code_to_size(d->real_size_code);
       break;
     }
     if (d->writeprot) {
@@ -1547,7 +1541,7 @@ trs_disk_command_write(unsigned char cmd)
     }
     if (state.last_readadr == -1) {
       state.status |= TRSDISK_BUSY;
-      trs_schedule_event(trs_disk_done, 0, 256);
+      trs_schedule_event(trs_disk_done, 0, 128);
     } else {
       state.last_readadr_density = state.density;
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
@@ -1586,6 +1580,8 @@ trs_disk_command_write(unsigned char cmd)
 	    free_sector(d, i);
 	  }
 	}
+      } else if (d->emutype == REAL) {
+	d->real_size_code = -1; /* watch for first, then check others match */
       }
       state.status = TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
@@ -1737,10 +1733,10 @@ real_read()
   raw_cmd.cmd[i++] = state.track;
   raw_cmd.cmd[i++] = state.curside;
   raw_cmd.cmd[i++] = state.sector;
-  raw_cmd.cmd[i++] = 1; /* 256 */
+  raw_cmd.cmd[i++] = d->real_size_code;
   raw_cmd.cmd[i++] = 255;
   raw_cmd.cmd[i++] = 0x0a;
-  raw_cmd.cmd[i++] = 0xff; /* 256 */
+  raw_cmd.cmd[i++] = 0xff; /* unused */
   raw_cmd.cmd_count = i;
   raw_cmd.data = (void*) d->buf;
   raw_cmd.length = 256;
@@ -1756,7 +1752,14 @@ real_read()
     /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
     state.status |= TRSDISK_NOTFOUND;
   } else {
-    if (raw_cmd.reply[1] & 0x85) state.status |= TRSDISK_NOTFOUND;
+    if (raw_cmd.reply[1] & 0x04) {
+      state.status |= TRSDISK_NOTFOUND;
+      /* Could have been due to wrong sector size.  Presumably
+         the Z-80 software will do some retries, so we'll cause
+         it to try the next sector size next time. */
+      d->real_size_code = (d->real_size_code + 1) % 3;
+    }
+    if (raw_cmd.reply[1] & 0x81) state.status |= TRSDISK_NOTFOUND;
     if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
     if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
     if (raw_cmd.reply[2] & 0x40) {
@@ -1771,7 +1774,7 @@ real_read()
     if ((raw_cmd.reply[0] & 0xc0) == 0) {
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
-      state.bytecount = REAL_SECSIZE;
+      state.bytecount = size_code_to_size(d->real_size_code);
       return;
     }
   }
@@ -1802,7 +1805,7 @@ real_write()
   raw_cmd.cmd[i++] = state.track;
   raw_cmd.cmd[i++] = state.curside;
   raw_cmd.cmd[i++] = state.sector;
-  raw_cmd.cmd[i++] = 1; /* 256 */
+  raw_cmd.cmd[i++] = d->real_size_code;
   raw_cmd.cmd[i++] = 255;
   raw_cmd.cmd[i++] = 0x0a;
   raw_cmd.cmd[i++] = 0xff; /* 256 */
@@ -1821,7 +1824,14 @@ real_write()
     /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
     state.status |= TRSDISK_WRITEFLT;
   } else {
-    if (raw_cmd.reply[1] & 0x85) state.status |= TRSDISK_NOTFOUND;
+    if (raw_cmd.reply[1] & 0x04) {
+      state.status |= TRSDISK_NOTFOUND;
+      /* Could have been due to wrong sector size.  Presumably
+         the Z-80 software will do some retries, so we'll cause
+         it to try the next sector size next time. */
+      d->real_size_code = (d->real_size_code + 1) % 3;
+    }
+    if (raw_cmd.reply[1] & 0x81) state.status |= TRSDISK_NOTFOUND;
     if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
     if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
     if (raw_cmd.reply[1] & 0x02) {
@@ -1888,7 +1898,9 @@ real_readadr()
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
       memcpy(d->buf, &raw_cmd.reply[3], 4);
-      state.bytecount = 4;
+      d->buf[4] = d->buf[5] = 0; /* CRC not emulated */
+      state.bytecount = 6;
+      d->real_size_code = d->buf[3]; /* update hint */
       return;
     }
   }
@@ -1920,7 +1932,7 @@ real_writetrk()
   raw_cmd.flags = FD_RAW_WRITE | FD_RAW_INTR;
   raw_cmd.cmd[i++] = 0x0d | (state.density ? 0x40 : 0x00);
   raw_cmd.cmd[i++] = state.curside ? 4 : 0;
-  raw_cmd.cmd[i++] = 1; /* 256 */
+  raw_cmd.cmd[i++] = d->real_size_code;
   raw_cmd.cmd[i++] = d->nblocks / 4;
   raw_cmd.cmd[i++] = 0x0c;
   raw_cmd.cmd[i++] = state.density ? 0x6d : 0xe5;
