@@ -1,5 +1,5 @@
 ;------------------------------------------------------------------
-; Free Model 4P mode boot ROM for xtrs - Version 0.03
+; Free Model 4P mode boot ROM for xtrs - Version 0.04
 ; Copyright 1999, Peter W. Cervasio (cervasio@airmail.net)
 ;------------------------------------------------------------------
 ; This software may be copied, modified, and used for any purpose
@@ -20,15 +20,15 @@
 ; and the Model 4/4P technical reference.
 ;
 ; 3-19-99, Tim Mann:  Improved disk error handling.  Ruled out 
-;   attempts to work in plain Model 4 mode.
+;   attempts to work in plain Model 4 mode. (v0.03)
 ; 4-4-99, Tim Mann:  Made read loop continue until NMI instead of
 ;   counting 256 bytes; this should let boot sectors of other than
-;   256 bytes work.
+;   256 bytes work. (v0.04)
 ;
 ; TODO:
 ;   possibly write code for the RST handlers as in the real 4P rom
 ;
-; Last modified on Sun Apr  4 22:26:04 PDT 1999 by mann 
+; Last modified on Sun Apr  4 23:39:59 PDT 1999 by mann 
 ;      modified on Mon Mar 15 17:25:49 CST 1999 by petec
 ;
 ;------------------------------------------------------------------
