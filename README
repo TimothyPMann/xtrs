@@ -126,3 +126,7 @@ added by changing tables; there is very little special-case code.
 I did some work on the KBWAIT feature, which tries to avoid burning
 host CPU cycles when the emulated program is sitting in a loop polling
 the keyboard.  It now works in a lot more cases.
+
+The correct character bitmaps are now used.
+
+The halt instruction is now emulated correctly.
