@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Mon Jan 12 19:45:51 PST 1998 by mann */
+/* Last modified on Sat Feb 14 14:02:47 PST 1998 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
@@ -154,6 +154,7 @@ typedef struct {
 #define JV1 1 /* compatible with Vavasour Model I emulator */
 #define JV3 3 /* compatible with Vavasour Model III/4 emulator */
 #define REAL 0
+#define NONE 2
 
 typedef struct {
   int writeprot;		  /* emulated write protect tab */
@@ -313,10 +314,14 @@ trs_disk_change(int drive)
     fd = open(diskname, O_ACCMODE|O_NDELAY);
     if (fd == -1) {
       d->file = NULL;
+      d->emutype = JV3;
       return;
     }
     d->file = fdopen(fd, "r+");
-    if (d->file == NULL) return;
+    if (d->file == NULL) {
+      d->emutype = JV3;
+      return;
+    }
     d->writeprot = 0;
     ioctl(fileno(d->file), FDRESET, &reset_now);
   } else
