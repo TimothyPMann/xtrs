@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Sun Oct 11 00:22:11 PDT 1998 by mann */
+/* Last modified on Tue Dec 15 11:30:32 PST 1998 by mann */
 
 /*
  * trs_imp_exp.h
@@ -67,7 +67,21 @@
  *         Before, B =  5
  *         After,  A =  0 if 2-button, 1 if 3-button
  *
- * ED2A-ED2F reserved
+ * ED2A emt_getddir
+ *   Get the value of the -diskdir command-line parameter.
+ *         Before, BC =  nbytes
+ *                 HL => buffer
+ *         After,  AF =  0 if OK, error number if not (Z flag affected)
+ *                 HL => same buffer, containing NUL-terminated pathname
+ *                 BC =  strlen(buffer), 0xFFFF if error
+ *
+ * ED2B emt_setddir
+ *   Change the value of the -diskdir command-line parameter.  Does not
+ *   force a disk change; use emt_misc afterwards if you want one.
+ *         Before, HL => path, null terminated
+ *         After,  AF =  0 if OK, error number if not (Z flag affected)
+ *
+ * ED2C-ED2F reserved
  *
  * ED30 emt_open
  *         Before, HL => path, null terminated

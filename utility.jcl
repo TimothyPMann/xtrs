@@ -1,4 +1,4 @@
-format :#d# (sden,cyl=35,name="xtrsutil",q=n,abs)
+format :#d# (sden,cyl=80,dir=17,name="xtrsutil",q=n,abs)
 import -n export.bas export/bas:#D#
 import export.cmd export/cmd:#D#
 import -n export.z export/z:#D#
@@ -17,3 +17,18 @@ import xtrs8.dct xtrs8/dct:#D#
 import -n xtrs8.z xtrs8/z:#D#
 import xtrsmous.cmd xtrsmous/cmd:#D#
 import -n xtrsmous.z xtrsmous/z:#D#
+import -n cd.ccc cd/ccc:#D#
+import -n pwd.ccc pwd/ccc:#D#
+import -n unix.ccc unix/ccc:#D#
+import -n mount.ccc mount/ccc:#D#
+import -n umount.ccc umount/ccc:#D#
+import cd.cmd cd/cmd:#D#
+import pwd.cmd pwd/cmd:#D#
+import unix.cmd unix/cmd:#D#
+import mount.cmd mount/cmd:#D#
+import umount.cmd umount/cmd:#D#
+import cd6.cmd cd6/cmd:#D#
+import pwd6.cmd pwd6/cmd:#D#
+import unix6.cmd unix6/cmd:#D#
+import mount6.cmd mount6/cmd:#D#
+import umount6.cmd umount6/cmd:#D#

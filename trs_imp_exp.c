@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Mon Sep 28 12:27:21 PDT 1998 by mann */
+/* Last modified on Tue Dec 15 11:34:26 PST 1998 by mann */
 
 /*
  * trs_imp_exp.c
@@ -103,6 +103,28 @@ void do_emt_mouse()
     error("undefined emt_mouse function code");
     break;
   }
+}
+
+void do_emt_getddir()
+{
+  if (REG_HL + REG_BC > 0x10000 ||
+      REG_HL + strlen(trs_disk_dir) + 1 > REG_HL + REG_BC) {
+    REG_A = EFAULT;
+    REG_F &= ~ZERO_MASK;
+    REG_BC = 0xFFFF;
+    return;
+  }
+  strcpy(mem_pointer(REG_HL, 1), trs_disk_dir);
+  REG_A = 0;
+  REG_F |= ZERO_MASK;
+  REG_BC = strlen(trs_disk_dir);
+}
+
+void do_emt_setddir()
+{
+  trs_disk_dir = strdup(mem_pointer(REG_HL, 0));
+  REG_A = 0;
+  REG_F |= ZERO_MASK;
 }
 
 void do_emt_open()

@@ -364,25 +364,69 @@ Newdos/80, and Model 4/4P TRSDOS/LS-DOS 6; they may also work under other
 TRS-80 operating systems.
 
 IMPORT/CMD imports a Unix file and writes it to an emulated disk.
-Usage: \fIIMPORT [-ln] unixfile trsfile\fP.  The -n flag converts Unix
-newlines (\\n) to TRS-80 newlines (\\r).  The -l flag converts the Unix
-filename to lower case, to compensate for TRS-80 operating systems
-such as Newdos/80 that convert all command line arguments to upper case.
-IMPORT/BAS is a much slower program that performs the same function
-but may work under more operating systems.  Simply run it under Disk
-Basic and answer the prompts.
+Usage: \fIIMPORT [-ln] unixfile [trsfile]\fP.  The -n flag converts
+Unix newlines (\\n) to TRS-80 newlines (\\r).  The -l flag converts
+the Unix filename to lower case, to compensate for TRS-80 operating
+systems such as Newdos/80 that convert all command line arguments to
+upper case.  If the destination file is omitted, IMPORT uses the last
+component of the Unix pathname, but with any "." changed to "/" to
+match TRS-80 DOS file extension syntax.  
+
+IMPORT/BAS is a much slower program that performs the same function as
+IMPORT/CMD but may work under more operating systems.  Simply run it
+under Disk Basic and answer the prompts.
 
 EXPORT/CMD reads a file from an emulated disk and exports it to a Unix
-file. Usage: \fIEXPORT [-ln] trsfile unixfile\fP.  The -n flag
+file. Usage: \fIEXPORT [-ln] trsfile [unixfile]\fP.  The -n flag
 converts TRS-80 newlines (\\r) to Unix newlines (\\n).  The -l flag
 converts the Unix filename to lower case, to compensate for TRS-80
 operating systems such as Newdos/80 that convert all command line
-arguments to upper case.  EXPORT/BAS is a much slower program that
-performs the same function but may work under more operating systems.
-Simply run it under Disk Basic and answer the prompts.
+arguments to upper case.  If the destination file is omitted, IMPORT
+uses the TRS-80 filename, but with any "/" changed to "." to match
+Unix file extension syntax.
+
+EXPORT/BAS is a much slower program that performs the same function as
+EXPORT/CMD but may work under more operating systems.  Simply run it
+under Disk Basic and answer the prompts.
 
 SETTIME/CMD reads the date and time from Unix and sets the TRS-80
 DOS's date and time accordingly.
+
+CD/CMD (or CD6/CMD) changes xtrs's Unix working directory.  This
+will change the interpretation of any relative pathnames given to
+IMPORT or EXPORT.  (It will also change the interpretation of disk
+names at the next disk change, unless you specified an absolute
+pathname for xtrs's -diskdir parameter.)  CD/CMD runs on LDOS 5.x,
+CD6/CMD on LS-DOS 6.x.  They have not been tested on other TRS-80
+operating systems.
+
+PWD/CMD (or PWD6/CMD) prints xtrs's Unix working directory.
+PWD/CMD runs on LDOS 5.x, PWD6/CMD on LS-DOS 6.x.  They have not
+been tested on other TRS-80 operating systems.
+
+UNIX/CMD (or UNIX6/CMD) runs a Unix shell command.  Standard I/O for
+the command uses the xtrs program's standard I/O descriptors; it does
+not go to the TRS-80 screen or come from the TRS-80 keyboard.  UNIX/CMD
+runs on LDOS 5.x, UNIX6/CMD on LS-DOS 6.x.  They have not been tested
+on other TRS-80 operating systems.
+
+MOUNT/CMD (or MOUNT6/CMD) is a convenience program that switches
+emulated floppy disks in the drives.  Usage: \fMOUNT filename U\fP.
+The filename is any Unix filename; U is a single digit, 0 through 7.
+The command deletes the file diskM-U (where M is the TRS-80 model)
+from the disk directory (see -diskdir option), replaces it with a
+symbolic link to the given filename, and signals a disk change (as if
+F7 had been pressed).  MOUNT/CMD runs on LDOS 5.x, MOUNT6/CMD on
+LS-DOS 6.x.  They have not been tested on other TRS-80 operating
+systems.
+
+UMOUNT/CMD (or UMOUNT6/CMD) is a convenience program that removes an
+emulated floppy disk from a drive.  Usage: \fUMOUNT U\fP.  U is a
+single digit, 0 through 7.  The command deletes the file diskM-U
+(where M is the TRS-80 model) from the disk directory (see -diskdir
+option) and signals a disk change (as if F7 had been pressed).
+UMOUNT/CMD runs on LDOS 5.x, UMOUNT6/CMD on LS-DOS 6.x.  They have not
+been tested on other TRS-80 operating systems.
 
 The emulated floppy \fIcpmutil.dsk\fP contains import and export
 programs for Montezuma CP/M, written by Roland Gerlach.  It was

@@ -6,7 +6,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Thu Apr  9 12:52:06 PDT 1998 by mann */
+/* Last modified on Tue Dec 15 14:40:25 PST 1998 by mann */
 
 #include <errno.h>
 #ifndef _TIME_T
@@ -31,6 +31,47 @@ emt_system(cmd)
     LD (ERRNO),BC
 #endasm
 }
+
+char *
+emt_gtddir(buffer, bytes)
+     char *buffer;
+     int bytes;
+{
+#asm
+    POP AF		;save return address
+    POP HL		;buffer to HL
+    POP BC		;bytes to BC
+    PUSH BC
+    PUSH HL
+    PUSH AF
+    DEFW 2AEDH		;emt_getddir
+    RET Z
+    LD B,0		;error code to errno
+    LD C,A
+    LD (ERRNO),BC
+    LD HL,0
+#endasm
+}
+
+int
+emt_stddir(fname)
+     char *fname;
+{
+#asm
+    POP AF		;save return address
+    POP HL		;fname to HL
+    PUSH HL
+    PUSH AF
+    DEFW 2BEDH		;emt_setddir
+    LD HL,0		;return 0 if OK
+    RET Z
+    LD B,0		;error code to errno
+    LD C,A
+    LD (ERRNO),BC
+    LD HL,0FFFFH	;return -1
+#endasm
+}
+
 
 int
 emt_open(fname, oflag, mode)
@@ -206,7 +247,7 @@ emt_time(local)
 }
 
 int
-emt_dopen(fname)
+emt_dropen(fname)
      char *fname;
 {
 #asm
@@ -225,7 +266,7 @@ emt_dopen(fname)
 }
 
 int
-emt_dclose(dirfd)
+emt_drclose(dirfd)
      int dirfd;
 {
 #asm
@@ -244,7 +285,7 @@ emt_dclose(dirfd)
 }
 
 int
-emt_dread(dirfd, buffer, bytes)
+emt_drread(dirfd, buffer, bytes)
      int dirfd;
      char *buffer;
      int bytes;
@@ -288,7 +329,7 @@ emt_chdir(fname)
 }
 
 
-int
+char *
 emt_getcwd(buffer, bytes)
      char *buffer;
      int bytes;
@@ -301,12 +342,11 @@ emt_getcwd(buffer, bytes)
     PUSH HL
     PUSH AF
     DEFW 3BEDH		;emt_getcwd
-    LD H,B
-    LD L,C
     RET Z
     LD B,0		;error code to errno
     LD C,A
     LD (ERRNO),BC
+    LD HL,0		;return NULL
 #endasm
 }
 
@@ -325,7 +365,7 @@ emt_misc(func)
 }
 
 void
-emt_misc2(func, hl, bc, de)
+emt_4misc(func, hl, bc, de)
      int func;
      int *hl;
      int *bc;
@@ -371,6 +411,7 @@ emt_misc2(func, hl, bc, de)
     INC HL
     LD (HL),D
     EX DE,HL		;HL return back to HL (not needed)
+    POP IX
 #endasm
 }
 
@@ -410,7 +451,7 @@ emt_ftruncate(fd, length)
 }
 
 int
-emt_opendisk(fname, oflag, mode)
+emt_dkopen(fname, oflag, mode)
      char *fname;
      int oflag;
      int mode;
@@ -435,7 +476,7 @@ emt_opendisk(fname, oflag, mode)
 }
 
 int
-emt_closedisk(fd)
+emt_dkclose(fd)
      int fd;
 {
 #asm

@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Oct 24 17:13:02 PDT 1998 by mann
+   Last modified on Tue Dec 15 11:30:39 PST 1998 by mann
 */
 
 /*
@@ -2956,6 +2956,12 @@ static void do_ED_instruction()
 	break;
       case 0x29:        /* emt_mouse */
 	do_emt_mouse();
+	break;
+      case 0x2a:        /* emt_getddir */
+	do_emt_getddir();
+	break;
+      case 0x2b:        /* emt_setddir */
+	do_emt_setddir();
 	break;
       case 0x30:        /* emt_open */
 	do_emt_open();

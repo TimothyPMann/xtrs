@@ -6,13 +6,16 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Thu Apr  9 12:35:26 PDT 1998 by mann */
+/* Last modified on Tue Dec 15 14:41:02 PST 1998 by mann */
 
 #ifndef _TIME_T
 #include <time.h>
 #endif
 
+/* Some names are changed to keep them unique in the first seven characters */
 extern int emt_system(/* char *cmd */);
+extern char* /*emt_getddir*/ emt_gtddir(/* char *buffer, int bytes */);
+extern int /*emt_setddir*/ emt_stddir(/* char *fname */);
 extern int emt_open(/* char *fname, int oflag, int mode */);
 extern int emt_close(/* int fd */);
 extern int emt_read(/* int fd, char *buffer, int bytes */);
@@ -20,16 +23,16 @@ extern int emt_write(/* int fd, char *buffer, int bytes */);
 extern long emt_lseek(/* int fd, long offset, int whence */);
 extern int emt_strerror(/* int err, char *buffer, int size */);
 extern time_t emt_time(/* int local */);
-extern int emt_dopen(/* char *fname */);
-extern int emt_dclose(/* int dirfd */);
-extern int emt_dread(/* int dirfd, char *buffer, int bytes */);
+extern int /*emt_opendir*/ emt_dropen(/* char *fname */);
+extern int /*emt_closedir*/ emt_drclose(/* int dirfd */);
+extern int /*emt_readdir*/ emt_drread(/*int dirfd, char *buffer, int bytes*/);
 extern int emt_chdir(/* char *fname */);
-extern int emt_getcwd(/* char *buffer, int bytes */);
+extern char* emt_getcwd(/* char *buffer, int bytes */);
 extern int emt_misc(/* int func */);
-extern void emt_misc2(/* int func, int *hl, int *bc, int *de */);
+extern void emt_4misc(/* int func, int *hl, int *bc, int *de */);
 extern int emt_ftruncate(/* int fd, long length */);
-extern int emt_opendisk(/* char *fname, int oflag, int mode */);
-extern int emt_closedisk(/* int fd */);
+extern int /*emt_opendisk*/ emt_dkopen(/* char *fname, int oflag, int mode */);
+extern int /*emt_closedisk*/ emt_dkclose(/* int fd */);
 
 /* oflag values for emt_open and emt_opendisk */
 #define EO_ACCMODE   03
