@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Thu Sep 24 20:42:33 PDT 1998 by mann */
+/* Last modified on Mon Oct 12 14:19:07 PDT 1998 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
@@ -1137,7 +1137,7 @@ trs_disk_command_write(unsigned char cmd)
     if (d->emutype == REAL) real_restore();
     /* Should this set lastdirection? */
     if (cmd & TRSDISK_VBIT) verify();
-    trs_schedule_event(trs_disk_intrq_interrupt, 1, 64);
+    trs_schedule_event(trs_disk_intrq_interrupt, 1, 8);
     break;
   case TRSDISK_SEEK:
     d->phytrack += (state.data - state.track);
@@ -1151,7 +1151,7 @@ trs_disk_command_write(unsigned char cmd)
     if (d->emutype == REAL) real_seek();
     /* Should this set lastdirection? */
     if (cmd & TRSDISK_VBIT) verify();
-    trs_schedule_event(trs_disk_intrq_interrupt, 1, 64);
+    trs_schedule_event(trs_disk_intrq_interrupt, 1, 8);
     break;
   case TRSDISK_STEP:
   case TRSDISK_STEPU:
@@ -1168,7 +1168,7 @@ trs_disk_command_write(unsigned char cmd)
     }
     if (d->emutype == REAL) real_seek();
     if (cmd & TRSDISK_VBIT) verify();
-    trs_schedule_event(trs_disk_intrq_interrupt, 1, 64);
+    trs_schedule_event(trs_disk_intrq_interrupt, 1, 8);
     break;
   case TRSDISK_STEPIN:
   case TRSDISK_STEPINU:
