@@ -977,9 +977,6 @@ the emulator's disk file format, ROM images, and TRS-80 software that
 has already been converted.  For pointers, see
 http://www.tim-mann.org/trs80.html.
 .SH Bugs and limitations
-Some of the more bizarre undocumented Z-80 instructions
-are not implemented.
-
 The emulated serial port's modem status and control signals are not
 tied to the signals on the real serial port, because the real signals
 are not available to software through the Unix tty device interface.

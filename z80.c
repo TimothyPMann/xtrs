@@ -21,29 +21,23 @@
 /*
  * z80.c:  The guts of the Z-80 emulator.
  *
- * The Z-80 emulator should be general and complete enough to be easily
- * adapted to emulate any Z-80 machine, although it's only really been
- * tested with TRS-80 code.  The only thing we cheat a little on is
- * interrupt handling (modes 0 and 2 are not supported) and the
- * refresh register (reading it returns a random number; writing it is
- * ignored).   All of the documented flags are supported.  All of the
- * documented Z-80 instructions are implemented.   
+ * The Z-80 emulator should be general and complete enough to be
+ * easily adapted to emulate any Z-80 machine, although it's only
+ * really been tested with TRS-80 code.  The only thing we cheat a
+ * little on is interrupt handling (modes 0 and 2 are not supported)
+ * and the refresh register (reading it returns a random number;
+ * writing it is ignored).  All of the documented Z-80 flags and
+ * instructions are implemented.
  *
- * Some undocumented Z-80 features are implemented too, but others are 
- * not.  Currently implemented: "slia" instructions (CB30-CB37), DD or 
- * FD prefix on instructions that use H or L (or that don't!),
- * undocumented ED prefix instructions including "in (c)" (ED70), "out
- * (c), 0" (ED71).  Registers F, F' each have 8 working bits, usable
- * with pop af/push af. 
- *
- * Known omissions: DD or FD prefix on CB instructions that don't 
- * reference HL (these are weird), ED prefix instructions that are
- * no-ops or that set IM to an undefined state.  Instructions other
- * than "pop af" and "ex af, af'" do not affect the undocumented flag
- * bits in F. 
- *
- * There may still be bugs in the emulator.  If you discover any,
- * please do send a report.  */
+ * All of the undocumented instructions, flags, and features listed in
+ * http://www.msxnet.org/tech/Z80/z80undoc.txt are implemented too,
+ * with some minor exceptions.  Undocumented flag settings are not
+ * handled correctly for the more or less bizarre cases 
+ * bit n,(ix/iy+d), bit n,(hl), block in/out, and perhaps a few
+ * others I didn't check carefully, and the R register is implemented 
+ * with a pseudo-random number generator.  The emulator does pass the 
+ * ZEXALL validator from Yaze.  
+ */
 
 #include "z80.h"
 #include "trs.h"
@@ -583,6 +577,9 @@ static void do_cpir()
     T_COUNT(-5);
 }
 
+#if 0
+/* This passed ZEXALL, but gets UNDOC3 and UNDOC5 wrong according to
+   http://www.msxnet.org/tech/Z80/z80undoc.txt. */
 static void do_test_bit(int op, int value, int bit)
 {
     if (value & (1 << bit)) {
@@ -594,6 +591,19 @@ static void do_test_bit(int op, int value, int bit)
     }
     if ((op & 7) != 6) REG_F |= value & (UNDOC3_MASK | UNDOC5_MASK);
 }
+#else
+/* This corrects UNDOC3 and UNDOC5 for "bit n,r", but they are
+   still wrong for "bit n,(ix/iy+d)" and "bit n,(hl)".  The latter
+   cases would be a pain to fix, especially "bit n,(hl)" whose
+   behavior is complex and not even fully understood yet. */
+static void do_test_bit(int op, int value, int bit)
+{
+    int result = value & (1 << bit);
+    REG_F = (REG_F & CARRY_MASK) | HALF_CARRY_MASK
+      | (result & (UNDOC3_MASK | UNDOC5_MASK | SIGN_MASK))
+      | (result ? 0 : (OVERFLOW_MASK | ZERO_MASK));
+}
+#endif
 
 static int rl_byte(int value)
 {
@@ -2351,177 +2361,119 @@ static void do_indexed_instruction(Ushort *ixp)
 
       case 0xCB:
         {
-	  signed char offset;
+	  signed char offset, result = 0;
 	  Uchar sub_instruction;
 
 	  offset = (signed char) mem_read(REG_PC++);
 	  sub_instruction = mem_read(REG_PC++);
 
-	  switch(sub_instruction)
+	  /* Instructions with (sub_instruction & 7) != 6 are undocumented;
+	     their extra effect is handled after this switch */
+	  switch(sub_instruction&0xf8)
 	  {
-	    case 0x46:	/* bit 0, (ix + offset) */
-	      do_test_bit(sub_instruction, mem_read((*ixp + offset) & 0xffff), 0);
-	      T_COUNT(20);
-	      break;
-	    case 0x4E:	/* bit 1, (ix + offset) */
-	      do_test_bit(sub_instruction, mem_read((*ixp + offset) & 0xffff), 1);
-	      T_COUNT(20);
-	      break;
-	    case 0x56:	/* bit 2, (ix + offset) */
-	      do_test_bit(sub_instruction, mem_read((*ixp + offset) & 0xffff), 2);
-	      T_COUNT(20);
-	      break;
-	    case 0x5E:	/* bit 3, (ix + offset) */
-	      do_test_bit(sub_instruction, mem_read((*ixp + offset) & 0xffff), 3);
-	      T_COUNT(20);
-	      break;
-	    case 0x66:	/* bit 4, (ix + offset) */
-	      do_test_bit(sub_instruction, mem_read((*ixp + offset) & 0xffff), 4);
-	      T_COUNT(20);
-	      break;
-	    case 0x6E:	/* bit 5, (ix + offset) */
-	      do_test_bit(sub_instruction, mem_read((*ixp + offset) & 0xffff), 5);
-	      T_COUNT(20);
-	      break;
-	    case 0x76:	/* bit 6, (ix + offset) */
-	      do_test_bit(sub_instruction, mem_read((*ixp + offset) & 0xffff), 6);
-	      T_COUNT(20);
-	      break;
-	    case 0x7E:	/* bit 7, (ix + offset) */
-	      do_test_bit(sub_instruction, mem_read((*ixp + offset) & 0xffff), 7);
-	      T_COUNT(20);
-	      break;
-
-	    case 0x86:	/* res 0, (ix + offset) */
-	      mem_write(*ixp + offset,
-			mem_read((*ixp + offset) & 0xffff) & ~(1 << 0));
-	      T_COUNT(23);
-	      break;
-	    case 0x8E:	/* res 1, (ix + offset) */
-	      mem_write(*ixp + offset,
-			mem_read((*ixp + offset) & 0xffff) & ~(1 << 1));
-	      T_COUNT(23);
-	      break;
-	    case 0x96:	/* res 2, (ix + offset) */
-	      mem_write(*ixp + offset,
-			mem_read((*ixp + offset) & 0xffff) & ~(1 << 2));
-	      T_COUNT(23);
-	      break;
-	    case 0x9E:	/* res 3, (ix + offset) */
-	      mem_write(*ixp + offset,
-			mem_read((*ixp + offset) & 0xffff) & ~(1 << 3));
-	      T_COUNT(23);
-	      break;
-	    case 0xA6:	/* res 4, (ix + offset) */
-	      mem_write(*ixp + offset,
-			mem_read((*ixp + offset) & 0xffff) & ~(1 << 4));
-	      T_COUNT(23);
-	      break;
-	    case 0xAE:	/* res 5, (ix + offset) */
-	      mem_write(*ixp + offset,
-			mem_read((*ixp + offset) & 0xffff) & ~(1 << 5));
-	      T_COUNT(23);
-	      break;
-	    case 0xB6:	/* res 6, (ix + offset) */
-	      mem_write(*ixp + offset,
-			mem_read((*ixp + offset) & 0xffff) & ~(1 << 6));
-	      T_COUNT(23);
-	      break;
-	    case 0xBE:	/* res 7, (ix + offset) */
-	      mem_write(*ixp + offset,
-			mem_read((*ixp + offset) & 0xffff) & ~(1 << 7));
-	      T_COUNT(23);
-	      break;
-	      
-	    case 0x16:	/* rl (ix + offset) */
-	      mem_write(*ixp + offset,
-			rl_byte(mem_read((*ixp + offset) & 0xffff)));
+	    case 0x00:	/* rlc (ix + offset) */
+	      result = rlc_byte(mem_read((*ixp + offset) & 0xffff));
+	      mem_write(*ixp + offset, result);
 	      T_COUNT(23);
 	      break;
 
-	    case 0x06:	/* rlc (ix + offset) */
-	      mem_write(*ixp + offset,
-			rlc_byte(mem_read((*ixp + offset) & 0xffff)));
+	    case 0x08:	/* rrc (ix + offset) */
+	      result = rrc_byte(mem_read((*ixp + offset) & 0xffff));
+	      mem_write(*ixp + offset, result);
 	      T_COUNT(23);
 	      break;
 
-	    case 0x1E:	/* rr (ix + offset) */
-	      mem_write(*ixp + offset,
-			rr_byte(mem_read((*ixp + offset) & 0xffff)));
+	    case 0x10:	/* rl (ix + offset) */
+	      result = rl_byte(mem_read((*ixp + offset) & 0xffff));
+	      mem_write(*ixp + offset, result);
 	      T_COUNT(23);
 	      break;
 
-	    case 0x0E:	/* rrc (ix + offset) */
-	      mem_write(*ixp + offset,
-			rrc_byte(mem_read((*ixp + offset) & 0xffff)));
+	    case 0x18:	/* rr (ix + offset) */
+	      result = rr_byte(mem_read((*ixp + offset) & 0xffff));
+	      mem_write(*ixp + offset, result);
 	      T_COUNT(23);
 	      break;
 
-	    case 0xC6:	/* set 0, (ix + offset) */
-	      mem_write(*ixp + offset,
-			mem_read((*ixp + offset) & 0xffff) | (1 << 0));
-	      T_COUNT(23);
-	      break;
-	    case 0xCE:	/* set 1, (ix + offset) */
-	      mem_write(*ixp + offset,
-			mem_read((*ixp + offset) & 0xffff) | (1 << 1));
-	      T_COUNT(23);
-	      break;
-	    case 0xD6:	/* set 2, (ix + offset) */
-	      mem_write(*ixp + offset,
-			mem_read((*ixp + offset) & 0xffff) | (1 << 2));
-	      T_COUNT(23);
-	      break;
-	    case 0xDE:	/* set 3, (ix + offset) */
-	      mem_write(*ixp + offset,
-			mem_read((*ixp + offset) & 0xffff) | (1 << 3));
-	      T_COUNT(23);
-	      break;
-	    case 0xE6:	/* set 4, (ix + offset) */
-	      mem_write(*ixp + offset,
-			mem_read((*ixp + offset) & 0xffff) | (1 << 4));
-	      T_COUNT(23);
-	      break;
-	    case 0xEE:	/* set 5, (ix + offset) */
-	      mem_write(*ixp + offset,
-			mem_read((*ixp + offset) & 0xffff) | (1 << 5));
-	      T_COUNT(23);
-	      break;
-	    case 0xF6:	/* set 6, (ix + offset) */
-	      mem_write(*ixp + offset,
-			mem_read((*ixp + offset) & 0xffff) | (1 << 6));
-	      T_COUNT(23);
-	      break;
-	    case 0xFE:	/* set 7, (ix + offset) */
-	      mem_write(*ixp + offset,
-			mem_read((*ixp + offset) & 0xffff) | (1 << 7));
+	    case 0x20:	/* sla (ix + offset) */
+	      result = sla_byte(mem_read((*ixp + offset) & 0xffff));
+	      mem_write(*ixp + offset, result);
 	      T_COUNT(23);
 	      break;
 
-	    case 0x26:	/* sla (ix + offset) */
-	      mem_write(*ixp + offset,
-			sla_byte(mem_read((*ixp + offset) & 0xffff)));
+	    case 0x28:	/* sra (ix + offset) */
+	      result = sra_byte(mem_read((*ixp + offset) & 0xffff));
+	      mem_write(*ixp + offset, result);
 	      T_COUNT(23);
 	      break;
-	    case 0x2E:	/* sra (ix + offset) */
-	      mem_write(*ixp + offset,
-			sra_byte(mem_read((*ixp + offset) & 0xffff)));
+
+	    case 0x30:	/* slia (ix + offset) [undocumented] */
+	      result = slia_byte(mem_read((*ixp + offset) & 0xffff));
+	      mem_write(*ixp + offset, result);
 	      T_COUNT(23);
 	      break;
-	    case 0x36:	/* slia (ix + offset) [undocumented] */
-	      mem_write(*ixp + offset,
-			slia_byte(mem_read((*ixp + offset) & 0xffff)));
+
+	    case 0x38:	/* srl (ix + offset) */
+	      result = srl_byte(mem_read((*ixp + offset) & 0xffff));
+	      mem_write(*ixp + offset, result);
 	      T_COUNT(23);
 	      break;
-	    case 0x3E:	/* srl (ix + offset) */
-	      mem_write(*ixp + offset,
-			srl_byte(mem_read((*ixp + offset) & 0xffff)));
+
+	    case 0x40:  /* bit 0, (ix + offset) */
+	    case 0x48:  /* bit 1, (ix + offset) */
+	    case 0x50:  /* bit 2, (ix + offset) */
+	    case 0x58:  /* bit 3, (ix + offset) */
+	    case 0x60:  /* bit 4, (ix + offset) */
+	    case 0x68:  /* bit 5, (ix + offset) */
+	    case 0x70:  /* bit 6, (ix + offset) */
+	    case 0x78:  /* bit 7, (ix + offset) */
+	      do_test_bit(sub_instruction, mem_read((*ixp + offset) & 0xffff),
+			  (sub_instruction >> 3) & 7);
+	      T_COUNT(20);
+	      break;
+
+	    case 0x80:	/* res 0, (ix + offset) */
+	    case 0x88:	/* res 1, (ix + offset) */
+	    case 0x90:	/* res 2, (ix + offset) */
+	    case 0x98:	/* res 3, (ix + offset) */
+	    case 0xA0:	/* res 4, (ix + offset) */
+	    case 0xA8:	/* res 5, (ix + offset) */
+	    case 0xB0:	/* res 6, (ix + offset) */
+	    case 0xB8:	/* res 7, (ix + offset) */
+	      result = mem_read((*ixp + offset) & 0xffff) &
+		~(1 << ((sub_instruction >> 3) & 7));
+	      mem_write(*ixp + offset, result);
 	      T_COUNT(23);
 	      break;
-	      
-	    default:
-	      disassemble(REG_PC - 4);
-	      error("unsupported instruction");
+
+	    case 0xC0:	/* set 0, (ix + offset) */
+	    case 0xC8:	/* set 1, (ix + offset) */
+	    case 0xD0:	/* set 2, (ix + offset) */
+	    case 0xD8:	/* set 3, (ix + offset) */
+	    case 0xE0:	/* set 4, (ix + offset) */
+	    case 0xE8:	/* set 5, (ix + offset) */
+	    case 0xF0:	/* set 6, (ix + offset) */
+	    case 0xF8:	/* set 7, (ix + offset) */
+	      result = mem_read((*ixp + offset) & 0xffff) |
+		(1 << ((sub_instruction >> 3) & 7));
+	      mem_write(*ixp + offset, result);
+	      T_COUNT(23);
+	      break;
+	  }
+
+	  if (sub_instruction < 0x40 || sub_instruction > 0x7f)
+          {
+	    switch (sub_instruction & 7) 
+	    {
+	      /* Undocumented cases */
+	      case 0:  REG_B = result; break;
+	      case 1:  REG_C = result; break;
+	      case 2:  REG_D = result; break;
+	      case 3:  REG_E = result; break;
+	      case 4:  REG_H = result; break;
+	      case 5:  REG_L = result; break;
+	      case 7:  REG_A = result; break;
+	    }
 	  }
         }
 	break;
