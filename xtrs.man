@@ -196,8 +196,7 @@ choose \fId\fP and \fIu\fP to be equal to reduce confusion.
 You can repeat these steps with different values of \fId\fP and
 \fIu\fP to have more than one 8-inch drive.  You might want to repeat
 four times using 4, 5, 6, and 7, or you might want to save some drive
-numbers for hard drives (see below).  You can now format and use
-emulated 8-
+numbers for hard drives (see below).
 
 Finally, it's a good idea to give the SYSTEM (SYSGEN) command (Model
 I/III) or SYSGEN command (Model 4/4P).  This command saves the SYSTEM
