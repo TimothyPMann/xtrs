@@ -1,0 +1,57 @@
+
+#
+# Makefile.local: local customizations for the xtrs Makefile
+#
+
+# If your machine is not a sun, vax, or DEC MIPS, uncomment the line below
+# if the processor has big-endian byte ordering.  If you're not sure what
+# to do, don't worry -- the program will complain if it's not right.
+
+# ENDIAN = -Dbig_endian
+
+# If you would like the TRS-80 ROM to be built into the application,
+# use this line (with the appropriate file name):
+
+# BUILT_IN_ROM = level2rom.hex
+
+# If you would like the application to load a default ROM file at startup
+# time, use this line (with the appropriate file name):
+
+# DEFAULT_ROM = -DDEFAULT_ROM='"/usr/local/lib/trs80rom.hex"'
+
+# If you have the GNU readline package (the README file tells you where to
+# get it) and would like to use it with the built-in Z-80 debugger, use
+# these lines:
+
+# READLINE = -DREADLINE
+# READLINELIBS = -lreadline -ltermcap
+
+# If you want to debug the emulator, use the -g flag instead:
+
+DEBUG = -O
+# DEBUG = -g
+
+# If you have gcc, and you want to use it:
+
+# CC = gcc
+
+# If you need a different path for libraries:
+
+# LDFLAGS = -L/usr/local/lib
+
+# If you need a different path for include files:
+
+# IFLAGS = -I/usr/local/include
+
+# Re-define this if your X library is strangely named:
+
+XLIB = -lX11
+
+# Use this if you need yet more libraries:
+
+# EXTRALIBS = -ldnet
+
+# Set these to where you want installed stuff to go, if you install them.
+
+BINDIR = /usr/local/bin
+MANDIR = /usr/local/man
