@@ -1,7 +1,6 @@
 <HTML>
 <HEAD>
    <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
-   <META NAME="GENERATOR" CONTENT="Mozilla/4.05 [en] (X11; I; OSF1 V4.0 alpha) [Netscape]">
    <TITLE>Common File Formats for Emulated TRS-80 Floppy Disks</TITLE>
 </HEAD>
 <BODY>
@@ -9,7 +8,7 @@
 <H1>
 Common File Formats for Emulated TRS-80 Floppy Disks</H1>
 <A HREF="http://www.tim-mann.org/">Tim Mann</A>
-<BR><A HREF="mailto:tim@tim-mann.org">tim@tim-mann.org</A>
+<BR>tim<a name="nospam">@</a>tim-mann.org</A>
 <BR>Last revised 18-Jul-99
 
 <P>Most current TRS-80 Model I/III/4 emulators use one of three common
@@ -28,7 +27,7 @@ with 256 byte sectors and a Model I directory on track 17.<p>
 <li>The JV3 format originated in Jeff's Model III/4 emulator for MS-DOS.
 It is much more flexible than JV1, but still cannot represent everything
 the real hardware can do, so some copy-protected disks cannot be represented.
-The format has been extended to support 8" floppies and sector sizes of
+The format has been extended to support 8-inch floppies and sector sizes of
 other than 256 bytes, but not all emulators support these extensions. I
 indicate below which features are extensions and which emulators are known
 to support which extensions.<p>
@@ -376,8 +375,9 @@ block.
 <P>It's obvious, by the way, how to extend the format to more than two
 header blocks, but no known emulators support more than two. Having more
 than two is not useful to describe any floppy format that was supported
-by any real TRS-80. One block is sufficient for 5.25"&nbsp;DD&nbsp;drives,
-and two are sufficient for 8" drives, 5.25" HD drives, or 3.5" HD drives.
+by any real TRS-80. One block is sufficient for 5.25-inch DD drives,
+and two are sufficient for 8-inch drives, 5.25-inch HD drives,
+or 3.5-inch HD drives.
 <H3>
 Allocating and Freeing Sectors</H3>
 Allocating and freeing sectors is a little tricky (if you support the extension
@@ -394,7 +394,7 @@ its size, so that the data of later sectors need not be moved.
 <P>If the highest in-use sector is freed, the emulator should search backward
 for the new highest in-use sector, and should truncate the file to eliminate
 any sector data for trailing free sectors, as well as the second header
-block if it is no longer needed. Why do this?&nbsp;If the user reformats
+block if it is no longer needed. Why do this? If the user reformats
 some sectors to be shorter or longer than they used to be, the nominal
 start of the second header block (as defined above) will shift. If you
 have garbage at the end of the file, and the block shifts to start somewhere
@@ -411,7 +411,7 @@ that do support the feature, as long as those disks didn't require that
 feature when they were created. For example, an emulator that supports
 the second header block will not create a second header block unless you
 format more that 2901 sectors on one disk; note that an 80 track, double
-sided, double density 5.25"&nbsp;disk contains less than 2901 sectors.
+sided, double density 5.25-inch disk contains less than 2901 sectors.
 <BR>&nbsp;
 <TABLE BORDER COLS=8 WIDTH="100%" NOSAVE >
 <TR>
