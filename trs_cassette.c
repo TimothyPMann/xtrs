@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Wed Aug 27 16:53:33 PDT 1997 by mann
+   Last modified on Wed Sep 24 18:27:48 PDT 1997 by mann
 */
 
 #include "trs.h"
@@ -125,7 +125,7 @@ void trs_cassette_out(value)
 	    mem_read_word(REG_SP + 8), mem_read_word(REG_SP + 10),
 	    mem_read_word(REG_SP + 12), mem_read_word(REG_SP + 14));
 #endif
-    if (trs_model == 3) return; /* not implemented */
+    if (trs_model != 1) return; /* not implemented */
 
     if(value & 4)
     {
@@ -183,7 +183,7 @@ int trs_cassette_in(modesel)
 	    mem_read_word(REG_SP + 8), mem_read_word(REG_SP + 10),
 	    mem_read_word(REG_SP + 12), mem_read_word(REG_SP + 14));
 #endif
-    if (trs_model == 3) return 0xff;
+    if (trs_model != 1) return 0xff; /* not implemented */
 
     if(REG_PC == 0x0245)
     {
