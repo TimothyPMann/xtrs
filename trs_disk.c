@@ -5,13 +5,14 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Thu Oct 30 09:30:44 PST 1997 by mann */
+/* Last modified on Tue Nov 18 14:29:08 PST 1997 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
  */
 
 /*#define DISKDEBUG 1*/
+#define DELAYED_INTRQ_KLUDGE 1
 
 #include "z80.h"
 #include "trs.h"
@@ -56,7 +57,15 @@ typedef struct {
   unsigned char controller;	/* TRSDISK_P1771 or TRSDISK_P1791 */
   int last_readadr;             /* id index found by last readadr */
   int last_readadr_density;
+#if DELAYED_INTRQ_KLUDGE
+  /* This ugly kludge is to make SuperUtility (and Trakcess)
+     happy.  They assume they can execute a few dozen instructions
+     between issuing a command and receiving a completion
+     interrupt.  In particular, SuperUtility assumes it will get
+     the interrupt inside a procedure call that it makes shortly
+     after issuing the command, not before the call. */
   int delayed_intrq_kludge;
+#endif
 } FDCState;
 
 FDCState state;
@@ -194,7 +203,9 @@ trs_disk_init(int reset_button)
   state.controller = (trs_model == 1) ? TRSDISK_P1771 : TRSDISK_P1791;
   state.last_readadr = -1;
   state.last_readadr_density = 0;
+#if DELAYED_INTRQ_KLUDGE
   state.delayed_intrq_kludge = 0;
+#endif
   for (i=0; i<NDRIVES; i++) {
     disk[i].phytrack = 0;
     disk[i].emutype = JV3;
@@ -1049,10 +1060,13 @@ trs_disk_status_read(void)
     last_status = state.status;
   }
 #endif
+#if DELAYED_INTRQ_KLUDGE
   if (state.delayed_intrq_kludge) {
     trs_disk_intrq_interrupt(1);
     state.delayed_intrq_kludge = 0;
-  } else {
+  } else 
+#endif
+  {
     trs_disk_intrq_interrupt(0);
   }
   return state.status;
@@ -1128,7 +1142,11 @@ trs_disk_command_write(unsigned char cmd)
     state.status = 0;
     id_index = search(state.sector);
     if (id_index == -1) {
+#if DELAYED_INTRQ_KLUDGE
+      state.delayed_intrq_kludge = 1;
+#else
       trs_disk_intrq_interrupt(1);
+#endif
     } else {
       if (d->emutype == JV1) {
 	if (d->phytrack == 17) {
@@ -1173,7 +1191,11 @@ trs_disk_command_write(unsigned char cmd)
     state.status = 0;
     id_index = search(state.sector);
     if (id_index == -1) {
+#if DELAYED_INTRQ_KLUDGE
+      state.delayed_intrq_kludge = 1;
+#else
       trs_disk_intrq_interrupt(1);
+#endif
     } else {
       int dirdam = (state.controller == TRSDISK_P1771 ?
 		    (cmd & (TRSDISK_CBIT|TRSDISK_DBIT)) != 0 :
@@ -1256,12 +1278,7 @@ trs_disk_command_write(unsigned char cmd)
       }
     }
     if (state.last_readadr == -1) {
-#if 1
-      /* This ugly kludge is to make SuperUtility happy.  SuperUtility
-	 assumes it can execute a few dozen instructions between issuing
-	 a read-address command and receiving a completion interrupt.
-	 It assumes it will get the interrupt inside a procedure call that
-	 it makes shortly after issuing the command. */
+#if DELAYED_INTRQ_KLUDGE
       state.delayed_intrq_kludge = 1;
 #else
       trs_disk_intrq_interrupt(1);
@@ -1466,26 +1483,31 @@ real_read()
     perror("real_read");
     /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
     state.status |= TRSDISK_NOTFOUND;
-    return;
-  }
-  if (raw_cmd.reply[1] & 0x85) state.status |= TRSDISK_NOTFOUND;
-  if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
-  if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
-  /*if (raw_cmd.reply[1] & 0x02) state.status |= TRSDISK_WRITEPRT;*/
-  if (raw_cmd.reply[2] & 0x40) {
-    if (state.controller == TRSDISK_P1771) {
-      state.status |= TRSDISK_1771_FA;
-    } else {
-      state.status |= TRSDISK_1791_F8;
+  } else {
+    if (raw_cmd.reply[1] & 0x85) state.status |= TRSDISK_NOTFOUND;
+    if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
+    if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
+    if (raw_cmd.reply[2] & 0x40) {
+      if (state.controller == TRSDISK_P1771) {
+        state.status |= TRSDISK_1771_FA;
+      } else {
+        state.status |= TRSDISK_1791_F8;
+      }
+    }
+    if (raw_cmd.reply[2] & 0x20) state.status |= TRSDISK_CRCERR;
+    if (raw_cmd.reply[2] & 0x13) state.status |= TRSDISK_NOTFOUND;
+    if ((raw_cmd.reply[0] & 0xc0) == 0) {
+      state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
+      trs_disk_drq_interrupt(1);
+      state.bytecount = SECSIZE;
+      return;
     }
   }
-  if (raw_cmd.reply[2] & 0x20) state.status |= TRSDISK_CRCERR;
-  if (raw_cmd.reply[2] & 0x13) state.status |= TRSDISK_NOTFOUND;
-  if ((raw_cmd.reply[0] & 0xc0) == 0) {
-    state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
-    trs_disk_drq_interrupt(1);
-    state.bytecount = SECSIZE;
-  }
+#if DELAYED_INTRQ_KLUDGE
+  state.delayed_intrq_kludge = 1;
+#else
+  trs_disk_intrq_interrupt(1);
+#endif
 #else
   trs_disk_unimpl(state.currcommand, "read real floppy");
 #endif
@@ -1529,22 +1551,26 @@ real_write()
     perror("real_write");
     /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
     state.status |= TRSDISK_WRITEFLT;
-    return;
-  }
-  if (raw_cmd.reply[1] & 0x85) state.status |= TRSDISK_NOTFOUND;
-  if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
-  if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
-  if (raw_cmd.reply[1] & 0x02) {
-    state.status |= TRSDISK_WRITEPRT;
-    d->writeprot = 1;
   } else {
-    d->writeprot = 0;
+    if (raw_cmd.reply[1] & 0x85) state.status |= TRSDISK_NOTFOUND;
+    if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
+    if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
+    if (raw_cmd.reply[1] & 0x02) {
+      state.status |= TRSDISK_WRITEPRT;
+      d->writeprot = 1;
+    } else {
+      d->writeprot = 0;
+    }
+    if (raw_cmd.reply[2] & 0x20) state.status |= TRSDISK_CRCERR;
+    if (raw_cmd.reply[2] & 0x13) state.status |= TRSDISK_NOTFOUND;
   }
-  if (raw_cmd.reply[2] & 0x20) state.status |= TRSDISK_CRCERR;
-  if (raw_cmd.reply[2] & 0x13) state.status |= TRSDISK_NOTFOUND;
   state.bytecount = 0;
   trs_disk_drq_interrupt(0);
+#if DELAYED_INTRQ_KLUDGE
+  state.delayed_intrq_kludge = 1;
+#else
   trs_disk_intrq_interrupt(1);
+#endif
 #else
   trs_disk_unimpl(state.currcommand, "write real floppy");
 #endif
@@ -1579,27 +1605,32 @@ real_readadr()
     perror("real_readadr");
     /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
     state.status |= TRSDISK_NOTFOUND;
-    return;
-  }
-  if (raw_cmd.reply[1] & 0x85) state.status |= TRSDISK_NOTFOUND;
-  if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
-  if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
-  /*if (raw_cmd.reply[1] & 0x02) state.status |= TRSDISK_WRITEPRT;*/
-  if (raw_cmd.reply[2] & 0x40) {
-    if (state.controller == TRSDISK_P1771) {
-      state.status |= TRSDISK_1771_FA;
-    } else {
-      state.status |= TRSDISK_1791_F8;
+  } else {
+    if (raw_cmd.reply[1] & 0x85) state.status |= TRSDISK_NOTFOUND;
+    if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
+    if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
+    if (raw_cmd.reply[2] & 0x40) {
+      if (state.controller == TRSDISK_P1771) {
+        state.status |= TRSDISK_1771_FA;
+      } else {
+        state.status |= TRSDISK_1791_F8;
+      }
+    }
+    if (raw_cmd.reply[2] & 0x20) state.status |= TRSDISK_CRCERR;
+    if (raw_cmd.reply[2] & 0x13) state.status |= TRSDISK_NOTFOUND;
+    if ((raw_cmd.reply[0] & 0xc0) == 0) {
+      state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
+      trs_disk_drq_interrupt(1);
+      memcpy(d->buf, &raw_cmd.reply[3], 4);
+      state.bytecount = 4;
+      return;
     }
   }
-  if (raw_cmd.reply[2] & 0x20) state.status |= TRSDISK_CRCERR;
-  if (raw_cmd.reply[2] & 0x13) state.status |= TRSDISK_NOTFOUND;
-  if ((raw_cmd.reply[0] & 0xc0) == 0) {
-    state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
-    trs_disk_drq_interrupt(1);
-    memcpy(d->buf, &raw_cmd.reply[3], 4);
-    state.bytecount = 4;
-  }
+#if DELAYED_INTRQ_KLUDGE
+  state.delayed_intrq_kludge = 1;
+#else
+  trs_disk_intrq_interrupt(1);
+#endif
 #else
   trs_disk_unimpl(state.currcommand, "read address on real floppy");
 #endif
