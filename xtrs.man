@@ -83,7 +83,7 @@ use the command "FDUBL" (newer versions of LDOS), or "PDUBL" or
 "RDUBL" (older versions) to install the driver.
 
 In Model III mode, xtrs emulates the stock Model III floppy
-controller, which used a WD1793 chip (software compatible with the
+controller, which used a WD1793 chip (software-compatible with the
 WD1791) to provide both single and double density.
 
 Four floppy drives are emulated, with storage in files named diskX-0,
@@ -109,7 +109,7 @@ double-sided, but the emulator is able to be more forgiving.
 
 The floppy image files can be of either of two types: JV1, compatible
 with Jeff Vavasour's popular freeware Model I emulator for the PC; or
-JV3, a compatible extension of the format first used in Vavasour's
+JV3, a compatible extension of a format first used in Vavasour's
 commercial Model III/4 emulator.  Both types work in both Model I and
 Model III mode.  The emulator uses a heuristic to decide which type of
 image it is looking at in each drive, as neither type has a "magic
@@ -155,11 +155,11 @@ that give TRS-80 programs access to Unix files.  The supplied Z-80
 assembly language programs import.z and export.z exercise these
 features; see the top of each file for usage instructions.
 Unfortunately, these programs currently run only under LDOS.  The
-Basic programs import.bas and export.bas are much slower, and use a
-different mechanism in the emulator that may be removed in the future,
-but they should work under all TRS-80 operating systems.  All these
+Basic programs import.bas and export.bas use a different mechanism in
+the emulator that may be removed in the future, and are very slow, but
+they should work under all TRS-80 operating systems.  All these
 programs are supplied (in both source and executable form) on the
-emulated floppy disk imp_exp.dsk to get you started.
+emulated floppy disk utility.dsk to get you started.
 
 See README and README.tpm in this package for additional technical
 (and historical) data.
@@ -186,12 +186,39 @@ Same as -foreground.
 .TP
 .B \-usefont
 .IP 
-Use a X font instead of the built-in font.  This is the default, if no
-arguments or resources are set.
+Use X fonts instead of the built-in character bitmaps.
+Some suitable fonts are supplied with \fIxtrs\fP; they are
+exactly the same as the built-in bitmaps, but drawing performance
+may be better when using fonts.  See the xset(1) man page for
+documentation on how to install fonts in your X server.
 .TP
 .B \-nofont
 .IP 
-Use the built-in font, instead of a X font.
+Use the built-in character bitmaps, not a X font.  This is the default.
+.TP
+.B \-font \fIfontname\fP
+.IP 
+If -usefont is also given,
+use the specified X font for normal width characters.
+The default uses the supplied fonts.
+.TP
+.B \-widefont \fIfontname\fP
+.IP 
+If -usefont is also given,
+use the specified X font for double width characters.
+The default uses the supplied fonts, scaled to double width.
+.TP
+.B \-trsfont
+.IP 
+Use the specified X fonts for TRS-80 graphics blocks as well as
+characters.  Meaningful only if -usefont is given.  This is the
+default if the X font name begins with "-trs80".
+.TP
+.B \-notrsfont
+.IP 
+Draw TRS-80 graphics blocks as bitmaps even if X fonts are being used
+for characters.  This is the
+default if the X font name does not begin with "-trs80".
 .TP
 .B \-display \fIdisplay\fP
 .IP 
@@ -203,6 +230,7 @@ use the DISPLAY environment variable.
 Enter zbx, the z80 debugger.
 .TP
 .B \-romfile \fIfilename\fP
+.TP
 .B \-romfile3 \fIfilename3\fP
 .IP 
 Use the romfile specified by \fIfilename\fP in Model I mode, or the
@@ -242,27 +270,23 @@ http://www.research.digital.com/SRC/personal/Tim_Mann/trs80.html.
 
 .SH Bugs
 There may be bugs in the Z-80 emulator which we haven't found yet.
-The undocumented Z-80 instructions are not implemented.  The HALT
-instruction causes an exit from the emulator.
-
-We don't draw the original Model I character set.  Instead of the four
-arrows you get '[', '\\', ']', and '^'.
-
-Double-width (32-column) mode is not supported.
-
-The alternate character set and probably a pile of other esoteric
-Model III features are not emulated.
+Some of the more bizarre undocumented Z-80 instructions are not
+implemented.  The HALT instruction causes an exit from the emulator.
 
 Cassette emulation does not work in Model III mode.  Even in Model I
 mode, it works only for programs that use the Level II ROM routines to
 access the cassette; the emulator looks for access to the cassette
 port from specific PC values to activate the feature.
 
-Some features of the disk controller are not emulated, but could be
-added without too much difficulty: (1) Force Interrupt with nonzero
-condition bits is not implemented. (2) Read Address is not
-implemented.  (3) Read Track is not implemented.  (4) The
-multiple-sector flags in Read and Write are not implemented.
+Serial ports are not emulated.
+
+The Model III alternate character set is not emulated.
+
+Some features of the disk controller are not currently emulated.  (1)
+Force Interrupt with condition bits 0x01, 0x02, or 0x04 is not
+implemented.  (2) Read Address is implemented for JV3 media only.  (3)
+Read Track is not implemented.  (4) The multiple-sector flags in Read
+and Write are not implemented.
 
 There is no support for real physical floppy disks.  It seems too
 non-portable to try to put this directly into the emulator.  Also,
@@ -281,8 +305,8 @@ floppy disk controller and for the JV3 format.
 The limit of 5802 sectors is somewhat arbitrary as well.  It could be
 raised by generalizing the code to permit more than two blocks of
 2901.  Again, this does not seem too useful.  It's not the way to
-emulate a hard drive.  The 5802 sector limit would accommodate a 3" HD
-floppy (1.44MB), which the TRS-80 hardware didn't support anyway.
+emulate a hard drive.  5802 sectors is already enough for a 3" HD
+(1.44MB) floppy, which is larger than anything the TRS-80 supported.
 
 The emulator guesses a romfile is in .hex format if its first byte is
 a colon (':'), so a raw binary ROM image can't start with that byte
@@ -296,3 +320,5 @@ David Gingold <gingold@think.com>, Thinking Machines Corporation
 Alec Wolman <wolman@crl.dec.com>, Digital Equipment Corporation
 .br
 Timothy Mann <mann@pa.dec.com>, Digital Equipment Corporation
+
+Thanks to Al Petrofsky for supplying the TRS-80 fonts in bdf format.
