@@ -139,17 +139,18 @@ CFLAGS = $(DEBUG) $(ENDIAN) $(DEFAULT_ROM) $(READLINE) $(DISKDIR) $(IFLAGS) \
 	-DKBWAIT -DHAVE_SIGIO
 LIBS = $(XLIB) $(READLINELIBS) $(EXTRALIBS)
 
+ZMACFLAGS = -h
 .SUFFIXES:	.z .cmd .dct .man .txt .hex
 .z.cmd:
-	zmac $<
+	zmac $(ZMACFLAGS) $<
 	hex2cmd $*.hex > $*.cmd
 	rm -f $*.hex
 .z.dct:
-	zmac $<
+	zmac $(ZMACFLAGS) $<
 	hex2cmd $*.hex > $*.dct
 	rm -f $*.hex
 .z.hex:
-	zmac $<
+	zmac $(ZMACFLAGS) $<
 .man.txt:
 	nroff -man $< > $*.txt
 

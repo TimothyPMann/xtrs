@@ -545,7 +545,7 @@ to port 0xFE would double the speed to 3.54816 MHz, while writing a 0
 would set the speed back to normal.  The heartbeat clock runs at 40 Hz
 in either case.  xtrs emulates this feature as well.
 .SH Sound
-Sound support has been completely rewritten in xtrs 3.7 and now uses
+Sound support was completely rewritten in xtrs 3.7 and now uses
 the Open Sound System /dev/dsp device, standard on Linux and available
 on many other Unix versions as well.  This support is compiled in
 automatically on Linux; if you have OSS on another version of Unix,
@@ -560,25 +560,26 @@ If you are playing a game with sound, you'll want to use the
 -autodelay flag to slow down instruction emulation to approximately
 the speed of a real TRS-80.  If you don't do this, sound will still
 play correctly, but the gameplay may be way too fast and get ahead of
-the sound.  On the other hand, if your machine is a bit too slow,
+the sound.  
+
+On the other hand, if your machine is a bit too slow,
 you'll hear gaps and pops in the sound when the TRS-80 program lags
 behind the demand of the sound card for more samples.  The -autodelay
 feature includes a small speed boost whenever a sound starts to play
 to try to prevent this, but if the boost is too much or too little,
 you might either find that the game runs too fast when a lot of sound
-is playing, or that the sound has gaps in it anyway.
+is playing, or that the sound has gaps in it anyway.  If your sound
+has gaps, you can try reducing the sample rate with the -samplerate flag.
 
-The Orchestra-85 music software will run under xtrs's Model I
-emulation, and the Orchestra-90 software will run with Model III
+The Orchestra-85 music synthesis software will run under xtrs's Model
+I emulation, and the Orchestra-90 software will run with Model III
 operating systems under xtrs's Model III, 4, or 4P emulation.  For
 best results, use Orchestra-90 and the Model 4 emulation, as this lets
 the software run at the highest emulated clock rate (4 MHz) and thus
-generate the best sound.  (If you want to run Orchestra-85 instead,
-you can tell it that you have a 3.5 MHz clock speedup with enable
-sequence 3E01D3FE and disable sequence 3E00D3FE; this will let the
-software run twice as fast and generate better sound.)  In either
-case, you should run xtrs with the "-samplerate 44100" flag if your
-machine is fast enough, as this greatly improves the sound output.
+generate the best sound.  If you want to run Orchestra-85 instead, you
+can tell it that you have a 3.5 MHz clock speedup with enable sequence
+3E01D3FE and disable sequence 3E00D3FE; this will let the software run
+twice as fast as on an unmodified Model I and generate better sound.
 There is no need to use xtrs's -autodelay flag when running
 Orchestra-85/90, but you might want to specify a small fixed delay to
 keep from getting excessive key repeat.
@@ -608,10 +609,11 @@ provided that your
 machine is fast enough to run the emulation in real time and that you
 choose the right command line options.
 "Galaxy Invaders Plus" by Big 5 Software is particularly good.
-You will usually want to turn on autodelay, and
-you'll often need to tweak the keystretch setting.  
+You will usually want to turn on autodelay,
+you'll often need to tweak the keystretch setting,
+and if your machine is slow you may need to reduce the sound sample rate.
 Running your X server in 8-bit/pixel mode 
-also seems to help in some cases. Sample command lines:
+also seems to help in some cases. Example command lines:
 
 .nf
     startx -- -bpp 8
@@ -626,10 +628,10 @@ and set the last number equal to the first number.
 See -keystretch below for more information.  This aspect of the
 emulator seems to need a bit more work.
 
-Games with audio output may sound better if you increase the sample
-rate from the default 11,025 Hz.  Try "-samplerate 44100".  On the
-other hand, raising the sample rate will make the sound break up if your
-machine isn't fast enough to generate samples at that rate.
+If you have a slow machine and the sound breaks up, it is possible
+that your machine is not fast enough to generate samples at the default
+rate of 44,100 Hz.  If you think this may be happening,
+try "-samplerate 11025" or even "-samplerate 8000".
 .SH Options
 Defaults for all options can be specified using the standard X resource
 mechanism, and the class name for \fBxtrs\fP is "Xtrs".
@@ -840,7 +842,7 @@ The opposite of -truedam.  This setting is the default.
 Set the default sample rate for new cassette wav files, direct
 cassette I/O to the sound card, and game sound output to the sound
 card.  Existing wav files will be read or modified using their
-original sample rate regardless of this flag.  The default is 11,025
+original sample rate regardless of this flag.  The default is 44,100
 Hz.  See also the cassette(1) man page.
 .SH Additional resources
 There are many other TRS-80 resources available on the Web, including

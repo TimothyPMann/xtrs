@@ -99,7 +99,7 @@ format is a standard sound file format.  The wav format is
 intermediate in emulation accuracy between cas and cpt.  It does
 represent actual signals, not decoded bits, but its timing precision
 is limited by the sample rate used.  The default rate for new wav
-files is 11,025 Hz; you can change this with the -samplerate command
+files is 44,100 Hz; you can change this with the -samplerate command
 line option to \fBxtrs\fP.
 
 You can play wav files written by \fBxtrs\fP through your sound card
@@ -112,8 +112,8 @@ card's output, but that is untested at this writing.
 that it writes without error (since no noise has been introduced), but
 reading wav files sampled from real cassettes is more difficult.  At
 this writing it seems to work fairly well for 500bps cassettes but
-poorly for 1500bps.  Perhaps a higher sampling rate or better
-signal preprocessing inside xtrs would help.
+poorly for 1500bps.  Perhaps better signal preprocessing inside xtrs
+would help.
 
 The wav file parsing code has several limitations.  Samples must be
 8-bit mono, and the wav file must contain only one data chunk and no

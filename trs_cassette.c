@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Fri Mar 31 14:32:06 PST 2000 by mann
+   Last modified on Fri Mar 31 18:07:46 PST 2000 by mann
 */
 
 /*
@@ -121,7 +121,7 @@ static tstate_t cassette_firstoutread;
 static int cassette_value, cassette_next, cassette_flipflop;
 static int cassette_lastnonzero;
 static unsigned long cassette_delta;
-static double cassette_roundoff_error;
+static float cassette_roundoff_error;
 
 /* For bit/byte conversion (.cas file i/o) */
 static int cassette_byte;
@@ -488,7 +488,7 @@ static int assert_state(int state)
 #endif
 
   if (cassette_state == ORCH90) {
-    trs_orch90_out(3, FLUSH);
+    trs_orch90_out(0, FLUSH);
   }
 
   if (cassette_state != CLOSE && cassette_state != FAILED) {
@@ -664,7 +664,7 @@ transition_out(int value)
   Uchar sample;
   long nsamples, delta_us;
   Ushort code;
-  double ddelta_us;
+  float ddelta_us;
   sigset_t set, oldset;
 
   if (value != FLUSH && value == cassette_value) return;
@@ -871,7 +871,7 @@ transition_in()
   Uint d;
   int next, ret = 0;
   int c, cabs;
-  double delta_ts;
+  float delta_ts;
   sigset_t set, oldset;
 
   sigemptyset(&set);
@@ -1149,7 +1149,7 @@ trs_sound_out(int value)
 static void
 orch90_flush(int dummy)
 {
-  trs_orch90_out(3, FLUSH);
+  trs_orch90_out(0, FLUSH);
 }
 
 /* Orchestra 85/90 */
@@ -1161,27 +1161,29 @@ trs_orch90_out(int channels, int value)
 {
 #if HAVE_OSS
   long nsamples;
-  double ddelta_us;
+  float ddelta_us;
   sigset_t set, oldset;
   int new_left, new_right;
+  int v;
 
   /* Convert 8-bit signed to 8-bit unsigned */
-  value = (value & 0xff) ^ 0x80;
+  v = (value & 0xff) ^ 0x80;
 
   if (cassette_motor != 0) return;
   if (assert_state(ORCH90) < 0) return;
   trs_suspend_delay();
   if (channels & 1) {
-    new_left = value;
+    new_left = v;
   } else {
     new_left = orch90_left;
   }
   if (channels & 2) {
-    new_right = value;
+    new_right = v;
   } else {
     new_right = orch90_right;
   }
-  if (new_left == orch90_left && new_right == orch90_right) return;
+  if (value != FLUSH &&
+      new_left == orch90_left && new_right == orch90_right) return;
   
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);
@@ -1190,14 +1192,16 @@ trs_orch90_out(int channels, int value)
 
   ddelta_us = (z80_state.t_count - cassette_transition) / z80_state.clockMHz
     - cassette_roundoff_error;
-  if (ddelta_us > 20000.0) {
+  if (ddelta_us > 300000.0) {
     /* Truncate silent periods */
-    ddelta_us = 20000.0;
+    ddelta_us = 300000.0;
   }
   nsamples = (unsigned long)
     (ddelta_us / (1000000.0/cassette_sample_rate) + 0.5);
+
   cassette_roundoff_error =
     nsamples * (1000000.0/cassette_sample_rate) - ddelta_us;
+
   while (nsamples-- > 0) {
     putc(orch90_left, cassette_file);
     putc(orch90_right, cassette_file);
@@ -1211,7 +1215,7 @@ trs_orch90_out(int channels, int value)
     trs_schedule_event((trs_event_func)assert_state, CLOSE, 5000000);
   } else {
     trs_schedule_event(orch90_flush, FLUSH,
-		       (int)(25000 * z80_state.clockMHz));
+		       (int)(250000 * z80_state.clockMHz));
   }
 
   sigprocmask(SIG_SETMASK, &oldset, NULL);
