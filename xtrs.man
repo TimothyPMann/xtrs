@@ -495,13 +495,12 @@ inconvenient if your Unix file names are in lower case; in that case
 you'll need to let the program prompt for the filenames.
 
 EXPORT.COM reads a file from an emulated CP/M disk and exports it to a
-Unix file.  Usage: \fIEXPORT [-n] [cpmfile [unixfile]]\fP.  The -n
-flag converts CP/M newlines (\\r\\n) to Unix newlines (\\n).  If the
-second filename is omitted, it is taken to be the same as the
-first. If both names are omitted, the program prompts for filenames.
-Note that the CP/M CCP converts all command line arguments to upper
-case, which is inconvenient if your Unix file names are in lower case;
-in that case you'll need to let the program prompt for the filenames.
+Unix file.  Usage: \fIEXPORT cpmfile [$[T][L]]\fP.  The cmpfile name
+can use ? and * as wildcard characters.  The $T flag converts CP/M
+newlines (\\r\\n) to Unix newlines (\\n).  The $L flag converts the
+CP/M filename to lowercase to form the Unix filename; note that the
+CP/M CCP converts all command line arguments to upper case, so you
+need $L even if you typed the CP/M name in lower case.
 
 The emulator implements a set of pseudo-instructions (emulator traps)
 that give TRS-80 programs access to Unix files.  The programs listed
@@ -654,13 +653,17 @@ Specifies the background color of the \fBxtrs\fP window.
 .PD
 Specifies the foreground color of the \fBxtrs\fP window.
 .TP
+.B \-title \fItitletext\fP
+Use \fItitletext\fP in the window title bar instead of the
+program name.
+.TP
 .B \-borderwidth \fIwidth\fP
 Put a border of \fIwidth\fP pixels
 around the TRS-80 display.  The default is 2.
 .TP
-.B \-title \fItitletext\fP
-Use \fItitletext\fP in the window title bar instead of the
-program name.
+.B \-scale \fIfac\fP
+Multiply the window size by \fIfac\fP.
+Possible values: 1 (default), 2, 3, or 4.
 .TP
 .B \-resize
 In Model 4/4P mode, resize the X window whenever the emulated display
@@ -927,7 +930,10 @@ Roland Gerlach contributed the CP/M import and export programs as well
 as several bug reports and fixes for the emulator itself.  Ulrich
 Mueller added the -borderwidth option and ported the import, export,
 and settime utilities to Newdos/80.  Branden Robinson supplied the
-first version of the cassette man page and fixed Makefile bugs.  Mark
-McDougall provided documentation for the Micro Labs Grafyx Solution
-card.  Jenz Guenther added the -title option and contributed code to
-emulate the GENIE (German Model I clone).
+first version of the cassette man page, fixed Makefile bugs, and
+translated cassette to the Bourne shell.  Mark McDougall provided
+documentation for the Micro Labs Grafyx Solution card.  Jenz Guenther
+added the -title option and contributed code to emulate the GENIE
+(German Model I clone).  Joe Peterson contributed code to emulate the
+TimeDate80.  Denis Leconte contributed part of the -scale
+implementation.

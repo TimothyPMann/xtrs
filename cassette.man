@@ -143,10 +143,11 @@ that way.  This is not implemented yet.
 
 
 .SH Authors
-\fBxtrs\fP was written by David Gingold <gingold@think.com> of
-Thinking Machines Corporation, Alec Wolman <wolman@crl.dec.com> of
-Digital Equipment Corporation, and Timothy Mann <mann@pa.dec.com> of
-Digital Equipment Corporation. 
+\fBxtrs\fP 1.0 was written by David Gingold, then at
+Thinking Machines Corporation, and Alec Wolman, then at
+Digital Equipment Corporation.
+The current version was revised and much extended by Timothy Mann
+<tim.mann@compaq.com> of Compaq Computer Corporation.
 An initial version of this man page, and
 the translation from C-shell (cassette) to Bourne shell (cassette.sh),
 are due to Branden Robinson of the Debian GNU/Linux project.

@@ -15,10 +15,11 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Mon Jul 26 12:52:10 PDT 1999 by mann
+   Last modified on Sat Apr  1 04:29:51 PST 2000 by mann
 */
 
 /*#define MOUSEDEBUG 1*/
+/*#define XDEBUG 1*/
 
 /*
  * trs_xinterface.c
@@ -62,6 +63,8 @@ extern char trs_widechar_data[][MAXCHARS][TRS_CHAR_HEIGHT][2];
   ExposureMask | KeyPressMask | MapRequest | KeyReleaseMask | \
   StructureNotifyMask | LeaveWindowMask
 
+#define MAX_SCALE 4
+
 /* Private data */
 static unsigned char trs_screen[2048];
 static int screen_chars = 1024;
@@ -88,8 +91,11 @@ static int text80x24 = 0, screen640x240 = 0;
 static XFontStruct *myfont, *mywidefont, *curfont;
 static XKeyboardState repeat_state;
 static int trs_charset;
+static int scale = 1;
+static int just_resized = False;
 
 static XrmOptionDescRec opts[] = {
+/* Option */    /* Resource */  /* Value from arg? */   /* Value if no arg */
 {"-background",	"*background",	XrmoptionSepArg,	(caddr_t)NULL},
 {"-bg",		"*background",	XrmoptionSepArg,	(caddr_t)NULL},
 {"-foreground",	"*foreground",	XrmoptionSepArg,	(caddr_t)NULL},
@@ -127,8 +133,13 @@ static XrmOptionDescRec opts[] = {
 {"-charset",    "*charset",     XrmoptionSepArg,        (caddr_t)NULL},
 {"-truedam",    "*truedam",     XrmoptionNoArg,         (caddr_t)"on"},
 {"-notruedam",  "*truedam",     XrmoptionNoArg,         (caddr_t)"off"},
-{"-samplerate", "*samplerate",  XrmoptionSepArg,        (caddr_t)11025},
+{"-samplerate", "*samplerate",  XrmoptionSepArg,        (caddr_t)NULL},
 {"-title",      "*title",       XrmoptionSepArg,        (caddr_t)NULL},
+{"-scale",      "*scale",       XrmoptionSepArg,        (caddr_t)NULL},
+{"-scale1",     "*scale",       XrmoptionNoArg,         (caddr_t)"1"},
+{"-scale2",     "*scale",       XrmoptionNoArg,         (caddr_t)"2"},
+{"-scale3",     "*scale",       XrmoptionNoArg,         (caddr_t)"3"},
+{"-scale4",     "*scale",       XrmoptionNoArg,         (caddr_t)"4"},
 #if __linux
 {"-sb",         "*sb",          XrmoptionSepArg,        (caddr_t)NULL},
 #endif /* linux */
@@ -139,9 +150,10 @@ static int num_opts = (sizeof opts / sizeof opts[0]);
 /* Support for Micro Labs Grafyx Solution and Radio Shack hi-res card */
 
 /* True size of graphics memory -- some is offscreen */
-#define G_XSIZE 128  
+#define G_XSIZE 128
 #define G_YSIZE 256
-char grafyx[2*G_YSIZE][G_XSIZE];
+char grafyx[(2*G_YSIZE*MAX_SCALE) * (G_XSIZE*MAX_SCALE)];
+unsigned char grafyx_unscaled[G_YSIZE][G_XSIZE];
 
 unsigned char grafyx_microlabs = 1;
 unsigned char grafyx_x = 0, grafyx_y = 0, grafyx_mode = 0;
@@ -160,8 +172,8 @@ unsigned char grafyx_xoffset = 0, grafyx_yoffset = 0;
 #define G_XNOCLKW   64
 #define G_YNOCLKW   128
 
-XImage xim = {
-  /*width, height*/    1024, 512,
+XImage image = {
+  /*width, height*/    8*G_XSIZE, 2*G_YSIZE,  /* if scale = 1 */
   /*xoffset*/          0,
   /*format*/           XYBitmap,
   /*data*/             (char*)grafyx,
@@ -170,7 +182,7 @@ XImage xim = {
   /*bitmap_bit_order*/ MSBFirst,
   /*bitmap_pad*/       8,
   /*depth*/            1,
-  /*bytes_per_line*/   128,
+  /*bytes_per_line*/   G_XSIZE,  /* if scale = 1 */
   /*bits_per_pixel*/   1,
   /*red_mask*/         1,
   /*green_mask*/       1,
@@ -295,6 +307,17 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
     x_db = command_db;
   }
 
+  (void) sprintf(option, "%s%s", program_name, ".scale");
+  if (XrmGetResource(x_db, option, "Xtrs.Scale", &type, &value)) 
+  {
+    sscanf(value.addr, "%d", &scale);
+    if (scale <= 0) scale = 1;
+    if (scale > MAX_SCALE) scale = MAX_SCALE;
+  }
+  image.width *= scale;
+  image.height *= scale;
+  image.bytes_per_line *= scale;
+
 #if __linux
   (void) sprintf(option, "%s%s", program_name, ".sb");
   if (XrmGetResource(x_db, option, "Xtrs.Sb", &type, &value)) {
@@ -355,26 +378,28 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
     }
     if (isdigit(*charset_name)) {
       trs_charset = atoi(charset_name);
+      cur_char_width = 8 * scale;
     } else {
       if (charset_name[0] == 'e'/*early*/) {
 	trs_charset = 0;
-	cur_char_width = 6;
+	cur_char_width = 6 * scale;
       } else if (charset_name[0] == 's'/*stock*/) {
 	trs_charset = 1;
-	cur_char_width = 6;
+	cur_char_width = 6 * scale;
       } else if (charset_name[0] == 'l'/*lcmod*/) {
 	trs_charset = 2;
-	cur_char_width = 6;
+	cur_char_width = 6 * scale;
       } else if (charset_name[0] == 'w'/*wider*/) {
 	trs_charset = 3;
-	cur_char_width = 8;
+	cur_char_width = 8 * scale;
       } else if (charset_name[0] == 'g'/*genie or german*/) {
 	trs_charset = 10;
-	cur_char_width = 8;
+	cur_char_width = 8 * scale;
       } else {
 	fatal("unknown charset name %s", value.addr);
       }
     }
+    cur_char_height = TRS_CHAR_HEIGHT * scale;
   } else /* trs_model > 1 */ {
     char *charset_name;
     /* Set default */
@@ -400,6 +425,9 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
 	fatal("unknown charset name %s", value.addr);
       }
     }
+    cur_char_width = TRS_CHAR_WIDTH * scale;
+    cur_char_height = ((trs_model >= 4) ? TRS_CHAR_HEIGHT4 : TRS_CHAR_HEIGHT)
+      * scale;
   }
 
   (void) sprintf(option, "%s%s", program_name, ".diskdir");
@@ -528,7 +556,7 @@ save_repeat()
 {
   XGetKeyboardControl(display, &repeat_state);
   XAutoRepeatOff(display);
-  XSync(display, FALSE);
+  XSync(display, False);
 }
 
 static void
@@ -536,7 +564,7 @@ restore_repeat()
 {
   if (repeat_state.global_auto_repeat == AutoRepeatModeOn) {
     XAutoRepeatOn(display);
-    XSync(display, FALSE);
+    XSync(display, False);
   }
 }
 
@@ -734,9 +762,14 @@ void trs_screen_init()
   if (trs_model >= 4 && !resize) {
     OrigWidth = cur_char_width * 80 + 2 * border_width;
     left_margin = cur_char_width * (80 - row_chars)/2 + border_width;
-    OrigHeight = TRS_CHAR_HEIGHT4 * 24 + 2 * border_width;
-    top_margin = (TRS_CHAR_HEIGHT4 * 24 - cur_char_height * col_chars)/2
-      + border_width;
+    if (usefont) {
+      OrigHeight = cur_char_height * 24 + 2 * border_width;
+      top_margin = cur_char_height * (24 - col_chars)/2 + border_width;
+    } else {
+      OrigHeight = TRS_CHAR_HEIGHT4 * scale * 24 + 2 * border_width;
+      top_margin = (TRS_CHAR_HEIGHT4 * scale * 24 -
+		    cur_char_height * col_chars)/2 + border_width;
+    }
   } else {
     OrigWidth = cur_char_width * row_chars + 2 * border_width;
     left_margin = border_width;
@@ -746,6 +779,9 @@ void trs_screen_init()
   window = XCreateSimpleWindow(display, root_window, 400, 400,
 			       OrigWidth, OrigHeight, 1, foreground,
 			       background);
+#if XDEBUG
+    fprintf(stderr, "XCreateSimpleWindow(%d, %d)\n", OrigWidth, OrigHeight);
+#endif XDEBUG
   XStoreName(display,window,title);
   XSelectInput(display, window, EVENT_MASK | ResizeRedirectMask);
   XMapWindow(display, window);
@@ -845,6 +881,10 @@ void trs_get_event(int wait)
 #if XDEBUG
       fprintf(stderr,"ConfigureNotify\n");
 #endif
+      if (just_resized) {
+	XSelectInput(display, window, EVENT_MASK | ResizeRedirectMask);
+	just_resized = False;
+      }
       break;
 
     case MapNotify:
@@ -988,11 +1028,11 @@ void trs_screen_640x240(int flag)
   if (flag) {
     row_chars = 80;
     col_chars = 24;
-    cur_char_height = 10 * 2;
+    if (!usefont) cur_char_height = TRS_CHAR_HEIGHT4 * scale;
   } else {
     row_chars = 64;
     col_chars = 16;
-    cur_char_height = 12 * 2;
+    if (!usefont) cur_char_height = TRS_CHAR_HEIGHT * scale;
   }
   screen_chars = row_chars * col_chars;
   if (resize) {
@@ -1002,12 +1042,20 @@ void trs_screen_640x240(int flag)
     top_margin = border_width;
     XSelectInput(display, window, EVENT_MASK);
     XResizeWindow(display, window, OrigWidth, OrigHeight);
+    XClearWindow(display,window);
     XFlush(display);
-    XSelectInput(display, window, EVENT_MASK | ResizeRedirectMask);
+    just_resized = True;  /* remember to select ResizeNotify events again */
+#if XDEBUG
+    fprintf(stderr, "XResizeWindow(%d, %d)\n", OrigWidth, OrigHeight);
+#endif XDEBUG
   } else {
     left_margin = cur_char_width * (80 - row_chars)/2 + border_width;
-    top_margin = (TRS_CHAR_HEIGHT4 * 24 - cur_char_height * col_chars)/2 +
-      border_width;
+    if (usefont) {
+      top_margin = cur_char_height * (24 - col_chars)/2 + border_width;
+    } else {
+      top_margin = (TRS_CHAR_HEIGHT4 * scale * 24 -
+		    cur_char_height * col_chars)/2 + border_width;
+    }
     if (left_margin > border_width || top_margin > border_width) {
       XClearWindow(display,window);
     }
@@ -1077,6 +1125,64 @@ boxes_init(int foreground, int background, int width, int height, int expanded)
   }
 }
 
+/* DPL 20000129
+ * This routine creates a rescaled charater bitmap, and then
+ * calls XCreateBitmapFromData. It then can be used pretty much
+ * as a drop-in replacement for XCreateBitmapFromData. 
+ */
+Pixmap XCreateBitmapFromDataScale(Display *display, Drawable window,
+			             char *data, unsigned int width, 
+                                     unsigned int height, unsigned int scale)
+{
+  static unsigned char *mydata;
+  static unsigned char *mypixels;
+  int i, j, k;
+
+  if (mydata == NULL)
+  {
+    /* 
+     * Allocate a bit more room than necessary - There shouldn't be 
+     * any proportional characters, but just in case...             
+     * These arrays never get released, but they are really not     
+     * too big, so we should be OK.
+     */
+    mydata= (unsigned char *)malloc(width * height * scale * scale * 4);
+    mypixels= (unsigned char *)malloc(width * height * 4);
+  }
+  
+  /* Read the character data */ 
+  for (j= 0; j< width * height; j += 8)
+  {
+    for (i= j + 7; i >= j; i--)
+    {
+      *(mypixels + i)= (*(data + (j >> 3)) >> (i - j)) & 1;
+    }
+  }
+
+  /* Clear out the rescaled character array */
+  for (i= 0; i< width / 8 * height * scale * scale * 4; i++)
+  {
+    *(mydata + i)= 0;
+  }
+  
+  /* And prepare our rescaled character. */
+  k= 0;
+  for (j= 0; j< height * scale; j++)
+  {
+    for (i= 0; i< width * scale; i++)
+    {
+       *(mydata + (k >> 3)) = *(mydata + (k >> 3)) |
+	 (*(mypixels + ((int)(j / scale) * width) +
+	    (int)(i / scale)) << (k & 7));
+       k++;
+    }
+  }
+
+  return XCreateBitmapFromData(display,window,
+			      (char*)mydata,
+			      width * scale, height * scale);
+}
+
 void bitmap_init(unsigned long foreground, unsigned long background)
 {
   if (usefont) {
@@ -1099,52 +1205,58 @@ void bitmap_init(unsigned long foreground, unsigned long background)
 	
     for (i = 0; i < MAXCHARS; i++) {
       trs_char[0][i] =
-	XCreateBitmapFromData(display,window,
-			      trs_char_data[trs_charset][i],
-			      TRS_CHAR_WIDTH,TRS_CHAR_HEIGHT);
+	XCreateBitmapFromDataScale(display,window,
+				   trs_char_data[trs_charset][i],
+				   TRS_CHAR_WIDTH,TRS_CHAR_HEIGHT,scale);
       trs_char[1][i] =
-	XCreateBitmapFromData(display,window,
-			      (char*)trs_widechar_data[trs_charset][i],
-			      TRS_CHAR_WIDTH*2,TRS_CHAR_HEIGHT);
+	XCreateBitmapFromDataScale(display,window,
+				   (char*)trs_widechar_data[trs_charset][i],
+				   TRS_CHAR_WIDTH*2,TRS_CHAR_HEIGHT,scale);
     }
     boxes_init(foreground, background,
-	       cur_char_width, TRS_CHAR_HEIGHT, 0);
+	       cur_char_width, TRS_CHAR_HEIGHT * scale, 0);
     boxes_init(foreground, background,
-	       cur_char_width*2, TRS_CHAR_HEIGHT, 1);
+	       cur_char_width*2, TRS_CHAR_HEIGHT * scale, 1);
   }
 }
 
 void trs_screen_refresh()
 {
-  int i;
+  int i, srcx, srcy, dunx, duny;
 
+#if XDEBUG
+  fprintf(stderr, "trs_screen_refresh\n");
+#endif
   if (grafyx_enable && !grafyx_overlay) {
-    XPutImage(display, window, gc, &xim,
-	      TRS_CHAR_WIDTH*grafyx_xoffset, 2*grafyx_yoffset,
-	      left_margin,
-	      top_margin,
-	      TRS_CHAR_WIDTH*row_chars, cur_char_height*col_chars);
+    srcx = cur_char_width * grafyx_xoffset;
+    srcy = 2 * scale * grafyx_yoffset;
+    XPutImage(display, window, gc, &image,
+	      srcx, srcy,
+	      left_margin, top_margin,
+	      cur_char_width*row_chars,
+	      cur_char_height*col_chars);
     /* Draw wrapped portions if any */
-    if (grafyx_xoffset > G_XSIZE - row_chars) {
-      XPutImage(display, window, gc, &xim, 0, 0,
-		left_margin +
-		TRS_CHAR_WIDTH*(grafyx_xoffset - G_XSIZE + row_chars),
-		top_margin,
-		TRS_CHAR_WIDTH*row_chars, cur_char_height*col_chars);
+    dunx = image.width - srcx;
+    if (dunx < cur_char_width*row_chars) {
+      XPutImage(display, window, gc, &image,
+		0, srcy,
+		left_margin + dunx, top_margin,
+		cur_char_width*row_chars - dunx,
+		cur_char_height*col_chars);
     }
-    if (2*grafyx_yoffset > 2*G_YSIZE - cur_char_height*col_chars) {
-      XPutImage(display, window, gc, &xim, 0, 0,
-		left_margin,
-		top_margin +
-		2*grafyx_yoffset - 2*G_YSIZE + cur_char_height*col_chars,
-		TRS_CHAR_WIDTH*row_chars, cur_char_height*col_chars);
-      if (grafyx_xoffset > G_XSIZE - row_chars) {
-	XPutImage(display, window, gc, &xim, 0, 0,
-		  left_margin +
-		  TRS_CHAR_WIDTH*(grafyx_xoffset - G_XSIZE + row_chars),
-		  top_margin +
-		  2*grafyx_yoffset - 2*G_YSIZE + cur_char_height*col_chars,
-		  TRS_CHAR_WIDTH*row_chars, cur_char_height*col_chars);
+    duny = image.height - srcy;
+    if (duny < cur_char_height*col_chars) {
+      XPutImage(display, window, gc, &image,
+		srcx, 0,
+		left_margin, top_margin + duny,
+		cur_char_width*row_chars,
+		cur_char_height*col_chars - duny);
+      if (dunx < cur_char_width*row_chars) {
+	XPutImage(display, window, gc, &image,
+		  0, 0,
+		  left_margin + dunx, top_margin + duny,
+		  cur_char_width*row_chars - dunx,
+		  cur_char_height*col_chars - duny);
       }
     }
   } else {
@@ -1233,32 +1345,41 @@ void trs_screen_write_char(int position, int char_index, Bool doflush)
     switch (currentmode & ~ALTERNATE) {
     case NORMAL:
       XCopyPlane(display,trs_char[0][char_index],
-		 window,gc,0,0,TRS_CHAR_WIDTH,
+		 window,gc,0,0,cur_char_width,
 		 cur_char_height,destx,desty,plane);
       break;
     case EXPANDED:
       XCopyPlane(display,trs_char[1][char_index],
-		 window,gc,0,0,TRS_CHAR_WIDTH*2,
+		 window,gc,0,0,cur_char_width*2,
 		 cur_char_height,destx,desty,plane);
       break;
     case INVERSE:
       XCopyPlane(display,trs_char[0][char_index & 0x7f],window,
 		 (char_index & 0x80) ? gc_inv : gc,
-		 0,0,TRS_CHAR_WIDTH,cur_char_height,destx,desty,plane);
+		 0,0,cur_char_width,cur_char_height,destx,desty,plane);
       break;
     case EXPANDED+INVERSE:
       XCopyPlane(display,trs_char[1][char_index & 0x7f],window,
 		 (char_index & 0x80) ? gc_inv : gc,
-		 0,0,TRS_CHAR_WIDTH*2,cur_char_height,destx,desty,plane);
+		 0,0,cur_char_width*2,cur_char_height,destx,desty,plane);
       break;
     }
   }
   if (grafyx_enable) {
     /* assert(grafyx_overlay); */
-    XPutImage(display, window, gc_xor, &xim,
-	      ((col+grafyx_xoffset) % G_XSIZE)*TRS_CHAR_WIDTH,
-	      (row*cur_char_height + grafyx_yoffset*2) % (2*G_YSIZE),
-	      destx, desty, TRS_CHAR_WIDTH, cur_char_height);
+    int srcx, srcy, duny;
+    srcx = ((col+grafyx_xoffset) % G_XSIZE)*cur_char_width;
+    srcy = (row*cur_char_height + grafyx_yoffset*2*scale) % (G_YSIZE*2*scale); 
+    XPutImage(display, window, gc_xor, &image, srcx, srcy,
+	      destx, desty, cur_char_width, cur_char_height);
+    /* Draw wrapped portion if any */
+    duny = image.height - srcy;
+    if (duny < cur_char_height) {
+      XPutImage(display, window, gc_xor, &image,
+		srcx, 0,
+		destx, desty + duny,
+		cur_char_width, cur_char_height - duny);
+    }
   }
 #if DO_XFLUSH
   if (doflush)
@@ -1299,32 +1420,70 @@ void trs_screen_write_chars(int *locations, int *values, int count)
 
 void grafyx_write_byte(int x, int y, char byte)
 {
+  int i, j;
+  char exp[MAX_SCALE];
   int screen_x = ((x - grafyx_xoffset + G_XSIZE) % G_XSIZE);
   int screen_y = ((y - grafyx_yoffset + G_YSIZE) % G_YSIZE);
-  int on_screen = screen_x < row_chars && screen_y < col_chars*cur_char_height;
+  int on_screen = screen_x < row_chars &&
+    screen_y < col_chars*cur_char_height/(scale*2);
   if (grafyx_enable && grafyx_overlay && on_screen) {
     /* Erase old byte, preserving text */
-    XPutImage(display, window, gc_xor, &xim, x*TRS_CHAR_WIDTH, y*2,
-	      left_margin + screen_x*TRS_CHAR_WIDTH,
-	      top_margin + screen_y*2,
-	      TRS_CHAR_WIDTH, 2);
+    XPutImage(display, window, gc_xor, &image,
+	      x*cur_char_width, y*2*scale,
+	      left_margin + screen_x*cur_char_width,
+	      top_margin + screen_y*2*scale,
+	      cur_char_width, 2*scale);
   }
 
   /* Save new byte in local memory */
-  grafyx[y*2][x] = grafyx[y*2+1][x] = byte;
+  grafyx_unscaled[y][x] = byte;
+  switch (scale) {
+  case 1:
+    exp[0] = byte;
+    break;
+  case 2:
+    exp[1] = ((byte & 0x01) + ((byte & 0x02) << 1)
+	      + ((byte & 0x04) << 2) + ((byte & 0x08) << 3)) * 3;
+    exp[0] = (((byte & 0x10) >> 4) + ((byte & 0x20) >> 3)
+	      + ((byte & 0x40) >> 2) + ((byte & 0x80) >> 1)) * 3;
+    break;
+  case 3:
+    exp[2] = ((byte & 0x01) + ((byte & 0x02) << 2)
+	      + ((byte & 0x04) << 4)) * 7;
+    exp[1] = (((byte & 0x08) >> 2) + (byte & 0x10)
+	      + ((byte & 0x20) << 2)) * 7 + ((byte & 0x04) >> 2);
+    exp[0] = (((byte & 0x40) >> 4) + ((byte & 0x80) >> 2)) * 7
+           + ((byte & 0x20) >> 5) * 3;
+    break;
+  case 4:
+    exp[3] = ((byte & 0x01) + ((byte & 0x02) << 3)) * 15;
+    exp[2] = (((byte & 0x04) >> 2) + ((byte & 0x08) << 1)) * 15;
+    exp[1] = (((byte & 0x10) >> 4) + ((byte & 0x20) >> 1)) * 15;
+    exp[0] = (((byte & 0x40) >> 6) + ((byte & 0x80) >> 3)) * 15;
+    break;
+  default:
+    fatal("scaling graphics by %dx not implemented\n", scale);
+  }
+  for (j=0; j<2*scale; j++) {
+    for (i=0; i<scale; i++) {
+      grafyx[(y*2*scale + j)*image.bytes_per_line + x*scale + i] = exp[i];
+    }
+  }
 
   if (grafyx_enable && on_screen) {
     /* Draw new byte */
     if (grafyx_overlay) {
-      XPutImage(display, window, gc_xor, &xim, x*TRS_CHAR_WIDTH, y*2,
-		left_margin + screen_x*TRS_CHAR_WIDTH,
-		top_margin + screen_y*2,
-		TRS_CHAR_WIDTH, 2);
+      XPutImage(display, window, gc_xor, &image,
+		x*cur_char_width, y*2*scale,
+		left_margin + screen_x*cur_char_width,
+		top_margin + screen_y*2*scale,
+		cur_char_width, 2*scale);
     } else {
-      XPutImage(display, window, gc, &xim, x*TRS_CHAR_WIDTH, y*2,
-		left_margin + screen_x*TRS_CHAR_WIDTH,
-		top_margin + screen_y*2,
-		TRS_CHAR_WIDTH, 2);
+      XPutImage(display, window, gc, &image,
+		x*cur_char_width, y*2*scale,
+		left_margin + screen_x*cur_char_width,
+		top_margin + screen_y*2*scale,
+		cur_char_width, 2*scale);
     }
   }
 }
@@ -1360,7 +1519,7 @@ void grafyx_write_data(int value)
 
 int grafyx_read_data()
 {
-  int value = grafyx[grafyx_y*2][grafyx_x % G_XSIZE];
+  int value = grafyx_unscaled[grafyx_y][grafyx_x % G_XSIZE];
   if (!(grafyx_mode & G_XNOCLKR)) {
     if (grafyx_mode & G_XDEC) {
       grafyx_x--;
@@ -1525,3 +1684,4 @@ int trs_get_mouse_type()
   /* !!Note: assuming 3-button mouse */
   return 1;
 }
+
