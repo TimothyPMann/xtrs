@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Jan  2 20:39:10 PST 1999 by mann
+   Last modified on Sun Apr  4 22:36:42 PDT 1999 by mann
 */
 
 /*#define MOUSEDEBUG 1*/
@@ -373,7 +373,13 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
       }
     }
   } else /* trs_model > 1 */ {
-    char *charset_name = "international"; /* default */
+    char *charset_name;
+    /* Set default */
+    if (trs_model == 3) {
+      charset_name = "katakana";
+    } else {
+      charset_name = "international";
+    }
     (void) sprintf(option, "%s%s", program_name, ".charset");
     if (XrmGetResource(x_db, option, "Xtrs.Charset", &type, &value)) {
       charset_name = (char*) value.addr;

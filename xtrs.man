@@ -618,9 +618,11 @@ programming in the Motorola character generator ROM that Radio Shack
 used, and a few early machines were actually shipped with this ROM.
 
 In Model III, 4, and 4P modes, three sets are available:
-\fIkatakana\fP is an early set with Japanese Katakana characters in
-the alternate character positions. \fIinternational\fP (the default) is
-a later set with accented Roman letters in the alternate positions.
+\fIkatakana\fP (the default for Model III) is the original Model III set with
+Japanese Katakana characters in the alternate character
+positions. This set was also used in early Model 4's.
+\fIinternational\fP (the default for Model 4 and 4P) is a
+later Model 4 set with accented Roman letters in the alternate positions.
 \fIbold\fP is a bold set from a character generator ROM found in one
 Model III, origin uncertain.
 .TP
