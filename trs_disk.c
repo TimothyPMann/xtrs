@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Tue Nov 18 14:41:33 PST 1997 by mann */
+/* Last modified on Tue Nov 18 14:49:00 PST 1997 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
@@ -1671,19 +1671,19 @@ real_writetrk()
     perror("real_writetrk");
     /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
     state.status |= TRSDISK_WRITEFLT;
-    return;
-  }
-  if (raw_cmd.reply[1] & 0x85) state.status |= TRSDISK_NOTFOUND;
-  if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
-  if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
-  if (raw_cmd.reply[1] & 0x02) {
-    state.status |= TRSDISK_WRITEPRT;
-    d->writeprot = 1;
   } else {
-    d->writeprot = 0;
+    if (raw_cmd.reply[1] & 0x85) state.status |= TRSDISK_NOTFOUND;
+    if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
+    if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
+    if (raw_cmd.reply[1] & 0x02) {
+      state.status |= TRSDISK_WRITEPRT;
+      d->writeprot = 1;
+    } else {
+      d->writeprot = 0;
+    }
+    if (raw_cmd.reply[2] & 0x20) state.status |= TRSDISK_CRCERR;
+    if (raw_cmd.reply[2] & 0x13) state.status |= TRSDISK_NOTFOUND;
   }
-  if (raw_cmd.reply[2] & 0x20) state.status |= TRSDISK_CRCERR;
-  if (raw_cmd.reply[2] & 0x13) state.status |= TRSDISK_NOTFOUND;
   state.bytecount = 0;
   trs_disk_drq_interrupt(0);
   trs_disk_intrq_interrupt(1);
