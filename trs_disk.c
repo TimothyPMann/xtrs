@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Thu Oct 15 15:35:10 PDT 1998 by mann */
+/* Last modified on Wed Nov  4 18:56:23 PST 1998 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
@@ -405,7 +405,7 @@ idoffset(DiskState *d, int id_index)
         /* Initialize new block of ids */
 	int c;
 	fseek(d->file, idstart2, 0);
-        c = fwrite((void*)&d->id[JV3_SECSPERBLK], 3, JV3_SECSPERBLK, d->file);
+        c = fwrite((void*)&d->id[JV3_SECSPERBLK], JV3_SECSTART, 1, d->file);
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
 	c = fflush(d->file);
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
@@ -433,7 +433,13 @@ alloc_sector(DiskState *d, int size_code)
   if (d->last_used_id >= JV3_SECSMAX-1) {
     return -1;
   }
-  return ++d->last_used_id;
+  d->last_used_id++;
+  d->offset[d->last_used_id + 1] =
+    d->offset[d->last_used_id] + size_code_to_size(size_code);
+  if (d->last_used_id + 1 == JV3_SECSPERBLK) {
+      d->offset[d->last_used_id + 1] += JV3_SECSTART;
+  }
+  return d->last_used_id;
 }
 
 void
