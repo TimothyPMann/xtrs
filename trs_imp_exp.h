@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Fri Dec 18 18:25:10 PST 1998 by mann */
+/* Last modified on Wed May 17 22:12:22 PDT 2000 by mann */
 
 /*
  * trs_imp_exp.h
@@ -17,6 +17,8 @@
  * fast, flexible ones use a set of emulator traps (instructions that
  * don't exist in a real Z-80).  The old ones should probably go away
  * at some point.
+ *
+ * ED20-ED21 reserved; used by Jeff Vavasour Model III/4 emulator
  *
  * ED28 emt_system
  *         Before, HL => shell command, null terminated
@@ -81,7 +83,10 @@
  *         Before, HL => path, null terminated
  *         After,  AF =  0 if OK, error number if not (Z flag affected)
  *
- * ED2C-ED2F reserved
+ * ED2C-ED2E reserved
+ *
+ * ED2F emt_debug
+ *   Enter zbx, the xtrs debugger.
  *
  * ED30 emt_open
  *         Before, HL => path, null terminated
@@ -234,6 +239,7 @@
  *   Similar to emt_close, but pairs with emt_opendisk.
  *         Before, DE =  fd, or -1 to close all fds opened with emt_opendisk
  *         After,  AF =  0 if OK, error number if not (Z flag affected)
+ *
  */
 
 /* Minimal subset of standard O_ flags.  We have to define our own for

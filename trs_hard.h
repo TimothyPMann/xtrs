@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Sun May 14 21:30:57 PDT 2000 by mann */
+/* Last modified on Wed May 17 23:33:12 PDT 2000 by mann */
 
 /*
  * Definitions for the Radio Shack TRS-80 Model I/III/4/4P
@@ -130,14 +130,14 @@ extern char* trs_disk_dir;
  *  e = error
  */
 #define TRS_HARD_STATUS (TRS_HARD_DATA+7)
-#define TRS_HARD_BUSY    0x80
-#define TRS_HARD_READY   0x40
-#define TRS_HARD_WRERR   0x20
-#define TRS_HARD_SEEKING 0x10
-#define TRS_HARD_DRQ	 0x08
-#define TRS_HARD_ECC	 0x04
-#define TRS_HARD_CIP	 0x02
-#define TRS_HARD_ERR	 0x01
+#define TRS_HARD_BUSY     0x80
+#define TRS_HARD_READY    0x40
+#define TRS_HARD_WRERR    0x20
+#define TRS_HARD_SEEKDONE 0x10
+#define TRS_HARD_DRQ	  0x08
+#define TRS_HARD_ECC	  0x04
+#define TRS_HARD_CIP	  0x02
+#define TRS_HARD_ERR	  0x01
 
 /* Command register (write only) */
 #define TRS_HARD_COMMAND (TRS_HARD_DATA+7)

@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Apr  1 04:29:51 PST 2000 by mann
+   Last modified on Wed May 17 21:22:40 PDT 2000 by mann
 */
 
 /*#define MOUSEDEBUG 1*/

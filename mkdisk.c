@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Fri Apr 24 21:18:06 PDT 1998 by mann */
+/* Last modified on Tue May 16 19:54:51 PDT 2000 by mann */
 
 /*
  * mkdisk.c
@@ -30,7 +30,7 @@ void Usage(char *progname)
 	  "Usage:\t%s -1 file\n"
 	  "\t%s [-3] file\n"
 	  "\t%s -k [-s sides] [-d density] [-8] [-i] file\n"
-	  "\t%s -h [-c cyl] [-s sec] [-g gran] [-d dir] file\n"
+	  "\t%s -h [-c cyl] [-s sec] [-g gran] file\n"
 	  "\t%s mkdisk {-p|-u} [-1|-3|-k|-h]\n",
 	  progname, progname, progname, progname, progname);
   exit(2);
@@ -385,11 +385,6 @@ main(int argc, char *argv[])
       exit(1);
     }
     fwrite(&rhh, sizeof(rhh), 1, f);
-
-#if 0 /* Applies only when using XTRSHARD/DCT */
-    printf("%s: Be sure to format this drive with FORMAT (DIR=%d)\n",
-           argv[0], dir);
-#endif
   }
   fclose(f);
   return 0;

@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Thu Sep 24 19:16:48 PDT 1998 by mann
+   Last modified on Wed May 17 02:10:24 PDT 2000 by mann
 */
 
 #include <string.h>
@@ -123,19 +123,15 @@ int main(int argc, char *argv[])
     trs_screen_init();
     trs_timer_init();
 
-    if(debug)
-    {
-	printf("Entering debugger.\n");
-	debug_init();
-	debug_shell();
-	printf("Quitting.\n");
+    z80_reset();
+    if (!debug) {
+      /* Run continuously until exit or request to enter debugger */
+      z80_run(TRUE);
     }
-    else
-    {
-	z80_reset();
-	z80_run(TRUE);	/* run continuously */
-	/* not reached */
-    }
+    printf("Entering debugger.\n");
+    debug_init();
+    debug_shell();
+    printf("Quitting.\n");
     exit(0);
 }
 

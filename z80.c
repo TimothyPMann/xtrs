@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Dec 15 11:30:39 PST 1998 by mann
+   Last modified on Wed May 17 22:15:33 PDT 2000 by mann
 */
 
 /*
@@ -2682,9 +2682,10 @@ static void do_indexed_instruction(Ushort *ixp)
 /*
  * Extended instructions which have 0xED as the first byte:
  */
-static void do_ED_instruction()
+static int do_ED_instruction()
 {
     Uchar instruction;
+    int debug = 0;
     
     instruction = mem_read(REG_PC++);
     
@@ -2963,6 +2964,10 @@ static void do_ED_instruction()
       case 0x2b:        /* emt_setddir */
 	do_emt_setddir();
 	break;
+      case 0x2f:        /* emt_debug */
+	if (trs_continuous > 0) trs_continuous = 0;
+	debug = 1;
+	break;
       case 0x30:        /* emt_open */
 	do_emt_open();
 	break;
@@ -3016,6 +3021,8 @@ static void do_ED_instruction()
 	disassemble(REG_PC - 2);
 	error("unsupported instruction");
     }
+
+    return debug;
 }
 
 volatile int x_poll_count = 0;
@@ -3026,6 +3033,8 @@ volatile int x_poll_count = 0;
 /*#define MEM_READ(a) ((a < 0x3000) ? memory[a] : mem_read(a));*/
 /* #define MEM_READ(a) (((((a) - 0x3000) & 0xffff) >= 0xc00) ? memory[a] : mem_read(a)) */
 
+int trs_continuous;
+
 int z80_run(int continuous)
      /* 1= continuous, 0= singlestep,
 	-1= singlestep and disallow interrupts */
@@ -3034,6 +3043,7 @@ int z80_run(int continuous)
     Ushort address; /* generic temps */
     int ret = 0;
     int i;
+    trs_continuous = continuous;
 
     /* loop to do a z80 instruction */
     do {
@@ -3063,7 +3073,7 @@ int z80_run(int continuous)
 	    do_indexed_instruction(&REG_IX);
 	    break;
 	  case 0xED:	/* ED.. extended instruction */
-	    do_ED_instruction();
+	    ret = do_ED_instruction();
 	    break;
 	  case 0xFD:	/* FD.. extended instruction */
 	    do_indexed_instruction(&REG_IY);
@@ -3467,9 +3477,6 @@ int z80_run(int continuous)
 	    
 	  case 0x76:	/* halt */
 	    REG_PC--;	/* don't increment PC past this instruction */
-#if OLDWAY
-	    if (continuous > 0) continuous = 0;
-#else
 	    if (trs_model == 1) {
 		/* Z-80 HALT output is tied to reset button circuit */
 		trs_reset();
@@ -3483,8 +3490,6 @@ int z80_run(int continuous)
 		    pause();
 		}
 	    }
-#endif
-	    ret = 1;
 	    T_COUNT(4);
 	    break;
 
@@ -4342,7 +4347,7 @@ int z80_run(int continuous)
 	}
 
 	/* Check for an interrupt */
-	if (continuous >= 0)
+	if (trs_continuous >= 0)
         {
 	    /* Handle NMI first */
 	    if(z80_state.nmi && !z80_state.nmi_seen)
@@ -4360,7 +4365,7 @@ int z80_run(int continuous)
 	        do_int();
 	    }
 	}
-    } while (continuous > 0);
+    } while (trs_continuous > 0);
     return ret;
 }
 

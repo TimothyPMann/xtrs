@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Sat Dec 12 11:46:26 PST 1998 by mann */
+/* Last modified on Wed May 17 22:02:19 PDT 2000 by mann */
 
 /*
  * Emulate interrupts
@@ -17,6 +17,9 @@
 #include <sys/time.h>
 #include <time.h>
 #include <signal.h>
+
+/*#define IDEBUG 1*/
+/*#define IDEBUG2 1*/
 
 /* IRQs */
 #define M1_TIMER_BIT    0x80
@@ -215,6 +218,12 @@ trs_nmi_mask_write(unsigned char value)
 {
   nmi_mask = value | M3_RESET_BIT;
   z80_state.nmi = (nmi_latch & nmi_mask) != 0;
+#if IDEBUG2
+  if (z80_state.nmi && !z80_state.nmi_seen) {
+    fprintf(stderr, "mask write caused nmi, mask %02x latch %02x\n",
+	    nmi_mask, nmi_latch);
+  }
+#endif
   if (!z80_state.nmi) z80_state.nmi_seen = 0;
 }
 

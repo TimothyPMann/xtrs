@@ -943,8 +943,8 @@ static struct opcode minor[6][256] = {
 	{ undefined,		A_0 },		/* ed1e */
 	{ undefined,		A_0 },		/* ed1f */
 
-	{ undefined,		A_0 },		/* ed20 */
-	{ undefined,		A_0 },		/* ed21 */
+	{ undefined,		A_0 },		/* ed20 [vavasour emt] */
+	{ undefined,		A_0 },		/* ed21 [vavasour emt] */
 	{ undefined,		A_0 },		/* ed22 */
 	{ undefined,		A_0 },		/* ed23 */
 	{ undefined,		A_0 },		/* ed24 */
@@ -955,12 +955,12 @@ static struct opcode minor[6][256] = {
 	/* xtrs emulator traps; not real Z80 instructions */
 	{ "emt_system",		A_0 },		/* ed28 */
 	{ "emt_mouse",		A_0 },		/* ed29 */
-	{ undefined,		A_0 },		/* ed2a */
-	{ undefined,		A_0 },		/* ed2b */
+	{ "emt_getdir",		A_0 },		/* ed2a */
+	{ "emt_setdir",		A_0 },		/* ed2b */
 	{ undefined,		A_0 },		/* ed2c */
 	{ undefined,		A_0 },		/* ed2d */
 	{ undefined,		A_0 },		/* ed2e */
-	{ undefined,		A_0 },		/* ed2f */
+	{ "emt_debug",		A_0 },		/* ed2f */
 
 	{ "emt_open",		A_0 },		/* ed30 */
 	{ "emt_close",		A_0 },		/* ed31 */

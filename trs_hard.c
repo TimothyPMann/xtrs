@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Wed May 17 23:33:39 PDT 2000 by mann */
+/* Last modified on Thu May 18 00:42:46 PDT 2000 by mann */
 
 /*
  * Emulation of the Radio Shack TRS-80 Model I/III/4/4P
@@ -75,7 +75,6 @@ static int open_drive(int drive);
 static int find_sector(int newstatus);
 static int open_drive(int n);
 static void set_dir_cyl(int cyl);
-static void hard_done(int cmd);
 
 /* Powerup or reset button */
 void trs_hard_init(int reset_button)
@@ -172,9 +171,8 @@ void trs_hard_out(int port, int value)
     if (value & TRS_HARD_SOFTWARE_RESET) {
       trs_hard_init(1);
     }
-    if (value & TRS_HARD_DEVICE_ENABLE) {
+    if ((value & TRS_HARD_DEVICE_ENABLE) && state.present == 0) {
       int i;
-      state.present = 0;
       for (i=0; i<TRS_HARD_MAXDRIVES; i++) {
 	if (open_drive(i)) state.present = 1;
       }
@@ -206,23 +204,18 @@ void trs_hard_out(int port, int value)
     state.drive = (value & TRS_HARD_DRIVEMASK) >> TRS_HARD_DRIVESHIFT;
     state.head = (value & TRS_HARD_HEADMASK) >> TRS_HARD_HEADSHIFT;
 #if 0
-    if (!open_drive(state.drive)) state.status = 0;
+    if (!open_drive(state.drive)) state.status &= ~TRS_HARD_READY;
 #else
-    /* Ready but perhaps not able... */
-    state.status = TRS_HARD_READY;
+    /* Ready, but perhaps not able!  This way seems to work better; it
+     * avoids a long delay in the Model 4P boot ROM when there is no
+     * unit 0. */
+    state.status = TRS_HARD_READY | TRS_HARD_SEEKDONE;
 #endif
     break;
 
   case TRS_HARD_COMMAND:
     state.bytesdone = 0;
     state.command = value;
-    if (trs_event_scheduled() == hard_done) {
-      trs_do_event();
-    }
-    if (!open_drive(state.drive)) {
-      /*state.status = 0;*/
-      break;
-    }
     switch (value & TRS_HARD_CMDMASK) {
     default:
       error("trs_hard: unknown command 0x%02x", value);
@@ -263,9 +256,7 @@ static void hard_restore(int cmd)
 #endif
   state.cyl = 0;
   /*!! should anything else be zeroed? */
-  state.status = TRS_HARD_SEEKING;
-  trs_schedule_event(hard_done, TRS_HARD_READY,
-		     1000 * z80_state.clockMHz);
+  state.status = TRS_HARD_READY | TRS_HARD_SEEKDONE;
 }
 
 static void hard_read(int cmd)
@@ -276,11 +267,11 @@ static void hard_read(int cmd)
 #endif
   if (cmd & TRS_HARD_DMA) {
     error("trs_hard: dma read not supported (0x%02x)", cmd);
-    state.status = TRS_HARD_READY | TRS_HARD_ERR;
+    state.status = TRS_HARD_READY | TRS_HARD_SEEKDONE | TRS_HARD_ERR;
     state.error = TRS_HARD_ABRTERR;
     return;
   }
-  find_sector(TRS_HARD_READY | TRS_HARD_DRQ);
+  find_sector(TRS_HARD_READY | TRS_HARD_SEEKDONE | TRS_HARD_DRQ);
 }
 
 static void hard_write(int cmd)
@@ -291,11 +282,11 @@ static void hard_write(int cmd)
 #endif
   if (cmd & TRS_HARD_DMA) {
     error("trs_hard: dma write not supported (0x%02x)", cmd);
-    state.status = TRS_HARD_READY | TRS_HARD_ERR;
+    state.status = TRS_HARD_READY | TRS_HARD_SEEKDONE | TRS_HARD_ERR;
     state.error = TRS_HARD_ABRTERR;
     return;
   }
-  find_sector(TRS_HARD_READY | TRS_HARD_DRQ);
+  find_sector(TRS_HARD_READY | TRS_HARD_SEEKDONE | TRS_HARD_DRQ);
 }
 
 static void hard_verify(int cmd)
@@ -304,7 +295,7 @@ static void hard_verify(int cmd)
   fprintf(stderr, "hard_verify drive %d cyl %d hd %d sec %d\n",
 	  state.drive, state.cyl, state.head, state.secnum);
 #endif
-  find_sector(TRS_HARD_READY);
+  find_sector(TRS_HARD_READY | TRS_HARD_SEEKDONE);
 }
 
 static void hard_format(int cmd)
@@ -322,7 +313,7 @@ static void hard_format(int cmd)
 	  TRS_HARD_SECSIZE, TRS_HARD_SECSIZE_CODE, state.secnum);
   }
   /* !!should probably set up to read skew table here */
-  state.status = TRS_HARD_READY;
+  state.status = TRS_HARD_READY | TRS_HARD_SEEKDONE;
 }
 
 static void hard_init(int cmd)
@@ -333,7 +324,7 @@ static void hard_init(int cmd)
 #endif
   /* I don't know what this command does */
   error("trs_hard: init command (0x%02x) not implemented", cmd);
-  state.status = TRS_HARD_READY;
+  state.status = TRS_HARD_READY | TRS_HARD_SEEKDONE;
 }
 
 static void hard_seek(int cmd)
@@ -342,7 +333,7 @@ static void hard_seek(int cmd)
   fprintf(stderr, "hard_seek drive %d cyl %d hd %d sec %d\n",
 	  state.drive, state.cyl, state.head, state.secnum);
 #endif
-  find_sector(TRS_HARD_READY);
+  find_sector(TRS_HARD_READY | TRS_HARD_SEEKDONE);
 }
 
 /* 
@@ -411,13 +402,13 @@ static int open_drive(int drive)
     goto fail;
   }
 
-  state.status = TRS_HARD_READY;
+  state.status = TRS_HARD_READY | TRS_HARD_SEEKDONE;
   return 1;
 
  fail:
   if (d->file) fclose(d->file);
   d->file = NULL;
-  state.status = TRS_HARD_READY | TRS_HARD_ERR;
+  state.status = TRS_HARD_READY | TRS_HARD_SEEKDONE | TRS_HARD_ERR;
   state.error = TRS_HARD_NFERR;
   return 0;
 }    
@@ -425,10 +416,8 @@ static int open_drive(int drive)
 /*
  * Check whether the current position is in bounds for the geometry.
  * If not, return 0 and set the controller error status.  If so, fseek
- * the file to the start of the current sector, return 1, set the
- * controller status to "seeking" for 50 us, and set the controller
- * status to newstatus after that.  (The Model 4P boot ROM device
- * driver needs the brief "seeking" status after every command, sigh.)
+ * the file to the start of the current sector, return 1, and set
+ * the controller status to newstatus.
  */
 static int find_sector(int newstatus)
 {
@@ -439,7 +428,7 @@ static int find_sector(int newstatus)
       state.secnum > d->secs /* allow 0-origin or 1-origin */ ) {
     error("trs_hard: requested cyl %d hd %d sec %d; max cyl %d hd %d sec %d\n",
 	  state.cyl, state.head, state.secnum, d->cyls, d->heads, d->secs);
-    state.status = TRS_HARD_READY | TRS_HARD_ERR;
+    state.status = TRS_HARD_READY | TRS_HARD_SEEKDONE | TRS_HARD_ERR;
     state.error = TRS_HARD_NFERR;
     return 0;
   }
@@ -449,8 +438,7 @@ static int find_sector(int newstatus)
 			    state.head * d->secs +
 			    (state.secnum % d->secs)),
 	0);
-  trs_schedule_event(hard_done, newstatus, 50 * z80_state.clockMHz);
-  state.status = TRS_HARD_SEEKING;
+  state.status = newstatus;
   return 1;
 }
 
@@ -488,7 +476,7 @@ static void hard_data_out(int value)
   }
   if (res == EOF) {
     error("trs_hard: errno %d while writing drive %d", errno, state.drive);
-    state.status = TRS_HARD_READY | TRS_HARD_ERR;
+    state.status = TRS_HARD_READY | TRS_HARD_SEEKDONE | TRS_HARD_ERR;
     state.error = TRS_HARD_DATAERR; /* arbitrary choice */
   }
 }
@@ -504,12 +492,4 @@ static void set_dir_cyl(int cyl)
   fseek(d->file, 31, 0);
   putc(cyl, d->file);
   fseek(d->file, where, 0);
-}
-
-static void hard_done(int newstatus)
-{
-#if HARDDEBUG2
-  /** fprintf(stderr, "hard_done newstatus %02x\n", newstatus); **/
-#endif
-  state.status = newstatus;
 }

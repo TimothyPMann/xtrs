@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Sep 29 13:05:39 PDT 1998 by mann
+   Last modified on Wed May 17 21:45:39 PDT 2000 by mann
 */
 
 /*
@@ -34,6 +34,9 @@ extern int trs_paused;
 extern int trs_autodelay;
 void trs_suspend_delay(void);
 void trs_restore_delay(void);
+extern int trs_continuous; /* 1= run continuously,
+			      0= enter debugger after instruction,
+			     -1= suppress interrupt and enter debugger */
 
 extern int trs_parse_command_line(int argc, char **argv, int *debug);
 
@@ -89,6 +92,7 @@ extern void trs_nmi_mask_write(unsigned char);
 extern void trs_reset_button_interrupt(int state);
 extern void trs_disk_intrq_interrupt(int state);
 extern void trs_disk_drq_interrupt(int state);
+extern void trs_disk_motoroff_interrupt(int state);
 extern void trs_timer_interrupt(int state);
 extern void trs_timer_init(void);
 extern void trs_timer_off(void);

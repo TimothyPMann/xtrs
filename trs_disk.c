@@ -5,13 +5,14 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Mon Jul 26 12:53:42 PDT 1999 by mann */
+/* Last modified on Wed May 17 22:01:32 PDT 2000 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
  */
 
 /*#define DISKDEBUG  1*/  /* FDC register reads and writes */
+/*#define DISKDEBUG1 1*/  /* FDC commands */
 /*#define DISKDEBUG2 1*/  /* VTOS 3.0 kludges */
 /*#define DISKDEBUG3 1*/  /* Gaps and real_writetrk */
 /*#define DISKDEBUG4 1*/  /* REAL sector size detection */
@@ -24,6 +25,7 @@
 #include "z80.h"
 #include "trs.h"
 #include "trs_disk.h"
+#include "trs_hard.h"
 #include <stdio.h>
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -414,7 +416,7 @@ trs_disk_init(int reset_button)
   trs_disk_change_all();
   trs_cancel_event();
 
-  trs_disk_nocontroller = (disk[0].file == NULL);
+  trs_disk_nocontroller = (trs_model < 5 && disk[0].file == NULL);
 }
 
 void
@@ -425,6 +427,7 @@ trs_disk_change_all()
     trs_disk_change(i);
   }
   trs_disk_changecount++;
+  trs_hard_init(1);
 }
 
 
@@ -678,7 +681,7 @@ trs_disk_emutype(DiskState *d)
 	d->emutype = JV1;
       } else {
 	d->emutype = DMK;
-	d->writeprot = (c == 0xff);
+	d->writeprot = d->writeprot || (c == 0xff);
       }
       return;
     }
@@ -702,7 +705,7 @@ trs_disk_emutype(DiskState *d)
   c = getc(d->file);
   if (c == 0 || c == 0xff) {
     d->emutype = JV3;
-    d->writeprot = (c == 0);
+    d->writeprot = d->writeprot || (c == 0);
     return;
   }
   d->emutype = JV1;
@@ -1169,7 +1172,7 @@ trs_disk_select_write(unsigned char data)
 #if DISKDEBUG
   static int old_data = -1;
   if (data != old_data) {
-    fprintf(stderr, "select_write(0x%02x)\n", data);
+    fprintf(stderr, "select_write(0x%02x) pc %04x\n", data, REG_PC);
     old_data = data;
   }
 #endif
@@ -1234,6 +1237,7 @@ trs_disk_select_write(unsigned char data)
     /* A drive was selected; retrigger emulated motor timeout */
     state.motor_timeout = z80_state.t_count +
       MOTOR_USEC * z80_state.clockMHz;
+    trs_disk_motoroff_interrupt(0);
     /* Also update our knowledge of whether there is a disk present */
     if (d->emutype == REAL) real_check_empty(d);
   }
@@ -1243,7 +1247,7 @@ unsigned char
 trs_disk_track_read(void)
 {
 #if DISKDEBUG
-  fprintf(stderr, "track_read() => 0x%02x\n", state.track);
+  fprintf(stderr, "track_read() => 0x%02x pc %04x\n", state.track, REG_PC);
 #endif
   return state.track;
 }
@@ -1252,7 +1256,7 @@ void
 trs_disk_track_write(unsigned char data)
 {
 #if DISKDEBUG
-  fprintf(stderr, "track_write(0x%02x)\n", data);
+  fprintf(stderr, "track_write(0x%02x) pc %04x\n", data, REG_PC);
 #endif
   state.track = data;
 }
@@ -1261,7 +1265,7 @@ unsigned char
 trs_disk_sector_read(void)
 {
 #if DISKDEBUG
-  fprintf(stderr, "sector_read() => 0x%02x\n", state.sector);
+  fprintf(stderr, "sector_read() => 0x%02x pc %04x\n", state.sector, REG_PC);
 #endif
   return state.sector;
 }
@@ -1294,7 +1298,7 @@ void
 trs_disk_sector_write(unsigned char data)
 {
 #if DISKDEBUG
-  fprintf(stderr, "sector_write(0x%02x)\n", data);
+  fprintf(stderr, "sector_write(0x%02x) pc %04x\n", data, REG_PC);
 #endif
   if (trs_model == 1 && (trs_disk_doubler & TRSDISK_TANDY)) {
     switch (data) {
@@ -1326,6 +1330,7 @@ trs_disk_data_read(void)
   DiskState *d = &disk[state.curdrive];
   SectorId *sid;
   switch (state.currcommand & TRSDISK_CMDMASK) {
+
   case TRSDISK_READ:
     if (state.bytecount > 0) {
       int c;
@@ -1367,8 +1372,9 @@ trs_disk_data_read(void)
 	}
 	trs_schedule_event(trs_disk_done, 0, 64);
       }
-    }
+    } 
     break;
+
   case TRSDISK_READADR:
     if (state.bytecount <= 0) break;
     if (d->emutype == REAL) {
@@ -1442,6 +1448,7 @@ trs_disk_data_read(void)
       trs_schedule_event(trs_disk_done, 0, 64);
     }
     break;
+
   case TRSDISK_READTRK:
     /* assert(emutype == DMK) */
     if (state.bytecount > 0) {
@@ -1459,11 +1466,12 @@ trs_disk_data_read(void)
       trs_schedule_event(trs_disk_done, 0, 64);
     }
     break;
+
   default:
     break;
   }
 #if DISKDEBUG
-  fprintf(stderr, "data_read() => 0x%02x\n", state.data);
+  fprintf(stderr, "data_read() => 0x%02x pc %04x\n", state.data, REG_PC);
 #endif
   return state.data;
 }
@@ -1475,7 +1483,7 @@ trs_disk_data_write(unsigned char data)
   int c;
 
 #if DISKDEBUG
-  fprintf(stderr, "data_write(0x%02x)\n", data);
+  fprintf(stderr, "data_write(0x%02x) pc %04x\n", data, REG_PC);
 #endif
   switch (state.currcommand & TRSDISK_CMDMASK) {
   case TRSDISK_WRITE:
@@ -2037,7 +2045,8 @@ trs_disk_status_read(void)
   }
 #if DISKDEBUG
   if (state.status != last_status) {
-    fprintf(stderr, "status_read() => 0x%02x\n", state.status);
+    fprintf(stderr, "status_read() => 0x%02x pc %04x\n",
+	    state.status, REG_PC);
     last_status = state.status;
   }
 #endif
@@ -2069,9 +2078,10 @@ trs_disk_command_write(unsigned char cmd)
 {
   int id_index, non_ibm, goal_side;
   DiskState *d = &disk[state.curdrive];
+  trs_event_func event;
 
 #if DISKDEBUG
-  fprintf(stderr, "command_write(0x%02x)\n", cmd);
+  fprintf(stderr, "command_write(0x%02x) pc %04x\n", cmd, REG_PC);
 #endif
   /* Handle DMK partial track reformat */
   if (d->emutype == DMK &&
@@ -2140,14 +2150,19 @@ trs_disk_command_write(unsigned char cmd)
   }
 
   /* Cancel any ongoing command */
-  if (trs_event_scheduled() == trs_disk_lostdata) {
+  event = trs_event_scheduled();
+  if (event == trs_disk_lostdata || event == trs_disk_intrq_interrupt) {
     trs_cancel_event();
   }
-  trs_schedule_event(trs_disk_intrq_interrupt, 0, 0);
+  trs_disk_intrq_interrupt(0);
   state.bytecount = 0;
   state.currcommand = cmd;
   switch (cmd & TRSDISK_CMDMASK) {
+
   case TRSDISK_RESTORE:
+#if DISKDEBUG1
+      fprintf(stderr, "%02x restore drv %d\n", cmd, state.curdrive);
+#endif
     state.last_readadr = -1;
     d->phytrack = 0;
     state.track = 0;
@@ -2157,7 +2172,12 @@ trs_disk_command_write(unsigned char cmd)
     if (cmd & TRSDISK_VBIT) verify();
     trs_schedule_event(trs_disk_done, 0, 2000);
     break;
+
   case TRSDISK_SEEK:
+#if DISKDEBUG1
+      fprintf(stderr, "%02x seek drv %d ptk %d otk %d ntk %d\n",
+	      cmd, state.curdrive, d->phytrack, state.track, state.data);
+#endif
     state.last_readadr = -1;
     d->phytrack += (state.data - state.track);
     state.track = state.data;
@@ -2172,9 +2192,17 @@ trs_disk_command_write(unsigned char cmd)
     if (cmd & TRSDISK_VBIT) verify();
     trs_schedule_event(trs_disk_done, 0, 2000);
     break;
+
   case TRSDISK_STEP:
   case TRSDISK_STEPU:
   step:
+#if DISKDEBUG1
+      fprintf(stderr, "%02x step%s %s drv %d ptk %d otk %d\n",
+	      cmd, (cmd & TRSDISK_UBIT) ? "u" : "",
+	      (state.lastdirection < 0) ? "out" : "in",
+	      state.curdrive, d->phytrack, state.track);
+	      
+#endif
     state.last_readadr = -1;
     d->phytrack += state.lastdirection;
     if (cmd & TRSDISK_UBIT) {
@@ -2190,15 +2218,22 @@ trs_disk_command_write(unsigned char cmd)
     if (cmd & TRSDISK_VBIT) verify();
     trs_schedule_event(trs_disk_done, 0, 2000);
     break;
+
   case TRSDISK_STEPIN:
   case TRSDISK_STEPINU:
     state.lastdirection = 1;
     goto step;
+
   case TRSDISK_STEPOUT:
   case TRSDISK_STEPOUTU:
     state.lastdirection = -1;
     goto step;
+
   case TRSDISK_READ:
+#if DISKDEBUG1
+      fprintf(stderr, "%02x read drv %d ptk %d tk %d sec %d\n", cmd,
+	      state.curdrive, d->phytrack, state.track, state.sector);
+#endif
     state.last_readadr = -1;
     state.status = 0;
     non_ibm = 0;
@@ -2393,11 +2428,17 @@ trs_disk_command_write(unsigned char cmd)
 			 500000 * z80_state.clockMHz);
     }
     break;
+
   case TRSDISK_READM:
     state.last_readadr = -1;
     trs_disk_unimpl(cmd, "read multiple");
     break;
+
   case TRSDISK_WRITE:
+#if DISKDEBUG1
+      fprintf(stderr, "%02x write drv %d ptk %d tk %d sec %d\n", cmd,
+	      state.curdrive, d->phytrack, state.track, state.sector);
+#endif
     state.last_readadr = -1;
     state.status = 0;
     non_ibm = 0;
@@ -2611,6 +2652,7 @@ trs_disk_command_write(unsigned char cmd)
 			 500000 * z80_state.clockMHz);
     }
     break;
+
   case TRSDISK_WRITEM:
     state.last_readadr = -1;
     if (d->writeprot) {
@@ -2619,7 +2661,12 @@ trs_disk_command_write(unsigned char cmd)
     }
     trs_disk_unimpl(cmd, "write multiple");
     break;
+
   case TRSDISK_READADR:
+#if DISKDEBUG1
+      fprintf(stderr, "%02x readadr drv %d ptk %d tk %d\n", cmd,
+	      state.curdrive, d->phytrack, state.track);
+#endif
     state.data = 0; /* workaround for apparent SU1 bug */
     if (state.density) {
       state.crc = 0xb230;  /* CRC of a1 a1 a1 fe */
@@ -2781,7 +2828,12 @@ trs_disk_command_write(unsigned char cmd)
 #endif
     }
     break;
+
   case TRSDISK_READTRK:
+#if DISKDEBUG1
+      fprintf(stderr, "%02x readtrk drv %d ptk %d tk %d\n", cmd,
+	      state.curdrive, d->phytrack, state.track);
+#endif
     state.last_readadr = -1;
     if (d->file == NULL) {
       /* Data sheet says we wait forever for an index pulse, ugh */
@@ -2809,6 +2861,7 @@ trs_disk_command_write(unsigned char cmd)
     trs_schedule_event(trs_disk_lostdata, state.currcommand,
 		       500000 * z80_state.clockMHz);
     break;
+
   case TRSDISK_WRITETRK:
     state.last_readadr = -1;
     /* Really a write track? */
@@ -2821,6 +2874,10 @@ trs_disk_command_write(unsigned char cmd)
 	state.density = (state.controller == TRSDISK_P1791);
       }
     } else {
+#if DISKDEBUG1
+      fprintf(stderr, "%02x writetrk drv %d ptk %d tk %d\n", cmd,
+	      state.curdrive, d->phytrack, state.track);
+#endif
       /* Yes; a real write track */
       if (d->emutype != REAL && d->writeprot) {
 	state.status = TRSDISK_WRITEPRT;
@@ -2873,7 +2930,11 @@ trs_disk_command_write(unsigned char cmd)
       }
     }
     break;
+
   case TRSDISK_FORCEINT:
+#if DISKDEBUG1
+      fprintf(stderr, "%02x forceint\n", cmd);
+#endif
     /* Stop whatever is going on and forget it */
     trs_cancel_event();
     state.status = 0;

@@ -11,7 +11,7 @@
 ;	the date included.  
 ;
 ;	Created 1-10-98
-;       Last modified on Sun May 14 21:30:57 PDT 2000 by mann
+;       Last modified on Wed May 17 00:08:52 PDT 2000 by mann
 ;*=*=*
 
 
@@ -444,7 +444,7 @@ nextmd:	pop	hl		;get back start of module
 ;*=*=*
 ;	Messages and globals
 ;*=*=*
-hello_: defb    'XTRSHARD - Emulated hard disk driver for xtrs - 9/29/98',CR
+hello_: defb    'XTRSHARD - Emulated hard disk driver for xtrs - 5/17/00',CR
 curdl_:	defb	'LS-DOS is curdled!',CR
 nomem_: defb    'High memory is not available!',CR
 viaset_:defb    'Must install via SYSTEM (DRIVE=,DRIVER=)!',CR

@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Dec 12 11:47:51 PST 1998 by mann
+   Last modified on Thu May 18 01:02:17 PDT 2000 by mann
 */
 
 #include "z80.h"
@@ -263,11 +263,13 @@ void debug_print_registers()
 static void signal_handler()
 {
     stop_signaled = 1;
+    if (trs_continuous > 0) trs_continuous = 0;
 }
 
 void trs_debug()
 {
     stop_signaled = 1;
+    if (trs_continuous > 0) trs_continuous = 0;
 }
 
 void debug_init()
@@ -322,6 +324,7 @@ static void debug_run()
 {
     void (*old_signal_handler)();
     Uchar t;
+    int continuous;
 
     /* catch control-c signal */
     old_signal_handler = signal(SIGINT, signal_handler);
@@ -350,11 +353,10 @@ static void debug_run()
 	
 	if(print_instructions) disassemble(REG_PC);
 	
-	if(z80_run(0))
-	{
-	    /* halt instruction */
-	    printf("Halt instruction executed.\n");
-	    stop_signaled = 1;
+	continuous = (!print_instructions && num_traps == 0);
+	if (z80_run(continuous)) {
+	  printf("emt_debug instruction executed.\n");
+	  stop_signaled = 1;
 	}
 
 	t = traps[REG_PC];
@@ -387,8 +389,6 @@ void debug_shell()
     sprintf (history_file, "%s/.zbx-history", home);
     read_history(history_file);
 #endif READLINE
-
-    z80_reset();
 
     while(!done)
     {
@@ -571,12 +571,12 @@ void debug_shell()
 	    else if(!strcmp(command, "reset"))
 	    {
 		printf("Resetting.");
-		z80_reset();
+		trs_reset();
 	    }
 	    else if(!strcmp(command, "run"))
 	    {
-		printf("Running.\n");
-		z80_reset();
+		printf("Resetting and running.\n");
+		trs_reset();
 		debug_run();
 	    }
 	    else if(!strcmp(command, "status"))

@@ -33,10 +33,11 @@ However, the emulator also includes some extensions to the standard
 hardware, and the special drivers, utilities, and instructions needed
 for these are not always provided for all systems.
 
-The Z-80 emulator has a debugger called zbx.  It works sort of
-like dbx.  If you run with debugging turned on (see the options section for
-how to do this), you'll enter the debugger, and
-you can type "help" for more information.
+The Z-80 emulator has a debugger called zbx.  You can enter the
+debugger either by starting \fBxtrs\fP with the -debug flag or by
+pressing F9 while \fBxtrs\fP is running.  The debugger runs in the X
+terminal window that you started \fBxtrs\fP from.  Once you are in the
+debugger, type "help" for more information.
 
 Special support in the emulator allows the program to block when
 waiting for information from the keyboard.  This will work only for
@@ -62,8 +63,7 @@ some users added to their machines.  F4 is the Model 4 Caps Lock key
 to the @ key (so that @ can be used as a modifier key).  F6 is
 equivalent to the 0 key (so that a shifted 0 can be obtained).  F7
 signals a disk change in the emulated floppy drives (see below).  F8
-exits the program.  F9 requests entry to the debugger if it is active.
-F10 is the reset button.
+exits the program.  F9 enters the debugger (zbx).  F10 is the reset button.
 
 In Model III, 4, and 4P modes, the left and right shift keys are
 distinct; in Model I mode, they are the same.  The PageUp and PageDown
@@ -128,12 +128,14 @@ flag on or off.  To change floppies in an emulated drive, rename the
 existing file for the drive (if any), rename the new floppy file to
 the proper name, and hit function key F7 in the emulator.
 
-If you try to boot with no file named diskM-0 (that is, no disk in
-drive 0), \fBxtrs\fP emulates having no disk controller.  The behavior of a
-real machine with a disk controller in this case didn't seem useful to
-emulate faithfully: A real Model I hangs with a screen full of
-garbage; a real Model III or 4 goes into a retry loop printing
-"Diskette?" on the screen and rechecking whether you've inserted one.
+If you try to boot an emulated Model I, III, or 4 with no file named
+diskM-0 (that is, no disk in drive 0), \fBxtrs\fP emulates having no
+floppy disk controller.  The behavior of a real machine with a disk
+controller in this case didn't seem useful to emulate faithfully: A
+real Model I hangs with a screen full of garbage; a real Model III or
+4 goes into a retry loop printing "Diskette?" on the screen and
+rechecking whether you've inserted one.  A real Model 4P always has a
+floppy controller, however, so \fBxtrs\fP always emulates one.
 
 Due to a limitation of the original Model I hardware, drive :3 cannot
 be double-sided in Model I mode.  In the original Model I, you could
@@ -412,7 +414,16 @@ Second, link the file to an appropriate name.  The WD1010 emulation
 supports up to four hard drives, with names of the form hardM-U, where
 M is the TRS-80 model (1, 3, 4, or 4p) and U is a unit number from 0
 to 3.  It looks for these files in the same directory as the floppy
-disk files diskM-U.
+disk files diskM-U.  If no such files are present, \fBxtrs\fP disables
+the WD1010 emulation.
+
+Note that if hard drive unit 0 is present on a Model 4P (file
+hard4p-0), the Radio Shack boot ROM will always try to boot from it,
+even if the operating system does not support booting from a hard
+drive.  (In particular, stock TRSDOS/LS-DOS 6 systems do not support
+this, though Montezuma CP/M does.)  If you have this problem, either
+hold down F2 while booting to force the ROM to boot from floppy, or
+simply avoid using unit number 0.
 
 Finally, obtain the correct driver for the operating system you will be
 using, read its documentation, configure the driver, and format the drive.  
@@ -918,8 +929,8 @@ more reliably, especially at 1500bps.
 
 Serial ports are not emulated.
 
-Some features of the disk controller are not currently emulated: Force
-Interrupt with condition bits 0x01, 0x02, or 0x04 is not
+Some features of the floppy disk controller are not currently
+emulated: Force Interrupt with condition bits 0x01, 0x02, or 0x04 is not
 implemented. Read Track is implemented only for DMK emulated
 floppies. The multiple-sector flags in Read and Write are not
 implemented.  The timing of returned sectors is emulated only for the
