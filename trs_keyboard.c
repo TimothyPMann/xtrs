@@ -503,6 +503,8 @@ static int stretch = 0;
 
 /* Avoid changing state too fast so keystrokes aren't lost. */
 #define STRETCH_AMOUNT 16
+#define STRETCH_POLL 1
+#define STRETCH_HEARTBEAT 1
 
 void trs_kb_reset()
 {
@@ -513,7 +515,9 @@ void trs_kb_reset()
 void trs_kb_heartbeat()
 {
     /* Be responsive if we are polled rarely */
-    stretch--;
+    if (stretch > 0) {
+        stretch -= STRETCH_HEARTBEAT;
+    }
 }
 
 static void change_keystate(key)
@@ -584,12 +588,11 @@ int trs_kb_mem_read(address)
     int key = -1;
     int i, wait;
 
-    if (--stretch < 0) {
-	stretch = STRETCH_AMOUNT;
-
+    stretch -= STRETCH_POLL;
+    if (stretch < 0) {
 	/* Check if we are in the system keyboard driver, called from
            the wait-for-input routine.  The test below works on both
-           Model I and III and is insentitive to what keyboard driver
+           Model I and III and is insensitive to what keyboard driver
            is being used, as long as it is called through the
            wait-for-key routine at ROM address 0x0049 and has not
            pushed too much on the stack yet when it first reads from
@@ -604,6 +607,7 @@ int trs_kb_mem_read(address)
 	    }
 	}
 	key = trs_next_key(wait);
+	stretch = STRETCH_AMOUNT;
     }
 
     if (key >= 0) change_keystate(key);
