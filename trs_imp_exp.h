@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Mon Aug 25 15:41:19 PDT 1997 by mann */
+/* Last modified on Sat Sep 20 13:12:51 PDT 1997 by mann */
 
 /*
  * trs_imp_exp.h
@@ -18,46 +18,88 @@
  * don't exist in a real Z-80).  The old ones should probably go away
  * at some point.
  *
- * ED30 open
+ * ED30 emt_open
  *         Before, HL => path, null terminated
  *                 BC =  oflag
  *                 DE =  mode
  *         After,  AF =  0 if OK, error number if not (Z flag affected)
  *                 DE =  fd, 0xFFFF if error
  *
- * ED31 close
+ * ED31 emt_close
  *         Before, DE =  fd
  *         After,  AF =  0 if OK, error number if not (Z flag affected)
  *
- * ED32 read
+ * ED32 emt_read
  *         Before, BC =  nbytes
  *                 DE =  fd
  *                 HL => buffer
  *         After,  AF =  0 if OK, error number if not (Z flag affected)
  *                 BC =  nbytes read, 0xFFFF if error
  *
- * ED33 write
+ * ED33 emt_write
  *         Before, BC =  nbytes
  *                 DE =  fd
  *                 HL => buffer
  *         After,  AF =  0 if OK, error number if not (Z flag affected)
  *                 BC =  nbytes written, 0xFFFF if error
  *
- * ED34 lseek
+ * ED34 emt_lseek
  *         Before, BC =  whence
  *                 DE =  fd
  *                 HL => offset (8-byte little-endian integer)
  *         After,  AF =  0 if OK, error number if not (Z flag affected)
- *                 HL => location in file (8-byte little-endian integer)
+ *                 HL => location in file, 0xFFFFFFFF if error
  *
- * ED35 strerror
+ * ED35 emt_strerror
  *         Before, A  =  error number
  *                 HL => buffer for error string
  *                 BC =  buffer size
  *         After,  AF =  0 if OK, new error number if not (Z flag affected)
- *                 HL => same buffer, containing \r-terminated error string
+ *                 HL => same buffer, containing \r\0-terminated error string
+ *                 BC =  strlen(buffer), 0xFFFF if error
  *
- * ED36-ED3F reserved
+ * ED36 emt_time
+ *         Before, A  =  0 for UTC (GMT), 1 for local time
+ *         After,  BCDE= time in seconds since Jan 1, 1970 00:00:00
+ *
+ * ED37 emt_opendir
+ *         Before, HL => path, null terminated
+ *         After,  AF =  0 if OK, error number if not (Z flag affected)
+ *                 DE =  dirfd, 0xFFFF if error
+ *
+ * ED38 emt_closedir
+ *         Before, DE =  dirfd
+ *         After,  AF =  0 if OK, error number if not (Z flag affected)
+ *
+ * ED39 emt_readdir
+ *         Before, BC =  nbytes
+ *                 DE =  dirfd
+ *                 HL => buffer
+ *         After,  AF =  0 if OK, error number if not (Z flag affected)
+ *                 HL => same buffer, containing NUL-terminated filename
+ *                 BC =  strlen(buffer), 0xFFFF if error
+ *
+ * ED3A emt_chdir
+ *   Warning: Changing the working directory will change where the disk*-*
+ *   files are found on the next disk-change command!
+ *         Before, HL => path, null terminated
+ *         After,  AF =  0 if OK, error number if not (Z flag affected)
+ *
+ * ED3B emt_getcwd
+ *         Before, BC =  nbytes
+ *                 HL => buffer
+ *         After,  AF =  0 if OK, error number if not (Z flag affected)
+ *                 HL => same buffer, containing NUL-terminated pathname
+ *                 BC =  strlen(buffer), 0xFFFF if error
+ *
+ * ED3C emt_misc
+ *         Before, A  = function code, one of the following:
+ *                      0 = disk change
+ *                      1 = exit emulator
+ *                      2 = enter debugger (if active)
+ *                      3 = press reset button
+ *
+ * ED3D-ED3F reserved
  *
  * Old import feature
  *  1) Write IMPEXP_CMD_IMPORT to the command port, write a Unix
@@ -93,6 +135,13 @@ extern void do_emt_read();
 extern void do_emt_write();
 extern void do_emt_lseek();
 extern void do_emt_strerror();
+extern void do_emt_time();
+extern void do_emt_opendir();
+extern void do_emt_closedir();
+extern void do_emt_readdir();
+extern void do_emt_chdir();
+extern void do_emt_getcwd();
+extern void do_emt_misc();
 
 #define IMPEXP_CMD     0xd0
 #define IMPEXP_STATUS  0xd0

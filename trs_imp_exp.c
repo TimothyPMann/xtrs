@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Mon Aug 25 15:54:27 PDT 1997 by mann */
+/* Last modified on Sat Sep 20 13:13:47 PDT 1997 by mann */
 
 /*
  * trs_imp_exp.c
@@ -18,12 +18,18 @@
 #include <errno.h>
 #include <signal.h>
 #include <string.h>
+#include <time.h>
+#include <dirent.h>
+#include <unistd.h>
 #include "trs_imp_exp.h"
 #include "z80.h"
 
 /* New emulator traps */
 
 extern Uchar *memory;
+
+#define MAX_OPENDIR 32
+DIR *dir[MAX_OPENDIR] = { NULL, };
 
 void do_emt_open()
 {
@@ -127,6 +133,7 @@ void do_emt_strerror()
     if (REG_HL + REG_BC > 0x10000) {
 	REG_A = EFAULT;
 	REG_F &= ~ZERO_MASK;
+	REG_BC = 0xFFFF;
 	return;
     }
     errno = 0;
@@ -135,15 +142,197 @@ void do_emt_strerror()
     if (errno != 0) {
 	REG_A = errno;
 	REG_F &= ~ZERO_MASK;
-    } else if (REG_BC < size + 1) {
-	REG_A = ENOMEM;
+    } else if (REG_BC < size + 2) {
+	REG_A = ERANGE;
 	REG_F |= ZERO_MASK;
 	size = REG_BC - 1;
     }
     memcpy(&memory[REG_HL], msg, size);
-    memory[REG_HL + size] = '\r';
+    memory[REG_HL + size++] = '\r';
+    memory[REG_HL + size] = '\0';
+    if (errno == 0) {
+	REG_BC = size;
+    } else {
+	REG_BC = 0xFFFF;
+    }
 }
 
+void do_emt_time()
+{
+    time_t now = time(0);
+    if (REG_A == 1) {
+#if __alpha
+	struct tm *loctm = localtime(&now);
+        now += loctm->tm_gmtoff;
+#else
+	struct tm loctm = *(localtime(&now));
+	struct tm gmtm = *(gmtime(&now));
+        int daydiff = loctm.tm_mday - gmtm.tm_mday;
+	now += (loctm.tm_sec - gmtm.tm_sec)
+	     + (loctm.tm_min - gmtm.tm_min) * 60
+	     + (loctm.tm_hour - gmtm.tm_hour) * 3600;
+	switch (daydiff) {
+	  case 0:
+	  case 1:
+	  case -1:
+	    now += 24*3600 * daydiff;
+	    break;
+	  case 30:
+	  case 29:
+	  case 28:
+          case 27:
+            now -= 24*3600;
+            break;
+	  case -30:
+	  case -29:
+	  case -28:
+          case -27:
+            now += 24*3600;
+            break;
+	  default:
+	    error("trouble computing local time in emt_time");
+	}
+#endif
+    } else if (REG_A != 0) {
+	error("unsupported function code to emt_time");
+    }
+    REG_BC = (now >> 16) & 0xffff;
+    REG_DE = now & 0xffff;
+}
+
+void do_emt_opendir()
+{
+    int i;
+    for (i = 0; i < MAX_OPENDIR; i++) {
+	if (dir[i] == NULL) break;
+    }
+    if (i == MAX_OPENDIR) {
+	REG_DE = 0xffff;
+	REG_A = EMFILE;
+	return;
+    }
+    dir[i] = opendir(&memory[REG_HL]);
+    if (dir[i] == NULL) {
+	REG_DE = 0xffff;
+	REG_A = errno;
+	REG_F &= ~ZERO_MASK;
+    } else {
+	REG_DE = i;
+	REG_A = 0;
+	REG_F |= ZERO_MASK;
+    }
+}
+
+void do_emt_closedir()
+{
+    int i = REG_DE;
+    int ok;
+    if (i < 0 || i >= MAX_OPENDIR || dir[i] == NULL) {
+	REG_A = EBADF;
+	REG_F &= ~ZERO_MASK;
+	return;
+    }	
+    ok = closedir(dir[i]);
+    dir[i] = NULL;
+    if (ok >= 0) {
+	REG_A = 0;
+	REG_F |= ZERO_MASK;
+    } else {
+	REG_A = errno;
+	REG_F &= ~ZERO_MASK;
+    }
+}
+
+void do_emt_readdir()
+{
+    int size, i = REG_DE;
+    struct dirent *result;
+
+    if (i < 0 || i >= MAX_OPENDIR || dir[i] == NULL) {
+	REG_A = EBADF;
+	REG_F &= ~ZERO_MASK;
+	REG_BC = 0xFFFF;
+	return;
+    }	
+    if (REG_HL + REG_BC > 0x10000) {
+	REG_A = EFAULT;
+	REG_F &= ~ZERO_MASK;
+	REG_BC = 0xFFFF;
+	return;
+    }
+    result = readdir(dir[i]);
+    if (result == NULL) {
+	REG_A = errno;
+	REG_F &= ~ZERO_MASK;
+	REG_BC = 0xFFFF;
+	return;
+    }
+    size = strlen(result->d_name);
+    if (size + 1 > REG_BC) {
+	REG_A = ERANGE;
+	REG_F &= ~ZERO_MASK;
+	REG_BC = 0xFFFF;
+	return;
+    }
+    strcpy(&memory[REG_HL], result->d_name);
+    REG_A = 0;
+    REG_F |= ZERO_MASK;
+    REG_BC = size;
+}
+
+void do_emt_chdir()
+{
+    int ok = chdir(&memory[REG_HL]);
+    if (ok < 0) {
+	REG_A = errno;
+	REG_F &= ~ZERO_MASK;
+    } else {
+	REG_A = 0;
+	REG_F |= ZERO_MASK;
+    }
+}
+
+void do_emt_getcwd()
+{
+    char *result;
+    if (REG_HL + REG_BC > 0x10000) {
+	REG_A = EFAULT;
+	REG_F &= ~ZERO_MASK;
+	REG_BC = 0xFFFF;
+	return;
+    }
+    result = getcwd(&memory[REG_HL], REG_BC);
+    if (result == NULL) {
+	REG_A = errno;
+	REG_F &= ~ZERO_MASK;
+	REG_BC = 0xFFFF;
+	return;
+    }
+    REG_A = 0;
+    REG_F |= ZERO_MASK;
+    REG_BC = strlen(result);
+}
+
+void do_emt_misc()
+{
+    switch (REG_A) {
+      case 0:
+	trs_disk_change_all();
+	break;
+      case 1:
+	trs_exit();
+	break;
+      case 2:
+	trs_debug();
+	break;
+      case 3:
+	trs_reset();
+	break;
+      default:
+	error("unsupported function code to emt_misc");
+	break;
+    }
+}
 
 /* Old kludgey way using i/o ports */
 
