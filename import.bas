@@ -2,11 +2,11 @@
 40 REM-- Uses xtrs 1.3 import feature to read a Unix file
 50 REM--   and display or save the results.
 60 REM-- Timothy Mann, 10/30/96
-70 REM-- Last modified on Wed Oct  1 17:36:55 PDT 1997 by mann
+70 REM-- Last modified on Fri Feb 13 12:18:22 PST 1998 by mann
 80 CLEAR 5000
 100 LINE INPUT "Unix input file? ";C$
 120 LINE INPUT "TRS-80 output file? (*DO to display) ";F$
-140 OPEN "o",1,F$
+140 OPEN "O",1,F$
 160 INPUT "Convert newlines (y/n)";CN$
 180 CN%=LEFT$(CN$,1)="y" OR LEFT$(CN$,1)="Y"
 200 OUT &HD0,0
