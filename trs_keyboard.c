@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Mon Dec  1 15:24:24 PST 1997 by mann
+   Last modified on Mon Dec  1 15:35:35 PST 1997 by mann
 */
 
 #include "z80.h"
