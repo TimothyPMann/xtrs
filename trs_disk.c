@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Sat Aug 23 02:13:19 PDT 1997 by mann */
+/* Last modified on Mon Sep  1 18:56:44 PDT 1997 by mann */
 
 /*
  * Emulate Model I or III disk controller
@@ -62,17 +62,23 @@ FDCState state;
 #define FMT_GAP4    14
 #define FMT_DONE    15
 
-/* The following rather quirky data structure is designed to be
- *   compatible with what Jeff Vavasour's Model III/4 emulator uses to
- *   represent disk formatting information.  My interpretation is
- *   based on reading his documentation, looking at some disk images,
- *   and experimenting with his emulator to generate odd cases, so the
- *   compatibility should be excellent.
+/*
+ * The following rather quirky data structure is designed to be
+ * compatible with what Jeff Vavasour's Model III/4 emulator uses to
+ * represent disk formatting information.  My interpretation is based
+ * on reading his documentation, looking at some disk images, and
+ * experimenting with his emulator to generate odd cases, so the
+ * compatibility should be excellent.
  *
- * NB: Vavasour's model I emulator uses no auxiliary data structure
- *   for disk format.  It simply assumes that all disks are single
- *   density, 256 bytes/sector, 10 sectors/track, single sided, with
- *   nonstandard FA data address mark on all sectors on track 17.  */
+ * I have compatibly extended the format to allow for more sectors, so
+ * that 8" DSDD drives can be supported, by adding a second block of
+ * ids after the block of data sectors that is described by the first
+ * block.  JV himself says that sounds like a good idea.
+ *
+ * NB: JV's model I emulator uses no auxiliary data structure for disk
+ * format.  It simply assumes that all disks are single density, 256
+ * bytes/sector, 10 sectors/track, single sided, with nonstandard FA
+ * data address mark on all sectors on track 17.  */
 
 /* Values for flags below */
 #define JV3_DENSITY     0x80  /* 1=dden, 0=sden */
@@ -105,21 +111,21 @@ typedef struct {
 /* Following are partially supported, as an undocumented kludge.
    Drives with select codes 1, 2, 4, 8 are 5" drives, disk?-0 to disk?-3.
    Drives with select codes 3, 5, 6, 7 are 8" drives, disk?-4 to disk?-7.
-   The JV3 data structure does not allow enough sectors for an 8" DSDD 
-   diskette.  I might extend this by adding a second, optional array of 
-   ids after the last data sector that JV3 can represent, followed by
-   more data sectors.
 */
 #define TRKSIZE_8SD   5208  /* 500kHz / 6 Hz [i.e. 360rpm] / (2 * 8) */
 #define TRKSIZE_8DD  10416  /* 500kHz / 6 Hz [i.e. 360rpm] / 8 */
 
-/* Following not currently supported */
+/* Following not currently supported, but expanded JV3 is big enough */
 #define TRKSIZE_5HD  10416  /* 500kHz / 6 Hz [i.e. 360rpm] / 8 */
 #define TRKSIZE_3HD  12500  /* 500kHz / 5 Hz [i.e. 300rpm] / 8 */
 
-#define JV3_SIDES     2
-#define JV3_SECSTART  (34*256) /* start of sectors within file */
-#define JV3_MAXSECS    ((int)(JV3_SECSTART/3))
+#define JV3_SIDES      2
+#define JV3_IDSTART    0
+#define JV3_SECSTART   (34*SECSIZE) /* start of sectors within file */
+#define JV3_SECSPERBLK ((int)(JV3_SECSTART/3))
+#define JV3_SECSMAX    (2*JV3_SECSPERBLK)
+#define JV3_IDSTART2   (JV3_SECSTART + JV3_SECSPERBLK*SECSIZE)
+#define JV3_SECSTART2  (JV3_IDSTART2 + JV3_SECSTART)
 
 #define JV1_SECPERTRK 10
 
@@ -128,15 +134,16 @@ typedef struct {
 #define JV3 3 /* compatible with Vavasour Model III/4 emulator */
 
 typedef struct {
-  int writeprot;		/* emulated write protect tab */
-  int phytrack;			/* where are we really? */
+  int writeprot;		  /* emulated write protect tab */
+  int phytrack;			  /* where are we really? */
   int emutype;
-  int inches;                   /* 5 or 8 */
+  int inches;                     /* 5 or 8 */
   FILE* file;
-  SectorId id[JV3_MAXSECS + 1]; /* extra one is a loop sentinel */
-  int unused_id;		/* first unused index in id array */
-  int last_used_id;		/* last used index */
-  short sorted_id[JV3_MAXSECS + 1];
+  SectorId id[JV3_SECSMAX + 1];   /* extra one is a loop sentinel */
+  int unused_id;		  /* first unused index in id array */
+  int last_used_id;		  /* last used index */
+  int nblocks;                    /* number of blocks of ids, 1 or 2 */
+  short sorted_id[JV3_SECSMAX + 1];
   int sorted_valid;
   int track_start[MAXTRACKS][JV3_SIDES];
 } DiskState;
@@ -172,8 +179,7 @@ trs_disk_init(int reset_button)
   disk[7].inches = 8;
   trs_disk_change_all();
 
-  trs_disk_nocontroller = 
-    (trs_model == 1 && disk[0].file == NULL);
+  trs_disk_nocontroller = (disk[0].file == NULL);
 }
 
 void
@@ -210,11 +216,11 @@ sort_ids(int drive)
   int olddrive = state.curdrive;
   int i, track, side;
 
-  for (i=0; i<=JV3_MAXSECS; i++) {
+  for (i=0; i<=JV3_SECSMAX; i++) {
     d->sorted_id[i] = i;
   }
   state.curdrive = drive;
-  qsort((void*) d->sorted_id, JV3_MAXSECS, sizeof(short), id_compare);
+  qsort((void*) d->sorted_id, JV3_SECSMAX, sizeof(short), id_compare);
   state.curdrive = olddrive;
 
   for (track=0; track<MAXTRACKS; track++) {
@@ -222,7 +228,7 @@ sort_ids(int drive)
     d->track_start[track][1] = -1;
   }    
   track = side = -1;
-  for (i=0; i<JV3_MAXSECS; i++) {
+  for (i=0; i<JV3_SECSMAX; i++) {
     SectorId *sid = &d->id[d->sorted_id[i]];
     if (sid->track != track ||
 	(sid->flags & JV3_SIDE ? 1 : 0) != side) {
@@ -269,20 +275,35 @@ trs_disk_change(int drive)
     } else {
       int c;
       d->emutype = JV3;
-      fseek(d->file, JV3_MAXSECS*sizeof(SectorId), 0);
+      fseek(d->file, JV3_SECSPERBLK*sizeof(SectorId), 0);
       c = getc(d->file);
-      if (c != 0xff) d->emutype = JV1;
+      switch (c) {
+	case 0xff:
+	  /* Normal */
+	  break;
+	case 0x00:
+	  /* Write-protected internally (new feature JV is planning) */
+	  d->writeprot = 1;  /* !!Hmm, no way to unprotect */
+	  break;
+	default:
+	  d->emutype = JV1;
+	  break;
+      }
     }
   }
 
   if (d->emutype == JV3) {
-    int id_index;
+    int id_index, n;
 
-    fseek(d->file, 0, 0);
-    fread(d->id, sizeof(d->id), 1, d->file);
+    memset((void*)d->id, JV3_UNUSED, sizeof(d->id));
+    fseek(d->file, JV3_IDSTART, 0);
+    fread((void*)&d->id[0], 3, JV3_SECSPERBLK, d->file);
+    fseek(d->file, JV3_IDSTART2, 0);
+    n = fread((void*)&d->id[JV3_SECSPERBLK], 3, JV3_SECSPERBLK, d->file);
+    d->nblocks = n > 0 ? 2 : 1;
 
     d->unused_id = d->last_used_id = -1;
-    for (id_index=0; id_index<JV3_MAXSECS; id_index++) {
+    for (id_index=0; id_index<JV3_SECSMAX; id_index++) {
       if (d->id[id_index].track == JV3_UNUSED) {
 	if (d->unused_id == -1) d->unused_id = id_index;
       } else {
@@ -339,9 +360,42 @@ offset(int emutype, int id_index)
   if (emutype == JV1) {
     return id_index * SECSIZE;
   } else {
-    return JV3_SECSTART + id_index * SECSIZE;
+    if (id_index < JV3_SECSPERBLK) {
+      return JV3_SECSTART + id_index * SECSIZE;
+    } else {
+      return JV3_SECSTART2 + (id_index - JV3_SECSPERBLK) * SECSIZE;
+    }
   }
 }
+
+/* Return the offset of the id block for the id_index'th sector
+   in an emulated-disk file.  Initialize a new block if needed. */
+static off_t
+idoffset(int id_index)
+{
+  DiskState *d = &disk[state.curdrive];
+  if (d->emutype == JV1) {
+    trs_disk_unimpl(state.currcommand, "JV1 id (internal error)");
+    return -1;
+  } else {
+    if (id_index < JV3_SECSPERBLK) {
+      return JV3_IDSTART + id_index * sizeof(SectorId);
+    } else {
+      if (d->nblocks == 1) {
+        /* Initialize new block of ids */
+	int c;
+	fseek(d->file, JV3_IDSTART2, 0);
+        c = fwrite((void*)&d->id[JV3_SECSPERBLK], 3, JV3_SECSPERBLK, d->file);
+	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+	c = fflush(d->file);
+	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+	d->nblocks = 2;
+      }	
+      return JV3_IDSTART2 + (id_index - JV3_SECSPERBLK) * sizeof(SectorId);
+    }
+  }
+}
+
 
 /* Search for a sector on the current physical track and return its
    index within the emulated-disk file.  Set status and return -1 if
@@ -609,7 +663,7 @@ trs_disk_data_write(unsigned char data)
 	state.format = FMT_TRACKID;
 	if (d->emutype == JV3) {
 	  /* Need to store sector ID info in d->unused_id */
-	  if (d->unused_id >= JV3_MAXSECS) {
+	  if (d->unused_id >= JV3_SECSMAX) {
 	    /* Data structure full */
 	    state.status |= TRSDISK_WRITEFLT;
 	    state.bytecount = 0;
@@ -705,7 +759,7 @@ trs_disk_data_write(unsigned char data)
       }
       if (d->emutype == JV3) {
 	/* Write the sector id */
-	fseek(d->file, sizeof(SectorId)*d->unused_id, 0);
+	fseek(d->file, idoffset(d->unused_id), 0);
 	c = fwrite(&d->id[d->unused_id], sizeof(SectorId), 1, d->file);
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
 	/* Update allocation limits */
@@ -871,7 +925,8 @@ trs_disk_command_write(unsigned char cmd)
 	}
 	if (newflags != sid->flags) {
 	  int c;
-	  fseek(d->file, ((char *) &sid->flags) - ((char *) d->id), 0);
+	  fseek(d->file, idoffset(id_index) 
+		         + ((char *) &sid->flags) - ((char *) sid), 0);
 	  c = putc(newflags, d->file);
 	  if (c == EOF) state.status |= TRSDISK_WRITEFLT;
 	  c = fflush(d->file);

@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Wed Aug 27 17:35:01 PDT 1997 by mann */
+/* Last modified on Mon Sep  1 18:47:22 PDT 1997 by mann */
 
 /*
  * Emulate Model-I interrupts
@@ -25,9 +25,9 @@ static unsigned char interrupt_latch = 0;
 static unsigned char interrupt_mask = 0xFF;
 
 /* NMIs (M3 only) */
-#define M3_INTRQ_BIT 0x80
-#define M3_DRQ_BIT   0x40
-#define M3_RESET_BIT 0x20
+#define M3_INTRQ_BIT    0x80  /* FDC chip INTRQ line */
+#define M3_MOTOROFF_BIT 0x40  /* FDC motor timed out (stopped) */
+#define M3_RESET_BIT    0x20  /* User pressed Reset button */
 static unsigned char nmi_latch = 0;
 static unsigned char nmi_mask = M3_RESET_BIT;
 
@@ -85,22 +85,28 @@ trs_disk_intrq_interrupt(int state)
 }
 
 void
-trs_disk_drq_interrupt(int state)
+trs_disk_motoroff_interrupt(int state)
 {
+  /* Drive motor timed out (stopped).
+     Not emulated; this routine is never called.
+   */
   if (trs_model == 1) {
     /* no effect */
   } else {
-#if 0
-/*!! seems to kill LDOS?? */
     if (state) {
-      nmi_latch |= M3_DRQ_BIT;
+      nmi_latch |= M3_MOTOROFF_BIT;
     } else {
-      nmi_latch &= ~M3_DRQ_BIT;
+      nmi_latch &= ~M3_MOTOROFF_BIT;
     }
     z80_state.nmi = (nmi_latch & nmi_mask) != 0;
     if (!z80_state.nmi) z80_state.nmi_seen = 0;
-#endif
   }
+}
+
+void
+trs_disk_drq_interrupt(int state)
+{
+  /* no effect */
 }
 
 void
@@ -143,7 +149,12 @@ unsigned char
 trs_nmi_latch_read()
 {
   unsigned char tmp = ~nmi_latch;
-  trs_reset_button_interrupt(0); /* acknowledge this one (only) !!? */
+
+  /* !!Kludge: On a real machine, the reset button interrupt signal
+     goes away when the user releases the button.  Here, we leave
+     it active until software has read the NMI latch. */
+  trs_reset_button_interrupt(0);
+
   return tmp;
 }
 

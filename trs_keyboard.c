@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Thu Aug 28 17:11:06 PDT 1997 by mann
+   Last modified on Mon Sep  1 18:02:55 PDT 1997 by mann
 */
 
 #include "z80.h"
@@ -79,13 +79,13 @@
 #define TK_Right        6, 6
 #define TK_Space        6, 7
 #define TK_LeftShift    7, 0
-#define TK_RightShift   7, 1  /* M3 only; both shifts are 7, 0 on M1 */
-#define TK_Unused       7, 2
-#define TK_CapsLock     7, 3  /* M3 only */
-#define TK_F1           7, 4  /* M3 only */
-#define TK_F2           7, 5  /* M3 only */
-#define TK_F3           7, 6  /* M3 only */
-#define TK_Ctrl         7, 7  /* M3 only */
+#define TK_RightShift   7, 1  /* M3/4 only; both shifts are 7, 0 on M1 */
+#define TK_Ctrl         7, 2  /* M4 only */
+#define TK_CapsLock     7, 3  /* M4 only */
+#define TK_F1           7, 4  /* M4 only */
+#define TK_F2           7, 5  /* M4 only */
+#define TK_F3           7, 6  /* M4 only */
+#define TK_Unused       7, 7
 
 #define TK_NULL          -1, 0
 
