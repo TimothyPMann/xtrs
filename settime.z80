@@ -11,7 +11,7 @@
 ;; marked as having been modified, with the modifier's name and
 ;; the date included.  
 ;;
-;; Last modified on Thu Mar 19 13:54:45 PST 1998 by mann
+;; Last modified on Fri Apr 24 22:16:17 PDT 1998 by mann
 ;;      modified on Sun Feb 22 21:27:13 CET 1998 by ulm
 
 ;; Model I/III addresses
@@ -103,6 +103,7 @@ month2:	sbc hl, de		; subtract length of month
 	inc hl
 	ld (hl), b		; month
 	ei
+	ld hl,0			; needed on Model 4 --mann
 	jr exit
 
 ;; divide BCDE / A
@@ -151,14 +152,18 @@ startj4:
 	defw date4$
 
 ;; Initialize tables
-initj:	ld a, (0004h)
-	cp 06h			; model 1?
-	ret z
-	ld hl, startj3
-	cp 30h			; model 3?
-	jr z, model3
-	ld hl, startj4
-model3:	ld de, startj
+;; Changed to work even on a Model III (or Model 4 in III mode)
+;;  using MODELA/III as its ROM.  Previous version didn't.  --mann
+;;
+initj:	ld hl, startj4		; model 4?
+	ld a, (000ah)
+	cp 40h
+	jr nz, movej		; go if so
+	ld hl, startj3		; model 3?
+	ld a, (0125h)
+	cp 'I'
+	ret nz			; return if not
+movej:	ld de, startj
 	ld bc, endj - startj
 	ldir
 	ret

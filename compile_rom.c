@@ -15,116 +15,130 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Mon Jan 12 15:44:50 PST 1998 by mann
+   Last modified on Sat Apr 25 00:57:31 PDT 1998 by mann
 */
 
 #include "z80.h"
+#include "load_cmd.h"
 
 static int highest_address = 0;
 static Uchar memory[Z80_ADDRESS_LIMIT];
+static Uchar loadmap[Z80_ADDRESS_LIMIT];
 
 /* Called by load_hex */
-void hex_data(address, value)
-    int address;
-    int value;
+void hex_data(int address, int value)
 {
-    address &= 0xffff;
+  address &= 0xffff;
 
-    memory[address] = value;
-    if(highest_address < address)
-      highest_address = address;
+  memory[address] = value;
+  if(highest_address < address)
+    highest_address = address;
 }
 
-void hex_transfer_address(address)
-     int address;
+void hex_transfer_address(int address)
 {
-    /* Ignore */
+  /* Ignore */
 }
 
-static void load_rom(filename)
-    char *filename;
+static void load_rom(char *filename)
 {
-    FILE *program;
-    int c, trs_rom_size;
+  FILE *program;
+  int c, a;
     
-    if((program = fopen(filename, "r")) == NULL)
+  if((program = fopen(filename, "r")) == NULL)
     {
-	char message[100];
-	sprintf(message, "could not read %s", filename);
-	fatal(message);
+      char message[100];
+      sprintf(message, "could not read %s", filename);
+      fatal(message);
     }
-    c = getc(program);
-    if (c == ':') {
-        rewind(program);
-        trs_rom_size = load_hex(program);
-    } else {
-        trs_rom_size = 0;
-        while (c != EOF) {
-	    hex_data(trs_rom_size++, c);
-	    c = getc(program);
-	}
-    }
+  c = getc(program);
+  if (c == ':') {
+    /* Assume Intel hex format */
+    rewind(program);
+    load_hex(program);
     fclose(program);
+    return;
+  } else if (c == 1 || c == 5) {
+    /* Assume MODELA/III file */
+    int res;
+    rewind(program);
+    res = load_cmd(program, memory, loadmap, 0, NULL, -1, NULL, NULL, 1);
+    if (res == LOAD_CMD_OK) {
+      highest_address = Z80_ADDRESS_LIMIT;
+      while (highest_address > 0) {
+	if (loadmap[--highest_address] != 0) {
+	  break;
+	}
+      }
+      fclose(program);
+      return;
+    } else {
+      /* Guess it wasn't one */
+      rewind(program);
+      c = getc(program);
+    } 
+  }
+  a = 0;
+  while (c != EOF) {
+    hex_data(a++, c);
+    c = getc(program);
+  }
 }
 
-void fatal(string)
-    char *string;
+void fatal(char *string)
 {
     fprintf(stderr, "compile_rom fatal error: %s\n", string);
     exit(1);
 }
 
-static void write_output(which)
-     char* which;
+static void write_output(char *which)
 {
-    int address = 0;
-    int i;
+  int address = 0;
+  int i;
     
-    highest_address++;
+  highest_address++;
 
-    printf("int trs_rom%s_size = %d;\n", which, highest_address);
-    printf("unsigned char trs_rom%s[%d] = \n{\n", which, highest_address);
+  printf("int trs_rom%s_size = %d;\n", which, highest_address);
+  printf("unsigned char trs_rom%s[%d] = \n{\n", which, highest_address);
     
-    while(address < highest_address) 
+  while(address < highest_address) 
     {
-	printf("    ");
-	for(i = 0; i < 8; ++i)
+      printf("    ");
+      for(i = 0; i < 8; ++i)
 	{
-	    printf("0x%.2x,", memory[address++]);
+	  printf("0x%.2x,", memory[address++]);
 
-	    if(address == highest_address)
-	      break;
+	  if(address == highest_address)
+	    break;
 	}
-	printf("\n");
+      printf("\n");
     }
-    printf("};\n");
+  printf("};\n");
 }
 
-static void write_norom_output(which)
-     char* which;
+static void write_norom_output(char *which)
 {
-    printf("int trs_rom%s_size = -1;\n", which);
-    printf("unsigned char trs_rom%s[1];\n", which);
+  printf("int trs_rom%s_size = -1;\n", which);
+  printf("unsigned char trs_rom%s[1];\n", which);
 }
 
-void main(argc, argv)
-    int argc;
-    char *argv[];
+int main(int argc, char *argv[])
 {
-    if(argc == 2)
+  if(argc == 2)
     {
-	fprintf(stderr,
-		"No specified ROM file, ROM %s will not be built into program.\n", argv[1]);
-	write_norom_output(argv[1]);
+      fprintf(stderr,
+	  "No specified ROM file, ROM %s will not be built into program.\n",
+	  argv[1]);
+      write_norom_output(argv[1]);
     }
-    else if(argc != 3)
+  else if(argc != 3)
     {
-	fatal("usage: compile_rom model hexfile");
+      fatal("usage: compile_rom model hexfile");
     }
-    else
+  else
     {
-	load_rom(argv[2]);
-	write_output(argv[1]);
+      load_rom(argv[2]);
+      write_output(argv[1]);
     }
-    exit(0);
+  return 0;
 }

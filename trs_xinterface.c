@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Wed Apr 15 21:36:05 PDT 1998 by mann
+   Last modified on Sat Apr 25 01:11:08 PDT 1998 by mann
 */
 
 /*
@@ -103,6 +103,7 @@ static XrmOptionDescRec opts[] = {
 {"-nodebug",	"*debug",	XrmoptionNoArg,		(caddr_t)"off"},
 {"-romfile",	"*romfile",	XrmoptionSepArg,	(caddr_t)NULL},
 {"-romfile3",	"*romfile3",	XrmoptionSepArg,	(caddr_t)NULL},
+{"-romfile4p",	"*romfile4p",	XrmoptionSepArg,	(caddr_t)NULL},
 {"-resize",	"*resize",	XrmoptionNoArg,		(caddr_t)"on"},
 {"-noresize",	"*resize",	XrmoptionNoArg,		(caddr_t)"off"},
 {"-spinfast",   "*spinfast",    XrmoptionNoArg,         (caddr_t)"on"},
@@ -113,9 +114,11 @@ static XrmOptionDescRec opts[] = {
 {"-model1",     "*model",       XrmoptionNoArg,		(caddr_t)"1"},
 {"-model3",     "*model",       XrmoptionNoArg,		(caddr_t)"3"},
 {"-model4",     "*model",       XrmoptionNoArg,		(caddr_t)"4"},
+{"-model4p",    "*model",       XrmoptionNoArg,		(caddr_t)"4p"},
 {"-diskdir",    "*diskdir",     XrmoptionSepArg,	(caddr_t)NULL},
+{"-delay",      "*delay",       XrmoptionSepArg,	(caddr_t)"0"},
 #if __linux
-{"-sb",         "*sbioport",    XrmoptionSepArg,        (caddr_t)NULL},
+{"-sb",         "*sb",          XrmoptionSepArg,        (caddr_t)NULL},
 #endif /* linux */
 };
 
@@ -135,8 +138,7 @@ static void clear_key_queue()
     key_queue_entries = 0;
 }
 
-void queue_key(state)
-    int state;
+void queue_key(int state)
 {
     key_queue[(key_queue_head + key_queue_entries) % KEY_QUEUE_SIZE] = state;
 #ifdef KBDEBUG
@@ -178,10 +180,7 @@ static XrmDatabase x_db = NULL;
 static XrmDatabase command_db = NULL;
 static char *program_name;
 
-int trs_parse_command_line(argc, argv, debug)
-     int argc;
-     char **argv;
-     int *debug;
+int trs_parse_command_line(int argc, char **argv, int *debug)
 {
     char option[512];
     char *type;
@@ -199,22 +198,6 @@ int trs_parse_command_line(argc, argv, debug)
     /* parse command line options */
     XrmParseCommand(&command_db,opts,num_opts,program_name,&argc,argv);
 
-#if __linux
-    (void) sprintf(option, "%s%s", program_name, ".sbioport");
-    if (XrmGetResource(x_db, option, "Xtrs.SbIoPort", &type, &value))
-    {
-        char *next; int ioport, vol;
-	ioport = strtol(value.addr, &next, 0);
-	if(*next == ',')
-	{
-	    next++;
-	    vol=atoi(next);
-	    trs_sound_init(ioport, vol);  /* requires root privilege */
-	}
-    }
-    setuid(getuid());
-#endif /* linux */
-
     (void) sprintf(option, "%s%s", program_name, ".display");
     (void) XrmGetResource(command_db, option, "Xtrs.Display", &type, &value);
     /* open display */
@@ -231,6 +214,22 @@ int trs_parse_command_line(argc, argv, debug)
     } else {
       x_db = command_db;
     }
+
+#if __linux
+    (void) sprintf(option, "%s%s", program_name, ".sb");
+    if (XrmGetResource(x_db, option, "Xtrs.Sb", &type, &value))
+    {
+        char *next; int ioport, vol;
+	ioport = strtol(value.addr, &next, 0);
+	if(*next == ',')
+	{
+	    next++;
+	    vol=atoi(next);
+	    trs_sound_init(ioport, vol);  /* requires root privilege */
+	}
+    }
+    setuid(getuid());
+#endif /* linux */
 
     (void) sprintf(option, "%s%s", program_name, ".debug");
     if (XrmGetResource(x_db, option, "Xtrs.Debug", &type, &value))
@@ -274,6 +273,9 @@ int trs_parse_command_line(argc, argv, debug)
       } else if (strcmp(value.addr, "4") == 0 ||
 		 strcasecmp(value.addr, "IV") == 0) {
 	trs_model = 4;
+      } else if (strcasecmp(value.addr, "4P") == 0 ||
+		 strcasecmp(value.addr, "IVp") == 0) {
+	trs_model = 5;
       } else {
 	  fprintf(stderr, "%s: TRS-80 Model %s not supported\n",
 		  program_name, value.addr);
@@ -285,6 +287,12 @@ int trs_parse_command_line(argc, argv, debug)
     if (XrmGetResource(x_db, option, "Xtrs.Diskdir", &type, &value))
     {
         trs_disk_dir = strdup(value.addr);
+    }
+
+    (void) sprintf(option, "%s%s", program_name, ".delay");
+    if (XrmGetResource(x_db, option, "Xtrs.Delay", &type, &value))
+    {
+        z80_state.delay = strtol(value.addr, NULL, 0);
     }
 
     return argc;
@@ -413,7 +421,7 @@ void trs_screen_init()
 	    exit(-1);
 #endif
 	}
-    } else {
+    } else if (trs_model == 3 || trs_model == 4) {
 	(void) sprintf(option, "%s%s", program_name, ".romfile3");
 	if (XrmGetResource(x_db, option, "Xtrs.Romfile3", &type, &value)) {
 	    trs_load_rom(value.addr);
@@ -422,6 +430,20 @@ void trs_screen_init()
 	} else {
 #ifdef DEFAULT_ROM3
 	    trs_load_rom(DEFAULT_ROM3);
+#else
+	    fprintf(stderr,"%s: rom file not specified!\n",program_name);
+	    exit(-1);
+#endif
+	}
+    } else {
+	(void) sprintf(option, "%s%s", program_name, ".romfile4p");
+	if (XrmGetResource(x_db, option, "Xtrs.Romfile4p", &type, &value)) {
+	    trs_load_rom(value.addr);
+	} else if (trs_rom4p_size > 0) {
+	    trs_load_compiled_rom(trs_rom4p_size, trs_rom4p);
+	} else {
+#ifdef DEFAULT_ROM4P
+	    trs_load_rom(DEFAULT_ROM4P);
 #else
 	    fprintf(stderr,"%s: rom file not specified!\n",program_name);
 	    exit(-1);
@@ -462,7 +484,7 @@ void trs_screen_init()
 	cur_char_height = myfont->ascent + myfont->descent;
     }
 
-    if (trs_model == 4 && !resize) {
+    if (trs_model >= 4 && !resize) {
       OrigWidth = cur_char_width * 80 + 2 * border_width;
       left_margin = cur_char_width * (80 - row_chars)/2;
       OrigHeight = cur_char_height * 24 + 2 * border_width;
@@ -510,8 +532,7 @@ void trs_event_init()
 }
 
 /* ARGSUSED */
-void trs_event(signo)
-    int signo;
+void trs_event(int signo)
 {
     x_poll_count = 0;
 }
@@ -525,8 +546,7 @@ KeySym last_key[256];
  *   If wait is false, process as many events as are available, returning
  *     when none are left.
  */ 
-void trs_get_event(wait)
-     int wait;
+void trs_get_event(int wait)
 {
     XEvent event;
     KeySym key;
@@ -660,8 +680,7 @@ void trs_get_event(wait)
     } while (!wait);
 }
 
-void trs_screen_expanded(flag)
-    int flag;
+void trs_screen_expanded(int flag)
 {
     int bit = flag ? EXPANDED : 0;
     if ((currentmode ^ bit) & EXPANDED) {
@@ -675,8 +694,7 @@ void trs_screen_expanded(flag)
     }
 }
 
-void trs_screen_inverse(flag)
-     int flag;
+void trs_screen_inverse(int flag)
 {
     int bit = flag ? INVERSE : 0;
     int i;
@@ -689,8 +707,7 @@ void trs_screen_inverse(flag)
     }
 }
 
-void trs_screen_80x24(flag)
-     int flag;
+void trs_screen_80x24(int flag)
 {
     /* Called only on an actual change */
     if (flag) {
@@ -725,7 +742,8 @@ void screen_init()
 	trs_screen[i] = ' ';
 }
 
-void boxes_init(foreground, background, width, height, expanded)
+void
+boxes_init(int foreground, int background, int width, int height, int expanded)
 {
     int graphics_char, bit, p;
     XRectangle bits[6];
@@ -769,8 +787,7 @@ void boxes_init(foreground, background, width, height, expanded)
     }
 }
 
-void bitmap_init(foreground, background)
-    unsigned long foreground, background;
+void bitmap_init(unsigned long foreground, unsigned long background)
 {
     if(!usefont) {
 	/* Initialize from built-in font bitmaps. */
@@ -815,10 +832,7 @@ void trs_screen_refresh()
 #endif
 }
 
-void trs_screen_write_char(position, char_index, doflush)
-int position;
-int char_index;
-Bool doflush;
+void trs_screen_write_char(int position, int char_index, Bool doflush)
 {
     int row,col,destx,desty;
     int plane;
@@ -931,10 +945,7 @@ void trs_screen_scroll()
 	trs_screen[i-row_chars] = trs_screen[i];
 }
 
-void trs_screen_write_chars(locations, values, count)
-int *locations;
-int *values;
-int count;
+void trs_screen_write_chars(int *locations, int *values, int count)
 {
     while(count--)
     {
@@ -945,8 +956,7 @@ int count;
 #endif
 }
 
-int trs_next_key(wait)
-     int wait;
+int trs_next_key(int wait)
 {
 #if KBWAIT
     if (wait) {

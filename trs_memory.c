@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Wed Nov 26 17:01:49 PST 1997 by mann
+   Last modified on Sun Apr 26 00:24:52 PDT 1998 by mann
 */
 
 /*
@@ -58,6 +58,7 @@ int bank_offset[2];
 #define VIDEO_PAGE_0 0
 #define VIDEO_PAGE_1 1024
 int video_offset = (-VIDEO_START + VIDEO_PAGE_0);
+int romin = 0; /* Model 4p */
 
 /*SUPPRESS 53*/
 /*SUPPRESS 112*/
@@ -73,9 +74,7 @@ static int video_cache_values[VIDEO_CACHE_SIZE];
 static int video_cache_count;
 static int video_cache_on;
 
-static void video_write(location, value)
-    int location;
-    int value;
+static void video_write(int location, int value)
 {
     if(video_cache_on)
     {
@@ -120,14 +119,12 @@ static void uncache_video_writes()
     video_cache_on = 0;
 }
 
-void mem_video_page(which)
-     int which;
+void mem_video_page(int which)
 {
     video_offset = -VIDEO_START + (which ? VIDEO_PAGE_1 : VIDEO_PAGE_0);
 }
 
-void mem_bank(command)
-     int command;
+void mem_bank(int command)
 {
     switch (command) {
       case 0:
@@ -161,10 +158,14 @@ void trs_exit()
     exit(0);
 }
 
+/* Handle reset button */
 void trs_reset()
 {
     /* Reset devices (Model I SYSRES, Model III/4 RESET) */
     trs_disk_init(1);
+    if (trs_model == 5) {
+	z80_out(0x9C, 1);
+    }
     if (trs_model >= 4) {
 	z80_out(0x84, 0);
     }
@@ -172,16 +173,27 @@ void trs_reset()
 	trs_interrupt_mask_write(0);
 	trs_nmi_mask_write(0);
     }
-    /* Signal a nonmaskable interrupt. */
-    trs_reset_button_interrupt(1);
-    /* Part of keyboard stretch kludge */
-    trs_kb_reset();
+    trs_kb_reset();  /* Part of keyboard stretch kludge */
+
+    if (trs_model == 5) {
+	/* Reset processor (!!guess this is what 4P does) */
+	z80_reset();
+    } else {
+	/* Signal a nonmaskable interrupt. */
+	trs_reset_button_interrupt(1);
+	trs_schedule_event(trs_reset_button_interrupt, 0, 500);
+    }
 }
 
-void mem_map(which)
-     int which;
+void mem_map(int which)
 {
-    memory_map = which + (trs_model << 4);
+    memory_map = which + (trs_model << 4) + (romin << 2);
+}
+
+void mem_romin(state)
+{
+    romin = (state & 1);
+    memory_map = (memory_map & ~4) + (romin << 2);
 }
 
 void mem_init()
@@ -200,14 +212,15 @@ void mem_init()
     mem_bank(0);
     mem_video_page(0);
     video_cache_on = 0;
+    if (trs_model == 5) {
+	z80_out(0x9C, 1);
+    }
 }
 
 /*
  * hack to let us initialize the ROM memory
  */
-void mem_write_rom(address, value)
-    int address;
-    int value;
+void mem_write_rom(int address, int value)
 {
     address &= 0xffff;
 
@@ -215,28 +228,23 @@ void mem_write_rom(address, value)
 }
 
 /* Called by load_hex */
-void hex_data(address, value)
-    int address;
-    int value;
+void hex_data(int address, int value)
 {
     mem_write_rom(address, value);
 }
 
 /* Called by load_hex */
-void hex_transfer_address(address)
-    int address;
+void hex_transfer_address(int address)
 {
     /* Ignore */
 }
 
-int mem_read(address)
-    int address;
+int mem_read(int address)
 {
     /*address &= 0xffff;   caller must guarantee this now */
 
     switch (memory_map) {
-      case 0x10:
-	/* Model I */
+      case 0x10: /* Model I */
 	if (address >= VIDEO_START) return memory[address];
 	if (address < trs_rom_size) return memory[address];
 	if (address == TRSDISK_DATA) return trs_disk_data_read();
@@ -248,16 +256,14 @@ int mem_read(address)
 	if (address >= KEYBOARD_START) return trs_kb_mem_read(address);
 	return 0xff;
 
-      case 0x30:
-	/* Model III */
+      case 0x30: /* Model III */
 	if (address >= VIDEO_START) return memory[address];
 	if (address == PRINTER_ADDRESS)	return trs_printer_read();
 	if (address < trs_rom_size) return memory[address];
 	if (address >= KEYBOARD_START) return trs_kb_mem_read(address);
 	return 0xff;
 
-      case 0x40:
-	/* Model 4 map 0 */
+      case 0x40: /* Model 4 map 0 */
 	if (address >= RAM_START) {
 	    return memory[address + bank_offset[address>>15]];
 	}
@@ -269,7 +275,13 @@ int mem_read(address)
 	if (address >= KEYBOARD_START) return trs_kb_mem_read(address);
 	return 0xff;
 
-      case 0x41:
+      case 0x54: /* Model 4P map 0, boot ROM in */
+      case 0x55: /* Model 4P map 1, boot ROM in */
+	if (address < trs_rom_size) return rom[address];
+	/* else fall thru */
+      case 0x41: /* Model 4 map 1 */
+      case 0x50: /* Model 4P map 0, boot ROM out */
+      case 0x51: /* Model 4P map 1, boot ROM out */
 	if (address >= RAM_START || address < KEYBOARD_START) {
 	    return memory[address + bank_offset[address>>15]];
 	}
@@ -279,29 +291,30 @@ int mem_read(address)
 	if (address >= KEYBOARD_START) return trs_kb_mem_read(address);
 	return 0xff;
 
-      case 0x42:
+      case 0x42: /* Model 4 map 2 */
+      case 0x52: /* Model 4P map 2, boot ROM out */
+      case 0x56: /* Model 4P map 2, boot ROM in (!!?) */
 	if (address < 0xf400) {
 	    return memory[address + bank_offset[address>>15]];
 	}
 	if (address >= 0xf800) return video[address-0xf800];
 	return trs_kb_mem_read(address);
 
-      case 0x43:
+      case 0x43: /* Model 4 map 3 */
+      case 0x53: /* Model 4P map 3, boot ROM out */
+      case 0x57: /* Model 4P map 3, boot ROM in (!!?) */
 	return memory[address + bank_offset[address>>15]];
     }
     /* not reached */
     return 0xff;
 }
 
-void mem_write(address, value)
-    int address;
-    int value;
+void mem_write(int address, int value)
 {
     address &= 0xffff;
 
     switch (memory_map) {
-      case 0x10:
-	/* Model I */
+      case 0x10: /* Model I */
 	if (address >= RAM_START) {
 	    memory[address] = value;
 	} else if (address >= VIDEO_START) {
@@ -337,8 +350,7 @@ void mem_write(address, value)
 	}
 	break;
 
-      case 0x30:
-	/* Model III */
+      case 0x30: /* Model III */
 	if (address >= RAM_START) {
 	    memory[address] = value;
 	} else if (address >= VIDEO_START) {
@@ -352,8 +364,9 @@ void mem_write(address, value)
 	}
 	break;
 
-      case 0x40:
-	/* Model 4 map 0 */
+      case 0x40: /* Model 4 map 0 */
+      case 0x50: /* Model 4P map 0, boot ROM out */
+      case 0x54: /* Model 4P map 0, boot ROM in */
 	if (address >= RAM_START) {
 	    memory[address + bank_offset[address>>15]] = value;
 	} else if (address >= VIDEO_START) {
@@ -367,7 +380,9 @@ void mem_write(address, value)
 	}
 	break;
 
-      case 0x41:
+      case 0x41: /* Model 4 map 1 */
+      case 0x51: /* Model 4P map 1, boot ROM out */
+      case 0x55: /* Model 4P map 1, boot ROM in */
 	if (address >= RAM_START || address < KEYBOARD_START) {
 	    memory[address + bank_offset[address>>15]] = value;
 	} else if (address >= VIDEO_START) {
@@ -379,7 +394,9 @@ void mem_write(address, value)
 	}
 	break;
 
-      case 0x42:
+      case 0x42: /* Model 4 map 2 */
+      case 0x52: /* Model 4P map 2, boot ROM out */
+      case 0x56: /* Model 4P map 2, boot ROM in (!!?) */
 	if (address < 0xf400) {
 	    memory[address + bank_offset[address>>15]] = value;
 	} else if (address >= 0xf800) {
@@ -391,7 +408,9 @@ void mem_write(address, value)
 	}
 	break;
 
-      case 0x43:
+      case 0x43: /* Model 4 map 3 */
+      case 0x53: /* Model 4P map 3, boot ROM out */
+      case 0x57: /* Model 4P map 3, boot ROM in (!!?) */
 	memory[address + bank_offset[address>>15]] = value;
 	break;
     }
@@ -400,8 +419,7 @@ void mem_write(address, value)
 /*
  * Words are stored with the low-order byte in the lower address.
  */
-int mem_read_word(address)
-    int address;
+int mem_read_word(int address)
 {
     int rval;
 
@@ -410,8 +428,7 @@ int mem_read_word(address)
     return rval;
 }
 
-void mem_write_word(address, value)
-    int address;
+void mem_write_word(int address, int value)
 {
     mem_write(address++, value & 0xff);
     mem_write(address, value >> 8);
@@ -423,26 +440,23 @@ void mem_write_word(address, value)
  * caller is responsible for making sure his strings don't span 
  * memory map boundaries.
  */
-Uchar *mem_pointer(address)
-     int address;
+Uchar *mem_pointer(int address, int writing)
 {
     address &= 0xffff;
 
-    switch (memory_map) {
-      case 0x10:
-	/* Model I */
+    switch (memory_map + (writing << 3)) {
+      case 0x10: /* Model I reading */
+      case 0x30: /* Model III reading */
 	if (address >= VIDEO_START) return &memory[address];
 	if (address < trs_rom_size) return &rom[address];
 	return NULL;
 
-      case 0x30:
-	/* Model III */
+      case 0x18: /* Model I writing */
+      case 0x38: /* Model III writing */
 	if (address >= VIDEO_START) return &memory[address];
-	if (address < trs_rom_size) return &rom[address];
 	return NULL;
 
-      case 0x40:
-	/* Model 4 map 0 */
+      case 0x40: /* Model 4 map 0 reading */
 	if (address >= RAM_START) {
 	    return &memory[address + bank_offset[address>>15]];
 	}
@@ -452,7 +466,27 @@ Uchar *mem_pointer(address)
 	}
 	return NULL;
 
-      case 0x41:
+      case 0x48: /* Model 4 map 0 writing */
+      case 0x58: /* Model 4P map 0, boot ROM out, writing */
+      case 0x5c: /* Model 4P map 0, boot ROM in, writing */
+	if (address >= RAM_START) {
+	    return &memory[address + bank_offset[address>>15]];
+	}
+	if (address >= VIDEO_START) {
+	    return &video[address + video_offset];
+	}
+	return NULL;
+
+      case 0x54: /* Model 4P map 0, boot ROM in, reading */
+      case 0x55: /* Model 4P map 1, boot ROM in, reading */
+	if (address < trs_rom_size) return &rom[address];
+	/* else fall thru */
+      case 0x41: /* Model 4 map 1 reading */
+      case 0x49: /* Model 4 map 1 writing */
+      case 0x50: /* Model 4P map 0, boot ROM out, reading */
+      case 0x51: /* Model 4P map 1, boot ROM out, reading */
+      case 0x59: /* Model 4P map 1, boot ROM out, writing */
+      case 0x5d: /* Model 4P map 1, boot ROM in, writing */
 	if (address >= RAM_START || address < KEYBOARD_START) {
 	    return &memory[address + bank_offset[address>>15]];
 	}
@@ -461,14 +495,24 @@ Uchar *mem_pointer(address)
 	}
 	return NULL;
 
-      case 0x42:
+      case 0x42: /* Model 4 map 1, reading */
+      case 0x4a: /* Model 4 map 1, writing */
+      case 0x52: /* Model 4P map 2, boot ROM out, reading */
+      case 0x5a: /* Model 4P map 2, boot ROM out, writing */
+      case 0x56: /* Model 4P map 2, boot ROM in, reading (!!?) */
+      case 0x5e: /* Model 4P map 2, boot ROM in, writing (!!?) */
 	if (address < 0xf400) {
 	    return &memory[address + bank_offset[address>>15]];
 	}
 	if (address >= 0xf800) return &video[address-0xf800];
 	return NULL;
 
-      case 0x43:
+      case 0x43: /* Model 4 map 3, reading */
+      case 0x4b: /* Model 4 map 3, writing */
+      case 0x53: /* Model 4P map 3, boot ROM out, reading */
+      case 0x5b: /* Model 4P map 3, boot ROM out, writing */
+      case 0x57: /* Model 4P map 3, boot ROM in, reading (!!?) */
+      case 0x5f: /* Model 4P map 3, boot ROM in, writing (!!?) */
 	return &memory[address + bank_offset[address>>15]];
     }
     /* not reached */
@@ -485,10 +529,8 @@ Uchar *mem_pointer(address)
  * These can be special cased to do fun stuff like fast
  * video scrolling.
  */
-void mem_block_transfer(dest, source, direction, count)
-    Ushort dest, source;
-    int direction;
-    Ushort count;
+void
+mem_block_transfer(Ushort dest, Ushort source, int direction, Ushort count)
 {
     /* special case for screen scroll */
     if(trs_model <= 3 &&

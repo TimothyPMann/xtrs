@@ -7,10 +7,11 @@ xtrs \- TRS-80 Model I/III/4 emulator for the X Window System
 .SH Description
 \fBxtrs\fP is built on top of a Z-80 emulator, with added routines to support
 keyboard and video I/O through an X interface.
-The hardware emulation can operate as a TRS-80 Model I, Model III, or Model 4.
+The hardware emulation can operate as a TRS-80 Model I, Model III,
+Model 4, or Model 4P.
 
 \fBxtrs\fP supports 48K of RAM in Model I or Model III mode,
-128K in Model 4 mode. 
+128K in Model 4 or Model 4P mode. 
 Floppy disks and hard disks are emulated using files to store the data;
 or under Linux only, real floppy drives can be used.
 A printer is emulated by
@@ -42,7 +43,7 @@ the Model 4 Ctrl key (address bit 7, data bit 2).  RightAlt is
 equivalent to the shifted down arrow key (used as a control key with
 some TRS-80 software).
 
-F1, F2, and F3 are the Model 4 function keys (address bit 7, data bits
+F1, F2, and F3 are the Model 4/4P function keys (address bit 7, data bits
 4, 5, and 6).  F1 is also the Model I Electric Pencil control key that
 some users added to their machines.  F4 is the Model 4 Caps Lock key
 (address bit 7, data bit 3).  F5, Compose, or ScrollLock is equivalent
@@ -52,10 +53,10 @@ signals a disk change in the emulated floppy drives (see below).  F8
 exits the program.  F9 requests entry to the debugger if it is active.
 F10 is the reset button.
 
-In Model III and 4 modes, the left and right shift keys are distinct; in
+In Model III, 4, and 4P modes, the left and right shift keys are distinct; in
 Model I mode, they are the same.  The F11 or F14 key activates the
 position in the TRS-80 keyboard matrix that corresponds to the Model
-III/4 right shift key (address bit 7, data bit 1) even in Model I mode.
+III/4/4P right shift key (address bit 7, data bit 1) even in Model I mode.
 F12 or End activates an unused position in the keyboard matrix
 (address bit 7, data bit 7).  The keys [, \\, ], ^, _, {, |, },
 and ~ also activate unused positions in the keyboard matrix (address
@@ -87,12 +88,12 @@ commands of both -- so a driver for either should work.  Under LDOS,
 use the command "FDUBL" (newer versions of LDOS), or "PDUBL" or
 "RDUBL" (older versions) to install the driver.
 
-In Model III or 4 mode, \fBxtrs\fP emulates the stock Model III/4 floppy
+In Model III, 4, or 4P mode, \fBxtrs\fP emulates the stock floppy
 controller, which used a WD1793 chip (software-compatible with the
 WD1791) to provide both single and double density.
 
 Four 5.25-inch floppy drives are emulated, with storage in files named
-diskM-U, where M is the TRS-80 model (1, 3, or 4) and U is the drive
+diskM-U, where M is the TRS-80 model (1, 3, 4, or 4p) and U is the drive
 unit number (0, 1, 2, or 3).  If a file of the required name is not
 found, a drive with no disk in it is emulated (but see below).  If the
 user does not have write permission for a floppy file, a write-protect
@@ -147,7 +148,7 @@ for more information.
 
 Early Model I operating systems used an FA data address mark for the
 directory (a nonstandard value supported only by the WD1771, but not
-the WD1791/3), while later ones wrote F8 (for Model III/4 compatibility)
+the WD1791/3), while later ones wrote F8 (for Model III/4/4P compatibility)
 but could read either.  To deal nicely with this problem, \fBxtrs\fP
 implements the following kludge.  On writing, any data address mark
 other than FB is recorded as F8.  On reading in single density with
@@ -162,7 +163,7 @@ standard hardware interface for 8-inch floppies on the TRS-80, so \fBxtrs\fP
 emulates a pseudo-hardware interface of its own and provides a driver for it.
 
 Storage for the emulated 8-inch disks is in files named diskM-U, where
-M is the TRS-80 model number (1, 3, or 4) and U is a unit number (4,
+M is the TRS-80 model number (1, 3, 4, or 4P) and U is a unit number (4,
 5, 6, or 7).  These files are in exactly the same JV3 format as 5.25-inch
 floppy files.  A new JV3 floppy can be formatted as either 5.25-inch or
 8-inch depending on whether you initially put it into a 5.25-inch or
@@ -199,7 +200,7 @@ numbers for hard drives (see below).  You can now format and use
 emulated 8-
 
 Finally, it's a good idea to give the SYSTEM (SYSGEN) command (Model
-I/III) or SYSGEN command (Model 4).  This command saves the SYSTEM
+I/III) or SYSGEN command (Model 4/4P).  This command saves the SYSTEM
 settings, so the 8-inch drives will be available again the next time
 you reboot or restart the emulator.  If you need to access an 8-inch
 drive after booting from a disk that hasn't been SYSGENed, simply use
@@ -255,7 +256,7 @@ you must press F7 to clear the error condition.
 \fBxtrs\fP can emulate a hard disk in a file with the aid of a special
 LDOS driver called XTRSHARD/DCT.  This driver has been tested and
 works under both LDOS 5.3.1 for Model I or III and TRSDOS/LS-DOS 6.3.1
-for Model 4.  It may or may not work under earlier LDOS versions.  It
+for Model 4/4P.  It may or may not work under earlier LDOS versions.  It
 definitely will not work under other TRS-80 operating systems or with
 emulators other than \fBxtrs\fP.  The hard disk format was designed by
 Matthew Reed for his Model I/III and Model 4 emulators; \fBxtrs\fP
@@ -268,9 +269,9 @@ would be: \fImkdisk -h mydisk.hdv\fP.  See the \fBmkdisk\fP(1) man
 page for other options.
 
 Second, link the file to an appropriate name.  \fBxtrs\fP supports up
-to eight hard drives, with names of the form hardM-U, where M=1 for
-Model I mode, 3 for Model III mode, or 4 for Model 4 mode, and U is a
-unit number from 0 to 7.  It looks for these files in the same
+to eight hard drives, with names of the form hardM-U, where M is the
+TRS-80 model (1, 3, or 4; in this case Model 4P also uses M=4) and U
+is a unit number from 0 to 7.  It looks for these files in the same
 directory as the floppy disk files diskM-U.
 
 Third, make sure an appropriate version of LDOS is in emulated floppy
@@ -278,7 +279,7 @@ drive 0, and the supplied file \fIutility.dsk\fP is in another
 emulated floppy drive.  Boot LDOS.  If you are using Model I LDOS
 5.3.1, patch a bug in the FORMAT command by typing \fIPATCH
 FORMAT/CMD.UTILITY M1FORMAT/FIX\fP.  You need to apply this patch only
-once.  It must not be applied to Model III or Model 4 LDOS.
+once.  It must not be applied to Model III or Model 4/4P LDOS.
 
 Fourth, type the following commands.  Here \fId\fP is the LDOS drive number
 you want to use for the hard drive (a typical choice would be 4) and \fIu\fP
@@ -296,7 +297,7 @@ curious about the \fIDIR=1\fP parameter to FORMAT, see
 \fId\fP and \fIu\fP to have more than one hard drive.
 
 Finally, it's a good idea to give the SYSTEM (SYSGEN) command (Model
-I/III) or SYSGEN command (Model 4).  This command saves the SYSTEM
+I/III) or SYSGEN command (Model 4/4P).  This command saves the SYSTEM
 settings, so the drive will be available again the next time you
 reboot or restart the emulator.  If you need to access the hard disk
 file after booting from a floppy that hasn't been SYSGENed, simply use
@@ -320,7 +321,7 @@ not work with it.
 The emulated floppy \fIutility.dsk\fP contains some programs for
 transferring data between the emulator and ordinary Unix files.  All
 the programs run on the emulator under Model I/III LDOS, Model I/III
-Newdos/80, and Model 4 TRSDOS/LS-DOS 6; they may also work under other
+Newdos/80, and Model 4/4P TRSDOS/LS-DOS 6; they may also work under other
 TRS-80 operating systems.
 
 IMPORT/CMD imports a Unix file and writes it to an emulated disk.
@@ -359,11 +360,11 @@ emulator traps.
 .SH Interrupts
 The emulator supports only interrupt mode 1.  It will complain if your
 program enables interrupts after powerup without executing an IM 1
-instruction first.  All Model I/III/4 software does this, as the
+instruction first.  All Model I/III/4/4P software does this, as the
 built-in peripherals in these machines supported only IM 1.
 
 The Model I has a 40 Hz "heartbeat" clock interrupt, while the Model
-III used 30 Hz, and the Model 4 could run at either 30 Hz or 60 Hz.
+III used 30 Hz, and the Model 4/4P could run at either 30 Hz or 60 Hz.
 The emulator approximates this rather well even on a system where
 clock ticks come at some frequency that isn't divisible by the
 emulated frequency (e.g., 100 Hz on Intel Linux), as long as the true
@@ -376,16 +377,17 @@ mode on Intel Linux you'd see this pattern: (tick, 30ms, tick,
 20ms,...) instead of seeing ticks every 25ms.
 .SH Sound
 Crude sound support is available on Linux.  Unfortunately, the Linux
-sound drivers do not provide sufficiently low-level functionality, so the
-emulator must write directly to the hardware.  Thus in order for the
-sound support to work, you must have a true SoundBlaster-compatible
-sound card, and you must start \fBxtrs\fP as root.  (\fBxtrs\fP will
-disable its root privileges after sound initialization.)
+sound drivers do not provide sufficiently low-level functionality, so
+the emulator must write directly to the hardware.  Thus in order for
+the sound support to work, you must have a true
+SoundBlaster-compatible sound card, and you must start \fBxtrs\fP as
+root.  (If you make \fBxtrs\fP setuid to root, it will disable its
+root privileges immediately after sound initialization.)
 
 Sound support is off by default, but can be turned on with the -sb
 option described below.  When sound support is on, any data written to
 the TRS-80 cassette port when the cassette motor is off, and any data
-written to the Model 4 optional sound port, is copied to the
+written to the Model 4/4P optional sound port, is copied to the
 SoundBlaster.  Sound frequencies will likely be quite far off, because
 TRS-80 sound depends on timing loops, and \fBxtrs\fP makes no attempt
 to emulate Z-80 instructions at the same speed as a real TRS-80.
@@ -452,25 +454,29 @@ Enter zbx, the z80 debugger.
 .PD 0
 .TP
 .B \-romfile3 \fIfilename3\fP
+.TP
+.B \-romfile4p \fIfilename4p\fP
 .PD
-Use the romfile specified by \fIfilename\fP in Model I mode, or the
-romfile specified by \fIfilename3\fP in Model III and Model 4 mode.  
-A romfile can be either a raw binary dump or in Intel hex format.
-If you do
-not set this option or the corresponding X resource, a default
+Use the romfile specified by \fIfilename\fP in Model I mode, the
+romfile specified by \fIfilename3\fP in Model III and Model 4 mode,
+or the romfile specified by \fIfilename4p\fP in Model 4P mode,
+A romfile can be either a raw binary dump, Intel hex format, or
+TRS-80 cmd format (for example, a modela/iii file).
+If you do not set this option or the corresponding X resource, a default
 established at compile time is used (if any); see Makefile.local for
 instructions on compiling in default romfiles or default romfile names.
 .TP
 .B \-model \fIm\fP
 Specifies which TRS-80 model to emulate.  Values accepted are 1 or I (Model
-I), 3 or III (Model III), and 4 or IV (Model 4).  Model I is the default.
+I), 3 or III (Model III), 4 or IV (Model 4), and 4P or IVP (Model 4P).
+Model I is the default. 
 .TP
 .B \-resize
-In Model 4 mode, resize the X window whenever the emulated display
+In Model 4/4P mode, resize the X window whenever the emulated display
 mode changes between 64x16 and 80x24.
 .TP
 .B \-noresize
-In Model 4 mode, always keep the X window large enough for 80x24
+In Model 4/4P mode, always keep the X window large enough for 80x24
 characters, putting a blank margin around the outside when the emulated
 display mode is 64x16.  This is the default.
 .TP
@@ -498,7 +504,7 @@ Turn off double-step mode.  Linux only.  This is the default.
 .B \-sb \fIportbase,vol\fP
 Enable sound support, using a SoundBlaster with I/O port base 
 at \fIportbase\fP, and playing sounds at \fIvol\fP percent of maximum
-volume.  A typical setting would be -sb 0x220,100.
+volume.  A typical setting would be -sb 0x220,30.
 .SH Additional resources
 There are many other TRS-80 resources available on the Web, including
 shareware and freeware emulators that run under MSDOS and other
@@ -508,17 +514,19 @@ has already been converted.  For pointers, see
 http://www.research.digital.com/SRC/personal/Tim_Mann/trs80.html.
 .SH Bugs and limitations
 There may be bugs in the Z-80 emulator which we haven't found yet.
-Some of the more bizarre undocumented Z-80 instructions are not
-implemented.
+Some of the more bizarre undocumented Z-80 instructions and behaviors
+are not implemented.
 
-Cassette emulation does not work in Model III or 4 mode.  Even in
-Model I mode, it works only for programs that use the Level II ROM
-routines to access the cassette; the emulator looks for access to the
-cassette port from specific PC values to activate the feature.
+Cassette emulation works only in Model I mode, and only for programs
+that use the Level II ROM routines to access the cassette; the
+emulator looks for access to the cassette port from specific PC values
+to activate the feature.  If someone wants to disassemble the Model
+III ROM and figure out what PC values to look for, cassette emulation
+could be made to work there too.
 
 Serial ports are not emulated.
 
-The Model III/4 alternate character set is not emulated.
+The Model III/4/4P alternate character set is not emulated.
 
 Some features of the disk controller are not currently emulated.  (1)
 Force Interrupt with condition bits 0x01, 0x02, or 0x04 is not
@@ -549,13 +557,10 @@ blocks of 2901.  Again, this does not seem too useful.  5802 sectors
 is already enough for a 3.5-inch HD (1.44MB) floppy, which the TRS-80 didn't
 support anyway.
 
-The emulator guesses a romfile is in .hex format if its first byte is
-a colon (':'), so a raw binary ROM image can't start with that byte
-value.  In the future it would be nice to accept MODELA/III files too.
-
-The sound support is crude.  On at least some SoundBlaster
-compatibles, sounds play at too low a volume and are unaffected by the
-system mixer.
+The emulator uses a heuristic to decide what format a ROM file is in.
+If a raw binary ROM image starts with 0x01, 0x05, or 0x22, it can be
+misidentified as being in a different format.  This is rather unlikely
+to occur, as ROMs typically begin with 0xF3, the DI instruction.
 
 If you discover other bugs, or write fixes for any of these, please let
 us know.  We expect to incorporate fixes into future releases.
@@ -574,4 +579,4 @@ supplied the TRS-80 fonts in bdf format.  Roland Gerlach contributed
 several bug reports and fixes.  Fabio Ferrari contributed the sound
 support.  Ulrich Mueller added the -borderwidth option and ported the
 import, export, and settime utilities to Newdos/80.  Branden Robinson
-supplied cassette.man and fixed Makefile bugs.
+supplied the cassette man page and fixed Makefile bugs.

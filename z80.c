@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Thu Apr  9 12:38:18 PDT 1998 by mann
+   Last modified on Sat Apr 25 01:16:12 PDT 1998 by mann
 */
 
 /*
@@ -117,8 +117,7 @@ static Uchar subtract_half_carry_table[] =
     HALF_CARRY_MASK,
 };
 
-static int parity(value)
-    unsigned value;
+static int parity(unsigned value)
 {
     /* for parity flag, 1 = even parity, 0 = odd parity. */
     static char parity_table[256] =
@@ -144,8 +143,7 @@ static int parity(value)
     return(parity_table[value]);
 }
 
-static void do_add_flags(a, b, result)
-    int a, b, result;
+static void do_add_flags(int a, int b, int result)
 {
     /*
      * Compute the flag values for a + b = result operation
@@ -172,8 +170,7 @@ static void do_add_flags(a, b, result)
     REG_F = f;
 }
 
-static void do_sub_flags(a, b, result)
-    int a, b, result;
+static void do_sub_flags(int a, int b, int result)
 {
     int index;
     int f;
@@ -197,8 +194,7 @@ static void do_sub_flags(a, b, result)
     REG_F = f;
 }
 
-static void do_adc_word_flags(a, b, result)
-    int a, b, result;
+static void do_adc_word_flags(int a, int b, int result)
 {
     int index;
     int f;
@@ -224,8 +220,7 @@ static void do_adc_word_flags(a, b, result)
     REG_F = f;
 }
 
-static void do_add_word_flags(a, b, result)
-    int a, b, result;
+static void do_add_word_flags(int a, int b, int result)
 {
     int index;
     int f;
@@ -248,8 +243,7 @@ static void do_add_word_flags(a, b, result)
     REG_F = f;
 }
 
-static void do_sbc_word_flags(a, b, result)
-    int a, b, result;
+static void do_sbc_word_flags(int a, int b, int result)
 {
     int index;
     int f;
@@ -275,8 +269,7 @@ static void do_sbc_word_flags(a, b, result)
     REG_F = f;
 }
 
-static void do_flags_dec_byte(value)
-    int value;
+static void do_flags_dec_byte(int value)
 {
     Uchar clear, set;
 
@@ -296,8 +289,7 @@ static void do_flags_dec_byte(value)
     REG_F = (REG_F & clear) | set;
 }
 
-static void do_flags_inc_byte(value)
-    int value;
+static void do_flags_inc_byte(int value)
 {
     Uchar clear, set;
 
@@ -321,8 +313,7 @@ static void do_flags_inc_byte(value)
  * Routines for executing or assisting various non-trivial arithmetic
  * instructions:
  */
-static void do_and_byte(value)
-    int value;
+static void do_and_byte(int value)
 {
     int result;
     Uchar clear, set;
@@ -343,8 +334,7 @@ static void do_and_byte(value)
     REG_F = (REG_F & clear) | set;
 }
 
-static void do_or_byte(value)
-    int value;
+static void do_or_byte(int value)
 {
     int result;  /* the result of the or operation */
     Uchar clear, set;
@@ -365,8 +355,7 @@ static void do_or_byte(value)
     REG_F = (REG_F & clear) | set;
 }
 
-static void do_xor_byte(value)
-    int value;
+static void do_xor_byte(int value)
 {
     int result;  /* the result of the xor operation */
     Uchar clear, set;
@@ -387,8 +376,7 @@ static void do_xor_byte(value)
     REG_F = (REG_F & clear) | set;
 }
 
-static void do_add_byte(value)
-    int value;
+static void do_add_byte(int value)
 {
     int a, result;
 
@@ -397,8 +385,7 @@ static void do_add_byte(value)
     do_add_flags(a, value, result);
 }
 
-static void do_adc_byte(value)
-    int value;
+static void do_adc_byte(int value)
 {
     int a, result;
 
@@ -410,8 +397,7 @@ static void do_adc_byte(value)
     do_add_flags(a, value, result);
 }
 
-static void do_sub_byte(value)
-    int value;
+static void do_sub_byte(int value)
 {
     int a, result;
 
@@ -428,14 +414,13 @@ static void do_negate()
     REG_A = - a;
     do_sub_flags(0, a, REG_A);
 #ifdef WRONG
-    /* This is utterly wrong.  Why was it here? --tpm */
+    /* This is wrong.  Strange that it was here. --tpm */
     if(a == 0)
       REG_F |= CARRY_MASK;
 #endif
 }
 
-static void do_sbc_byte(value)
-    int value;
+static void do_sbc_byte(int value)
 {
     int a, result;
 
@@ -447,8 +432,7 @@ static void do_sbc_byte(value)
     do_sub_flags(a, value, result);
 }
 
-static void do_add_word(value)
-    int value;
+static void do_add_word(int value)
 {
     int a, result;
 
@@ -458,8 +442,7 @@ static void do_add_word(value)
     do_add_word_flags(a, value, result);
 }
 
-static void do_adc_word(value)
-    int value;
+static void do_adc_word(int value)
 {
     int a, result;
 
@@ -473,8 +456,7 @@ static void do_adc_word(value)
     do_adc_word_flags(a, value, result);
 }
 
-static void do_sbc_word(value)
-    int value;
+static void do_sbc_word(int value)
 {
     int a, result;
 
@@ -488,9 +470,7 @@ static void do_sbc_word(value)
     do_sbc_word_flags(a, value, result);
 }
 
-static void do_add_word_index(regp, value)
-    Ushort *regp;
-    int value;
+static void do_add_word_index(Ushort *regp, int value)
 {
     int a, result;
 
@@ -500,8 +480,8 @@ static void do_add_word_index(regp, value)
     do_add_word_flags(a, value, result);
 }
 
-static void do_cp(value)
-    int value;	/* compare this value with A's contents */
+/* compare this value with A's contents */
+static void do_cp(int value)
 {
     int a, result;
 
@@ -563,8 +543,7 @@ static void do_cpir()
     } while((REG_BC != 0) && !ZERO_FLAG);
 }
 
-static void do_test_bit(value, bit)
-    int value, bit;
+static void do_test_bit(int value, int bit)
 {
     Uchar clear, set;
 
@@ -577,8 +556,7 @@ static void do_test_bit(value, bit)
     REG_F = (REG_F & clear) | set;
 }
 
-static int rl_byte(value)
-    int value;
+static int rl_byte(int value)
 {
     /*
      * Compute rotate-left-through-carry
@@ -615,8 +593,7 @@ static int rl_byte(value)
     return result;
 }
 
-static int rr_byte(value)
-    int value;
+static int rr_byte(int value)
 {
     /*
      * Compute rotate-right-through-carry
@@ -652,8 +629,7 @@ static int rr_byte(value)
 
     return result;
 }
-static int rlc_byte(value)
-    int value;
+static int rlc_byte(int value)
 {
     /*
      * Compute the result of an RLC operation and set the flags appropriately.
@@ -689,8 +665,7 @@ static int rlc_byte(value)
     return result;
 }
 
-static int rrc_byte(value)
-    int value;
+static int rrc_byte(int value)
 {
     Uchar clear, set;
     int result;
@@ -806,8 +781,7 @@ static void do_rrca()
     REG_F = (REG_F & clear) | set;
 }
 
-static int sla_byte(value)
-    int value;
+static int sla_byte(int value)
 {
     Uchar clear, set;
     int result;
@@ -816,7 +790,7 @@ static int sla_byte(value)
 		      SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
-    result = value << 1;
+    result = (value << 1) & 0xFF;
 
     if(result & 0x80)
       set |= SIGN_MASK;
@@ -832,8 +806,7 @@ static int sla_byte(value)
     return result;
 }
 
-static int sra_byte(value)
-    int value;
+static int sra_byte(int value)
 {
     Uchar clear, set;
     int result;
@@ -865,8 +838,7 @@ static int sra_byte(value)
 }
 
 /* undocumented opcode slia: shift left and increment */
-static int slia_byte(value)
-    int value;
+static int slia_byte(int value)
 {
     Uchar clear, set;
     int result;
@@ -875,7 +847,7 @@ static int slia_byte(value)
 		      SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
-    result = (value << 1) | 1;
+    result = ((value << 1) & 0xFF) | 1;
 
     if(result & 0x80)
       set |= SIGN_MASK;
@@ -891,8 +863,7 @@ static int slia_byte(value)
     return result;
 }
 
-static int srl_byte(value)
-    int value;
+static int srl_byte(int value)
 {
     Uchar clear, set;
     int result;
@@ -1257,8 +1228,7 @@ static void do_inir()
     SET_SUBTRACT();
 }
 
-static int in_with_flags(port)
-    int port;
+static int in_with_flags(int port)
 {
     /*
      * Do the appropriate flag calculations for the in instructions
@@ -2203,8 +2173,7 @@ static void do_CB_instruction()
 }
 
 
-static void do_indexed_instruction(ixp)
-    Ushort *ixp;
+static void do_indexed_instruction(Ushort *ixp)
 {
     Uchar instruction;
     
@@ -2977,7 +2946,7 @@ static void do_ED_instruction()
     }
 }
 
-int x_poll_count = 0;
+volatile int x_poll_count = 0;
 #define X_POLL_INTERVAL 10000
 
 /* Hack, hack, see if we can speed this up. */
@@ -2985,9 +2954,9 @@ int x_poll_count = 0;
 /*#define MEM_READ(a) ((a < 0x3000) ? memory[a] : mem_read(a));*/
 /* #define MEM_READ(a) (((((a) - 0x3000) & 0xffff) >= 0xc00) ? memory[a] : mem_read(a)) */
 
-int z80_run(continuous)
-    int continuous;  /* 1= continuous, 0= singlestep,
-			-1= singlestep and disallow interrupts */
+int z80_run(int continuous)
+     /* 1= continuous, 0= singlestep,
+	-1= singlestep and disallow interrupts */
 {
     Uchar instruction;
     Ushort address; /* generic temps */
@@ -3005,6 +2974,18 @@ int z80_run(continuous)
 	   by setting x_poll_count to 0 */
 	x_poll_count--;
 #endif
+        /* Speed control */
+        if (z80_state.delay) {
+	    int i = z80_state.delay;
+	    while (--i) /*nothing*/;
+	}
+
+	/* Event scheduler */
+	if (z80_state.sched > -1) {
+	    if (z80_state.sched == 0) trs_do_event();
+	    z80_state.sched--;
+	}
+
 	instruction = mem_read(REG_PC++);
 	/* instruction = MEM_READ(REG_PC);  REG_PC++; */
 	
@@ -4199,6 +4180,7 @@ void z80_reset()
     z80_state.iff2 = 0;
     z80_state.interrupt_mode = 0;
     z80_state.irq = z80_state.nmi = FALSE;
+    z80_state.sched = -1;
 
     /* z80_state.r = 0; */
     srand(time(NULL));  /* Seed the RNG, for reading the refresh register */

@@ -66,6 +66,119 @@ the \fI-d dir\fP and \fIDIR=dir\fP values to agree is not essential
 unless you plan to share hard drive images with Matthew Reed's
 emulators; \fBxtrs\fP itself ignores the \fIdir\fP parameter and
 allows FORMAT to place the directory on any cylinder.
+.SH Technical data
+The JV1 format is just an array of 256-byte sectors, in the order
+(track 0 sector 0, track 0 sector 1, ... track 0 sector 9, track 1
+sector 0, ...).  It can represent only single-sided, single-density
+floppies.  The directory is assumed to be track 17.
+
+The original JV3 format is documented in the printed manual for Jeff
+Vavasour's commercial Model III/4 emulator.  The xtrs implementation
+includes some extensions.
+
+A JV3 file is an array of 3-byte sector descriptors followed by an
+array of 256-byte sectors, in the same order as the descriptors.  The
+first 34*256 bytes of the file are reserved for descriptors, leaving
+room for 2901 of them with one byte left over at the end.  The extra
+byte should be 0xff.  A newer feature, not implemented in all
+emulators, emulates a write protect tab on the disk if the extra byte
+is 0x00.  Currently xtrs respects this flag, but provides no way to
+turn it on or off.  The preferred way to write-protect a floppy image
+under xtrs is to turn off write permission on the corresponding file.
+
+The original format thus could handle only 2901 sectors.  This is
+enough for a DSDD 80-track 5" floppy, but not enough for 8" floppies,
+so xtrs extends the format by adding an optional second block of 2901
+more headers after the last possible sector described by the first
+block.  That is, the second block starts at byte (34 + 2901)*256 in
+the file.  This extension is also implemented in Matthew Reed's newer
+TRS-80 emulators.
+
+The headers themselves look like this (from trs_disk.c):
+
+.nf
+/* Values for flags below */
+#define JV3_DENSITY     0x80  /* 1=dden, 0=sden */
+#define JV3_LOCKED      0x40  /* always zero */
+#define JV3_DIRECTORY   0x20  /* dden: 1=deleted DAM (0xF8)
+                                 sden: 1=0xFA or 0xF8 */
+#define JV3_SIDE        0x10  /* 0=side 0, 1=side 1 */
+#define JV3_ERROR       0x08  /* 0=ok, 1=CRC error */
+#define JV3_MBZ         0x07  /* must be zero if sector in use */
+#define JV3_UNUSED      0xFF
+
+typedef struct {
+  unsigned char track;
+  unsigned char sector;
+  unsigned char flags;
+} SectorId;
+.fi
+
+An unused sector is denoted by a header filled with 0xFF.  Sometimes
+headers in the middle of a block can be unused; this happens, for
+example, if you reformat a track from double density to single
+density.  In general, when you format a track with N sectors, the
+first N unused headers are assigned to it; they need not be contiguous
+in the file or ordered with respect to other tracks.  The order of the
+sectors within a track does matter, though; they show up in that order
+if you do a series of Read Address commands or a Read Track command
+(however, xtrs doesn't currently implement Read Track).
+
+An HDV (hard disk) image has the following format.  This information
+is based on email from Matthew Reed.  There is an initial 256-byte
+header block, followed by an array of sectors.  The geometry of the
+drive is defined in the header block, which looks like this (from
+mkdisk.c):
+
+.nf
+typedef unsigned char Uchar;
+typedef struct {
+  Uchar id1;       /* 0: Identifier #1: 56H */
+  Uchar id2;       /* 1: Identifier #2: CBH */
+  Uchar ver;       /* 2: Version of format: 10H = version 1.0 */
+  Uchar cksum;     /* 3: Simple checksum: 
+		      To calculate, add together bytes 0 to 31 of header
+		      (excepting byte 3), then XOR result with 4CH */
+  Uchar blks;      /* 4: Number of 256 byte blocks in header: should be 1 */
+  Uchar mb4;       /* 5: Not used, currently set to 4 */
+  Uchar media;     /* 6: Media type: 0 for hard disk */
+  Uchar flag1;     /* 7: Flags #1:
+		      bit 7: Write protected: 0 for no, 1 for yes 
+                             [warning: xtrs currently ignores this flag]
+		      bit 6: Must be 0
+		      bit 5 - 0: reserved */
+  Uchar flag2;     /* 8: Flags #2: reserved */
+  Uchar flag3;     /* 9: Flags #3: reserved */
+  Uchar crtr;      /* 10: Created by: 
+		      14H = HDFORMAT
+		      42H = xtrs mkdisk
+                      80H = Cervasio xtrshard port to Vavasour M4 emulator */
+  Uchar dfmt;      /* 11: Disk format: 0 = LDOS/LS-DOS */
+  Uchar mm;        /* 12: Creation month: mm */
+  Uchar dd;        /* 13: Creation day: dd */
+  Uchar yy;        /* 14: Creation year: yy (offset from 1900) */
+  Uchar res1[12];  /* 15 - 26: reserved */
+  Uchar dparm;     /* 27: Disk parameters: (unused with hard drives)
+		      bit 7: Density: 0 = double, 1 = single
+		      bit 6: Sides: 0 = one side, 1 = 2 sides
+		      bit 5: First sector: 0 if sector 0, 1 if sector 1
+		      bit 4: DAM convention: 0 if normal (LDOS),
+		      1 if reversed (TRSDOS 1.3)
+		      bit 3 - 0: reserved */
+  Uchar cyl;       /* 28: Number of cylinders per disk */
+  Uchar sec;       /* 29: Number of sectors per track (floppy); cyl (hard) */
+  Uchar gran;      /* 30: Number of granules per track (floppy); cyl (hard)*/
+  Uchar dcyl;      /* 31: Directory cylinder [mkdisk sets to 1; xtrs
+                      ignores, but value must be correct if image is
+                      to be used with Reed emulators.] */
+  char label[32];  /* 32: Volume label: 31 bytes terminated by 0 */
+  char filename[8];/* 64 - 71: 8 characters of filename (without extension)
+		      [Cervasio addition.  xtrs actually doesn't limit this 
+                       to 8 chars or strip the extension] */
+  Uchar res2[184]; /* 72 - 255: reserved */
+} ReedHardHeader;
+.fi
+
 .SH See also
 .BR xtrs (1)
 .SH Authors

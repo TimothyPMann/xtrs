@@ -15,12 +15,13 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Mon Jan 12 15:44:47 PST 1998 by mann
+   Last modified on Sat Apr 25 00:59:59 PDT 1998 by mann
 */
 
 #include "z80.h"
 #include "trs.h"
 #include "trs_disk.h"
+#include "load_cmd.h"
 
 int trs_model = 1;
 
@@ -35,8 +36,7 @@ static void check_endian()
     }
 }
 
-void trs_load_rom(filename)
-    char *filename;
+void trs_load_rom(char *filename)
 {
     FILE *program;
     int c;
@@ -49,21 +49,42 @@ void trs_load_rom(filename)
     }
     c = getc(program);
     if (c == ':') {
+        /* Assume Intel hex format */
         rewind(program);
         trs_rom_size = load_hex(program);
-    } else {
-        trs_rom_size = 0;
-        while (c != EOF) {
-	    mem_write_rom(trs_rom_size++, c);
+	fclose(program);
+	return;
+    } else if (c == 1 || c == 5) {
+	/* Assume MODELA/III file */
+	int res;
+	extern Uchar *rom; /*!! fixme*/
+	Uchar loadmap[Z80_ADDRESS_LIMIT];
+	rewind(program);
+	res = load_cmd(program, rom, loadmap, 0, NULL, -1, NULL, NULL, 1);
+	if (res == LOAD_CMD_OK) {
+	    trs_rom_size = Z80_ADDRESS_LIMIT;
+	    while (trs_rom_size > 0) {
+		if (loadmap[--trs_rom_size] != 0) {
+		    trs_rom_size++;
+		    break;
+		}
+	    }
+	    fclose(program);
+	    return;
+	} else {
+	    /* Guess it wasn't one */
+	    rewind(program);
 	    c = getc(program);
 	}
     }
-    fclose(program);
+    trs_rom_size = 0;
+    while (c != EOF) {
+        mem_write_rom(trs_rom_size++, c);
+	c = getc(program);
+    }
 }
 
-void trs_load_compiled_rom(size, rom)
-     int size;
-     unsigned char rom[];
+void trs_load_compiled_rom(int size, unsigned char rom[])
 {
     int i;
     
@@ -74,9 +95,7 @@ void trs_load_compiled_rom(size, rom)
     }
 }
 
-int main(argc, argv)
-    int argc;
-    char *argv[];
+int main(int argc, char *argv[])
 {
     int debug = FALSE;
 

@@ -5,14 +5,13 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Fri Apr 24 18:53:42 PDT 1998 by mann */
+/* Last modified on Tue Apr 28 17:17:41 PDT 1998 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
  */
 
 /*#define DISKDEBUG 1*/
-#define DELAYED_INTRQ_KLUDGE 1
 
 #include "z80.h"
 #include "trs.h"
@@ -58,18 +57,6 @@ typedef struct {
   unsigned char controller;	/* TRSDISK_P1771 or TRSDISK_P1791 */
   int last_readadr;             /* id index found by last readadr */
   int last_readadr_density;
-#if DELAYED_INTRQ_KLUDGE
-  /* This ugly kludge is to make SuperUtility, Trakcess, and the
-     Model 4P boot ROM happy.  They assume they can execute a few
-     instructions between issuing a command and receiving a completion
-     interrupt.  In particular, SuperUtility assumes it will get
-     the interrupt inside a procedure call that it makes shortly
-     after issuing the command, not before the call.  The Model 4P
-     boot ROM assumes it will get to execute at least two more 
-     instructions after the ini that reads the last byte of a sector.
-  */
-  int delayed_intrq_kludge;
-#endif
 } FDCState;
 
 FDCState state;
@@ -129,19 +116,18 @@ typedef struct {
 #define MAXTRACKS     96
 
 /* Max bytes per unformatted track. */
-#define TRKSIZE_SD    3125  /* 250kHz / 5 Hz [i.e. 300rpm] / (2 * 8) */
-#define TRKSIZE_DD    6250  /* 250kHz / 5 Hz [i.e. 300rpm] / 8 */
-
-/* Following are partially supported, as an undocumented kludge.
-   Drives with select codes 1, 2, 4, 8 are 5" drives, disk?-0 to disk?-3.
-   Drives with select codes 3, 5, 6, 7 are 8" drives, disk?-4 to disk?-7.
-*/
-#define TRKSIZE_8SD   5208  /* 500kHz / 6 Hz [i.e. 360rpm] / (2 * 8) */
-#define TRKSIZE_8DD  10416  /* 500kHz / 6 Hz [i.e. 360rpm] / 8 */
-
-/* Following not currently supported, but expanded JV3 is big enough */
-#define TRKSIZE_5HD  10416  /* 500kHz / 6 Hz [i.e. 360rpm] / 8 */
-#define TRKSIZE_3HD  12500  /* 500kHz / 5 Hz [i.e. 300rpm] / 8 */
+/* Select codes 1, 2, 4, 8 are emulated 5" drives, disk?-0 to disk?-3 */
+#define TRKSIZE_SD    3125  /* 250kHz / 5 Hz [300rpm] / (2 * 8) */
+                         /* or 300kHz / 6 Hz [360rpm] / (2 * 8) */
+#define TRKSIZE_DD    6250  /* 250kHz / 5 Hz [300rpm] / 8 */
+                         /* or 300kHz / 6 Hz [360rpm] / 8 */
+/* Select codes 3, 5, 6, 7 are emulated 8" drives, disk?-4 to disk?-7 */
+#define TRKSIZE_8SD   5208  /* 500kHz / 6 Hz [360rpm] / (2 * 8) */
+#define TRKSIZE_8DD  10416  /* 500kHz / 6 Hz [360rpm] / 8 */
+/* TRS-80 software has no concept of HD, so these constants are unused,
+ * but expanded JV3 would be big enough even for 3.5" HD. */
+#define TRKSIZE_5HD  10416  /* 500kHz / 6 Hz [360rpm] / 8 */
+#define TRKSIZE_3HD  12500  /* 500kHz / 5 Hz [300rpm] / 8 */
 
 #define JV3_SIDES      2
 #define JV3_IDSTART    0
@@ -208,9 +194,6 @@ trs_disk_init(int reset_button)
   state.controller = (trs_model == 1) ? TRSDISK_P1771 : TRSDISK_P1791;
   state.last_readadr = -1;
   state.last_readadr_density = 0;
-#if DELAYED_INTRQ_KLUDGE
-  state.delayed_intrq_kludge = 0;
-#endif
   for (i=0; i<NDRIVES; i++) {
     disk[i].phytrack = 0;
     disk[i].emutype = JV3;
@@ -224,6 +207,7 @@ trs_disk_init(int reset_button)
   disk[6].inches = 8;
   disk[7].inches = 8;
   trs_disk_change_all();
+  trs_cancel_event();
 
   trs_disk_nocontroller = (disk[0].file == NULL);
 }
@@ -403,7 +387,7 @@ trs_disk_unimpl(unsigned char cmd, char* more)
   state.bytecount = state.format_bytecount = 0;
   state.format = FMT_DONE;
   trs_disk_drq_interrupt(0);
-  trs_disk_intrq_interrupt(1);
+  trs_schedule_event(trs_disk_intrq_interrupt, 1, 0);
   fprintf(stderr, "trs_disk_command(0x%02x) not implemented - %s\n",
 	  cmd, more);
 }
@@ -627,12 +611,6 @@ trs_disk_select_write(unsigned char data)
 #ifdef DISKDEBUG
   fprintf(stderr, "select_write(0x%02x)\n", data);
 #endif
-#if DELAYED_INTRQ_KLUDGE
-  if (state.delayed_intrq_kludge) {
-    trs_disk_intrq_interrupt(1);
-    state.delayed_intrq_kludge = 0;
-  }
-#endif
   state.status &= ~TRSDISK_NOTRDY;
   if (trs_model == 1) {
     /* Disk 3 and side select share a bit.  You can't have a drive :3
@@ -774,14 +752,7 @@ trs_disk_data_read(void)
 	state.bytecount = 0;
 	state.status &= ~(TRSDISK_BUSY|TRSDISK_DRQ);
         trs_disk_drq_interrupt(0);
-/******!!
-#if DELAYED_INTRQ_KLUDGE > 1
-	state.delayed_intrq_kludge = 1;
-#else
-	trs_disk_intrq_interrupt(1);
-#endif
-******/
-	trs_schedule_event(trs_disk_intrq_interrupt, 1, 2);
+	trs_schedule_event(trs_disk_intrq_interrupt, 1, 8);
       }
     }
     break;
@@ -851,11 +822,7 @@ trs_disk_data_read(void)
       state.bytecount = 0;
       state.status &= ~(TRSDISK_BUSY|TRSDISK_DRQ);
       trs_disk_drq_interrupt(0);
-#if DELAYED_INTRQ_KLUDGE > 1
-      state.delayed_intrq_kludge = 1;
-#else
-      trs_disk_intrq_interrupt(1);
-#endif
+      trs_schedule_event(trs_disk_intrq_interrupt, 1, 8);
     }
     break;
   default:
@@ -894,11 +861,7 @@ trs_disk_data_write(unsigned char data)
 	state.bytecount = 0;
 	state.status = 0;
         trs_disk_drq_interrupt(0);
-#if DELAYED_INTRQ_KLUDGE > 2
-	state.delayed_intrq_kludge = 1;
-#else
-	trs_disk_intrq_interrupt(1);
-#endif
+	trs_schedule_event(trs_disk_intrq_interrupt, 1, 8);
 	c = fflush(d->file);
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
       }
@@ -1070,11 +1033,7 @@ trs_disk_data_write(unsigned char data)
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
       }
       trs_disk_drq_interrupt(0);
-#if DELAYED_INTRQ_KLUDGE > 2
-      state.delayed_intrq_kludge = 1;
-#else
-      trs_disk_intrq_interrupt(1);
-#endif
+      trs_schedule_event(trs_disk_intrq_interrupt, 1, 8);
       break;
     case FMT_DONE:
       break;
@@ -1107,15 +1066,7 @@ trs_disk_status_read(void)
     last_status = state.status;
   }
 #endif
-#if DELAYED_INTRQ_KLUDGE
-  if (state.delayed_intrq_kludge) {
-    trs_disk_intrq_interrupt(1);
-    state.delayed_intrq_kludge = 0;
-  } else 
-#endif
-  {
-    trs_disk_intrq_interrupt(0);
-  }
+  trs_schedule_event(trs_disk_intrq_interrupt, 0, 0);
   return state.status;
 }
 
@@ -1128,7 +1079,7 @@ trs_disk_command_write(unsigned char cmd)
 #ifdef DISKDEBUG
   fprintf(stderr, "command_write(0x%02x)\n", cmd);
 #endif
-  trs_disk_intrq_interrupt(0);
+  trs_schedule_event(trs_disk_intrq_interrupt, 0, 0);
   state.bytecount = 0;		/* just forget any ongoing command */
   state.currcommand = cmd;
   switch (cmd & TRSDISK_CMDMASK) {
@@ -1139,11 +1090,7 @@ trs_disk_command_write(unsigned char cmd)
     if (d->emutype == REAL) real_restore();
     /* Should this set lastdirection? */
     if (cmd & TRSDISK_VBIT) verify();
-#if DELAYED_INTRQ_KLUDGE > 2
-    state.delayed_intrq_kludge = 1;
-#else
-    trs_disk_intrq_interrupt(1);
-#endif
+    trs_schedule_event(trs_disk_intrq_interrupt, 1, 8);
     break;
   case TRSDISK_SEEK:
     d->phytrack += (state.data - state.track);
@@ -1157,11 +1104,7 @@ trs_disk_command_write(unsigned char cmd)
     if (d->emutype == REAL) real_seek();
     /* Should this set lastdirection? */
     if (cmd & TRSDISK_VBIT) verify();
-#if DELAYED_INTRQ_KLUDGE > 2
-    state.delayed_intrq_kludge = 1;
-#else
-    trs_disk_intrq_interrupt(1);
-#endif
+    trs_schedule_event(trs_disk_intrq_interrupt, 1, 8);
     break;
   case TRSDISK_STEP:
   case TRSDISK_STEPU:
@@ -1178,11 +1121,7 @@ trs_disk_command_write(unsigned char cmd)
     }
     if (d->emutype == REAL) real_seek();
     if (cmd & TRSDISK_VBIT) verify();
-#if DELAYED_INTRQ_KLUDGE > 2
-    state.delayed_intrq_kludge = 1;
-#else
-    trs_disk_intrq_interrupt(1);
-#endif
+    trs_schedule_event(trs_disk_intrq_interrupt, 1, 8);
     break;
   case TRSDISK_STEPIN:
   case TRSDISK_STEPINU:
@@ -1200,11 +1139,7 @@ trs_disk_command_write(unsigned char cmd)
     state.status = 0;
     id_index = search(state.sector);
     if (id_index == -1) {
-#if DELAYED_INTRQ_KLUDGE
-      state.delayed_intrq_kludge = 1;
-#else
-      trs_disk_intrq_interrupt(1);
-#endif
+      trs_schedule_event(trs_disk_intrq_interrupt, 1, 32);
     } else {
       if (d->emutype == JV1) {
 	if (d->phytrack == 17) {
@@ -1249,11 +1184,7 @@ trs_disk_command_write(unsigned char cmd)
     state.status = 0;
     id_index = search(state.sector);
     if (id_index == -1) {
-#if DELAYED_INTRQ_KLUDGE
-      state.delayed_intrq_kludge = 1;
-#else
-      trs_disk_intrq_interrupt(1);
-#endif
+      trs_schedule_event(trs_disk_intrq_interrupt, 1, 32);
     } else {
       int dirdam = (state.controller == TRSDISK_P1771 ?
 		    (cmd & (TRSDISK_CBIT|TRSDISK_DBIT)) != 0 :
@@ -1336,11 +1267,7 @@ trs_disk_command_write(unsigned char cmd)
       }
     }
     if (state.last_readadr == -1) {
-#if DELAYED_INTRQ_KLUDGE
-      state.delayed_intrq_kludge = 1;
-#else
-      trs_disk_intrq_interrupt(1);
-#endif
+      trs_schedule_event(trs_disk_intrq_interrupt, 1, 32);
     } else {
       state.last_readadr_density = state.density;
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
@@ -1423,11 +1350,7 @@ trs_disk_command_write(unsigned char cmd)
 	}
       }
       if ((cmd & 0x08) != 0) {
-#if DELAYED_INTRQ_KLUDGE > 2
-	  state.delayed_intrq_kludge = 1;
-#else
-	  trs_disk_intrq_interrupt(1);
-#endif
+	trs_schedule_event(trs_disk_intrq_interrupt, 1, 0);
       }
     }
     break;
@@ -1581,11 +1504,7 @@ real_read()
       return;
     }
   }
-#if DELAYED_INTRQ_KLUDGE
-  state.delayed_intrq_kludge = 1;
-#else
-  trs_disk_intrq_interrupt(1);
-#endif
+  trs_schedule_event(trs_disk_intrq_interrupt, 1, 32);
 #else
   trs_disk_unimpl(state.currcommand, "read real floppy");
 #endif
@@ -1644,11 +1563,7 @@ real_write()
   }
   state.bytecount = 0;
   trs_disk_drq_interrupt(0);
-#if DELAYED_INTRQ_KLUDGE > 2
-  state.delayed_intrq_kludge = 1;
-#else
-  trs_disk_intrq_interrupt(1);
-#endif
+  trs_schedule_event(trs_disk_intrq_interrupt, 1, 32);
 #else
   trs_disk_unimpl(state.currcommand, "write real floppy");
 #endif
@@ -1704,11 +1619,7 @@ real_readadr()
       return;
     }
   }
-#if DELAYED_INTRQ_KLUDGE
-  state.delayed_intrq_kludge = 1;
-#else
-  trs_disk_intrq_interrupt(1);
-#endif
+  trs_schedule_event(trs_disk_intrq_interrupt, 1, 32);
 #else
   trs_disk_unimpl(state.currcommand, "read address on real floppy");
 #endif
@@ -1768,11 +1679,7 @@ real_writetrk()
   }
   state.bytecount = 0;
   trs_disk_drq_interrupt(0);
-#if DELAYED_INTRQ_KLUDGE > 2
-  state.delayed_intrq_kludge = 1;
-#else
-  trs_disk_intrq_interrupt(1);
-#endif
+  trs_schedule_event(trs_disk_intrq_interrupt, 1, 32);
 #else
   trs_disk_unimpl(state.currcommand, "write track on real floppy");
 #endif

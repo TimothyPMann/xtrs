@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sun Mar 22 23:01:07 PST 1998 by mann
+   Last modified on Sat Apr 25 00:55:05 PDT 1998 by mann
 */
 
 #include "z80.h"
@@ -23,13 +23,13 @@
 #include "trs_imp_exp.h"
 #include "trs_disk.h"
 
-static int modesel = 0;   /* Model I */
-static int modeimage = 0; /* Model III/4 */
-static int ctrlimage = 0; /* Model 4 */
+static int modesel = 0;     /* Model I */
+static int modeimage = 0;   /* Model III/4/4p */
+static int ctrlimage = 0;   /* Model 4/4p */
+static int rominimage = 0;  /* Model 4p */
 
 /*ARGSUSED*/
-void z80_out(port, value)
-    int port, value;
+void z80_out(int port, int value)
 {
     if (trs_model == 1) {
 	switch (port) {
@@ -81,6 +81,15 @@ void z80_out(port, value)
 	  case 0x92:
 	  case 0x93:
 	    trs_sound_out(value & 1);
+	    break;
+	  case 0x9C:
+	  case 0x9D: /* !!? */
+	  case 0x9E: /* !!? */
+	  case 0x9F: /* !!? */
+	    if (trs_model == 5 /*4p*/) {
+		rominimage = value & 1;
+		mem_romin(rominimage);
+	    }
 	    break;
 	  case IMPEXP_CMD: /* 0xD0 */
 	    trs_impexp_cmd_write(value);
@@ -149,8 +158,7 @@ void z80_out(port, value)
 }
 
 /*ARGSUSED*/
-int z80_in(port)
-    int port;
+int z80_in(int port)
 {
     if (trs_model == 1) {
 	switch (port) {
@@ -165,6 +173,14 @@ int z80_in(port)
 	}
     } else {
 	switch (port) {
+	  case 0x9C: /* !!? */
+	  case 0x9D: /* !!? */
+	  case 0x9E: /* !!? */
+	  case 0x9F: /* !!? */
+	    if (trs_model == 5 /*4p*/) {
+		return rominimage;
+	    }
+	    break;
 	  case IMPEXP_STATUS: /* 0xD0 */
 	    return trs_impexp_status_read();
 	  case IMPEXP_DATA: /* 0xD1 */

@@ -5,10 +5,10 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Mon Jan 12 21:30:43 PST 1998 by mann */
+/* Last modified on Sun Apr 26 00:24:54 PDT 1998 by mann */
 
 /*
- * Emulate Model-I interrupts
+ * Emulate interrupts
  */
 
 #include "z80.h"
@@ -24,7 +24,7 @@
 static unsigned char interrupt_latch = 0;
 static unsigned char interrupt_mask = 0;
 
-/* NMIs (M3 only) */
+/* NMIs (M3/4/4P only) */
 #define M3_INTRQ_BIT    0x80  /* FDC chip INTRQ line */
 #define M3_MOTOROFF_BIT 0x40  /* FDC motor timed out (stopped) */
 #define M3_RESET_BIT    0x20  /* User pressed Reset button */
@@ -154,8 +154,7 @@ trs_interrupt_latch_read()
 }
 
 void
-trs_interrupt_mask_write(value)
-     unsigned char value;
+trs_interrupt_mask_write(unsigned char value)
 {
   interrupt_mask = value;
   z80_state.irq = (interrupt_latch & interrupt_mask) != 0;
@@ -165,19 +164,11 @@ trs_interrupt_mask_write(value)
 unsigned char
 trs_nmi_latch_read()
 {
-  unsigned char tmp = ~nmi_latch;
-
-  /* !!Kludge: On a real machine, the reset button interrupt signal
-     goes away when the user releases the button.  Here, we leave
-     it active until software has read the NMI latch. */
-  trs_reset_button_interrupt(0);
-
-  return tmp;
+  return ~nmi_latch;
 }
 
 void
-trs_nmi_mask_write(value)
-     unsigned char value;
+trs_nmi_mask_write(unsigned char value)
 {
   nmi_mask = value | M3_RESET_BIT;
   z80_state.nmi = (nmi_latch & nmi_mask) != 0;
@@ -185,7 +176,7 @@ trs_nmi_mask_write(value)
 }
 
 void
-trs_timer_event(signo)
+trs_timer_event(int signo)
 {
   struct timeval tv;
   struct itimerval it;
@@ -245,7 +236,7 @@ trs_timer_init()
       mem_write(LDOS3_MONTH, (lt->tm_mon + 1) ^ 0x50);
       mem_write(LDOS3_DAY, lt->tm_mday);
       mem_write(LDOS3_YEAR, lt->tm_year - 80);
-      if (trs_model == 4) {
+      if (trs_model >= 4) {
         extern Uchar memory[];
 	memory[LDOS4_MONTH] = lt->tm_mon + 1;
 	memory[LDOS4_DAY] = lt->tm_mday;
@@ -270,10 +261,61 @@ trs_timer_on()
 }
 
 void
-trs_timer_speed(fast)
-     int fast;
+trs_timer_speed(int fast)
 {
-    if (trs_model == 4) {
+    if (trs_model >= 4) {
 	timer_hz = fast ? TIMER_HZ_4 : TIMER_HZ_3;
     }
+}
+
+static trs_event_func event_func = NULL;
+static int event_arg;
+
+/* Schedule an event to occur after "countdown" more instructions have
+ *  executed.  0 makes the event happen immediately -- that is, at
+ *  the end of the current instruction, but before the emulator checks
+ *  for interrupts.  It is legal for an event function to call 
+ *  trs_schedule_event.  
+ *
+ * Only one event can be buffered.  If you try to schedule a second
+ *  event while one is still pending, the pending event (along with
+ *  any further events that it schedules) is executed immediately.
+ */
+void
+trs_schedule_event(trs_event_func f, int arg, int countdown)
+{
+    while (event_func) {
+#if EDEBUG	
+	error("warning: trying to schedule two events");
+#endif
+	trs_do_event();
+    }
+    event_func = f;
+    event_arg = arg;
+    z80_state.sched = countdown;
+}
+
+/*
+ * If an event is scheduled, do it now.  (If the event function
+ * schedules a new event, however, leave that one pending.)
+ */
+void
+trs_do_event()
+{
+    trs_event_func f = event_func;
+    if (f) {
+	event_func = NULL;
+	z80_state.sched = -1;
+	f(event_arg);    
+    }
+}
+
+/*
+ * Cancel scheduled event, if any.
+ */
+void
+trs_cancel_event()
+{
+    event_func = NULL;
+    z80_state.sched = -1;
 }

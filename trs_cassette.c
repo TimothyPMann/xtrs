@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Wed Apr 15 21:33:37 PDT 1998 by mann
+   Last modified on Sat Apr 25 01:04:14 PDT 1998 by mann
 */
 
 #include "trs.h"
@@ -23,8 +23,9 @@
 #include <string.h>
 
 #if __linux
-#include <sys/io.h>
+#include <sys/io.h> /* delete this line if it gives you a compile error */
 #include <asm/io.h>
+#include <unistd.h>
 #endif
 
 #define CLOSE		0
@@ -73,8 +74,7 @@ static void put_control()
     }
 }
 
-static int assert_state(state)
-    int state;
+static int assert_state(int state)
 {
     if(cassette_state == state)
     {
@@ -126,23 +126,59 @@ static unsigned char sb_cass_volume[4];
 static unsigned char sb_sound_volume[2];
 
 /* try to initialize SoundBlaster. Usual ioport is 0x220 */
-void trs_sound_init(ioport, vol)
-    int ioport; int vol;
+void trs_sound_init(int ioport, int vol)
 {
 #if __linux
+#define MAX_TRIES 65536
+    int tries;
+#ifdef SOUNDDEBUG
+    int major, minor;
+#endif
+
     if(sb_address != 0) return;
     if((ioport & 0xFFFFFF0F) != 0x200)
     {
-        fprintf(stderr, "Error in the SoundBlaster IOPort\n");
+        error("Invalid SoundBlaster I/O port");
 	return;
     }
-    sb_address = ioport + 0xC; /* COMMAND address */
+    sb_address = ioport;
     if(ioperm(ioport, 0x10, 1))
     {
         perror("Unable to access SoundBlaster");
 	sb_address = 0;
+	return;
     }
-    setuid(getuid());
+
+    /* Reset SoundBlaster DSP */
+    outb(0x01, sb_address + 0x6);
+    usleep(3);
+    outb(0x00, sb_address + 0x6);
+    for (tries = 0; tries < MAX_TRIES; tries++) {
+	if ((inb(sb_address + 0xE) & 0x80) &&
+	    (inb(sb_address + 0xA) == 0xAA)) break;
+    }
+    if (tries == MAX_TRIES) {
+	error("Unable to detect SoundBlaster");
+	sb_address = 0;
+	return;
+    }
+
+#ifdef SOUNDDEBUG
+    /* Get DSP version number */
+    while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
+    outb(0xE1, sb_address + 0xC);
+    while ((inb(sb_address + 0xE) & 0x80) == 0) /*poll*/ ;
+    major = inb(sb_address + 0xA);
+    while ((inb(sb_address + 0xE) & 0x80) == 0) /*poll*/ ;
+    minor = inb(sb_address + 0xA);
+    fprintf(stderr, "SoundBlaster DSP version %d.%d detected\n", major, minor);
+#endif
+
+    /* Turn on DAC speaker */
+    while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
+    outb(0xD1, sb_address + 0xC);
+
+    /* Set up volume values */
     if (vol < 0) vol = 0;
     if (vol > 100) vol = 100;
     /* Values in comments from Model I technical manual.  Model III/4 used
@@ -159,7 +195,7 @@ void trs_sound_init(ioport, vol)
 #endif
 }
 
-void trs_cassette_motor(value)
+void trs_cassette_motor(int value)
 {
     if(value)
     {
@@ -180,7 +216,7 @@ void trs_cassette_motor(value)
     }
 }
 
-void trs_cassette_out(value)
+void trs_cassette_out(int value)
 {
 #ifdef CASSDEBUG
     fprintf(stderr, 
@@ -222,12 +258,10 @@ void trs_cassette_out(value)
     /* Do sound emulation */
     if((cassette_motor == 0) && sb_address)
     {
-	while (inb(sb_address) & 0x80)
-	    ;
-	outb(0x10, sb_address);
-	while (inb(sb_address) & 0x80)
-	    ;
-	outb(sb_cass_volume[value], sb_address);
+	while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
+	outb(0x10, sb_address + 0xC);
+	while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
+	outb(sb_cass_volume[value], sb_address + 0xC);
     }
 #endif /* linux */
 }
@@ -235,24 +269,21 @@ void trs_cassette_out(value)
 
 /* Model 4 sound port */
 void
-trs_sound_out(value)
+trs_sound_out(int value)
 {
 #if __linux
     /* Do sound emulation */
-    if(sb_address)
+    if(sb_address + 0xC)
     {
-	while (inb(sb_address) & 0x80)
-	    ;
-	outb(0x10, sb_address);
-	while (inb(sb_address) & 0x80)
-	    ;
-	outb(sb_sound_volume[value], sb_address);
+	while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
+	outb(0x10, sb_address + 0xC);
+	while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
+	outb(sb_sound_volume[value], sb_address + 0xC);
     }
 #endif /* linux */
 }
 
-int trs_cassette_in(modesel)
-    int modesel;
+int trs_cassette_in(int modesel)
 {
 #ifdef CASSDEBUG
     fprintf(stderr, 

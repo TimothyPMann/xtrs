@@ -14,14 +14,18 @@
 
 BUILT_IN_ROM = level2rom.hex
 BUILT_IN_ROM3 = romimage.m3
+BUILT_IN_ROM4P =
 
 # If you would like the application to load a default ROM file at startup
 # time, use these lines (with the appropriate file names).  The default file
-# name is ignored and may be omitted if the ROM for that model is built in.
+# name is ignored and can be omitted if the ROM for that model is built in.
 
 # DEFAULT_ROM = -DDEFAULT_ROM='"/usr/local/lib/level2rom.hex"' \
-#               -DDEFAULT_ROM3='"/usr/local/lib/romimage.m3"'
-# DEFAULT_ROM = -DDEFAULT_ROM='"level2rom.hex"' -DDEFAULT_ROM3='"romimage.m3"'
+#               -DDEFAULT_ROM3='"/usr/local/lib/romimage.m3"' \
+#               -DDEFAULT_ROM4P='"/usr/local/lib/romimage.m4p"'
+# DEFAULT_ROM = -DDEFAULT_ROM='"level2rom.hex"' \
+#               -DDEFAULT_ROM3='"romimage.m3"' \
+#               -DDEFAULT_ROM4P='"romimage.m4p"'
 
 # If you would like to change where xtrs looks for disk?-? files, edit
 # this line.  "." of course means the current working directory.

@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Thu Mar 26 14:15:31 PST 1998 by mann
+   Last modified on Sat Apr 25 01:08:05 PDT 1998 by mann
 */
 
 #include "z80.h"
@@ -525,8 +525,7 @@ void trs_kb_heartbeat()
     }
 }
 
-void trs_xlate_keycode(keycode)
-     int keycode;
+void trs_xlate_keycode(int keycode)
 {
     int key_down;
     KeyTable* kt;
@@ -564,8 +563,7 @@ void trs_xlate_keycode(keycode)
     }
 }
 
-static void change_keystate(action)
-     int action;
+static void change_keystate(int action)
 {
     int key_down;
     int i;
@@ -599,8 +597,7 @@ static void change_keystate(action)
     }
 }
 
-static int kb_mem_value(address)
-     int address;
+static int kb_mem_value(int address)
 {
     int i, bitpos, data = 0;
 
@@ -633,8 +630,7 @@ static int kb_mem_value(address)
     return data;
 }
 
-int trs_kb_mem_read(address)
-    int address;
+int trs_kb_mem_read(int address)
 {
     int key = -1;
     int i, wait;

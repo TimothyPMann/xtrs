@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Mon Jan 12 15:47:15 PST 1998 by mann
+   Last modified on Sat Apr 25 00:55:04 PDT 1998 by mann
 */
 
 #ifndef _Z80_H
@@ -93,6 +93,15 @@ struct z80_state_struct
      * so turn off both nmi and nmi_seen when the interrupt is acknowledged.
      */
     int nmi, nmi_seen;
+
+    /* Speed control.  0 = full speed */
+    int delay;
+
+    /* Simple event scheduler.  If >= 0, counts down before each
+     * instruction is executed.  When count goes from 0 to -1, 
+     * trs_do_event() is called.
+     */
+    int sched;
 };
 
 #define Z80_ADDRESS_LIMIT	(1 << 16)
@@ -187,22 +196,24 @@ struct z80_state_struct
 
 extern struct z80_state_struct z80_state;
 
-extern void z80_reset();
-extern int z80_run();
-extern void mem_init();
-extern int mem_read(/* int address */);  /* 0 <= address <= 0xffff REQUIRED */
-extern void mem_write();
-extern void mem_write_rom();
-extern int mem_read_word();
-extern void mem_write_word();
-extern void mem_block_transfer();
+extern void z80_reset(void);
+extern int z80_run(int continuous);
+extern void mem_init(void);
+extern int mem_read(int address);  /* 0 <= address <= 0xffff REQUIRED */
+extern void mem_write(int address, int value);
+extern void mem_write_rom(int address, int value);
+extern int mem_read_word(int address);
+extern void mem_write_word(int address, int value);
+Uchar *mem_pointer(int address, int writing);
+extern void mem_block_transfer(Ushort dest, Ushort source, int direction,
+			       Ushort count);
 extern int load_hex(); /* returns highest address loaded + 1 */
-extern void error();
-extern void fatal();
-extern void z80_out();
-extern int z80_in();
-extern int disassemble();
-extern void debug_init();
-extern void debug_shell();
+extern void error(char *string);
+extern void fatal(char *string);
+extern void z80_out(int port, int value);
+extern int z80_in(int port);
+extern int disassemble(unsigned short pc);
+extern void debug_init(void);
+extern void debug_shell(void);
 
 #endif

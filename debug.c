@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Mon Jan 12 21:22:34 PST 1998 by mann
+   Last modified on Sat Apr 25 00:55:03 PDT 1998 by mann
 */
 
 #include "z80.h"
@@ -57,8 +57,7 @@ static struct
 } trap_table[MAX_TRAPS];
 
 
-static char *trap_name(flag)
-    int flag;
+static char *trap_name(int flag)
 {
     switch(flag)
     {
@@ -112,8 +111,7 @@ static void print_traps()
     }
 }
 
-static void set_trap(address, flag)
-    int address, flag;
+static void set_trap(int address, int flag)
 {
     int i;
 
@@ -136,8 +134,7 @@ static void set_trap(address, flag)
     }
 }
 
-static void clear_trap(i)
-    int i;
+static void clear_trap(int i)
 {
     if((i < 0) || (i > MAX_TRAPS) || !trap_table[i].valid)
     {
@@ -153,8 +150,7 @@ static void clear_trap(i)
     }
 }
 
-static void clear_trap_address(address, flag)
-    int address;
+static void clear_trap_address(int address, int flag)
 {
     int i;
     for(i = 0; i < MAX_TRAPS; ++i)
@@ -209,9 +205,7 @@ void debug_init()
     for(i = 0; i < MAX_TRAPS; ++i) trap_table[i].valid = 0;
 }
 
-static void print_memory(address, num_bytes)
-    Ushort address;
-    int num_bytes;
+static void print_memory(Ushort address, int num_bytes)
 {
     int bytes_to_print, i;
     int byte;
@@ -756,8 +750,7 @@ overflow(a, b, r)
     return carry_in(a, b, r) ^ carry_out(a, b, r);
 }
 
-test_add(a, b)
-    int a, b;
+test_add(int a, int b)
 {
     Uchar result;
     Uchar flags;
@@ -784,8 +777,7 @@ test_add(a, b)
     }
 }
 
-test_sub(a, b)
-    int a, b;
+test_sub(int a, int b)
 {
     Uchar result;
     Uchar flags;

@@ -6,6 +6,7 @@
 OBJECTS = \
 	z80.o \
 	main.o \
+	load_cmd.o \
 	load_hex.o \
 	trs_memory.o \
 	trs_keyboard.o \
@@ -19,12 +20,14 @@ OBJECTS = \
 	trs_printer.o \
 	trs_rom1.o \
 	trs_rom3.o \
+	trs_rom4p.o \
 	trs_disk.o \
 	trs_interrupt.o \
 	trs_imp_exp.o
 
 CR_OBJECTS = \
 	compile_rom.o \
+	load_cmd.o \
 	load_hex.o
 
 MD_OBJECTS = \
@@ -35,13 +38,19 @@ HC_OBJECTS = \
 	load_hex.o \
 	hex2cmd.o
 
+CD_OBJECTS = \
+	cmddump.o \
+	load_cmd.o
+
 SOURCES = \
 	cmd.c \
+	cmddump.c \
 	compile_rom.c \
 	debug.c \
 	dis.c \
 	error.c \
 	hex2cmd.c \
+	load_cmd.c \
 	load_hex.c \
 	main.c \
 	mkdisk.c \
@@ -103,7 +112,7 @@ MISC = \
 	xtrshard.lst \
 	xtrshard.z
 
-default: xtrs mkdisk hex2cmd xtrs.txt mkdisk.txt cassette.txt
+default: xtrs mkdisk hex2cmd cmddump xtrs.txt mkdisk.txt cassette.txt
 
 # Local customizations for make variables are done in Makefile.local:
 include Makefile.local
@@ -136,11 +145,17 @@ trs_rom1.c:	compile_rom $(BUILT_IN_ROM)
 trs_rom3.c:	compile_rom $(BUILT_IN_ROM3)
 		./compile_rom 3 $(BUILT_IN_ROM3) > trs_rom3.c
 
+trs_rom4p.c:	compile_rom $(BUILT_IN_ROM4P)
+		./compile_rom 4p $(BUILT_IN_ROM4P) > trs_rom4p.c
+
 mkdisk:		$(MD_OBJECTS)
 		$(CC) -o mkdisk $(MD_OBJECTS)
 
 hex2cmd:	$(HC_OBJECTS)
 		$(CC) -o hex2cmd $(HC_OBJECTS)
+
+cmddump:	$(CD_OBJECTS)
+		$(CC) -o cmddump $(CD_OBJECTS)
 
 saber_src:
 		#ignore SIGIO
@@ -153,6 +168,7 @@ tar:		$(SOURCES) $(HEADERS)
 
 clean:
 		rm -f $(OBJECTS) $(MD_OBJECTS) $(CR_OBJECTS) $(HC_OBJECTS) \
+	                $(CD_OBJECTS) \
 			*~ xtrs mkdisk compile_rom hex2cmd trs_rom*.c
 
 link:	
