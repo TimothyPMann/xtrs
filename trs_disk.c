@@ -1107,7 +1107,12 @@ trs_disk_status_read(void)
     last_status = state.status;
   }
 #endif
-  trs_schedule_event(trs_disk_intrq_interrupt, 0, 0);
+  /* Do this directly -- don't call trs_schedule_event, which would
+   *  cancel a pending interrupt that should occur later and prevent
+   *  it from ever happening.
+   */
+  trs_disk_intrq_interrupt(0);
+
   return state.status;
 }
 
@@ -1120,8 +1125,9 @@ trs_disk_command_write(unsigned char cmd)
 #ifdef DISKDEBUG
   fprintf(stderr, "command_write(0x%02x)\n", cmd);
 #endif
+  /* Cancel any ongoing command */
   trs_schedule_event(trs_disk_intrq_interrupt, 0, 0);
-  state.bytecount = 0;		/* just forget any ongoing command */
+  state.bytecount = 0;
   state.currcommand = cmd;
   switch (cmd & TRSDISK_CMDMASK) {
   case TRSDISK_RESTORE:
@@ -1131,7 +1137,7 @@ trs_disk_command_write(unsigned char cmd)
     if (d->emutype == REAL) real_restore();
     /* Should this set lastdirection? */
     if (cmd & TRSDISK_VBIT) verify();
-    trs_schedule_event(trs_disk_intrq_interrupt, 1, 8);
+    trs_schedule_event(trs_disk_intrq_interrupt, 1, 64);
     break;
   case TRSDISK_SEEK:
     d->phytrack += (state.data - state.track);
@@ -1145,7 +1151,7 @@ trs_disk_command_write(unsigned char cmd)
     if (d->emutype == REAL) real_seek();
     /* Should this set lastdirection? */
     if (cmd & TRSDISK_VBIT) verify();
-    trs_schedule_event(trs_disk_intrq_interrupt, 1, 8);
+    trs_schedule_event(trs_disk_intrq_interrupt, 1, 64);
     break;
   case TRSDISK_STEP:
   case TRSDISK_STEPU:
@@ -1162,7 +1168,7 @@ trs_disk_command_write(unsigned char cmd)
     }
     if (d->emutype == REAL) real_seek();
     if (cmd & TRSDISK_VBIT) verify();
-    trs_schedule_event(trs_disk_intrq_interrupt, 1, 8);
+    trs_schedule_event(trs_disk_intrq_interrupt, 1, 64);
     break;
   case TRSDISK_STEPIN:
   case TRSDISK_STEPINU:
@@ -1203,7 +1209,7 @@ trs_disk_command_write(unsigned char cmd)
     /*!! 1791 side compare logic belongs here? */
     id_index = search(state.sector);
     if (id_index == -1) {
-      trs_schedule_event(trs_disk_intrq_interrupt, 1, 32);
+      trs_schedule_event(trs_disk_intrq_interrupt, 1, 128);
     } else {
       if (d->emutype == JV1) {
 	if (d->phytrack == 17) {
@@ -1271,7 +1277,7 @@ trs_disk_command_write(unsigned char cmd)
     /*!! 1791 side compare logic belongs here? */
     id_index = search(state.sector);
     if (id_index == -1) {
-      trs_schedule_event(trs_disk_intrq_interrupt, 1, 32);
+      trs_schedule_event(trs_disk_intrq_interrupt, 1, 128);
     } else {
       int dirdam = (state.controller == TRSDISK_P1771 ?
 		    (cmd & (TRSDISK_CBIT|TRSDISK_DBIT)) != 0 :
@@ -1380,7 +1386,7 @@ trs_disk_command_write(unsigned char cmd)
       }
     }
     if (state.last_readadr == -1) {
-      trs_schedule_event(trs_disk_intrq_interrupt, 1, 32);
+      trs_schedule_event(trs_disk_intrq_interrupt, 1, 128);
     } else {
       state.last_readadr_density = state.density;
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
@@ -1617,7 +1623,7 @@ real_read()
       return;
     }
   }
-  trs_schedule_event(trs_disk_intrq_interrupt, 1, 32);
+  trs_schedule_event(trs_disk_intrq_interrupt, 1, 128);
 #else
   trs_disk_unimpl(state.currcommand, "read real floppy");
 #endif
@@ -1676,7 +1682,7 @@ real_write()
   }
   state.bytecount = 0;
   trs_disk_drq_interrupt(0);
-  trs_schedule_event(trs_disk_intrq_interrupt, 1, 32);
+  trs_schedule_event(trs_disk_intrq_interrupt, 1, 128);
 #else
   trs_disk_unimpl(state.currcommand, "write real floppy");
 #endif
@@ -1732,7 +1738,7 @@ real_readadr()
       return;
     }
   }
-  trs_schedule_event(trs_disk_intrq_interrupt, 1, 32);
+  trs_schedule_event(trs_disk_intrq_interrupt, 1, 128);
 #else
   trs_disk_unimpl(state.currcommand, "read address on real floppy");
 #endif
@@ -1792,7 +1798,7 @@ real_writetrk()
   }
   state.bytecount = 0;
   trs_disk_drq_interrupt(0);
-  trs_schedule_event(trs_disk_intrq_interrupt, 1, 32);
+  trs_schedule_event(trs_disk_intrq_interrupt, 1, 128);
 #else
   trs_disk_unimpl(state.currcommand, "write track on real floppy");
 #endif
