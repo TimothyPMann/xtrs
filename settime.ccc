@@ -1,0 +1,29 @@
+/* settime.ccc -- Misosys C program to set time using xtrs emulator traps */
+/* Copyright (c) 1997, Timothy Mann */
+
+/* This software may be copied, modified, and used for any purpose
+ * without fee, provided that (1) the above copyright notice is
+ * retained, and (2) modified versions are clearly marked as having
+ * been modified, with the modifier's name and the date included.  */
+
+/* Last modified on Sat Sep 20 13:41:00 PDT 1997 by mann */
+
+#include "xtrsemt.h"
+#include "xtrsemt.ccc"  /* could use separate compilation instead */
+
+main()
+{
+    time_t now;
+    struct tm *nowtm;
+    char cmd[81];
+
+    now = emt_time(EMT_TIME_LOCAL);
+    nowtm = localtime(&now);
+    sprintf(cmd, "date %02d/%02d/%02d",
+	    nowtm->tm_mon + 1, nowtm->tm_mday, nowtm->tm_year % 100);
+    system(cmd);
+    sprintf(cmd, "time %02d:%02d:%02d", 
+	    nowtm->tm_hour, nowtm->tm_min, nowtm->tm_sec);
+    system(cmd);
+    system("time");
+}
