@@ -135,17 +135,20 @@ JV3 is much more flexible, though it still does not support everything
 the real controllers could do.  It is best to use JV3 for all the disk
 images you create, unless you need to exchange images with someone who
 is using the Vavasour Model I emulator.  A JV3 disk can be formatted
-with 256 byte sectors, 1 or 2 sides, single or double density, with
-either FB (normal) or F8 (deleted) data address mark on any sector.
-You cannot format a sector with an incorrect track number or head
-number, or with length other than 256 bytes.  You can format a sector
-with an intentional CRC error in the data field.  The original JV3
-format had a limit of 2901 total sectors, but \fBxtrs\fP allows up to 5802.
-If you format more than 2901 sectors on a disk image, however, other
-emulators may be unable to read the additional sectors.  An 80 track,
-double-sided, double-density (18 sector) 5.25-inch floppy will fit within
-the original 2901 sector limit; the extension to 5802 is primarily for
-emulation of 8-inch drives (see below).  
+with 128, 256, 512, or 1024-byte sectors, 1 or 2 sides, single or
+double density, with either FB (normal) or F8 (deleted) data address
+mark on any sector.  You cannot format a sector with an incorrect
+track number or head number.  You can format a sector with an
+intentional CRC error in the data field.  \fBxtrs\fP supports at most
+96 cylinders and at most 5802 total sectors on a JV3 image.
+
+The original Vavasour JV3 format supported only 256-byte sectors, and
+had a limit of 2901 total sectors.  If you use sectors sizes other
+than 256 bytes or format more than 2901 sectors on a disk image,
+emulators other than \fBxtrs\fP may be unable to read it.  Note that
+an 80 track, double-sided, double-density (18 sector) 5.25-inch floppy
+will fit within the original 2901 sector limit; the extension to 5802
+is primarily for emulation of 8-inch drives (see below).
 
 The program \fBmkdisk\fP(1) makes a blank emulated floppy or "bulk
 erases" an existing one.  By default, mkdisk makes a JV3 floppy, but
@@ -652,12 +655,13 @@ programs that try to generate them on purpose unhappy.
 Real physical floppy disks are supported only under Linux, because
 Unix does not provide a portable interface to the low-level floppy
 controller functionality that \fBxtrs\fP needs.  There are some
-limitations even under Linux: Sectors must be 256 bytes long.
-(Supporting multiple lengths would be difficult due to an interface
-difference between the PC and TRS-80 floppy controllers.)  Index holes
-are faked, not detected on the real disk.  Attempts to access a real
-drive with no disk in it are dealt with awkwardly (as documented
-above).  Read/write performance seems poor.
+limitations even under Linux: Index holes are faked, not detected on
+the real disk.  Attempts to access a real drive with no disk in it are
+dealt with awkwardly (as documented above).  Due to a limitation of
+PC-style floppy disk controllers, \fBxtrs\fP does not support mixing
+sectors of different sizes on the same track when formatting a real
+floppy. However, \fBxtrs\fP can read and write to such floppies if
+they are already formatted (perhaps by a real TRS-80).
 
 The emulator arbitrarily limits both JV1 and JV3 disk images to 96
 tracks.  The limit could easily be increased to 255 or maybe 256, but
