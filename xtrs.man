@@ -1051,7 +1051,7 @@ the changes into future releases.
 .SH Authors and acknowledgements
 \fBxtrs\fP 1.0 was written by David Gingold and Alec Wolman.
 The current version was revised and much extended by Timothy Mann
-<tim@tim-mann.org>.  See README and
+(see http://tim-mann.org/).  See README and
 README.tpm for additional notes from the authors.
 
 We also thank the following people for their help.  The JV1 and JV3
