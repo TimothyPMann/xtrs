@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Thu Sep 25 16:47:13 PDT 1997 by mann
+   Last modified on Thu Sep 25 19:40:54 PDT 1997 by mann
 */
 
 /*
@@ -23,6 +23,8 @@
  *
  * X Windows interface for TRS-80 simulator
  */
+
+#define XDEBUG 1
 
 #include <stdio.h>
 #include <fcntl.h>
@@ -344,7 +346,8 @@ int *debug;
 				 background);
     XStoreName(display,window,program_name);
     XSelectInput(display, window, ExposureMask | KeyPressMask | MapRequest |
-		 KeyReleaseMask | StructureNotifyMask | ResizeRedirectMask );
+		 KeyReleaseMask | StructureNotifyMask | ResizeRedirectMask |
+		 LeaveWindowMask );
     XMapWindow(display, window);
 
     bitmap_init(foreground, background);
@@ -419,6 +422,7 @@ void trs_get_event(wait)
 #endif
 	    trs_screen_refresh();
 	    break;
+
 	  case ResizeRequest:
 #ifdef XDEBUG
 	    fprintf(stderr,"ResizeRequest\n");
@@ -429,17 +433,34 @@ void trs_get_event(wait)
 			     (CWWidth | CWHeight),&xwc);
 	    XFlush(display);
 	    break;
+
 	  case ConfigureNotify:
 #ifdef XDEBUG
 	    fprintf(stderr,"ConfigureNotify\n");
 #endif
 	    break;
+
 	  case MapNotify:
 #ifdef XDEBUG
 	    fprintf(stderr,"MapNotify\n");
 #endif
 	    trs_screen_refresh();
 	    break;
+
+	  case EnterNotify:
+#ifdef XDEBUG
+	    fprintf(stderr,"EnterNotify\n");
+#endif
+	    queue_key(0x10000); /* all keys up */
+	    break;
+
+	  case LeaveNotify:
+#ifdef XDEBUG
+	    fprintf(stderr,"LeaveNotify\n");
+#endif
+	    queue_key(0x10000); /* all keys up */
+	    break;
+
 	  case KeyPress:
 	    (void) XLookupString((XKeyEvent *)&event,buf,10,&key,&status);
 #ifdef XDEBUG
@@ -476,21 +497,27 @@ void trs_get_event(wait)
 	    if (key == XK_Shift_R && trs_model == 1) {
 		key = XK_Shift_L;
 	    }
+	    if (last_key[event.xkey.keycode] != 0) {
+		queue_key(0x10000 | last_key[event.xkey.keycode]);
+	    }
+	    last_key[event.xkey.keycode] = key;
 	    if (key != 0) {
 		queue_key(key);
 	    }
-	    last_key[event.xkey.keycode] = key;
 	    break;
+
 	  case KeyRelease:
 	    key = last_key[event.xkey.keycode];
+	    last_key[event.xkey.keycode] = 0;
+	    if (key != 0) {
+		queue_key(0x10000 | key);
+	    }
 #ifdef XDEBUG
 	    fprintf(stderr,"KeyRelease: keycode 0x%x, last_key 0x%x\n",
 		    event.xkey.state, event.xkey.keycode, key);
 #endif
-	    if (key != 0) {
-		queue_key(0x10000 | key);
-	    }
 	    break;
+
 	  default:
 #ifdef XDEBUG	    
 	    fprintf(stderr,"Unhandled event: type %d\n", event.type);
