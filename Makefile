@@ -102,8 +102,6 @@ MISC = \
 	settime.cmd \
 	settime.lst \
 	settime.z \
-	trs80-model1.bdf \
-	trs80-model3.bdf \
 	utility.dsk \
 	utility.jcl \
 	cpmutil.dsk \
