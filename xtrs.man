@@ -156,6 +156,16 @@ the emulated WD1771 (available in Model I mode only), F8 is returned
 as FA.  In all other modes, F8 is returned as F8.  This trick makes
 the different operating systems perfectly compatible with each other,
 which is better than on a real Model I!
+
+TRS-80 programs that attempt to measure the rotational
+speed of their floppy disk drives using timing loops will get the
+answers they expect, even though \fBxtrs\fP makes no
+attempt to emulate instructions at the same speed as the original
+machines. This works because \fBxtrs\fP keeps a virtual clock 
+(technically, a T-state counter),
+which measures how much time it should have taken to execute the
+instruction stream on a real machine, and it ties the emulation of
+floppy disk index holes to this clock.
 .SH Emulated 8-inch floppy disks
 In addition to the four standard 5.25-inch drives, \fBxtrs\fP also
 emulates four 8-inch floppy drives.  There is no widely-accepted
@@ -387,9 +397,9 @@ Sound support is off by default, but can be turned on with the -sb
 option described below.  When sound support is on, any data written to
 the TRS-80 cassette port when the cassette motor is off, and any data
 written to the Model 4/4P optional sound port, is copied to the
-SoundBlaster.  Sound frequencies will likely be quite far off, because
-TRS-80 sound depends on timing loops, and \fBxtrs\fP makes no attempt
-to emulate Z-80 instructions at the same speed as a real TRS-80.
+SoundBlaster.  TRS-80 sound depends on timing loops, so the pitches
+will be wildly wrong unless you use the -autodelay option described
+below.  Even with -autodelay, don't expect pitches to be accurate or stable.
 .SH Options
 Defaults for all options can be specified using the standard X resource
 mechanism, and the class name for \fBxtrs\fP is "Xtrs".
@@ -475,6 +485,30 @@ A crude speed control.  After each Z-80 instruction, xtrs busy-waits
 for \fId\fP iterations around an empty loop.  A really smart C optimizer
 might delete this loop entirely, so it's possible that this option
 won't work if you compile xtrs with too high an optimization level.
+The default delay is 0.
+.TP
+.B \-autodelay
+Dynamically adjusts the value of -delay to run instructions at roughly
+the same rate as a real machine.  The tracking is not very accurate
+or stable, but it can be useful for running games and playing sounds.
+.TP
+.B \-autodelay
+Turn off -autodelay. This is the default.
+.TP
+.B \-keystretch \fIamount,poll,heartbeat\fP
+Fine-tune the keyboard behavior.  To prevent keystrokes from being
+lost, xtrs "stretches" the intervals between key transitions, so that
+the Z-80 program has time to see each transition before the next one
+occurs.  Whenever an emulated key goes up or down, xtrs sets a counter
+to \fIamount\fP.  While the counter is greater than zero, (1) any
+further key transitions are held in a queue instead of being passed
+immediately to the Z-80, (2) whenever the Z-80 program reads from the
+keyboard matrix, the counter is decremented by \fIpoll\fP, and (3)
+whenever a TRS-80 heartbeat interrupt is schedule to occur (even if
+interrupts are disabled), the counter is decremented by
+\fIheartbeat\fP.  The default setting is "16,1,1"; this seems to work
+well with ordinary keyboard drivers, but you may want to experiment
+with different values for games if keyboard response seem sluggish.
 .TP
 .B \-resize
 In Model 4/4P mode, resize the X window whenever the emulated display
@@ -484,19 +518,6 @@ mode changes between 64x16 and 80x24.
 In Model 4/4P mode, always keep the X window large enough for 80x24
 characters, putting a blank margin around the outside when the emulated
 display mode is 64x16.  This is the default.
-.TP
-.B \-spinfast
-Make the floppy disk appear to spin at 10 times the normal rate.
-This works around a problem with some TRS-80 operating systems that
-detect whether a drive contains a floppy by polling for a fixed
-number of iterations waiting for an index hole to go by.  The emulator
-normally emulates the index holes in real time, but can emulate Z-80
-instructions faster than a real TRS-80, so sometimes the loop will
-time out too soon and the operating system will report that there is
-no disk in the drive.
-.TP
-.B \-nospinfast
-Turn off -spinfast mode.  This is the default.
 .TP
 .B \-doublestep
 Make real floppy drives double-step, allowing access to 35-track or
@@ -536,7 +557,9 @@ The Model III/4/4P alternate character set is not emulated.
 Some features of the disk controller are not currently emulated.  (1)
 Force Interrupt with condition bits 0x01, 0x02, or 0x04 is not
 implemented.  (2) Read Track is not implemented.  (3) The
-multiple-sector flags in Read and Write are not implemented.
+multiple-sector flags in Read and Write are not implemented.  Certain
+errors (such as Lost Data) cannot occur, which makes disk diagnostic
+programs that try to generate them on purpose unhappy.
 
 Real physical floppy disks are supported only under Linux, because
 Unix does not provide a portable interface to the low-level floppy

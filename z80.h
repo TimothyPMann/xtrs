@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Apr 25 00:55:04 PDT 1998 by mann
+   Last modified on Thu Sep 24 16:37:40 PDT 1998 by mann
 */
 
 #ifndef _Z80_H
@@ -102,6 +102,15 @@ struct z80_state_struct
      * trs_do_event() is called.
      */
     int sched;
+
+    /* Cyclic T-state counter */
+#ifdef __GNUC__
+    unsigned long long t_count;
+#else
+    unsigned long t_count;
+#endif
+    /* Clock in MHz = T-states per microsecond */
+    float clockMHz;
 };
 
 #define Z80_ADDRESS_LIMIT	(1 << 16)
@@ -143,6 +152,9 @@ struct z80_state_struct
 
 #define HIGH(p) (((struct twobyte *)(p))->high)
 #define LOW(p) (((struct twobyte *)(p))->low)
+
+#define T_COUNT(n) z80_state.t_count += (n)
+/*#define T_COUNT(n)*/
 
 /*
  * Flag accessors:

@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Apr 25 00:59:59 PDT 1998 by mann
+   Last modified on Thu Sep 24 19:16:48 PDT 1998 by mann
 */
 
 #include "z80.h"
@@ -24,6 +24,8 @@
 #include "load_cmd.h"
 
 int trs_model = 1;
+int trs_pausing = 0;
+int trs_autodelay = 0;
 
 static void check_endian()
 {

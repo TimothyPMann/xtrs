@@ -273,7 +273,7 @@ trs_sound_out(int value)
 {
 #if __linux
     /* Do sound emulation */
-    if(sb_address + 0xC)
+    if(sb_address)
     {
 	while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
 	outb(0x10, sb_address + 0xC);

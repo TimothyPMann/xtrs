@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Apr 25 01:11:08 PDT 1998 by mann
+   Last modified on Fri Sep 25 23:17:46 PDT 1998 by mann
 */
 
 /*
@@ -78,6 +78,7 @@ static int screen;
 static Window window;
 static GC gc;
 static GC gc_inv;
+static GC gc_xor;
 static int currentmode = NORMAL;
 static int OrigHeight,OrigWidth;
 static int usefont = DEF_USEFONT;
@@ -85,6 +86,7 @@ static int trsfont;
 static int cur_char_width = TRS_CHAR_WIDTH;
 static int cur_char_height = TRS_CHAR_HEIGHT;
 static XFontStruct *myfont, *mywidefont, *curfont;
+static XKeyboardState repeat_state;
 
 static XrmOptionDescRec opts[] = {
 {"-background",	"*background",	XrmoptionSepArg,	(caddr_t)NULL},
@@ -106,8 +108,6 @@ static XrmOptionDescRec opts[] = {
 {"-romfile4p",	"*romfile4p",	XrmoptionSepArg,	(caddr_t)NULL},
 {"-resize",	"*resize",	XrmoptionNoArg,		(caddr_t)"on"},
 {"-noresize",	"*resize",	XrmoptionNoArg,		(caddr_t)"off"},
-{"-spinfast",   "*spinfast",    XrmoptionNoArg,         (caddr_t)"on"},
-{"-nospinfast", "*spinfast",    XrmoptionNoArg,         (caddr_t)"off"},
 {"-doublestep", "*doublestep",  XrmoptionNoArg,         (caddr_t)"on"},
 {"-nodoublestep","*doublestep", XrmoptionNoArg,         (caddr_t)"off"},
 {"-model",      "*model",       XrmoptionSepArg,	(caddr_t)NULL},
@@ -116,13 +116,52 @@ static XrmOptionDescRec opts[] = {
 {"-model4",     "*model",       XrmoptionNoArg,		(caddr_t)"4"},
 {"-model4p",    "*model",       XrmoptionNoArg,		(caddr_t)"4p"},
 {"-diskdir",    "*diskdir",     XrmoptionSepArg,	(caddr_t)NULL},
-{"-delay",      "*delay",       XrmoptionSepArg,	(caddr_t)"0"},
+{"-delay",      "*delay",       XrmoptionSepArg,	(caddr_t)NULL},
+{"-autodelay",  "*autodelay",   XrmoptionNoArg,         (caddr_t)"on"},
+{"-noautodelay","*autodelay",   XrmoptionNoArg,         (caddr_t)"off"},
+{"-keystretch", "*keystretch",  XrmoptionSepArg,        (caddr_t)NULL},
 #if __linux
 {"-sb",         "*sb",          XrmoptionSepArg,        (caddr_t)NULL},
 #endif /* linux */
 };
 
 static int num_opts = (sizeof opts / sizeof opts[0]);
+
+/* Grafyx Solution support.  Radio Shack graphics card should be the same. */
+char grafyx[512][128]; /* a bit bigger to allow for out-of-range coords */
+unsigned char grafyx_x = 0, grafyx_y = 0, grafyx_mode = 0;
+
+#define G_SELECT   3
+#define G_TEXT     0
+#define G_OVERLAY  1
+#define G_UNUSED   2  /* !!same as G_TEXT in Reed emulator */
+#define G_GRAFYX   3
+
+#define G_XDEC     4
+#define G_YDEC     8
+#define G_XNOCLKR  16
+#define G_YNOCLKR  32
+#define G_XNOCLKW  64
+#define G_YNOCLKW  128
+
+XImage xim = {
+    /*width, height*/    1024, 512,
+    /*xoffset*/          0,
+    /*format*/           XYBitmap,
+    /*data*/             (char*)grafyx,
+    /*byte_order*/       LSBFirst,
+    /*bitmap_unit*/      8,
+    /*bitmap_bit_order*/ MSBFirst,
+    /*bitmap_pad*/       8,
+    /*depth*/            1,
+    /*bytes_per_line*/   128,
+    /*bits_per_pixel*/   1,
+    /*red_mask*/         1,
+    /*green_mask*/       1,
+    /*blue_mask*/        1,
+    /*obdata*/           NULL,
+    /*f*/                { NULL, NULL, NULL, NULL, NULL, NULL }
+};
 
 /*
  * Key event queueing routines
@@ -168,6 +207,30 @@ int dequeue_key()
 #endif
     }
     return rval;
+}
+
+int trs_next_key(int wait)
+{
+#if KBWAIT
+    if (wait) {
+	int rval;
+	for (;;) {
+	    if ((rval = dequeue_key()) >= 0) break;
+	    if ((z80_state.nmi && !z80_state.nmi_seen) ||
+		(z80_state.irq && z80_state.iff1)) {
+		rval = -1;
+		break;
+	    }
+	    trs_pausing = 1;
+	    pause(); /* Wait for SIGALRM or SIGIO */
+	    trs_pausing = 0;
+	    trs_get_event(0);
+	}
+	return rval;
+    }
+#endif
+    return dequeue_key();
+
 }
 
 /* Private routines */
@@ -241,13 +304,13 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
 	}
     }
 
-    (void) sprintf(option, "%s%s", program_name, ".spinfast");
-    if (XrmGetResource(x_db, option, "Xtrs.Spinfast", &type, &value))
+    (void) sprintf(option, "%s%s", program_name, ".autodelay");
+    if (XrmGetResource(x_db, option, "Xtrs.Autodelay", &type, &value))
     {
 	if (strcmp(value.addr,"on") == 0) {
-	    trs_disk_spinfast = True;
+	    trs_autodelay = True;
 	} else if (strcmp(value.addr,"off") == 0) {
-	    trs_disk_spinfast = False;
+	    trs_autodelay = False;
 	}
     }
 
@@ -295,8 +358,32 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
         z80_state.delay = strtol(value.addr, NULL, 0);
     }
 
+    (void) sprintf(option, "%s%s", program_name, ".keystretch");
+    if (XrmGetResource(x_db, option, "Xtrs.Keystretch", &type, &value))
+    {
+	sscanf(value.addr, "%d,%d,%d",
+	       &stretch_amount, &stretch_poll, &stretch_heartbeat);
+    }
+
     return argc;
 }
+
+static void
+save_repeat()
+{
+    XGetKeyboardControl(display, &repeat_state);
+    XAutoRepeatOff(display);
+}
+
+static void
+restore_repeat()
+{
+    if (repeat_state.global_auto_repeat == AutoRepeatModeOn) {
+        XAutoRepeatOn(display);
+        XSync(display, FALSE);
+    }
+}
+
 
 /* exits if something really bad happens */
 void trs_screen_init()
@@ -456,17 +543,26 @@ void trs_screen_init()
     /* setup root window, and gc */
     root_window = DefaultRootWindow(display);
 
-    gcvals.graphics_exposures = False;
-    gc = XCreateGC(display, root_window, GCGraphicsExposures, &gcvals);
+    /* save keyboard repeat state */
+    XGetKeyboardControl(display, &repeat_state);
+    atexit(restore_repeat);
 
-    XSetForeground(display, gc, fore_pixel);
-    XSetBackground(display, gc, back_pixel);
     foreground = fore_pixel;
     background = back_pixel;
+    gcvals.graphics_exposures = False;
+
+    gc = XCreateGC(display, root_window, GCGraphicsExposures, &gcvals);
+    XSetForeground(display, gc, fore_pixel);
+    XSetBackground(display, gc, back_pixel);
 
     gc_inv = XCreateGC(display, root_window, GCGraphicsExposures, &gcvals);
     XSetForeground(display, gc_inv, back_pixel);
     XSetBackground(display, gc_inv, fore_pixel);
+
+    gc_xor = XCreateGC(display, root_window, GCGraphicsExposures, &gcvals);
+    XSetForeground(display, gc_xor, back_pixel^fore_pixel);
+    XSetBackground(display, gc_xor, 0);
+    XSetFunction(display, gc_xor, GXxor);
 
     if (usefont) {
 	if ((myfont = XLoadQueryFont(display,fontname)) == NULL) {
@@ -487,8 +583,8 @@ void trs_screen_init()
     if (trs_model >= 4 && !resize) {
       OrigWidth = cur_char_width * 80 + 2 * border_width;
       left_margin = cur_char_width * (80 - row_chars)/2;
-      OrigHeight = cur_char_height * 24 + 2 * border_width;
-      top_margin = cur_char_height * (24 - col_chars)/2;
+      OrigHeight = TRS_CHAR_HEIGHT4 * 24 + 2 * border_width;
+      top_margin = (TRS_CHAR_HEIGHT4 * 24 - cur_char_height * col_chars)/2;
     } else {
       OrigWidth = cur_char_width * row_chars + 2 * border_width;
       OrigHeight = cur_char_height * col_chars + 2 * border_width;
@@ -601,16 +697,18 @@ void trs_get_event(int wait)
 	    break;
 
 	  case EnterNotify:
-#ifdef XDEBUG
+#ifdef XDEBUG1
 	    fprintf(stderr,"EnterNotify\n");
 #endif
+	    save_repeat();
 	    trs_xlate_keycode(0x10000); /* all keys up */
 	    break;
 
 	  case LeaveNotify:
-#ifdef XDEBUG
+#ifdef XDEBUG1
 	    fprintf(stderr,"LeaveNotify\n");
 #endif
+	    restore_repeat();
 	    trs_xlate_keycode(0x10000); /* all keys up */
 	    break;
 
@@ -713,9 +811,11 @@ void trs_screen_80x24(int flag)
     if (flag) {
 	row_chars = 80;
 	col_chars = 24;
+	cur_char_height = 10 * 2;
     } else {
 	row_chars = 64;
 	col_chars = 16;
+	cur_char_height = 12 * 2;
     }
     screen_chars = row_chars * col_chars;
     if (resize) {
@@ -727,7 +827,7 @@ void trs_screen_80x24(int flag)
       XSelectInput(display, window, EVENT_MASK | ResizeRedirectMask);
     } else {
       left_margin = cur_char_width * (80 - row_chars)/2;
-      top_margin = cur_char_height * (24 - col_chars)/2;
+      top_margin = (TRS_CHAR_HEIGHT4 * 24 - cur_char_height * col_chars)/2;
       if (left_margin || top_margin) XClearWindow(display,window);
     }
     trs_screen_refresh();
@@ -824,8 +924,13 @@ void trs_screen_refresh()
 {
     int i;
 
-    for (i = 0; i < screen_chars; i++) {
-	trs_screen_write_char(i,trs_screen[i],False);
+    if ((grafyx_mode & G_SELECT) == G_GRAFYX) {
+	XPutImage(display, window, gc, &xim, 0, 0, 0, 0,
+		  TRS_CHAR_WIDTH*row_chars, cur_char_height*col_chars);
+    } else {
+	for (i = 0; i < screen_chars; i++) {
+	    trs_screen_write_char(i,trs_screen[i],False);
+	}
     }
 #ifdef DO_XFLUSH
     XFlush(display);
@@ -843,6 +948,9 @@ void trs_screen_write_char(int position, int char_index, Bool doflush)
       return;
     }
     if ((currentmode & EXPANDED) && (position & 1)) {
+      return;
+    }
+    if ((grafyx_mode & G_SELECT) == G_GRAFYX) {
       return;
     }
     row = position / row_chars;
@@ -906,24 +1014,29 @@ void trs_screen_write_char(int position, int char_index, Bool doflush)
 	  case NORMAL:
 	    XCopyPlane(display,trs_char[0][char_index],
 		       window,gc,0,0,TRS_CHAR_WIDTH,
-		       TRS_CHAR_HEIGHT,destx,desty,plane);
+		       cur_char_height,destx,desty,plane);
 	    break;
 	  case EXPANDED:
 	    XCopyPlane(display,trs_char[1][char_index],
 		       window,gc,0,0,TRS_CHAR_WIDTH*2,
-		       TRS_CHAR_HEIGHT,destx,desty,plane);
+		       cur_char_height,destx,desty,plane);
 	    break;
 	  case INVERSE:
 	    XCopyPlane(display,trs_char[0][char_index & 0x7f],window,
 		       (char_index & 0x80) ? gc_inv : gc,
-		       0,0,TRS_CHAR_WIDTH,TRS_CHAR_HEIGHT,destx,desty,plane);
+		       0,0,TRS_CHAR_WIDTH,cur_char_height,destx,desty,plane);
 	    break;
 	  case EXPANDED+INVERSE:
 	    XCopyPlane(display,trs_char[1][char_index & 0x7f],window,
 		       (char_index & 0x80) ? gc_inv : gc,
-		       0,0,TRS_CHAR_WIDTH*2,TRS_CHAR_HEIGHT,destx,desty,plane);
+		       0,0,TRS_CHAR_WIDTH*2,cur_char_height,destx,desty,plane);
 	    break;
 	}
+    }
+    if ((grafyx_mode & G_SELECT) == G_OVERLAY) {
+	XPutImage(display, window, gc_xor, &xim,
+		  col*TRS_CHAR_WIDTH, row*cur_char_height,
+		  destx, desty, TRS_CHAR_WIDTH, cur_char_height);
     }
 #ifdef DO_XFLUSH
     if (doflush)
@@ -937,12 +1050,22 @@ void trs_screen_scroll()
 {
     int i = 0;
 
-    XCopyArea(display,window,window,gc,
-	      border_width,cur_char_height+border_width,
-	      (cur_char_width*row_chars),(cur_char_height*col_chars),
-	      border_width,border_width);
     for (i = row_chars; i < screen_chars; i++)
 	trs_screen[i-row_chars] = trs_screen[i];
+    switch ((grafyx_mode & G_SELECT)) {
+      case G_TEXT:
+      case G_UNUSED:
+	XCopyArea(display,window,window,gc,
+		  border_width,cur_char_height+border_width,
+		  (cur_char_width*row_chars),(cur_char_height*col_chars),
+		  border_width,border_width);
+	break;
+      case G_GRAFYX:
+	break;
+      case G_OVERLAY:
+	trs_screen_refresh(); /* !!punt */
+	break;
+    }
 }
 
 void trs_screen_write_chars(int *locations, int *values, int count)
@@ -956,24 +1079,82 @@ void trs_screen_write_chars(int *locations, int *values, int count)
 #endif
 }
 
-int trs_next_key(int wait)
+void grafyx_write_byte(int x, int y, char byte)
 {
-#if KBWAIT
-    if (wait) {
-	int rval;
-	for (;;) {
-	    if ((rval = dequeue_key()) >= 0) break;
-	    if ((z80_state.nmi && !z80_state.nmi_seen) ||
-		(z80_state.irq && z80_state.iff1)) {
-		rval = -1;
-		break;
-	    }
-	    pause(); /* Wait for SIGALRM or SIGIO */
-	    trs_get_event(0);
-	}
-	return rval;
+    int gm = grafyx_mode & G_SELECT;
+    if (gm == G_OVERLAY) {
+	/* Erase old byte, preserving text */
+	XPutImage(display, window, gc_xor, &xim, x*TRS_CHAR_WIDTH, y*2,
+		  x*TRS_CHAR_WIDTH, y*2, TRS_CHAR_WIDTH, 2);
     }
-#endif
-    return dequeue_key();
 
+    /* Save new byte in local memory */
+    grafyx[y*2][x] = grafyx[y*2+1][x] = byte;
+
+    /* Draw new byte */
+    if (gm == G_GRAFYX) {
+	XPutImage(display, window, gc, &xim, x*TRS_CHAR_WIDTH, y*2,
+		  x*TRS_CHAR_WIDTH, y*2, TRS_CHAR_WIDTH, 2);
+    } else if (gm == G_OVERLAY) {
+	XPutImage(display, window, gc_xor, &xim, x*TRS_CHAR_WIDTH, y*2,
+		  x*TRS_CHAR_WIDTH, y*2, TRS_CHAR_WIDTH, 2);
+    }
+}
+
+void grafyx_write_x(int value)
+{
+    grafyx_x = value;
+}
+
+void grafyx_write_y(int value)
+{
+    grafyx_y = value;
+}
+
+void grafyx_write_data(int value)
+{
+    grafyx_write_byte(grafyx_x & 0x7f, grafyx_y, value);
+    if (!(grafyx_mode & G_XNOCLKW)) {
+	if (grafyx_mode & G_XDEC) {
+	    grafyx_x--;
+	} else {
+	    grafyx_x++;
+	}
+    }
+    if (!(grafyx_mode & G_YNOCLKW)) {
+	if (grafyx_mode & G_YDEC) {
+	    grafyx_y--;
+	} else {
+	    grafyx_y++;
+	}
+    }
+}
+
+int grafyx_read_data()
+{
+    int value = grafyx[grafyx_y*2][grafyx_x & 0x7f];
+    if (!(grafyx_mode & G_XNOCLKR)) {
+	if (grafyx_mode & G_XDEC) {
+	    grafyx_x--;
+	} else {
+	    grafyx_x++;
+	}
+    }
+    if (!(grafyx_mode & G_YNOCLKR)) {
+	if (grafyx_mode & G_YDEC) {
+	    grafyx_y--;
+	} else {
+	    grafyx_y++;
+	}
+    }
+    return value;
+}
+
+void grafyx_write_mode(int value)
+{
+    int oldgm = grafyx_mode & G_SELECT;
+    grafyx_mode = value;
+    if (oldgm != (grafyx_mode & G_SELECT)) {
+	trs_screen_refresh(); /* !!punt */
+    }
 }

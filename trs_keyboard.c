@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Apr 25 01:08:05 PDT 1998 by mann
+   Last modified on Wed Aug  5 15:01:17 PDT 1998 by mann
 */
 
 #include "z80.h"
@@ -504,12 +504,10 @@ KeyTable function_key_table[] = {
 
 static int keystate[8] = { 0, };
 static int force_shift = TK_Neutral;
-static int stretch = 0;
 
 /* Avoid changing state too fast so keystrokes aren't lost. */
-#define STRETCH_AMOUNT 16
-#define STRETCH_POLL 1
-#define STRETCH_HEARTBEAT 1
+static int stretch = 0;
+int stretch_amount = 16, stretch_poll = 1, stretch_heartbeat = 1;
 
 void trs_kb_reset()
 {
@@ -521,7 +519,7 @@ void trs_kb_heartbeat()
 {
     /* Be responsive if we are polled rarely */
     if (stretch > 0) {
-        stretch -= STRETCH_HEARTBEAT;
+        stretch -= stretch_heartbeat;
     }
 }
 
@@ -635,7 +633,7 @@ int trs_kb_mem_read(int address)
     int key = -1;
     int i, wait;
 
-    stretch -= STRETCH_POLL;
+    stretch -= stretch_poll;
     if (stretch < 0) {
 	/* Check if we are in the system keyboard driver, called from
            the wait-for-input routine.  The test below works on both
@@ -654,7 +652,7 @@ int trs_kb_mem_read(int address)
 	    }
 	}
 	key = trs_next_key(wait);
-	stretch = STRETCH_AMOUNT;
+	stretch = stretch_amount;
     }
 
     if (key >= 0) change_keystate(key);

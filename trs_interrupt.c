@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Sun Apr 26 00:24:54 PDT 1998 by mann */
+/* Last modified on Thu Sep 24 19:16:50 PDT 1998 by mann */
 
 /*
  * Emulate interrupts
@@ -28,13 +28,17 @@ static unsigned char interrupt_mask = 0;
 #define M3_INTRQ_BIT    0x80  /* FDC chip INTRQ line */
 #define M3_MOTOROFF_BIT 0x40  /* FDC motor timed out (stopped) */
 #define M3_RESET_BIT    0x20  /* User pressed Reset button */
-static unsigned char nmi_latch = 0;
+static unsigned char nmi_latch = 1; /* ?? One diagnostic program needs this */
 static unsigned char nmi_mask = M3_RESET_BIT;
 
 #define TIMER_HZ_1 40
 #define TIMER_HZ_3 30
 #define TIMER_HZ_4 60
 static int timer_hz;
+
+#define CLOCK_MHZ_1 1.774
+#define CLOCK_MHZ_3 2.017 /*!! is this right? */
+#define CLOCK_MHZ_4 4.034 /*!! is this right? */
 
 /* Kludge: LDOS hides the date (not time) in a memory area across reboots. */
 /* We put it there on powerup, so LDOS magically knows the date! */
@@ -183,6 +187,27 @@ trs_timer_event(int signo)
 
   if (!timer_on) return;
 
+  gettimeofday(&tv, NULL);
+  if (trs_autodelay) {
+      static struct timeval oldtv;
+#if __GNUC__
+      static long long oldtcount;
+#else
+      static long oldtcount;
+#endif
+      if (!trs_pausing) {
+	  if (((tv.tv_sec*1000000 + tv.tv_usec) -
+	       (oldtv.tv_sec*1000000 + oldtv.tv_usec))*z80_state.clockMHz >
+	      (z80_state.t_count - oldtcount) && z80_state.delay > 0) {
+	      z80_state.delay--;
+	  } else {
+	      z80_state.delay++;
+	  }
+      }
+      oldtv = tv;
+      oldtcount = z80_state.t_count;
+  }
+
   trs_timer_interrupt(1); /* generate */
   trs_kb_heartbeat(); /* part of keyboard stretch kludge */
 #if HAVE_SIGIO
@@ -195,7 +220,6 @@ trs_timer_event(int signo)
      to tick at 25ms.  If we ask setitimer to wake us up in 25ms, it
      will really wake us up in 30ms.  The algorithm below compensates
      for such an error by making the next tick shorter. */
-  gettimeofday(&tv, NULL);
   it.it_value.tv_sec = 0;
   it.it_value.tv_usec =
     (1000000/timer_hz) - (tv.tv_usec % (1000000/timer_hz));
@@ -213,8 +237,11 @@ trs_timer_init()
 
   if (trs_model == 1) {
       timer_hz = TIMER_HZ_1;
+      z80_state.clockMHz = CLOCK_MHZ_1;
   } else {
-      timer_hz = TIMER_HZ_3;  /* initially */
+      /* initially... */
+      timer_hz = TIMER_HZ_3;  
+      z80_state.clockMHz = CLOCK_MHZ_3;
   }
 
   sa.sa_handler = trs_timer_event;
@@ -265,6 +292,7 @@ trs_timer_speed(int fast)
 {
     if (trs_model >= 4) {
 	timer_hz = fast ? TIMER_HZ_4 : TIMER_HZ_3;
+	z80_state.clockMHz = fast ? CLOCK_MHZ_4 : CLOCK_MHZ_3;
     }
 }
 

@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Apr 25 00:55:05 PDT 1998 by mann
+   Last modified on Fri Sep 25 19:33:40 PDT 1998 by mann
 */
 
 #include "z80.h"
@@ -52,6 +52,18 @@ void z80_out(int port, int value)
 	}
     } else {
 	switch (port) {
+	  case 0x80:
+	    if (trs_model >= 4) grafyx_write_x(value);
+	    break;
+	  case 0x81:
+	    if (trs_model >= 4) grafyx_write_y(value);
+	    break;
+	  case 0x82:
+	    if (trs_model >= 4) grafyx_write_data(value);
+	    break;
+	  case 0x83:
+	    if (trs_model >= 4) grafyx_write_mode(value);
+	    break;
 	  case 0x84:
 	  case 0x85:
 	  case 0x86:
@@ -173,6 +185,11 @@ int z80_in(int port)
 	}
     } else {
 	switch (port) {
+	  case 0x82:
+	    if (trs_model >= 4) {
+		return grafyx_read_data();
+	    }
+	    break;
 	  case 0x9C: /* !!? */
 	  case 0x9D: /* !!? */
 	  case 0x9E: /* !!? */
@@ -188,6 +205,9 @@ int z80_in(int port)
 	  case 0xE0:
 	    return trs_interrupt_latch_read();
 	  case 0xEC:
+	  case 0xED:
+	  case 0xEE:
+	  case 0xEF:
 	    trs_timer_interrupt(0); /* acknowledge */
 	    return 0xFF;
 	  case TRSDISK3_INTERRUPT: /* 0xE4 */

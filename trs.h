@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Apr 25 21:36:43 PDT 1998 by mann
+   Last modified on Fri Sep 25 19:34:17 PDT 1998 by mann
 */
 
 /*
@@ -29,6 +29,8 @@
 #define INVERSE 2
 
 extern int trs_model; /* 1, 3, 4, 5(=4p) */
+extern int trs_pausing;
+extern int trs_autodelay;
 
 extern int trs_parse_command_line(int argc, char **argv, int *debug);
 
@@ -51,6 +53,7 @@ extern void trs_kb_heartbeat(void);
 extern void trs_xlate_keycode(int keycode);
 extern void queue_key(int key);
 extern int dequeue_key(void);
+extern int stretch_amount, stretch_poll, stretch_heartbeat;
 
 extern void trs_get_event(int wait);
 extern volatile int x_poll_count;
@@ -102,3 +105,9 @@ typedef void (*trs_event_func)(int arg);
 void trs_schedule_event(trs_event_func f, int arg, int when);
 void trs_do_event(void);
 void trs_cancel_event(void);
+
+void grafyx_write_x(int value);
+void grafyx_write_y(int value);
+void grafyx_write_data(int value);
+int grafyx_read_data(void);
+void grafyx_write_mode(int value);

@@ -5,13 +5,15 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Tue Apr 28 17:17:41 PDT 1998 by mann */
+/* Last modified on Thu Sep 24 20:42:33 PDT 1998 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
  */
 
 /*#define DISKDEBUG 1*/
+/*#define DISKDEBUG2 1*/
+#define TSTATEREV 1
 
 #include "z80.h"
 #include "trs.h"
@@ -33,11 +35,11 @@
 
 #define NDRIVES 8
 
-int trs_disk_spinfast = 0;
 int trs_disk_nocontroller = 0;
 int trs_disk_doublestep = 0;
 char *trs_disk_dir = DISKDIR;
 unsigned short trs_disk_changecount = 0;
+float trs_disk_holewidth = 0.01;
 
 typedef struct {
   /* Registers */
@@ -103,6 +105,7 @@ FDCState state;
 #define JV3_DIRECTORY   0x20  /* dden: 1=deleted DAM (F8); sden: 1=F8 or FA */
 #define JV3_SIDE        0x10  /* 0=side 0, 1=side 1 */
 #define JV3_ERROR       0x08  /* 0=ok, 1=CRC error */
+#define JV3_NONIBM      0x04  /* 0=normal, 1=short (for VTOS 3.0, xtrs only) */
 #define JV3_UNUSED      0xff
 
 typedef struct {
@@ -180,6 +183,7 @@ void
 trs_disk_init(int reset_button)
 {
   int i;
+
   state.status = TRSDISK_NOTRDY|TRSDISK_TRKZERO;
   state.track = 0;
   state.sector = 0;
@@ -467,13 +471,12 @@ idoffset(int id_index)
 
 /* Search for a sector on the current physical track and return its
    index within the emulated disk's array of sectors.  Set status and
-   return -1 if there is no such sector.  If sector == -1, just return
+   return -1 if there is no such sector.  If sector == -1, 
    the first sector found if any. */
 static int
 search(int sector)
 {
   DiskState *d = &disk[state.curdrive];
-  /* Get true address within file of current sector data */
   if (d->emutype == JV1) { 
     if (d->phytrack < 0 || d->phytrack >= MAXTRACKS ||
 	state.curside > 0 || sector >= JV1_SECPERTRK || d->file == NULL ||
@@ -518,7 +521,6 @@ static int
 search_adr()
 {
   DiskState *d = &disk[state.curdrive];
-  /* Get true address within file of current sector data */
   if (d->emutype == JV1) { 
     if (d->phytrack < 0 || d->phytrack >= MAXTRACKS ||
 	state.curside > 0 || d->file == NULL || state.density == 1) {
@@ -567,7 +569,7 @@ verify()
       state.status |= TRSDISK_SEEKERR;
     }
   } else {
-    search(-1);			/* TRSDISK_SEEKERR == TRSDISK_NOTFOUND */
+    search(-1);	/* TRSDISK_SEEKERR == TRSDISK_NOTFOUND */
   }
 }
 
@@ -575,7 +577,6 @@ verify()
 static void
 type1_status()
 {
-  struct timeval tv;
   DiskState *d = &disk[state.curdrive];
 
   if (cmd_type(state.currcommand) != 1) return;
@@ -584,14 +585,30 @@ type1_status()
   } else {
     /* Simulate index hole going by at 300, 360, or 3000 RPM */
     /* !! if (d->emutype == REAL) { check if disk in drive } */
-    gettimeofday(&tv, NULL);
-    if (trs_disk_spinfast ? (tv.tv_usec % 20000) < 500 /* 3000 RPM */ : 
-	d->inches == 5 ? (tv.tv_usec % 200000) < 5000 /* 300 RPM */ : 
-	(tv.tv_usec % 166666) < 4166 /* 360 RPM */) {
+    /* Set revus to number of microseconds per revolution */
+    int revus = d->inches == 5 ? 200000 /* 300 RPM */ : 166666 /* 360 RPM */;
+#if TSTATEREV
+    /* Lock revolution rate to emulated time measured in T-states */
+    /* Minor bug: there will be a glitch when t_count wraps around on
+       a 32-bit machine */
+    if ((z80_state.t_count % (int)(revus * z80_state.clockMHz))
+	 < (int)(revus * z80_state.clockMHz * trs_disk_holewidth)) {
       state.status |= TRSDISK_INDEX;
     } else {
       state.status &= ~TRSDISK_INDEX;
     }
+#else
+    /* Old way: lock revolution rate to real time */
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    /* Ignore the seconds field; this is OK if there are a round number
+       of revolutions per second */
+    if ((tv.tv_usec % revus) < (int)(revus * trs_disk_holewidth)) {
+      state.status |= TRSDISK_INDEX;
+    } else {
+      state.status &= ~TRSDISK_INDEX;
+    }
+#endif
     if (d->writeprot) {
       state.status |= TRSDISK_WRITEPRT;
     } else {
@@ -992,6 +1009,30 @@ trs_disk_data_write(unsigned char data)
       }
       break;
     case FMT_DATA:
+      if (data == 0xfe) {
+	/* Short sector with intentional CRC error */
+	if (d->emutype == JV3) {
+	  d->id[d->unused_id].flags |= JV3_NONIBM | JV3_ERROR;
+#if DISKDEBUG2
+	  fprintf(stderr,
+		  "non-IBM sector: drv %02x, sid %d, trk %02x, sec %02x\n",
+		  state.curdrive, state.curside,
+		  d->id[d->unused_id].track, 
+		  d->id[d->unused_id].sector);
+#endif
+	  /* Write the sector id */
+	  fseek(d->file, idoffset(d->unused_id), 0);
+	  c = fwrite(&d->id[d->unused_id], sizeof(SectorId), 1, d->file);
+	  if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+	  /* Update allocation limits */
+	  if (d->last_used_id < d->unused_id) d->last_used_id = d->unused_id;
+	  d->unused_id++;
+	  while (d->id[d->unused_id].track != JV3_UNUSED) d->unused_id++;
+	  goto got_idam;
+	} else {
+	  trs_disk_unimpl(state.currcommand, "JV1 non-IBM sector");
+	}
+      }
       if (d->emutype == JV3) {
 	c = putc(data, d->file);
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
@@ -1073,7 +1114,7 @@ trs_disk_status_read(void)
 void
 trs_disk_command_write(unsigned char cmd)
 {
-  int id_index;
+  int id_index, bytecount;
   DiskState *d = &disk[state.curdrive];
 
 #ifdef DISKDEBUG
@@ -1132,11 +1173,34 @@ trs_disk_command_write(unsigned char cmd)
     state.lastdirection = -1;
     goto step;
   case TRSDISK_READ:
+    state.status = 0;
+    bytecount = SECSIZE;
+    if (state.controller == TRSDISK_P1771) {
+      if (!(cmd & TRSDISK_BBIT)) {
+#if DISKDEBUG2
+	fprintf(stderr, 
+		"non-IBM read: drv %02x, sid %d, trk %02x, sec %02x\n",
+		state.curdrive, state.curside, state.track, state.sector);
+#endif
+	if (d->emutype == REAL) {
+	  trs_disk_unimpl(cmd, "non-IBM read on real floppy");
+	}
+	bytecount = 16;
+      } else {
+#if DISKDEBUG2
+	if (state.sector >= 0x7c) {
+	  fprintf(stderr, 
+		  "IBM read: drv %02x, sid %d, trk %02x, sec %02x\n",
+		  state.curdrive, state.curside, state.track, state.sector);
+	}
+#endif
+      }
+    }
     if (d->emutype == REAL) {
       real_read();
       break;
     }
-    state.status = 0;
+    /*!! 1791 side compare logic belongs here? */
     id_index = search(state.sector);
     if (id_index == -1) {
       trs_schedule_event(trs_disk_intrq_interrupt, 1, 32);
@@ -1163,7 +1227,7 @@ trs_disk_command_write(unsigned char cmd)
       }
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
-      state.bytecount = SECSIZE;
+      state.bytecount = bytecount;
       fseek(d->file, offset(d->emutype, id_index), 0);
     }
     break;
@@ -1171,17 +1235,40 @@ trs_disk_command_write(unsigned char cmd)
     trs_disk_unimpl(cmd, "read multiple");
     break;
   case TRSDISK_WRITE:
+    state.status = 0;
+    bytecount = SECSIZE;
+    if (state.controller == TRSDISK_P1771) {
+      if (!(cmd & TRSDISK_BBIT)) {
+#if DISKDEBUG2
+	fprintf(stderr,
+		"non-IBM write drv %02x, sid %d, trk %02x, sec %02x\n",
+		state.curdrive, state.curside, state.track, state.sector);
+#endif
+	if (d->emutype == REAL) {
+	  trs_disk_unimpl(cmd, "non-IBM write on real floppy");
+	}
+	bytecount = 16;
+      } else {
+#if DISKDEBUG2
+	if (state.sector >= 0x7c) {
+	  fprintf(stderr, 
+		  "IBM write: drv %02x, sid %d, trk %02x, sec %02x\n",
+		  state.curdrive, state.curside, state.track, state.sector);
+	}
+#endif
+      }
+    }
     if (d->emutype == REAL) {
       state.status = TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
-      state.bytecount = SECSIZE;
+      state.bytecount = bytecount;
       break;
     }
     if (d->writeprot) {
       state.status = TRSDISK_WRITEPRT;
       break;
     }
-    state.status = 0;
+    /*!! 1791 side compare logic belongs here? */
     id_index = search(state.sector);
     if (id_index == -1) {
       trs_schedule_event(trs_disk_intrq_interrupt, 1, 32);
@@ -1213,10 +1300,36 @@ trs_disk_command_write(unsigned char cmd)
 	  if (c == EOF) state.status |= TRSDISK_WRITEFLT;
 	  sid->flags = newflags;
 	}
+
+	/* Kludge for VTOS 3.0 */
+	if (sid->flags & JV3_NONIBM) {
+	  int i, j, c;
+	  /* Smash following sectors. This is especially a kludge because
+	     it uses the sector numbers, not the known physical sector
+	     order. */
+	  for (i = state.sector+1; i <= 0x7f; i++) {
+	    j = search(i);
+	    if (j != -1) {
+#if DISKDEBUG2
+	      fprintf(stderr, "smashing sector %02x\n", i);
+#endif
+	      fseek(d->file, idoffset(j), SEEK_SET);
+	      putc(0xff, d->file);
+	      putc(0xff, d->file);
+	      putc(0xff, d->file);
+	      c = fflush(d->file);
+	      if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+	    }	      
+	    /* Smash only one for non-IBM write */
+	    if (bytecount == 16) break;
+	  }
+	}
+	/* end kludge */
+
       }
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
-      state.bytecount = SECSIZE;
+      state.bytecount = bytecount;
       fseek(d->file, offset(d->emutype, id_index), 0);
     }
     break;

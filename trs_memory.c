@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sun Apr 26 00:24:52 PDT 1998 by mann
+   Last modified on Fri Sep 25 19:49:40 PDT 1998 by mann
 */
 
 /*
@@ -168,6 +168,7 @@ void trs_reset()
     }
     if (trs_model >= 4) {
 	z80_out(0x84, 0);
+	z80_out(0x83, 0);
     }
     if (trs_model >= 3) {
 	trs_interrupt_mask_write(0);
