@@ -3521,9 +3521,8 @@ int z80_run(int continuous)
 		if (continuous > 0 &&
 		    !(z80_state.nmi && !z80_state.nmi_seen) &&
 		    !(z80_state.irq && z80_state.iff1)) {
-		    trs_pausing = 1;
+		    trs_paused = 1;
 		    pause();
-		    trs_pausing = 0;
 		}
 	    }
 #endif
