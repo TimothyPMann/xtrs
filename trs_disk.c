@@ -23,6 +23,7 @@
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #if __linux
 #include <sys/types.h>
@@ -54,6 +55,7 @@ typedef struct {
   int bytecount;		/* bytes left to transfer this command */
   int format;			/* write track state machine */
   int format_bytecount;         /* bytes left in this part of write track */
+  int format_sec;               /* current sector number or id_index */
   unsigned curdrive;
   unsigned curside;
   unsigned density;		/* sden=0, dden=1 */
@@ -93,7 +95,27 @@ FDCState state, other_state;
  * I have compatibly extended the format to allow for more sectors, so
  * that 8" DSDD drives can be supported, by adding a second block of
  * ids after the block of data sectors that is described by the first
- * block.  JV himself says that sounds like a good idea.
+ * block.  JV himself says that sounds like a good idea.  Matthew
+ * Reed's emulators now support this extension.
+ *
+ * I've further extended the format to add a flag bit for non-IBM
+ * sectors. Only a subset of the non-IBM functionality is supported,
+ * rigged to make the VTOS 3.0 copy-protection system work.  Non-IBM
+ * sectors were a feature of the 1771 only. Using this feature, you
+ * could have a sector of any length from 16 to 4096 bytes in
+ * multiples of 16. xtrs supports only 16-byte non-IBM sectors (with
+ * their data stored in a 256-byte field), and has some special kludges
+ * to detect and support VTOS's trick of formatting these sectors with
+ * inadequate gaps between so that writing to one would smash the
+ * index block of the next one.
+ *
+ * Finally, I've extended the format to support (IBM) sector lengths
+ * other than 256 bytes. The standard lengths 128, 256, 512, and 1024
+ * are supported, using the last two available bits in the header
+ * flags byte. The data area of a floppy image thus becomes an array
+ * of *variable length* sectors, making it more complicated to find
+ * the sector data corresponding to a given header and to manage freed
+ * sectors.
  *
  * NB: JV's model I emulator uses no auxiliary data structure for disk
  * format.  It simply assumes that all disks are single density, 256
@@ -107,7 +129,11 @@ FDCState state, other_state;
 #define JV3_SIDE        0x10  /* 0=side 0, 1=side 1 */
 #define JV3_ERROR       0x08  /* 0=ok, 1=CRC error */
 #define JV3_NONIBM      0x04  /* 0=normal, 1=short (for VTOS 3.0, xtrs only) */
-#define JV3_UNUSED      0xff
+#define JV3_SIZE        0x03  /* in used sectors: 0=256,1=128,2=1024,3=512
+				 in free sectors: 0=512,1=1024,2=128,3=256 */
+
+#define JV3_FREE        0xff  /* in track/sector fields */
+#define JV3_FREEF       0xfc  /* in flags field, or'd with size code */
 
 typedef struct {
   unsigned char track;
@@ -115,9 +141,11 @@ typedef struct {
   unsigned char flags;
 } SectorId;
 
-/* Unfortunately we don't support sector sizes other than 256 bytes */
-#define SECSIZE       256
+/* Arbitrary maximum on tracks, chosen because LDOS can use at most 95 */
 #define MAXTRACKS     96
+
+#define REAL_SECSIZE 256  /* !!temporary limitation */
+#define JV1_SECSIZE 256
 
 /* Max bytes per unformatted track. */
 /* Select codes 1, 2, 4, 8 are emulated 5" drives, disk?-0 to disk?-3 */
@@ -135,11 +163,9 @@ typedef struct {
 
 #define JV3_SIDES      2
 #define JV3_IDSTART    0
-#define JV3_SECSTART   (34*SECSIZE) /* start of sectors within file */
+#define JV3_SECSTART   (34*256) /* start of sectors within file */
 #define JV3_SECSPERBLK ((int)(JV3_SECSTART/3))
 #define JV3_SECSMAX    (2*JV3_SECSPERBLK)
-#define JV3_IDSTART2   (JV3_SECSTART + JV3_SECSPERBLK*SECSIZE)
-#define JV3_SECSTART2  (JV3_IDSTART2 + JV3_SECSTART)
 
 #define JV1_SECPERTRK 10
 
@@ -155,14 +181,15 @@ typedef struct {
   int inches;                     /* 5 or 8, as seen by TRS-80 */
   int real_rps;                   /* used only for emutype REAL */
   FILE* file;
-  int unused_id;		  /* first unused index in id array */
+  int free_id[4];		  /* first free id, if any, of each size */
   int last_used_id;		  /* last used index */
   int nblocks;                    /* number of blocks of ids, 1 or 2 */
   int sorted_valid;               /* sorted_id array valid */
   SectorId id[JV3_SECSMAX + 1];   /* extra one is a loop sentinel */
+  int offset[JV3_SECSMAX + 1];    /* offset into file for each id */
   short sorted_id[JV3_SECSMAX + 1];
   short track_start[MAXTRACKS][JV3_SIDES];
-  unsigned char buf[SECSIZE];
+  unsigned char buf[REAL_SECSIZE];
 } DiskState;
 
 DiskState disk[NDRIVES];
@@ -194,6 +221,7 @@ trs_disk_init(int reset_button)
   state.bytecount = 0;
   state.format = FMT_DONE;
   state.format_bytecount = 0;
+  state.format_sec = 0;
   state.curdrive = state.curside = 0;
   state.density = 0;
   state.controller = (trs_model == 1) ? TRSDISK_P1771 : TRSDISK_P1791;
@@ -227,6 +255,26 @@ trs_disk_change_all()
   trs_disk_changecount++;
 }
 
+
+static void
+trs_disk_done(int dummy)
+{
+    state.status &= ~TRSDISK_BUSY;
+    trs_disk_intrq_interrupt(1);
+}
+
+
+static void
+trs_disk_unimpl(unsigned char cmd, char* more)
+{
+  state.status = TRSDISK_WRITEFLT|TRSDISK_NOTFOUND;
+  state.bytecount = state.format_bytecount = 0;
+  state.format = FMT_DONE;
+  trs_disk_drq_interrupt(0);
+  trs_schedule_event(trs_disk_done, 0, 0);
+  fprintf(stderr, "trs_disk_command(0x%02x) not implemented - %s\n",
+	  cmd, more);
+}
 
 /* Sort first by track, second by side, third by position in emulated-disk
    sector array (i.e., physical sector order on track).
@@ -269,13 +317,120 @@ sort_ids(int drive)
     if (sid->track != track ||
 	(sid->flags & JV3_SIDE ? 1 : 0) != side) {
       track = sid->track;
-      if (track == JV3_UNUSED) break;
+      if (track == JV3_FREE) break;
       side = sid->flags & JV3_SIDE ? 1 : 0;
       d->track_start[track][side] = i;
     }
   }
 
   d->sorted_valid = 1;  
+}
+
+int
+id_index_to_size_code(DiskState *d, int id_index)
+{
+  return (d->id[id_index].flags & JV3_SIZE) ^
+    ((d->id[id_index].track == JV3_FREE) ? 2 : 1);
+}
+
+int
+size_code_to_size(int code)
+{
+  return 128 << code;
+}
+
+int
+id_index_to_size(DiskState *d, int id_index)
+{
+  return 128 << id_index_to_size_code(d, id_index);
+}
+
+/* Return the offset of the data block for the id_index'th sector
+   in an emulated-disk file. */
+static off_t
+offset(DiskState *d, int id_index)
+{
+  if (d->emutype == JV1) {
+    return id_index * JV1_SECSIZE;
+  } else {
+    return d->offset[id_index];
+  }
+}
+
+/* Return the offset of the id block for the id_index'th sector
+   in an emulated-disk file.  Initialize a new block if needed. */
+static off_t
+idoffset(DiskState *d, int id_index)
+{
+  if (d->emutype == JV1) {
+    trs_disk_unimpl(state.currcommand, "JV1 id (internal error)");
+    return -1;
+  } else {
+    if (id_index < JV3_SECSPERBLK) {
+      return JV3_IDSTART + id_index * sizeof(SectorId);
+    } else {
+      int idstart2 = d->offset[JV3_SECSPERBLK-1] +
+	id_index_to_size(d, JV3_SECSPERBLK-1);
+
+      if (d->nblocks == 1) {
+        /* Initialize new block of ids */
+	int c;
+	fseek(d->file, idstart2, 0);
+        c = fwrite((void*)&d->id[JV3_SECSPERBLK], 3, JV3_SECSPERBLK, d->file);
+	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+	c = fflush(d->file);
+	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+	d->nblocks = 2;
+      }	
+      return idstart2 + (id_index - JV3_SECSPERBLK) * sizeof(SectorId);
+    }
+  }
+}
+
+int
+alloc_sector(DiskState *d, int size_code)
+{
+  int maybe = d->free_id[size_code];
+  d->sorted_valid = 0;
+  while (maybe <= d->last_used_id) {
+    if (d->id[maybe].track == JV3_FREE &&
+	id_index_to_size_code(d, maybe) == size_code) {
+      d->free_id[size_code] = maybe + 1;
+      return maybe;
+    }
+    maybe++;
+  }
+  d->free_id[size_code] = JV3_SECSMAX; /* none are free */
+  if (d->last_used_id >= JV3_SECSMAX-1) {
+    return -1;
+  }
+  return ++d->last_used_id;
+}
+
+void
+free_sector(DiskState *d, int id_index)
+{
+  int c;
+  int size_code = (d->id[id_index].flags & JV3_SIZE) ^ 1;
+  if (d->free_id[size_code] > id_index) d->free_id[size_code] = id_index;
+  d->sorted_valid = 0;
+  d->id[id_index].track = JV3_FREE;
+  d->id[id_index].sector = JV3_FREE;
+  d->id[id_index].flags = (d->id[id_index].flags | JV3_FREEF) ^ JV3_SIZE;
+  fseek(d->file, idoffset(d, id_index), 0);
+  c = fwrite(&d->id[id_index], sizeof(SectorId), 1, d->file);
+  if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+
+  if (id_index == d->last_used_id) {
+    while (d->id[d->last_used_id].track == JV3_FREE) {
+      d->last_used_id--;
+    }
+    fflush(d->file);
+    rewind(d->file);
+    ftruncate(fileno(d->file),
+	      offset(d, d->last_used_id) +
+	      id_index_to_size(d, d->last_used_id));
+  }
 }
 
 void
@@ -365,43 +520,50 @@ trs_disk_change(int drive)
 
   if (d->emutype == JV3) {
     int id_index, n;
+    int ofst;
 
-    memset((void*)d->id, JV3_UNUSED, sizeof(d->id));
+    memset((void*)d->id, JV3_FREE, sizeof(d->id));
+
+    /* Read first block of ids */
     fseek(d->file, JV3_IDSTART, 0);
     fread((void*)&d->id[0], 3, JV3_SECSPERBLK, d->file);
-    fseek(d->file, JV3_IDSTART2, 0);
+
+    /* Scan to find their offsets */
+    ofst = JV3_SECSTART;
+    for (id_index=0; id_index<JV3_SECSPERBLK; id_index++) {
+      d->offset[id_index] = ofst;
+      ofst += id_index_to_size(d, id_index);
+    }
+
+    /* Read second block of ids, if any */
+    fseek(d->file, ofst, 0);
     n = fread((void*)&d->id[JV3_SECSPERBLK], 3, JV3_SECSPERBLK, d->file);
     d->nblocks = n > 0 ? 2 : 1;
 
-    d->unused_id = d->last_used_id = -1;
+    /* Scan to find their offsets */
+    ofst += JV3_SECSTART;
+    for (id_index=JV3_SECSPERBLK; id_index<JV3_SECSPERBLK*2; id_index++) {
+      d->offset[id_index] = ofst;
+      ofst += id_index_to_size(d, id_index);
+    }
+
+    /* Find last_used_id value and free_id hints */
+    for (n=0; n<4; n++) {
+      d->free_id[n] = JV3_SECSMAX;
+    }
+    d->last_used_id = -1;
     for (id_index=0; id_index<JV3_SECSMAX; id_index++) {
-      if (d->id[id_index].track == JV3_UNUSED) {
-	if (d->unused_id == -1) d->unused_id = id_index;
+      if (d->id[id_index].track == JV3_FREE) {
+	int size_code = id_index_to_size_code(d, id_index);
+	if (d->free_id[size_code] == JV3_SECSMAX) {
+	  d->free_id[size_code] = id_index;
+	}
       } else {
 	d->last_used_id = id_index;
       }
     }
     sort_ids(drive);
   }
-}
-
-static void
-trs_disk_done(int dummy)
-{
-    state.status &= ~TRSDISK_BUSY;
-    trs_disk_intrq_interrupt(1);
-}
-
-static void
-trs_disk_unimpl(unsigned char cmd, char* more)
-{
-  state.status = TRSDISK_WRITEFLT|TRSDISK_NOTFOUND;
-  state.bytecount = state.format_bytecount = 0;
-  state.format = FMT_DONE;
-  trs_disk_drq_interrupt(0);
-  trs_schedule_event(trs_disk_done, 0, 0);
-  fprintf(stderr, "trs_disk_command(0x%02x) not implemented - %s\n",
-	  cmd, more);
 }
 
 static int
@@ -430,50 +592,6 @@ cmd_type(unsigned char cmd)
     return 4;
   }
   return -1;			/* not reached */
-}
-
-/* Return the offset of the data block for the id_index'th sector
-   in an emulated-disk file. */
-static off_t
-offset(int emutype, int id_index)
-{
-  if (emutype == JV1) {
-    return id_index * SECSIZE;
-  } else {
-    if (id_index < JV3_SECSPERBLK) {
-      return JV3_SECSTART + id_index * SECSIZE;
-    } else {
-      return JV3_SECSTART2 + (id_index - JV3_SECSPERBLK) * SECSIZE;
-    }
-  }
-}
-
-/* Return the offset of the id block for the id_index'th sector
-   in an emulated-disk file.  Initialize a new block if needed. */
-static off_t
-idoffset(int id_index)
-{
-  DiskState *d = &disk[state.curdrive];
-  if (d->emutype == JV1) {
-    trs_disk_unimpl(state.currcommand, "JV1 id (internal error)");
-    return -1;
-  } else {
-    if (id_index < JV3_SECSPERBLK) {
-      return JV3_IDSTART + id_index * sizeof(SectorId);
-    } else {
-      if (d->nblocks == 1) {
-        /* Initialize new block of ids */
-	int c;
-	fseek(d->file, JV3_IDSTART2, 0);
-        c = fwrite((void*)&d->id[JV3_SECSPERBLK], 3, JV3_SECSPERBLK, d->file);
-	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
-	c = fflush(d->file);
-	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
-	d->nblocks = 2;
-      }	
-      return JV3_IDSTART2 + (id_index - JV3_SECSPERBLK) * sizeof(SectorId);
-    }
-  }
 }
 
 
@@ -782,7 +900,7 @@ trs_disk_data_read(void)
     if (state.bytecount > 0) {
       int c;
       if (d->emutype == REAL) { 
-	c = d->buf[SECSIZE - state.bytecount];
+	c = d->buf[REAL_SECSIZE - state.bytecount];
       } else {
 	c = getc(disk[state.curdrive].file);
 	if (c == EOF) {
@@ -857,7 +975,8 @@ trs_disk_data_read(void)
 	  state.data = sid->sector;
 	  break;
 	case 3:
-	  state.data = 0x01;  /* 256 bytes always */
+	  state.data =
+	    id_index_to_size_code(d, d->sorted_id[state.last_readadr]);
 	  break;
 	case 2:
 	case 1:
@@ -896,7 +1015,7 @@ trs_disk_data_write(unsigned char data)
   case TRSDISK_WRITE:
     if (state.bytecount > 0) {
       if (d->emutype == REAL) {
-	d->buf[SECSIZE - state.bytecount] = data;
+	d->buf[REAL_SECSIZE - state.bytecount] = data;
 	state.bytecount--;
 	if (state.bytecount <= 0) {
 	  real_write();
@@ -936,18 +1055,6 @@ trs_disk_data_write(unsigned char data)
       got_idam:
 	/* We've received an ID address mark */
 	state.format = FMT_TRACKID;
-	if (d->emutype == JV3) {
-	  /* Need to store sector ID info in d->unused_id */
-	  if (d->unused_id >= JV3_SECSMAX) {
-	    /* Data structure full */
-	    state.status |= TRSDISK_WRITEFLT;
-	    state.bytecount = 0;
-	    state.format_bytecount = 0;
-	    state.format = FMT_DONE;
-	  } else {
-	    d->sorted_valid = 0;
-	  }
-	}
       }
       break;
     case FMT_TRACKID:
@@ -966,9 +1073,6 @@ trs_disk_data_write(unsigned char data)
 	if (data != d->phytrack) {
 	  trs_disk_unimpl(state.currcommand, "false track number");
 	}
-	if (d->emutype == JV3) {
-	  d->id[d->unused_id].track = data;
-	}
 	state.format = FMT_HEADID;
       }
       break;
@@ -985,9 +1089,6 @@ trs_disk_data_write(unsigned char data)
       } else {
 	if (data != state.curside) {
 	  trs_disk_unimpl(state.currcommand, "false head number");
-	} else {
-	  d->id[d->unused_id].flags =
-	    (data ? JV3_SIDE : 0) | (state.density ? JV3_DENSITY : 0);
 	}
       }
       state.format = FMT_SECID;
@@ -1000,16 +1101,40 @@ trs_disk_data_write(unsigned char data)
 	  trs_disk_unimpl(state.currcommand, "JV1 sector number >= 10");
 	}
       } else {
-	d->id[d->unused_id].sector = data;
+	state.format_sec = data;
       }
       state.format = FMT_SIZEID;
       break;
     case FMT_SIZEID:
-      if (data != 0x01) {
-	trs_disk_unimpl(state.currcommand, "sector size != 256");
-      }
-      if (d->emutype == REAL) {
-	d->buf[d->nblocks++] = data;
+      if (d->emutype == JV3) {
+	int id_index;
+	if (data > 0x03) {
+	  trs_disk_unimpl(state.currcommand, "invalid sector size");
+	}
+	id_index = alloc_sector(d, data);
+	if (id_index == -1) {
+	  /* Data structure full */
+	  state.status |= TRSDISK_WRITEFLT;
+	  state.bytecount = 0;
+	  state.format_bytecount = 0;
+	  state.format = FMT_DONE;
+	  break;
+	}
+	d->sorted_valid = 0;
+	d->id[id_index].track = d->phytrack;
+	d->id[id_index].sector = state.format_sec;
+	d->id[id_index].flags =
+	  (state.curside ? JV3_SIDE : 0) | (state.density ? JV3_DENSITY : 0) |
+	  ((data & 3) ^ 1);
+	state.format_sec = id_index;
+
+      } else {
+	if (data != 0x01) {
+	  trs_disk_unimpl(state.currcommand, "sector size != 256");
+	}
+	if (d->emutype == REAL) {
+	  d->buf[d->nblocks++] = data;
+	}
       }
       state.format = FMT_GAP2;
       break;
@@ -1028,38 +1153,38 @@ trs_disk_data_write(unsigned char data)
 		trs_disk_unimpl(state.currcommand,
 				"JV1 directory track must be 17");
 	    } else {
-	      d->id[d->unused_id].flags |= JV3_DIRECTORY;
+	      d->id[state.format_sec].flags |= JV3_DIRECTORY;
 	    }
 	  }
 	}
 	if (d->emutype == JV3) {
 	  /* Prepare to write the data */
-	  fseek(d->file, offset(JV3, d->unused_id), 0);
+	  fseek(d->file, offset(d, state.format_sec), 0);
+	  state.format_bytecount = id_index_to_size(d, state.format_sec);
+	} else if (d->emutype == JV1) {
+	  state.format_bytecount = JV1_SECSIZE;
+	} else if (d->emutype == REAL) {
+	  state.format_bytecount = REAL_SECSIZE;
 	}
 	state.format = FMT_DATA;
-	state.format_bytecount = SECSIZE;
       }
       break;
     case FMT_DATA:
       if (data == 0xfe) {
 	/* Short sector with intentional CRC error */
 	if (d->emutype == JV3) {
-	  d->id[d->unused_id].flags |= JV3_NONIBM | JV3_ERROR;
+	  d->id[state.format_sec].flags |= JV3_NONIBM | JV3_ERROR;
 #if DISKDEBUG2
 	  fprintf(stderr,
 		  "non-IBM sector: drv %02x, sid %d, trk %02x, sec %02x\n",
 		  state.curdrive, state.curside,
-		  d->id[d->unused_id].track, 
-		  d->id[d->unused_id].sector);
+		  d->id[state.format_sec].track, 
+		  d->id[state.format_sec].sector);
 #endif
 	  /* Write the sector id */
-	  fseek(d->file, idoffset(d->unused_id), 0);
-	  c = fwrite(&d->id[d->unused_id], sizeof(SectorId), 1, d->file);
+	  fseek(d->file, idoffset(d, state.format_sec), 0);
+	  c = fwrite(&d->id[state.format_sec], sizeof(SectorId), 1, d->file);
 	  if (c == EOF) state.status |= TRSDISK_WRITEFLT;
-	  /* Update allocation limits */
-	  if (d->last_used_id < d->unused_id) d->last_used_id = d->unused_id;
-	  d->unused_id++;
-	  while (d->id[d->unused_id].track != JV3_UNUSED) d->unused_id++;
 	  goto got_idam;
 	} else {
 	  trs_disk_unimpl(state.currcommand, "JV1 non-IBM sector");
@@ -1077,22 +1202,18 @@ trs_disk_data_write(unsigned char data)
       if (data == 0xf7) {
 	state.bytecount--;  /* two bytes are written */
       } else {
-	/* Intentional CRC error (?!) */
+	/* Intentional CRC error */
 	if (d->emutype != JV3) {
 	  trs_disk_unimpl(state.currcommand, "intentional CRC error");
 	} else {
-	  d->id[d->unused_id].flags |= JV3_ERROR;
+	  d->id[state.format_sec].flags |= JV3_ERROR;
 	}
       }
       if (d->emutype == JV3) {
 	/* Write the sector id */
-	fseek(d->file, idoffset(d->unused_id), 0);
-	c = fwrite(&d->id[d->unused_id], sizeof(SectorId), 1, d->file);
+	fseek(d->file, idoffset(d, state.format_sec), 0);
+	c = fwrite(&d->id[state.format_sec], sizeof(SectorId), 1, d->file);
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
-	/* Update allocation limits */
-	if (d->last_used_id < d->unused_id) d->last_used_id = d->unused_id;
-	d->unused_id++;
-	while (d->id[d->unused_id].track != JV3_UNUSED) d->unused_id++;
       }
       state.format = FMT_GAP3;
       break;
@@ -1151,7 +1272,7 @@ trs_disk_status_read(void)
 void
 trs_disk_command_write(unsigned char cmd)
 {
-  int id_index, bytecount;
+  int id_index, non_ibm;
   DiskState *d = &disk[state.curdrive];
 
 #ifdef DISKDEBUG
@@ -1212,7 +1333,7 @@ trs_disk_command_write(unsigned char cmd)
     goto step;
   case TRSDISK_READ:
     state.status = 0;
-    bytecount = SECSIZE;
+    non_ibm = 0;
     if (state.controller == TRSDISK_P1771) {
       if (!(cmd & TRSDISK_BBIT)) {
 #if DISKDEBUG2
@@ -1223,7 +1344,7 @@ trs_disk_command_write(unsigned char cmd)
 	if (d->emutype == REAL) {
 	  trs_disk_unimpl(cmd, "non-IBM read on real floppy");
 	}
-	bytecount = 16;
+	non_ibm = 1;
       } else {
 #if DISKDEBUG2
 	if (state.sector >= 0x7c) {
@@ -1251,6 +1372,7 @@ trs_disk_command_write(unsigned char cmd)
 	    state.status |= TRSDISK_1791_F8;
 	  }
 	}
+	state.bytecount = JV1_SECSIZE;
       } else {
 	if (d->id[id_index].flags & JV3_DIRECTORY) {
 	  if (state.controller == TRSDISK_P1771) {
@@ -1262,11 +1384,15 @@ trs_disk_command_write(unsigned char cmd)
 	if (d->id[id_index].flags & JV3_ERROR) {
 	  state.status |= TRSDISK_CRCERR;
 	}
+	if (non_ibm) {
+	  state.bytecount = 16;
+	} else {
+	  state.bytecount = id_index_to_size(d, id_index);
+	}
       }
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
-      state.bytecount = bytecount;
-      fseek(d->file, offset(d->emutype, id_index), 0);
+      fseek(d->file, offset(d, id_index), 0);
     }
     break;
   case TRSDISK_READM:
@@ -1274,7 +1400,7 @@ trs_disk_command_write(unsigned char cmd)
     break;
   case TRSDISK_WRITE:
     state.status = 0;
-    bytecount = SECSIZE;
+    non_ibm = 0;
     if (state.controller == TRSDISK_P1771) {
       if (!(cmd & TRSDISK_BBIT)) {
 #if DISKDEBUG2
@@ -1285,7 +1411,7 @@ trs_disk_command_write(unsigned char cmd)
 	if (d->emutype == REAL) {
 	  trs_disk_unimpl(cmd, "non-IBM write on real floppy");
 	}
-	bytecount = 16;
+	non_ibm = 1;
       } else {
 #if DISKDEBUG2
 	if (state.sector >= 0x7c) {
@@ -1299,7 +1425,7 @@ trs_disk_command_write(unsigned char cmd)
     if (d->emutype == REAL) {
       state.status = TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
-      state.bytecount = bytecount;
+      state.bytecount = REAL_SECSIZE;
       break;
     }
     if (d->writeprot) {
@@ -1319,6 +1445,7 @@ trs_disk_command_write(unsigned char cmd)
 	  trs_disk_unimpl(state.currcommand, "JV1 directory must be track 17");
 	  break;
 	}
+	state.bytecount = JV1_SECSIZE;
       } else {
 	SectorId *sid = &d->id[id_index];
 	unsigned char newflags = sid->flags;
@@ -1330,7 +1457,7 @@ trs_disk_command_write(unsigned char cmd)
 	}
 	if (newflags != sid->flags) {
 	  int c;
-	  fseek(d->file, idoffset(id_index) 
+	  fseek(d->file, idoffset(d, id_index) 
 		         + ((char *) &sid->flags) - ((char *) sid), 0);
 	  c = putc(newflags, d->file);
 	  if (c == EOF) state.status |= TRSDISK_WRITEFLT;
@@ -1351,15 +1478,12 @@ trs_disk_command_write(unsigned char cmd)
 #if DISKDEBUG2
 	      fprintf(stderr, "smashing sector %02x\n", i);
 #endif
-	      fseek(d->file, idoffset(j), SEEK_SET);
-	      putc(0xff, d->file);
-	      putc(0xff, d->file);
-	      putc(0xff, d->file);
+	      free_sector(d, idoffset(d, j));
 	      c = fflush(d->file);
 	      if (c == EOF) state.status |= TRSDISK_WRITEFLT;
 	    }	      
 	    /* Smash only one for non-IBM write */
-	    if (bytecount == 16) break;
+	    if (non_ibm) break;
 	  }
 	}
 	/* end kludge */
@@ -1367,8 +1491,12 @@ trs_disk_command_write(unsigned char cmd)
       }
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
-      state.bytecount = bytecount;
-      fseek(d->file, offset(d->emutype, id_index), 0);
+      if (non_ibm) {
+	state.bytecount = 16;
+      } else {
+	state.bytecount = id_index_to_size(d, id_index);
+      }
+      fseek(d->file, offset(d, id_index), 0);
     }
     break;
   case TRSDISK_WRITEM:
@@ -1437,8 +1565,7 @@ trs_disk_command_write(unsigned char cmd)
   case TRSDISK_WRITETRK:
     /* Really a write track? */
     if (trs_model == 1 && (cmd == TRSDISK_P1771 || cmd == TRSDISK_P1791)) {
-      /* No; emulate Percom Doubler.  Shortcut: we don't really maintain
-	 separate state for the two controllers. */
+      /* No; emulate Percom Doubler */
       if (trs_disk_doubler & TRSDISK_PERCOM) {
 	trs_disk_set_controller(cmd);
 	/* The Doubler's 1791 is hardwired to double density */
@@ -1453,21 +1580,11 @@ trs_disk_command_write(unsigned char cmd)
       if (d->emutype == JV3) {
 	/* Erase track if already formatted */
 	int i;
-	SectorId *sid;
-	for (i=0, sid=d->id; i<=d->last_used_id; i++, sid++) {
-	  if (sid->track == d->phytrack &&
-	      ((sid->flags & JV3_SIDE) != 0) == state.curside) {
-            int c;
-	    sid->track = sid->sector = sid->flags = JV3_UNUSED;
-	    fseek(d->file, idoffset(i), 0);
-	    c = fwrite(sid, sizeof(SectorId), 1, d->file);
-	    if (c == EOF) state.status |= TRSDISK_WRITEFLT;
-	    if (d->unused_id > i) d->unused_id = i;
-	    d->sorted_valid = 0;
+	for (i=0; i<=d->last_used_id; i++) {
+	  if (d->id[i].track == d->phytrack &&
+	      ((d->id[i].flags & JV3_SIDE) != 0) == state.curside) {
+	    free_sector(d, i);
 	  }
-	}
-	while (d->id[d->last_used_id].track == JV3_UNUSED) {
-	  d->last_used_id--;
 	}
       }
       state.status = TRSDISK_BUSY|TRSDISK_DRQ;
@@ -1654,7 +1771,7 @@ real_read()
     if ((raw_cmd.reply[0] & 0xc0) == 0) {
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
-      state.bytecount = SECSIZE;
+      state.bytecount = REAL_SECSIZE;
       return;
     }
   }
