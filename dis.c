@@ -373,14 +373,14 @@ static struct opcode minor[6][256] = {
 	"sra	(hl)",		0,		/* cb2e */
 	"sra	a",		0,		/* cb2f */
 	
-	undefined,		0,		/* cb30 */
-	undefined,		0,		/* cb31 */
-	undefined,		0,		/* cb32 */
-	undefined,		0,		/* cb33 */
-	undefined,		0,		/* cb34 */
-	undefined,		0,		/* cb35 */
-	undefined,		0,		/* cb36 */
-	undefined,		0,		/* cb37 */
+	"sll	b",		0,		/* cb30 [undocumented] */
+	"sll	c",		0,		/* cb31 [undocumented] */
+	"sll	d",		0,		/* cb32 [undocumented] */
+	"sll	e",		0,		/* cb33 [undocumented] */
+	"sll	h",		0,		/* cb34 [undocumented] */
+	"sll	l",		0,		/* cb35 [undocumented] */
+	"sll	(hl)",		0,		/* cb36 [undocumented] */
+	"sll	a",		0,		/* cb37 [undocumented] */
 	
 	"srl	b",		0,		/* cb38 */
 	"srl	c",		0,		/* cb39 */
@@ -647,18 +647,18 @@ static struct opcode minor[6][256] = {
 	"ld	ix,%02x%02xh",	2,		/* dd21 */
 	"ld	(%02x%02xh),ix",2,		/* dd22 */
 	"inc	ix",		0,		/* dd23 */
-	undefined,		0,		/* dd24 */
-	undefined,		0,		/* dd25 */
-	undefined,		0,		/* dd26 */
+	"inc	ixh",		0,		/* dd24 [undocumented] */
+	"dec	ixh",		0,		/* dd25 [undocumented] */
+	"ld	ixh,%02xh",	1,		/* dd26 [undocumented] */
 	undefined,		0,		/* dd27 */
 
 	undefined,		0,		/* dd28 */
 	"add	ix,ix",		0,		/* dd29 */
 	"ld	ix,(%02x%02xh)",2,		/* dd2a */
 	"dec	ix",		0,		/* dd2b */
-	undefined,		0,		/* dd2c */
-	undefined,		0,		/* dd2d */
-	undefined,		0,		/* dd2e */
+	"inc	ixl",		0,		/* dd2c [undocumented] */
+	"dec	ixl",		0,		/* dd2d [undocumented] */
+	"ld	ixl,%02xh",	1,		/* dd2e [undocumented] */
 	undefined,		0,		/* dd2f */
 
 	undefined,		0,		/* dd30 */
@@ -683,8 +683,8 @@ static struct opcode minor[6][256] = {
 	undefined,		0,		/* dd41 */
 	undefined,		0,		/* dd42 */
 	undefined,		0,		/* dd43 */
-	undefined,		0,		/* dd44 */
-	undefined,		0,		/* dd45 */
+	"ld	b,ixh",		0,		/* dd44 [undocumented] */
+	"ld	b,ixl",		0,		/* dd45 [undocumented] */
 	"ld	b,(ix+%02xh)",	1,		/* dd46 */
 	undefined,		0,		/* dd47 */
 
@@ -692,8 +692,8 @@ static struct opcode minor[6][256] = {
 	undefined,		0,		/* dd49 */
 	undefined,		0,		/* dd4a */
 	undefined,		0,		/* dd4b */
-	undefined,		0,		/* dd4c */
-	undefined,		0,		/* dd4d */
+	"ld	c,ixh",		0,		/* dd4c [undocumented] */
+	"ld	c,ixl",		0,		/* dd4d [undocumented] */
 	"ld	c,(ix+%02xh)",	1,		/* dd4e */
 	undefined,		0,		/* dd4f */
 	
@@ -701,8 +701,8 @@ static struct opcode minor[6][256] = {
 	undefined,		0,		/* dd51 */
 	undefined,		0,		/* dd52 */
 	undefined,		0,		/* dd53 */
-	undefined,		0,		/* dd54 */
-	undefined,		0,		/* dd55 */
+	"ld	d,ixh",		0,		/* dd54 [undocumented] */
+	"ld	d,ixl",		0,		/* dd55 [undocumented] */
 	"ld	d,(ix+%02xh)",	1,		/* dd56 */
 	undefined,		0,		/* dd57 */
 
@@ -710,28 +710,28 @@ static struct opcode minor[6][256] = {
 	undefined,		0,		/* dd59 */
 	undefined,		0,		/* dd5a */
 	undefined,		0,		/* dd5b */
-	undefined,		0,		/* dd5c */
-	undefined,		0,		/* dd5d */
+	"ld	e,ixh",		0,		/* dd5c [undocumented] */
+	"ld	e,ixl",		0,		/* dd5d [undocumented] */
 	"ld	e,(ix+%02xh)",	1,		/* dd5e */
 	undefined,		0,		/* dd5f */
 	
-	undefined,		0,		/* dd60 */
-	undefined,		0,		/* dd61 */
-	undefined,		0,		/* dd62 */
-	undefined,		0,		/* dd63 */
-	undefined,		0,		/* dd64 */
-	undefined,		0,		/* dd65 */
+	"ld	ixh,b",		0,		/* dd60 [undocumented] */
+	"ld	ixh,c",		0,		/* dd61 [undocumented] */
+	"ld	ixh,d",		0,		/* dd62 [undocumented] */
+	"ld	ixh,e",		0,		/* dd63 [undocumented] */
+	"ld	ixh,ixh",	0,		/* dd64 [undocumented] */
+	"ld	ixh,ixl",	0,		/* dd65 [undocumented] */
 	"ld	h,(ix+%02xh)",	1,		/* dd66 */
-	undefined,		0,		/* dd67 */
+	"ld	ixh,a",		0,		/* dd67 [undocumented] */
 
-	undefined,		0,		/* dd68 */
-	undefined,		0,		/* dd69 */
-	undefined,		0,		/* dd6a */
-	undefined,		0,		/* dd6b */
-	undefined,		0,		/* dd6c */
-	undefined,		0,		/* dd6d */
+	"ld	ixl,b",		0,		/* dd68 [undocumented] */
+	"ld	ixl,c",		0,		/* dd69 [undocumented] */
+	"ld	ixl,d",		0,		/* dd6a [undocumented] */
+	"ld	ixl,e",		0,		/* dd6b [undocumented] */
+	"ld	ixl,ixh",	0,		/* dd6c [undocumented] */
+	"ld	ixl,ixl",	0,		/* dd6d [undocumented] */
 	"ld	l,(ix+%02xh)",	1,		/* dd6e */
-	undefined,		0,		/* dd6f */
+	"ld	ixl,a",		0,		/* dd6f [undocumented] */
 	
 	"ld	(ix+%02xh),b",	1,		/* dd70 */
 	"ld	(ix+%02xh),c",	1,		/* dd71 */
@@ -746,8 +746,8 @@ static struct opcode minor[6][256] = {
 	undefined,		0,		/* dd79 */
 	undefined,		0,		/* dd7a */
 	undefined,		0,		/* dd7b */
-	undefined,		0,		/* dd7c */
-	undefined,		0,		/* dd7d */
+	"ld	a,ixh",		0,		/* dd7c [undocumented] */
+	"ld	a,ixl",		0,		/* dd7d [undocumented] */
 	"ld	a,(ix+%02xh)",	1,		/* dd7e */
 	undefined,		0,		/* dd7f */
 
@@ -755,8 +755,8 @@ static struct opcode minor[6][256] = {
 	undefined,		0,		/* dd81 */
 	undefined,		0,		/* dd82 */
 	undefined,		0,		/* dd83 */
-	undefined,		0,		/* dd84 */
-	undefined,		0,		/* dd85 */
+	"add	a,ixh",		0,		/* dd84 [undocumented] */
+	"add	a,ixl",		0,		/* dd85 [undocumented] */
 	"add	a,(ix+%02xh)",	1,		/* dd86 */
 	undefined,		0,		/* dd87 */
 
@@ -764,8 +764,8 @@ static struct opcode minor[6][256] = {
 	undefined,		0,		/* dd89 */
 	undefined,		0,		/* dd8a */
 	undefined,		0,		/* dd8b */
-	undefined,		0,		/* dd8c */
-	undefined,		0,		/* dd8d */
+	"adc	a,ixh",		0,		/* dd8c [undocumented] */
+	"adc	a,ixl",		0,		/* dd8d [undocumented] */
 	"adc	a,(ix+%02xh)",	1,		/* dd8e */
 	undefined,		0,		/* dd8f */
 	
@@ -773,8 +773,8 @@ static struct opcode minor[6][256] = {
 	undefined,		0,		/* dd91 */
 	undefined,		0,		/* dd92 */
 	undefined,		0,		/* dd93 */
-	undefined,		0,		/* dd94 */
-	undefined,		0,		/* dd95 */
+	"sub	ixh",		0,		/* dd94 [undocumented] */
+	"sub	ixl",		0,		/* dd95 [undocumented] */
 	"sub	(ix+%02xh)",	1,		/* dd96 */
 	undefined,		0,		/* dd97 */
 
@@ -782,8 +782,8 @@ static struct opcode minor[6][256] = {
 	undefined,		0,		/* dd99 */
 	undefined,		0,		/* dd9a */
 	undefined,		0,		/* dd9b */
-	undefined,		0,		/* dd9c */
-	undefined,		0,		/* dd9d */
+	"sbc	ixh",		0,		/* dd9c [undocumented] */
+	"sbc	ixl",		0,		/* dd9d [undocumented] */
 	"sbc	a,(ix+%02xh)",	1,		/* dd9e */
 	undefined,		0,		/* dd9f */
 	
@@ -791,8 +791,8 @@ static struct opcode minor[6][256] = {
 	undefined,		0,		/* dda1 */
 	undefined,		0,		/* dda2 */
 	undefined,		0,		/* dda3 */
-	undefined,		0,		/* dda4 */
-	undefined,		0,		/* dda5 */
+	"and	ixh",		0,		/* dda4 [undocumented] */
+	"and	ixl",		0,		/* dda5 [undocumented] */
 	"and	(ix+%02xh)",	1,		/* dda6 */
 	undefined,		0,		/* dda7 */
 
@@ -800,8 +800,8 @@ static struct opcode minor[6][256] = {
 	undefined,		0,		/* dda9 */
 	undefined,		0,		/* ddaa */
 	undefined,		0,		/* ddab */
-	undefined,		0,		/* ddac */
-	undefined,		0,		/* ddad */
+	"xor	ixh",		0,		/* ddac [undocumented] */
+	"xor	ixl",		0,		/* ddad [undocumented] */
 	"xor	(ix+%02xh)",	1,		/* ddae */
 	undefined,		0,		/* ddaf */
 	
@@ -809,8 +809,8 @@ static struct opcode minor[6][256] = {
 	undefined,		0,		/* ddb1 */
 	undefined,		0,		/* ddb2 */
 	undefined,		0,		/* ddb3 */
-	undefined,		0,		/* ddb4 */
-	undefined,		0,		/* ddb5 */
+	"or	ixh",		0,		/* ddb4 [undocumented] */
+	"or	ixl",		0,		/* ddb5 [undocumented] */
 	"or	(ix+%02xh)",	1,		/* ddb6 */
 	undefined,		0,		/* ddb7 */
 
@@ -818,8 +818,8 @@ static struct opcode minor[6][256] = {
 	undefined,		0,		/* ddb9 */
 	undefined,		0,		/* ddba */
 	undefined,		0,		/* ddbb */
-	undefined,		0,		/* ddbc */
-	undefined,		0,		/* ddbd */
+	"cp	ixh",		0,		/* ddbc [undocumented] */
+	"cp	ixl",		0,		/* ddbd [undocumented] */
 	"cp	(ix+%02xh)",	1,		/* ddbe */
 	undefined,		0,		/* ddbf */
 	
@@ -949,21 +949,21 @@ static struct opcode minor[6][256] = {
 	undefined,		0,		/* ed2e */
 	undefined,		0,		/* ed2f */
 
-	/* Emulator traps; not real Z80 instructions */
-	"open",			0,		/* ed30 */
-	"close",		0,		/* ed31 */
-	"read",			0,		/* ed32 */
-	"write",		0,		/* ed33 */
-	"lseek",		0,		/* ed34 */
-	undefined,		0,		/* ed35 */
-	undefined,		0,		/* ed36 */
-	undefined,		0,		/* ed37 */
+	/* xtrs emulator traps; not real Z80 instructions */
+	"emt_open",		0,		/* ed30 */
+	"emt_close",		0,		/* ed31 */
+	"emt_read",		0,		/* ed32 */
+	"emt_write",		0,		/* ed33 */
+	"emt_lseek",		0,		/* ed34 */
+	"emt_strerror",		0,		/* ed35 */
+	"emt_time",		0,		/* ed36 */
+	"emt_opendir",		0,		/* ed37 */
 
-	undefined,		0,		/* ed38 */
-	undefined,		0,		/* ed39 */
-	undefined,		0,		/* ed3a */
-	undefined,		0,		/* ed3b */
-	undefined,		0,		/* ed3c */
+	"emt_closedir",		0,		/* ed38 */
+	"emt_readdir",		0,		/* ed39 */
+	"emt_chdir",		0,		/* ed3a */
+	"emt_getcwd",		0,		/* ed3b */
+	"emt_misc",		0,		/* ed3c */
 	undefined,		0,		/* ed3d */
 	undefined,		0,		/* ed3e */
 	undefined,		0,		/* ed3f */
@@ -981,17 +981,17 @@ static struct opcode minor[6][256] = {
 	"out	(c),c",		0,		/* ed49 */
 	"adc	hl,bc",		0,		/* ed4a */
 	"ld	bc,(%02x%02xh)",2,		/* ed4b */
-	undefined,		0,		/* ed4c */
+	"neg",			0,		/* ed4c [undocumented] */
 	"reti",			0,		/* ed4d */
 	undefined,		0,		/* ed4e */
-	undefined,		0,		/* ed4f */
+	"ld	r,a",		0,		/* ed4f */
 
 	"in	d,(c)",		0,		/* ed50 */
 	"out	(c),d",		0,		/* ed51 */
 	"sbc	hl,de",		0,		/* ed52 */
 	"ld	(%02x%02xh),de",2,		/* ed53 */
-	undefined,		0,		/* ed54 */
-	undefined,		0,		/* ed55 */
+	"neg",			0,		/* ed54 [undocumented] */
+	"ret",			0,		/* ed55 [undocumented] */
 	"im	1",		0,		/* ed56 */
 	"ld	a,i",		0,		/* ed57 */
 
@@ -999,45 +999,45 @@ static struct opcode minor[6][256] = {
 	"out	(c),e",		0,		/* ed59 */
 	"adc	hl,de",		0,		/* ed5a */
 	"ld	de,(%02x%02xh)",2,		/* ed5b */
-	undefined,		0,		/* ed5c */
-	undefined,		0,		/* ed5d */
+	"neg",			0,		/* ed5c [undocumented] */
+	"ret",			0,		/* ed5d [undocumented] */
 	"im	2",		0,		/* ed5e */
 	undefined,		0,		/* ed5f */
 
 	"in	h,(c)",		0,		/* ed60 */
 	"out	(c),h",		0,		/* ed61 */
 	"sbc	hl,hl",		0,		/* ed62 */
-	undefined,		0,		/* ed63 */
-	undefined,		0,		/* ed64 */
-	undefined,		0,		/* ed65 */
-	undefined,		0,		/* ed66 */
+	"ld	(%02x%02xh),hl",2,		/* ed63 [semi-documented] */
+	"neg",			0,		/* ed64 [undocumented] */
+	"ret",			0,		/* ed65 [undocumented] */
+	"im	0",		0,		/* ed66 [undocumented] */
 	"rrd",			0,		/* ed67 */
 
 	"in	l,(c)",		0,		/* ed68 */
 	"out	(c),l",		0,		/* ed69 */
 	"adc	hl,hl",		0,		/* ed6a */
-	undefined,		0,		/* ed6b */
-	undefined,		0,		/* ed6c */
-	undefined,		0,		/* ed6d */
+	"ld	hl,(%02x%02xh)",2,		/* ed6b [semi-documented] */
+	"neg",			0,		/* ed6c [undocumented] */
+	"ret",			0,		/* ed6d [undocumented] */
 	undefined,		0,		/* ed6e */
 	"rld",			0,		/* ed6f */
 	
-	undefined,		0,		/* ed70 */
-	undefined,		0,		/* ed71 */
+	"in	(c)",		0,		/* ed70 [undocumented] */
+	"out	(c),0",		0,		/* ed71 [undocumented] */
 	"sbc	hl,sp",		0,		/* ed72 */
 	"ld	(%02x%02xh),sp",2,		/* ed73 */
-	undefined,		0,		/* ed74 */
-	undefined,		0,		/* ed75 */
-	undefined,		0,		/* ed76 */
+	"neg",			0,		/* ed74 [undocumented] */
+	"ret",			0,		/* ed75 [undocumented] */
+	"im	1",		0,		/* ed76 [undocumented] */
 	undefined,		0,		/* ed77 */
 
 	"in	a,(c)",		0,		/* ed78 */
 	"out	(c),a",		0,		/* ed79 */
 	"adc	hl,sp",		0,		/* ed7a */
 	"ld	sp,(%02x%02xh)",2,		/* ed7b */
-	undefined,		0,		/* ed7c */
-	undefined,		0,		/* ed7d */
-	undefined,		0,		/* ed7e */
+	"neg",			0,		/* ed7c [undocumented] */
+	"ret",			0,		/* ed7d [undocumented] */
+	"im	2",		0,		/* ed7e [undocumented] */
 	undefined,		0,		/* ed7f */
 
 	undefined,		0,		/* ed80 */
@@ -1533,7 +1533,7 @@ static struct opcode minor[6][256] = {
 	undefined,		0,		/* ddcb33 */
 	undefined,		0,		/* ddcb34 */
 	undefined,		0,		/* ddcb35 */
-	undefined,		0,		/* ddcb36 */
+	"sll	(ix+%02xh)",	3,		/* ddcb36 [undocumented] */
 	undefined,		0,		/* ddcb37 */
 	
 	undefined,		0,		/* ddcb38 */
@@ -1822,7 +1822,7 @@ static struct opcode minor[6][256] = {
 	undefined,		0,		/* fdcb33 */
 	undefined,		0,		/* fdcb34 */
 	undefined,		0,		/* fdcb35 */
-	undefined,		0,		/* fdcb36 */
+	"sll	(iy+%02xh)",	3,		/* fdcb36 [undocumented] */
 	undefined,		0,		/* fdcb37 */
 	
 	undefined,		0,		/* fdcb38 */
