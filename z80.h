@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Aug 23 02:22:57 PDT 1997 by mann
+   Last modified on Sat Sep 20 18:28:25 PDT 1997 by mann
 */
 
 #include "config.h"
@@ -128,6 +128,9 @@ struct z80_state_struct
 #define REG_IY	(z80_state.iy.word)
 
 #define REG_I	(z80_state.i)
+
+#define HIGH(p) (((struct twobyte *)(p))->high)
+#define LOW(p) (((struct twobyte *)(p))->low)
 
 /*
  * Flag accessors:

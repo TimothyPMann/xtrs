@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Aug 26 00:12:26 PDT 1997 by mann
+   Last modified on Thu Sep 25 18:07:18 PDT 1997 by mann
 */
 
 /*
@@ -25,11 +25,24 @@
  * adapted to emulate any Z-80 machine, although it's only really been tested
  * with TRS-80 code.  The only thing we cheat a little on is interrupt
  * handling and the refresh register.  All of the flags are supported.
- * All of the documented Z-80 instructions are implemented.
+ * All of the documented Z-80 instructions are implemented.  
  *
- * There are undobutedly bugs in the emulator.  If you discover any,
- * please do send a report.
- */
+ * Some undocumented Z-80 features are implemented too, but others are
+ * not.  Currently implemented: "sll" instructions (CB30-CB37), DD or
+ * FD prefix on instructions that use H or L, undocumented ED prefix
+ * instructions including "in (c)" (ED70), "out (c), 0" (ED71).
+ * Registers F, F' each have 8 working bits, usable with pop af/push af.
+ *
+ * Known omissions: DD or FD prefix on CB instructions that don't
+ * reference HL (these are weird), DD or FD prefix on other
+ * instructions that don't reference HL, H, or L (prefix should be
+ * ignored), multiple DD or FD prefixes on one instruction (all but
+ * the last should be ignored), ED prefix instructions that are no-ops
+ * or that set IM to an undefined state.  Instructions other than "pop
+ * af" and "ex af, af'" do not affect the undocumented flag bits in F.
+ *
+ * There are undoubtedly bugs in the emulator.  If you discover any,
+ * please do send a report.  */
 #include "z80.h"
 #include "trs.h"
 
@@ -850,6 +863,33 @@ static int sra_byte(value)
     return result;
 }
 
+/* undocumented opcode sll: shift left and set bit 0 to 1 */
+static int sll_byte(value)
+    int value;
+{
+    Uchar clear, set;
+    int result;
+
+    clear = (Uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
+		      SUBTRACT_MASK | CARRY_MASK);
+    set = 0;
+
+    result = (value << 1) | 1;
+
+    if(result & 0x80)
+      set |= SIGN_MASK;
+    if(result == 0)
+      set |= ZERO_MASK;
+    if(parity(result))
+      set |= PARITY_MASK;
+    if(value & 0x80)
+      set |= CARRY_MASK;
+
+    REG_F = (REG_F & clear) | set;
+
+    return result;
+}
+
 static int srl_byte(value)
     int value;
 {
@@ -1308,16 +1348,12 @@ static void do_outir()
 
 static void do_di()
 {
-    z80_state.iff1 = 0;
+    z80_state.iff1 = z80_state.iff2 = 0;
 }
 
 static void do_ei()
 {
-    /* Enable interrupts after the *next* instruction.  The bogus
-       value "2" is corrected by our caller at the end of the
-       current instruction.
-    */
-    z80_state.iff1 = 2;
+    z80_state.iff1 = z80_state.iff2 = 1;
 }
 
 static void do_im0()
@@ -1361,7 +1397,6 @@ static void do_nmi()
     /* handle a non-maskable interrupt */
     REG_SP -= 2;
     mem_write_word(REG_SP, REG_PC);
-    z80_state.iff2 = z80_state.iff1;
     z80_state.iff1 = 0;
     REG_PC = 0x66;
 }
@@ -2110,6 +2145,31 @@ static void do_CB_instruction()
 	mem_write(REG_HL, sra_byte(mem_read(REG_HL)));
 	break;
 
+      case 0x37:	/* sll a [undocumented] */
+	REG_A = sll_byte(REG_A);
+	break;
+      case 0x30:	/* sll b [undocumented] */
+	REG_B = sll_byte(REG_B);
+	break;
+      case 0x31:	/* sll c [undocumented] */
+	REG_C = sll_byte(REG_C);
+	break;
+      case 0x32:	/* sll d [undocumented] */
+	REG_D = sll_byte(REG_D);
+	break;
+      case 0x33:	/* sll e [undocumented] */
+	REG_E = sll_byte(REG_E);
+	break;
+      case 0x34:	/* sll h [undocumented] */
+	REG_H = sll_byte(REG_H);
+	break;
+      case 0x35:	/* sll l [undocumented] */
+	REG_L = sll_byte(REG_L);
+	break;
+      case 0x36:	/* sll (hl) [undocumented] */
+	mem_write(REG_HL, sll_byte(mem_read(REG_HL)));
+	break;
+
       case 0x3F:	/* srl a */
 	REG_A = srl_byte(REG_A);
 	break;
@@ -2152,7 +2212,7 @@ static void do_indexed_instruction(ixp)
     
     switch(instruction)
     {
-	/* same for FD, except uses IY? */
+	/* same for FD, except uses IY */
 
       case 0x8E:	/* adc a, (ix + offset) */
 	do_adc_byte(mem_read(*ixp + (char) mem_read(REG_PC++)));
@@ -2427,6 +2487,9 @@ static void do_indexed_instruction(ixp)
 	    case 0x2E:	/* sra (ix + offset) */
 	      mem_write(*ixp + offset, sra_byte(mem_read(*ixp + offset)));
 	      break;
+	    case 0x36:	/* sll (ix + offset) [undocumented] */
+	      mem_write(*ixp + offset, sll_byte(mem_read(*ixp + offset)));
+	      break;
 	    case 0x3E:	/* srl (ix + offset) */
 	      mem_write(*ixp + offset, srl_byte(mem_read(*ixp + offset)));
 	      break;
@@ -2438,6 +2501,150 @@ static void do_indexed_instruction(ixp)
 	  }
         }
 	break;
+
+      /* begin undocumented instructions */
+      case 0x8C:	/* adc a, ixh */
+	do_adc_byte(HIGH(ixp));
+	break;
+      case 0x8D:	/* adc a, ixl */
+	do_adc_byte(LOW(ixp));
+	break;
+      case 0x84:	/* add a, ixh */
+	do_add_byte(HIGH(ixp));
+	break;
+      case 0x85:	/* add a, ixl */
+	do_add_byte(LOW(ixp));
+	break;
+      case 0xA4:	/* and ixh */
+	do_and_byte(HIGH(ixp));
+	break;
+      case 0xA5:	/* and ixl */
+	do_and_byte(LOW(ixp));
+	break;
+      case 0xBC:	/* cp ixh */
+	do_cp(HIGH(ixp));
+	break;
+      case 0xBD:	/* cp ixl */
+	do_cp(LOW(ixp));
+	break;
+      case 0x25:	/* dec ixh */
+	do_flags_dec_byte(--HIGH(ixp));
+	break;
+      case 0x2D:	/* dec ixl */
+	do_flags_dec_byte(--LOW(ixp));
+	break;
+      case 0x24:	/* inc ixh */
+	HIGH(ixp)++;
+	do_flags_inc_byte(HIGH(ixp));
+	break;
+      case 0x2C:	/* inc ixl */
+	LOW(ixp)++;
+	do_flags_inc_byte(LOW(ixp));
+	break;
+      case 0x7C:	/* ld a, ixh */
+	REG_A = HIGH(ixp);
+	break;
+      case 0x7D:	/* ld a, ixl */
+	REG_A = LOW(ixp);
+	break;
+      case 0x44:	/* ld b, ixh */
+	REG_B = HIGH(ixp);
+	break;
+      case 0x45:	/* ld b, ixl */
+	REG_B = LOW(ixp);
+	break;
+      case 0x4C:	/* ld c, ixh */
+	REG_C = HIGH(ixp);
+	break;
+      case 0x4D:	/* ld c, ixl */
+	REG_C = LOW(ixp);
+	break;
+      case 0x54:	/* ld d, ixh */
+	REG_D = HIGH(ixp);
+	break;
+      case 0x55:	/* ld d, ixl */
+	REG_D = LOW(ixp);
+	break;
+      case 0x5C:	/* ld e, ixh */
+	REG_E = HIGH(ixp);
+	break;
+      case 0x5D:	/* ld e, ixl */
+	REG_E = LOW(ixp);
+	break;
+      case 0x67:	/* ld ixh, a */
+	HIGH(ixp) = REG_A;
+	break;
+      case 0x60:	/* ld ixh, b */
+	HIGH(ixp) = REG_B;
+	break;
+      case 0x61:	/* ld ixh, c */
+	HIGH(ixp) = REG_C;
+	break;
+      case 0x62:	/* ld ixh, d */
+	HIGH(ixp) = REG_D;
+	break;
+      case 0x63:	/* ld ixh, e */
+	HIGH(ixp) = REG_E;
+	break;
+      case 0x64:	/* ld ixh, ixh */
+	HIGH(ixp) = HIGH(ixp);
+	break;
+      case 0x65:	/* ld ixh, ixl */
+	HIGH(ixp) = LOW(ixp);
+	break;
+      case 0x6F:	/* ld ixl, a */
+	LOW(ixp) = REG_A;
+	break;
+      case 0x68:	/* ld ixl, b */
+	LOW(ixp) = REG_B;
+	break;
+      case 0x69:	/* ld ixl, c */
+	LOW(ixp) = REG_C;
+	break;
+      case 0x6A:	/* ld ixl, d */
+	LOW(ixp) = REG_D;
+	break;
+      case 0x6B:	/* ld ixl, e */
+	LOW(ixp) = REG_E;
+	break;
+      case 0x6C:	/* ld ixl, ixh */
+	LOW(ixp) = HIGH(ixp);
+	break;
+      case 0x6D:	/* ld ixl, ixl */
+	LOW(ixp) = LOW(ixp);
+	break;
+      case 0x26:	/* ld ixh, value */
+	HIGH(ixp) = mem_read(REG_PC++);
+	break;
+      case 0x2E:	/* ld ixl, value */
+	LOW(ixp) = mem_read(REG_PC++);
+	break;
+      case 0xB4:	/* or ixh */
+	do_or_byte(HIGH(ixp));
+	break;
+      case 0xB5:	/* or ixl */
+	do_or_byte(LOW(ixp));
+	break;
+      case 0x9C:	/* sbc a, ixh */
+	do_sbc_byte(HIGH(ixp));
+	break;
+      case 0x9D:	/* sbc a, ixl */
+	do_sbc_byte(LOW(ixp));
+	break;
+      case 0x94:	/* sub a, ixh */
+	do_sub_byte(HIGH(ixp));
+	break;
+      case 0x95:	/* sub a, ixl */
+	do_sub_byte(LOW(ixp));
+	break;
+      case 0xAC:	/* xor ixh */
+	do_xor_byte(HIGH(ixp));
+	break;
+      case 0xAD:	/* xor ixl */
+	do_xor_byte(LOW(ixp));
+	break;
+      /* end undocumented instructions */
+
       default:
 	REG_PC -= 2;
 	disassemble(REG_PC);
@@ -2482,12 +2689,15 @@ static void do_ED_instruction()
 	break;
 
       case 0x46:	/* im 0 */
+      case 0x66:	/* im 0 [undocumented]*/
 	do_im0();
 	break;
       case 0x56:	/* im 1 */
+      case 0x76:	/* im 1 [undocumented] */
 	do_im1();
 	break;
       case 0x5E:	/* im 2 */
+      case 0x7E:	/* im 2 [undocumented] */
 	do_im2();
 	break;
 
@@ -2512,6 +2722,9 @@ static void do_ED_instruction()
       case 0x68:	/* in l, (c) */
 	REG_L = in_with_flags(REG_C);
 	break;
+      case 0x70:	/* in (c) [undocumented] */
+	(void) in_with_flags(REG_C);
+	break;
 
       case 0xAA:	/* ind */
 	do_ind();
@@ -2535,6 +2748,9 @@ static void do_ED_instruction()
 
       case 0x5F:	/* ld a, r */
 	do_ld_a_r();
+	break;
+      case 0x4F:	/* ld r, a */
+	/* unimplemented; ignore */
 	break;
 
       case 0x4B:	/* ld bc, (address) */
@@ -2564,6 +2780,7 @@ static void do_ED_instruction()
 	REG_PC += 2;
 	break;
       case 0x63:	/* ld (address), hl */
+	/* this instruction is redundant with the 22 instruction */
 	mem_write_word(mem_read_word(REG_PC), REG_HL);
 	REG_PC += 2;
 	break;
@@ -2586,6 +2803,13 @@ static void do_ED_instruction()
 	break;
 
       case 0x44:	/* neg */
+      case 0x4C:	/* neg [undocumented] */
+      case 0x54:	/* neg [undocumented] */
+      case 0x5C:	/* neg [undocumented] */
+      case 0x64:	/* neg [undocumented] */
+      case 0x6C:	/* neg [undocumented] */
+      case 0x74:	/* neg [undocumented] */
+      case 0x7C:	/* neg [undocumented] */
 	do_negate();
 	break;
 
@@ -2609,6 +2833,9 @@ static void do_ED_instruction()
 	break;
       case 0x69:	/* out (c), l */
 	z80_out(REG_C, REG_L);
+	break;
+      case 0x71:	/* out (c), 0 [undocumented] */
+	z80_out(REG_C, 0);
 	break;
 
       case 0xAB:	/* outd */
@@ -2636,6 +2863,16 @@ static void do_ED_instruction()
 	z80_state.iff1 = z80_state.iff2;  /* restore the iff state */
 	break;
 
+      case 0x55:	/* ret [undocumented] */
+      case 0x5D:	/* ret [undocumented] */
+      case 0x65:	/* ret [undocumented] */
+      case 0x6D:	/* ret [undocumented] */
+      case 0x75:	/* ret [undocumented] */
+      case 0x7D:	/* ret [undocumented] */
+	REG_PC = mem_read_word(REG_SP);
+	REG_SP += 2;
+	break;
+
       case 0x6F:	/* rld */
 	do_rld();
 	break;
@@ -2658,23 +2895,44 @@ static void do_ED_instruction()
 	break;
 
       /* Emulator traps -- not real Z-80 instructions */
-      case 0x30:        /* open */
+      case 0x30:        /* emt_open */
 	do_emt_open();
 	break;
-      case 0x31:	/* close */
+      case 0x31:	/* emt_close */
 	do_emt_close();
 	break;
-      case 0x32:	/* read */
+      case 0x32:	/* emt_read */
 	do_emt_read();
 	break;
-      case 0x33:	/* write */
+      case 0x33:	/* emt_write */
 	do_emt_write();
 	break;
-      case 0x34:	/* lseek */
+      case 0x34:	/* emt_lseek */
 	do_emt_lseek();
 	break;
-      case 0x35:	/* strerror */
+      case 0x35:	/* emt_strerror */
 	do_emt_strerror();
+	break;
+      case 0x36:	/* emt_time */
+	do_emt_time();
+	break;
+      case 0x37:        /* emt_opendir */
+	do_emt_opendir();
+	break;
+      case 0x38:	/* emt_closedir */
+	do_emt_closedir();
+	break;
+      case 0x39:	/* emt_readdir */
+	do_emt_readdir();
+	break;
+      case 0x3a:	/* emt_chdir */
+	do_emt_chdir();
+	break;
+      case 0x3b:	/* emt_getcwd */
+	do_emt_getcwd();
+	break;
+      case 0x3c:	/* emt_misc */
+	do_emt_misc();
 	break;
 
       default:
@@ -3861,16 +4119,12 @@ int z80_run(continuous)
 	    error("unsupported instruction");
 	}
 
-	/* Check for an interrupt.  We do this at the bottom because
-	   it makes it easier to delay reenabling interrupts to the
-	   end of the instruction *following* an EI, as we should. */
-	if((delay_enable = (z80_state.iff1 == 2)))
-	  z80_state.iff1 = 1;
+	/* Check for an interrupt */
 	if (continuous >= 0)
         {
+	    /* Handle NMI first */
 	    if(z80_state.nmi && !z80_state.nmi_seen)
 	    {
-	        /* Handle the NMI first */
 	        do_nmi();
 	        z80_state.nmi_seen = TRUE;
                 if (trs_model == 1) {
@@ -3878,7 +4132,8 @@ int z80_run(continuous)
 		  trs_reset_button_interrupt(0);
 		}
 	    }
-	    if(z80_state.irq && z80_state.iff1 == 1 && !delay_enable)
+	    /* Allow IRQ if enabled and instruction was not EI */
+	    if(z80_state.irq && z80_state.iff1 == 1 && instruction != 0xFB)
             {
 	        do_int();
 	    }
