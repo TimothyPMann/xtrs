@@ -95,8 +95,16 @@ PREFIX=/usr/local
 # Set these to where you want installed stuff to go, if you install them.
 
 BINDIR = $(PREFIX)/bin
-MANDIR = $(PREFIX)/man
-#Debian: MANDIR = $(PREFIX)/share/man
+MANDIR = $(PREFIX)/share/man
+
+# Change this if you have a BSD-compatible install program that is
+# not the first program named "install" on your $PATH
+
+INSTALL = install
 
 # If you are building in a subdirectory:
+#-vpath %.c ..
+#-vpath %.h ..
+#-vpath %.man ..
+#old way:
 #VPATH = ..
