@@ -213,8 +213,8 @@ install:
 		install -c -m 644 xtrs.man $(MANDIR)/man1/xtrs.1
 		install -c -m 644 cassette.man $(MANDIR)/man1/cassette.1
 		install -c -m 644 mkdisk.man $(MANDIR)/man1/mkdisk.1
-		install -c -m 644 mkdisk.man $(MANDIR)/man1/cmddump.1
-		install -c -m 644 mkdisk.man $(MANDIR)/man1/hex2cmd.1
+		install -c -m 644 cmddump.man $(MANDIR)/man1/cmddump.1
+		install -c -m 644 hex2cmd.man $(MANDIR)/man1/hex2cmd.1
 
 depend:
 	makedepend -- $(CFLAGS) -- $(SOURCES)
