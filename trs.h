@@ -100,6 +100,8 @@ extern void trs_cassette_clear_interrupts(void);
 extern int trs_cassette_interrupts_enabled(void);
 extern void trs_cassette_update(int dummy);
 extern int cassette_default_sample_rate;
+extern void trs_orch90_out(int chan, int value);
+extern void trs_cassette_reset(void);
 
 extern void trs_disk_change(int drive);
 extern void trs_disk_change_all(void);
@@ -139,3 +141,4 @@ int trs_get_mouse_type(void);
 
 void sb_set_volume(int vol);
 int sb_get_volume(void);
+

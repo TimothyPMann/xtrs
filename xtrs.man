@@ -17,11 +17,14 @@ can be used.  A printer is emulated by sending its output to standard
 output.  Cassette I/O is emulated using files to store the cassette
 data; real cassettes can also be read or written (with luck), either
 directly through your sound card (on Linux and other systems with
-OSS-compatible sound drivers), or via .wav files.  Game sound output
-is also available if you have an OSS-compatible sound driver.  In
-Model 4/4P mode, a hi-res graphics card is emulated; you can select
-either the Radio Shack card or the Micro Labs Grafyx Solution card.
-There is also a mouse driver for Model 4/4P mode.
+OSS-compatible sound drivers), or via .wav files.  Game sound and
+music output are also supported if you have an OSS-compatible sound
+driver; sound output though the cassette port, through the Model 4
+sound option, and through the optional Orchestra-85/90 music synthesizer
+card are all emulated.  In Model 4/4P mode, a hi-res graphics card is
+emulated; you can select either the Radio Shack card or the Micro Labs
+Grafyx Solution card.  There is also a mouse driver for Model 4/4P
+mode.
 
 Because \fBxtrs\fP emulates the hardware, all known TRS-80 Model
 I/III/4/4P operating systems should run on it, including all flavors
@@ -48,7 +51,7 @@ The following keys have special meanings to \fBxtrs\fP:
 LeftArrow, Backspace, or Delete is the TRS-80 left arrow key.
 RightArrow or Tab is the right arrow key.  UpArrow is the up arrow
 key.  DownArrow or Linefeed is the down arrow key.  Esc or Break is
-the Break key.  Clear or LeftAlt is the Clear key.  Control is
+the Break key.  Home, Clear or LeftAlt is the Clear key.  Control is
 the Model 4 Ctrl key (address bit 7, data bit 2).  RightAlt is
 equivalent to the shifted down arrow key (used as a control key with
 some TRS-80 software).
@@ -530,6 +533,17 @@ net result is that some ticks may be late, but there are always the
 proper number of ticks per second.  For example, running in Model I
 mode on Intel Linux you'd see this pattern: (tick, 30ms, tick,
 20ms,...) instead of seeing ticks every 25ms.
+.SH Clock speed selection
+A standard Model 4 has a software-controlled switch to select
+operation at either 4.05504 MHz (with heartbeat clock at 60 Hz)
+or 2.02752 MHz (with heartbeat clock at 30 Hz)  xtrs emulates this
+feature.
+
+Model I's were often modified to operate at higher speeds than the
+standard 1.77408 MHz.  With one common modification, writing a 1
+to port 0xFE would double the speed to 3.54816 MHz, while writing a 0
+would set the speed back to normal.  The heartbeat clock runs at 40 Hz
+in either case.  xtrs emulates this feature as well.
 .SH Sound
 Sound support has been completely rewritten in xtrs 3.7 and now uses
 the Open Sound System /dev/dsp device, standard on Linux and available
@@ -553,6 +567,21 @@ feature includes a small speed boost whenever a sound starts to play
 to try to prevent this, but if the boost is too much or too little,
 you might either find that the game runs too fast when a lot of sound
 is playing, or that the sound has gaps in it anyway.
+
+The Orchestra-85 music software will run under xtrs's Model I
+emulation, and the Orchestra-90 software will run with Model III
+operating systems under xtrs's Model III, 4, or 4P emulation.  For
+best results, use Orchestra-90 and the Model 4 emulation, as this lets
+the software run at the highest emulated clock rate (4 MHz) and thus
+generate the best sound.  (If you want to run Orchestra-85 instead,
+you can tell it that you have a 3.5 MHz clock speedup with enable
+sequence 3E01D3FE and disable sequence 3E00D3FE; this will let the
+software run twice as fast and generate better sound.)  In either
+case, you should run xtrs with the "-samplerate 44100" flag if your
+machine is fast enough, as this greatly improves the sound output.
+There is no need to use xtrs's -autodelay flag when running
+Orchestra-85/90, but you might want to specify a small fixed delay to
+keep from getting excessive key repeat.
 .SH Mouse
 A few Model 4 programs could use a mouse, such as the shareware hi-res
 drawing program MDRAW-II. The program XTRSMOUS/CMD on the utility disk
@@ -598,9 +627,7 @@ See -keystretch below for more information.  This aspect of the
 emulator seems to need a bit more work.
 
 Games with audio output may sound better if you increase the sample
-rate from the default 11,025 Hz.  Try "-samplerate 44100".  The title
-screen to "Talking Adventure 1: Forbidden Planet" by Fantastic
-Software seems to work a lot better at the higher sample rate.  On the
+rate from the default 11,025 Hz.  Try "-samplerate 44100".  On the
 other hand, raising the sample rate will make the sound break up if your
 machine isn't fast enough to generate samples at that rate.
 .SH Options

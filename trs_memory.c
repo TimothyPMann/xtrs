@@ -162,6 +162,8 @@ void trs_exit()
 void trs_reset()
 {
     /* Reset devices (Model I SYSRES, Model III/4 RESET) */
+    trs_cassette_reset();
+    trs_timer_speed(0);
     trs_disk_init(1);
     if (trs_model == 5) {
 	z80_out(0x9C, 1);

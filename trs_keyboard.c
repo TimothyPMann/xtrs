@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Wed Aug  5 15:01:17 PDT 1998 by mann
+   Last modified on Tue Jan  4 17:03:53 PST 2000 by mann
 */
 
 #include "z80.h"
@@ -456,8 +456,8 @@ KeyTable function_key_table[] = {
 /* 0xff52   XK_Up          */    { TK_Up, TK_Neutral },
 /* 0xff53   XK_Right       */    { TK_Right, TK_Neutral },
 /* 0xff54   XK_Down        */    { TK_Down, TK_Neutral },
-/* 0xff55   XK_Prior, XK_Page_Up  */  { TK_NULL, TK_Neutral },
-/* 0xff56   XK_Next, XK_Page_Down */  { TK_NULL, TK_Neutral },
+/* 0xff55   XK_Prior, XK_Page_Up  */  { TK_LeftShift, TK_Neutral },
+/* 0xff56   XK_Next, XK_Page_Down */  { TK_RightShift, TK_Neutral },
 /* 0xff57   XK_End         */    { TK_Unused, TK_Neutral },
 /* 0xff58   XK_Begin       */    { TK_NULL, TK_Neutral },
 /* 0xff59                  */    { TK_NULL, TK_Neutral },
@@ -520,13 +520,13 @@ KeyTable function_key_table[] = {
 /* 0xff92   XK_KP_F2       */    { TK_F2, TK_Neutral },
 /* 0xff93   XK_KP_F3       */    { TK_F3, TK_Neutral },
 /* 0xff94   XK_KP_F4       */    { TK_CapsLock, TK_Neutral },
-/* 0xff95   XK_KP_Home     */    { TK_RightShift, TK_Neutral },
+/* 0xff95   XK_KP_Home     */    { TK_Clear, TK_Neutral },
 /* 0xff96   XK_KP_Left     */    { TK_Left, TK_Neutral },
 /* 0xff97   XK_KP_Up       */    { TK_Up, TK_Neutral },
 /* 0xff98   XK_KP_Right    */    { TK_Right, TK_Neutral },
 /* 0xff99   XK_KP_Down     */    { TK_Down, TK_Neutral },
-/* 0xff9a   XK_KP_Prior, XK_KP_Page_Up  */ { TK_NULL, TK_Neutral },
-/* 0xff9b   XK_KP_Next, XK_KP_Page_Down */ { TK_NULL, TK_Neutral },
+/* 0xff9a   XK_KP_Prior, XK_KP_Page_Up  */ { TK_LeftShift, TK_Neutral },
+/* 0xff9b   XK_KP_Next, XK_KP_Page_Down */ { TK_RightShift, TK_Neutral },
 /* 0xff9c   XK_KP_End      */    { TK_Unused, TK_Neutral },
 /* 0xff9d   XK_KP_Begin    */    { TK_NULL, TK_Neutral },
 /* 0xff9e   XK_KP_Insert   */    { TK_Underscore, TK_Neutral },

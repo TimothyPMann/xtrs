@@ -186,6 +186,7 @@ XImage xim = {
 static int key_queue[KEY_QUEUE_SIZE];
 static int key_queue_head;
 static int key_queue_entries;
+static int key_immediate;
 
 /* dummy buffer for stat() call */
 struct stat statbuf;
@@ -237,7 +238,7 @@ int trs_next_key(int wait)
       if ((rval = dequeue_key()) >= 0) break;
       if ((z80_state.nmi && !z80_state.nmi_seen) ||
 	  (z80_state.irq && z80_state.iff1) ||
-	  trs_event_scheduled()) {
+	  trs_event_scheduled() || key_immediate) {
 	rval = -1;
 	break;
       }
@@ -803,6 +804,7 @@ void trs_get_event(int wait)
   XComposeStatus status;
   XWindowChanges xwc;
 
+  key_immediate = 0;
   do {
     if (wait) {
       XNextEvent(display, &event);
@@ -879,18 +881,22 @@ void trs_get_event(int wait)
       case XK_F10:
 	trs_reset();
 	key = 0;
+	key_immediate = 1;
 	break;
       case XK_F9:
 	trs_debug();
 	key = 0;
+	key_immediate = 1;
 	break;
       case XK_F8:
 	trs_exit();
 	key = 0;
+	key_immediate = 1;
 	break;
       case XK_F7:
 	trs_disk_change_all();
 	key = 0;
+	key_immediate = 1;
 	break;
       default:
 	break;

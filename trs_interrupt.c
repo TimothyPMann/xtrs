@@ -378,6 +378,9 @@ trs_timer_speed(int fast)
     if (trs_model >= 4) {
 	timer_hz = fast ? TIMER_HZ_4 : TIMER_HZ_3;
 	z80_state.clockMHz = fast ? CLOCK_MHZ_4 : CLOCK_MHZ_3;
+    } else if (trs_model == 1) {
+        /* Typical 2x clock speedup kit */
+        z80_state.clockMHz = CLOCK_MHZ_1 * ((fast&1) + 1);
     }
 }
 

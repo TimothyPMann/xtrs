@@ -56,6 +56,8 @@
 
 /*#define CASSDEBUG 1*/
 /*#define CASSDEBUG2 1*/
+/*#define CASSDEBUG3 1*/
+/*#define CASSDEBUG4 1*/
 
 #include "trs.h"
 #include "z80.h"
@@ -79,7 +81,8 @@
 #define READ		1
 #define WRITE		2
 #define SOUND           3  /* used for OSS_SOUND only */
-#define FAILED          4
+#define ORCH90          4  /* used for OSS_SOUND only */
+#define FAILED          5
 
 #define CAS_FORMAT         1  /* recovered bit/byte stream */
 #define CPT_FORMAT         2  /* cassette pulse train w/ exact timing */
@@ -97,7 +100,7 @@ static char *format_name[] = {
 #define DSP_FILENAME            "/dev/dsp"  /* for sound output */
 #define DEFAULT_FORMAT		CAS_FORMAT
 
-#define FLUSH 4  /* special fake signal value used when turning off motor */
+#define FLUSH -500  /* special fake signal value used when turning off motor */
 
 static char cassette_filename[256];
 static int cassette_position;
@@ -114,6 +117,7 @@ int cassette_default_sample_rate = DEFAULT_SAMPLE_RATE;
 /* For bit-level emulation */
 static tstate_t cassette_transition;
 static tstate_t last_sound;
+static tstate_t cassette_firstoutread;
 static int cassette_value, cassette_next, cassette_flipflop;
 static int cassette_lastnonzero;
 static unsigned long cassette_delta;
@@ -123,30 +127,33 @@ static double cassette_roundoff_error;
 static int cassette_byte;
 static int cassette_bitnumber;
 static int cassette_pulsestate;
-int cassette_highspeed = 0;
+#define SPEED_500     0
+#define SPEED_1500    1
+#define SPEED_250     2
+int cassette_speed = SPEED_500;
 
 /* Pulse shapes for conversion from .cas on input */
 #define CAS_MAXSTATES 8
 struct {
   int delta_us;
   int next;
-} pulse_shape[2][2][CAS_MAXSTATES] = {
+} pulse_shape[3][2][CAS_MAXSTATES] = {
   {{
     /* Low-speed zero: clock 1 data 0 */
     { 0,    1 },
     { 128,  2 },
     { 128,  0 },
-    { 1750, 0 },
+    { 1871, 0 },  /* normally 1757; 1871 after 8th bit */
     { -1,  -1 }
   }, {
     /* Low-speed one: clock 1 data 1 */
     { 0,    1 },
     { 128,  2 },
     { 128,  0 },
-    { 747,  1 },
+    { 748,  1 },
     { 128,  2 },
     { 128,  0 },
-    { 747,  0 },
+    { 860, 0 },  /* normally 748; 860 after 8th bit; 1894 after a5 sync */
     { -1,  -1 }
   }}, {{
     /* High-speed zero: wide pulse */
@@ -160,16 +167,39 @@ struct {
     { 188,  2 },
     { 188,  1 },
     { -1,  -1 }
-  }}
+  }}, {{
+    /* Level I zero: clock 1 data 0 */
+    { 0,    1 },
+    { 125,  2 },
+    { 125,  0 },
+    { 3568, 0 },
+    { -1,  -1 }
+  }, {
+    /* Level I one: clock 1 data 1 */
+    { 0,    1 },
+    { 128,  2 },
+    { 128,  0 },
+    { 1673, 1 },
+    { 128,  2 },
+    { 128,  0 },
+    { 1673, 0 },
+    { -1,  -1 }
+  }}    
 };
 
 /* States and thresholds for conversion to .cas on output */
-#define ST_INITIAL  0
-#define ST_LOGOTCLK 1
-#define ST_LOGOTDAT 2
-#define ST_HIGH 3
-#define ST_LOTHRESH 1250.0 /* us threshold between 0 and 1 */
-#define ST_HITHRESH 282.0  /* us threshold between 1 and 0 */
+#define ST_INITIAL   0
+#define ST_500GOTCLK 1
+#define ST_500GOTDAT 2
+#define ST_1500      3
+#define ST_250       4
+#define ST_250GOTCLK 5
+#define ST_250GOTDAT 6
+#define ST_500THRESH  1250.0 /* us threshold between 0 and 1 */
+#define ST_1500THRESH  282.0 /* us threshold between 1 and 0 */
+#define ST_250THRESH  2500.0 /* us threshold between 0 and 1 */
+
+#define DETECT_250    1200.0 /* detect level 1 input routine */
 
 /* Values for conversion to .wav on output */
 /* Values in comments are from Model I technical manual.  Model III/4 are
@@ -198,6 +228,8 @@ static long wave_dataid_offset = WAVE_DATAID_OFFSET;
 static long wave_datasize_offset = WAVE_DATASIZE_OFFSET;
 static long wave_data_offset = WAVE_DATA_OFFSET;
 
+/* Orchestra 80/85/90 stuff */
+static int orch90_left = 128, orch90_right = 128;
 
 #if SB_SOUND
 /* ioport of the SoundBlaster command register. 0 means none */
@@ -383,20 +415,20 @@ parse_wav_header(FILE *f)
 
 #if !USESOX
 static int
-set_audio_format(FILE *f)
+set_audio_format(FILE *f, int state)
 {
 #if HAVE_OSS
   int audio_fd = fileno(f);
-  int format, stereo, speed;
-  format = AFMT_U8;  
+  int format, stereo, speed, req;
+  req = format = AFMT_U8;  /* unsigned 8-bit */
   if (ioctl(audio_fd, SNDCTL_DSP_SETFMT, &format)==-1) return -1;
-  if (format != AFMT_U8) { errno = EINVAL; return -1; }
-  stereo = 0;
+  if (format != req) { errno = EINVAL; return -1; }
+  req = stereo = (state == ORCH90);
   if (ioctl(audio_fd, SNDCTL_DSP_STEREO, &stereo)==-1) return -1;
-  if (stereo != 0) { errno = EINVAL; return -1; }
-  speed = cassette_sample_rate;
+  if (stereo != req) { errno = EINVAL; return -1; }
+  req = speed = cassette_sample_rate;
   if (ioctl(audio_fd, SNDCTL_DSP_SPEED, &speed)==-1) return -1;
-  if (abs(speed - cassette_sample_rate) > cassette_sample_rate/20) {
+  if (abs(speed - req) > req/20) {
     errno = EINVAL;
     return -1;
   }
@@ -455,6 +487,10 @@ static int assert_state(int state)
   printf("state %d -> %d\n", cassette_state, state);
 #endif
 
+  if (cassette_state == ORCH90) {
+    trs_orch90_out(3, FLUSH);
+  }
+
   if (cassette_state != CLOSE && cassette_state != FAILED) {
     if (cassette_format == DIRECT_FORMAT) {
 #if USESOX
@@ -480,7 +516,7 @@ static int assert_state(int state)
       }
       fclose(cassette_file);
     }
-    if (cassette_state != SOUND) {
+    if (cassette_state != SOUND && cassette_state != ORCH90) {
       put_control();
     }
   }
@@ -510,7 +546,7 @@ static int assert_state(int state)
       }
       setbuf(cassette_file, NULL);
       cassette_sample_rate = cassette_default_sample_rate;
-      if (set_audio_format(cassette_file) < 0) {
+      if (set_audio_format(cassette_file, state) < 0) {
 	error("couldn't set audio format on %s: %s",
 	      cassette_filename, strerror(errno));
 	cassette_file = NULL;
@@ -534,8 +570,9 @@ static int assert_state(int state)
     break;
 
   case SOUND:
+  case ORCH90:
   case WRITE:
-    if (state == SOUND) {
+    if (state == SOUND || state == ORCH90) {
       cassette_format = DIRECT_FORMAT;
       strcpy(cassette_filename, DSP_FILENAME);
     } else {
@@ -549,8 +586,8 @@ static int assert_state(int state)
 #if USESOX
       char command[256];
       cassette_sample_rate = cassette_default_sample_rate;
-      sprintf(command, "sox -t raw -r %d -u -b - -t ossdsp /dev/dsp",
-	      cassette_sample_rate);
+      sprintf(command, "sox -t raw -r %d -u -b -c %d - -t ossdsp /dev/dsp",
+	      cassette_sample_rate, (state == ORCH90) ? 2 : 1);
       cassette_file = popen(command, "w");
 #else
       cassette_sample_rate = cassette_default_sample_rate;
@@ -562,7 +599,7 @@ static int assert_state(int state)
       }
       setbuf(cassette_file, NULL);
 #if OSS_SOUND && HAVE_OSS
-      if (state == SOUND) {
+      if (state == SOUND || state == ORCH90) {
 	/*int arg = 0x7fff0008;*/ /* unlimited fragments of size (1 << 8) */
 	int arg = 0x00200008; /* 32 fragments of size (1 << 8) */
 	if (ioctl(fileno(cassette_file), SNDCTL_DSP_SETFRAGMENT, &arg) < 0) {
@@ -571,7 +608,7 @@ static int assert_state(int state)
 	}
       }
 #endif
-      if (set_audio_format(cassette_file) < 0) {
+      if (set_audio_format(cassette_file, state) < 0) {
 	error("couldn't set audio format on %s: %s",
 	      cassette_filename, strerror(errno));
 	cassette_file = NULL;
@@ -723,17 +760,23 @@ transition_out(int value)
     case ST_INITIAL:
       if (cassette_value == 2 && value == 0) {
 	/* Low speed, end of first pulse.  Assume clock */
-	cassette_pulsestate = ST_LOGOTCLK;
+	cassette_pulsestate = ST_500GOTCLK;
       } else if (cassette_value == 2 && value == 1) {
 	/* High speed, nothing interesting yet. */
-	cassette_pulsestate = ST_HIGH;
+	cassette_pulsestate = ST_1500;
       }
       break;
 
-    case ST_LOGOTCLK:
+    case ST_500GOTCLK:
       if (cassette_value == 0 && value == 1) {
 	/* Low speed, start of next pulse. */
-	if (ddelta_us > ST_LOTHRESH) {
+	if (ddelta_us > ST_250THRESH) {
+	  /* Oops, really ultra-low speed */
+	  /* It's the next clock; bit was 0 */
+	  sample = 0;
+	  /* Watch for end of this clock */
+	  cassette_pulsestate = ST_250;
+	} else if (ddelta_us > ST_500THRESH) {
 	  /* It's the next clock; bit was 0 */
 	  sample = 0;
 	  /* Watch for end of this clock */
@@ -742,21 +785,52 @@ transition_out(int value)
 	  /* It's a data pulse; bit was 1 */
 	  sample = 1;
 	  /* Ignore the data pulse falling edge */
-	  cassette_pulsestate = ST_LOGOTDAT;
+	  cassette_pulsestate = ST_500GOTDAT;
 	}
       }
       break;
       
-    case ST_LOGOTDAT:
+    case ST_500GOTDAT:
       if (cassette_value == 2 && value == 0) {
 	/* End of data pulse; watch for end of next clock */
 	cassette_pulsestate = ST_INITIAL;
       }
       break;
 
-    case ST_HIGH:
+    case ST_1500:
       if (cassette_value == 1 && value == 2) {
-	sample = (ddelta_us < ST_HITHRESH);
+	sample = (ddelta_us < ST_1500THRESH);
+      }
+      break;
+
+    case ST_250:
+      if (cassette_value == 2 && value == 0) {
+	/* Ultra-low speed, end of first pulse.  Assume clock */
+	cassette_pulsestate = ST_250GOTCLK;
+      }
+      break;
+      
+    case ST_250GOTCLK:
+      if (cassette_value == 0 && value == 1) {
+	/* Low speed, start of next pulse. */
+	if (ddelta_us > ST_250THRESH) {
+	  /* It's the next clock; bit was 0 */
+	  sample = 0;
+	  /* Watch for end of this clock */
+	  cassette_pulsestate = ST_250;
+	} else {
+	  /* It's a data pulse; bit was 1 */
+	  sample = 1;
+	  /* Ignore the data pulse falling edge */
+	  cassette_pulsestate = ST_250GOTDAT;
+	}
+      }
+      break;
+      
+    case ST_250GOTDAT:
+      if (cassette_value == 2 && value == 0) {
+	/* End of data pulse; watch for end of next clock */
+	cassette_pulsestate = ST_250;
       }
       break;
     }
@@ -858,7 +932,7 @@ transition_in()
       } else {
 	next = 0;
       }
-      if (cassette_highspeed) {
+      if (cassette_speed == SPEED_1500) {
 	cassette_noisefloor = 2;
       } else {
 	/* Attempt to learn the correct noise cutoff adaptively.
@@ -914,16 +988,22 @@ transition_in()
     }
     c = (cassette_byte >> cassette_bitnumber) & 1;
     delta_us =
-      pulse_shape[cassette_highspeed][c][cassette_pulsestate].delta_us;
+      pulse_shape[cassette_speed][c][cassette_pulsestate].delta_us;
     cassette_next =
-      pulse_shape[cassette_highspeed][c][cassette_pulsestate].next;
+      pulse_shape[cassette_speed][c][cassette_pulsestate].next;
+    cassette_pulsestate++;
+    if (pulse_shape[cassette_speed][c][cassette_pulsestate].next == -1) {
+      cassette_pulsestate = 0;
+      /* Kludge to emulate extra delay that's needed after the initial
+	 0xA5 sync byte to let Basic execute the CLEAR routine.
+      */
+      if (cassette_byte == 0xa5 && cassette_speed == SPEED_500) {
+	delta_us += 1034;
+      }
+    }
     delta_ts = delta_us * z80_state.clockMHz - cassette_roundoff_error;
     cassette_delta = (unsigned long)(delta_ts + 0.5);
     cassette_roundoff_error = cassette_delta - delta_ts;
-    cassette_pulsestate++;
-    if (pulse_shape[cassette_highspeed][c][cassette_pulsestate].next == -1) {
-      cassette_pulsestate = 0;
-    }
 #if CASSDEBUG
     printf("%d %4lu %d\n",
 	   cassette_value, cassette_delta, cassette_next);
@@ -955,7 +1035,7 @@ trs_cassette_kickoff(int dummy)
 {
   if (cassette_motor && cassette_state == CLOSE &&
       trs_cassette_interrupts_enabled()) {
-    cassette_highspeed = 1;
+    cassette_speed = SPEED_1500;
     cassette_transition = z80_state.t_count;
     trs_cassette_fall_interrupt(1);
     trs_cassette_rise_interrupt(1);
@@ -968,6 +1048,9 @@ void trs_cassette_motor(int value)
   if (value) {
     /* motor on */
     if (!cassette_motor) {
+#if CASSDEBUG3
+      printf("motor on %ld\n", z80_state.t_count);
+#endif
       cassette_motor = 1;
       cassette_transition = z80_state.t_count;
       cassette_value = 0;
@@ -977,13 +1060,14 @@ void trs_cassette_motor(int value)
       cassette_byte = 0;
       cassette_bitnumber = 0;
       cassette_pulsestate = 0;
-      cassette_highspeed = 0;
+      cassette_speed = SPEED_500;
       cassette_roundoff_error = 0.0;
       cassette_avg = NOISE_FLOOR;
       cassette_env = 127;
       cassette_noisefloor = NOISE_FLOOR;
+      cassette_firstoutread = 0;
       if (trs_model > 1) {
-	/* Get reading started after 1 second */
+	/* Get 1500bps reading started after 1 second */
 	trs_schedule_event(trs_cassette_kickoff, 0,
 			   (tstate_t) (1000000 * z80_state.clockMHz));
       }
@@ -1002,10 +1086,16 @@ void trs_cassette_motor(int value)
 
 void trs_cassette_out(int value)
 {
+#if CASSDEBUG3
+  printf("out %ld\n", z80_state.t_count);
+#endif
   if (cassette_motor) {
     if (cassette_state == READ) {
       trs_cassette_update(0);
       cassette_flipflop = 0;
+      if (cassette_firstoutread == 0) {
+	cassette_firstoutread = z80_state.t_count;
+      }
     }
     if (cassette_state != READ && value != cassette_value) {
       if (assert_state(WRITE) < 0) return;
@@ -1056,6 +1146,81 @@ trs_sound_out(int value)
 #endif
 }
 
+static void
+orch90_flush(int dummy)
+{
+  trs_orch90_out(3, FLUSH);
+}
+
+/* Orchestra 85/90 */
+/* Not supported in obsolescent SB_SOUND mode */
+/* Implementation shares some global state with cassette and game
+   sound implementations. */
+void
+trs_orch90_out(int channels, int value)
+{
+#if HAVE_OSS
+  long nsamples;
+  double ddelta_us;
+  sigset_t set, oldset;
+  int new_left, new_right;
+
+  /* Convert 8-bit signed to 8-bit unsigned */
+  value = (value & 0xff) ^ 0x80;
+
+  if (cassette_motor != 0) return;
+  if (assert_state(ORCH90) < 0) return;
+  trs_suspend_delay();
+  if (channels & 1) {
+    new_left = value;
+  } else {
+    new_left = orch90_left;
+  }
+  if (channels & 2) {
+    new_right = value;
+  } else {
+    new_right = orch90_right;
+  }
+  if (new_left == orch90_left && new_right == orch90_right) return;
+  
+  sigemptyset(&set);
+  sigaddset(&set, SIGALRM);
+  sigaddset(&set, SIGIO);
+  sigprocmask(SIG_BLOCK, &set, &oldset);
+
+  ddelta_us = (z80_state.t_count - cassette_transition) / z80_state.clockMHz
+    - cassette_roundoff_error;
+  if (ddelta_us > 20000.0) {
+    /* Truncate silent periods */
+    ddelta_us = 20000.0;
+  }
+  nsamples = (unsigned long)
+    (ddelta_us / (1000000.0/cassette_sample_rate) + 0.5);
+  cassette_roundoff_error =
+    nsamples * (1000000.0/cassette_sample_rate) - ddelta_us;
+  while (nsamples-- > 0) {
+    putc(orch90_left, cassette_file);
+    putc(orch90_right, cassette_file);
+  }
+
+  if (trs_event_scheduled() == orch90_flush ||
+      trs_event_scheduled() == (trs_event_func) assert_state) {
+    trs_cancel_event();
+  }
+  if (value == FLUSH) {
+    trs_schedule_event((trs_event_func)assert_state, CLOSE, 5000000);
+  } else {
+    trs_schedule_event(orch90_flush, FLUSH,
+		       (int)(25000 * z80_state.clockMHz));
+  }
+
+  sigprocmask(SIG_SETMASK, &oldset, NULL);
+  last_sound = z80_state.t_count;
+  cassette_transition = z80_state.t_count;
+  orch90_left = new_left;
+  orch90_right = new_right;
+#endif
+}
 
 void
 trs_cassette_update(int dummy)
@@ -1085,7 +1250,7 @@ trs_cassette_update(int dummy)
 	if (z80_state.nmi) return;
     }
     /* Schedule an interrupt on the 1500-bps cassette input if needed */
-    if (newtrans && cassette_highspeed) {
+    if (newtrans && cassette_speed == SPEED_1500) {
       if (cassette_next == 2 && cassette_lastnonzero != 2) {
 	trs_schedule_event(trs_cassette_fall_interrupt, 1,
 			   cassette_delta -
@@ -1107,6 +1272,26 @@ trs_cassette_update(int dummy)
 int
 trs_cassette_in()
 {
+#if CASSDEBUG3
+  printf("in  %ld\n", z80_state.t_count);
+#endif
+  /* Heuristic to detect reading with Level 1 routines.  If the
+     routine paused too long after resetting the flipflop before
+     reading it again, assume it must be Level 1 code.  */
+  if (cassette_firstoutread > 1) {
+    if ((z80_state.t_count - cassette_firstoutread)
+	/ z80_state.clockMHz > DETECT_250) {
+      cassette_speed = SPEED_250;
+    } else {
+      cassette_speed = SPEED_500;
+    }
+#if CASSDEBUG4
+    printf("250 detector = %s (%f)\n",
+	   (cassette_speed == SPEED_250) ? "yes" : "no",
+	   (z80_state.t_count - cassette_firstoutread) / z80_state.clockMHz);
+#endif
+    cassette_firstoutread = 1; /* disable detector */
+  }
   trs_cassette_clear_interrupts();
   trs_cassette_update(0);
   if (trs_model == 1) {
@@ -1114,6 +1299,12 @@ trs_cassette_in()
   } else {
     return cassette_flipflop | (cassette_lastnonzero == 1);
   }
+}
+
+void
+trs_cassette_reset()
+{
+  assert_state(CLOSE);
 }
 
 void trs_sound_init(int ioport, int vol)

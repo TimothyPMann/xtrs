@@ -18,6 +18,8 @@
    Last modified on Sat Oct 10 22:15:30 PDT 1998 by mann
 */
 
+#include <time.h>
+
 #include "z80.h"
 #include "trs.h"
 #include "trs_imp_exp.h"
@@ -33,6 +35,12 @@ void z80_out(int port, int value)
 {
     if (trs_model == 1) {
 	switch (port) {
+	  case 0xB9: /* Orchestra-85 left channel */
+	    trs_orch90_out(1, value);
+	    break;
+	  case 0xB5: /* Orchestra-85 right channel */
+	    trs_orch90_out(2, value);
+	    break;
 	  case IMPEXP_CMD: /* 0xD0 */
 	    trs_impexp_cmd_write(value);
 	    break;
@@ -42,6 +50,10 @@ void z80_out(int port, int value)
 	  case 0xFD:
 	    /* GENIE location of printer port */
 	    trs_printer_write(value);
+	    break;
+	  case 0xFE:
+	    /* Typical location for clock speedup kits */
+	    trs_timer_speed(value);
 	    break;
 	  case 0xFF:
 	    /* screen mode select is on D3 line */
@@ -56,6 +68,12 @@ void z80_out(int port, int value)
 	}
     } else {
 	switch (port) {
+	  case 0x79: /* Orchestra-90 left channel */
+	    trs_orch90_out(1, value);
+	    break;
+	  case 0x75: /* Orchestra-90 right channel */
+	    trs_orch90_out(2, value);
+	    break;
 	  case 0x80:
 	    if (trs_model >= 4) grafyx_write_x(value);
 	    break;
@@ -197,9 +215,72 @@ int z80_in(int port)
 	    return trs_printer_read();
 	  case 0xFF:
 	    return (modesel ? 0x7f : 0x3f) | trs_cassette_in();
-	  default:
+          default:
 	    break;
 	}
+
+        /* Support for a special HW real-time clock (TimeDate80?)
+         * I used to have.  It was a small card-edge unit with a
+         * battery that held the time/date with power off.
+         * - Joe Peterson (joe@skyrush.com)
+	 *
+	 * According to the LDOS Quarterly 1-6, TChron1, TRSWatch, and
+	 * TimeDate80 are accessible at high ports 0xB0-0xBC, while
+	 * T-Timer is accessible at high ports 0xC0-0xCC.  It does
+	 * not say where the low ports were; Joe's code had 0x70-0x7C,
+	 * so I presume that's correct at least for the TimeDate80.
+	 *
+	 * I suspect the returned values should be or'ed with ASCII
+	 * '0' (0x30), at least for some of these devices.
+	 *
+	 * The originals were probably not Y2K compliant at all; they
+	 * returned the units digit of the year in one port, the
+	 * tens digit in another, and the leading "19" nowhere.
+	 * This emulation lets the tens digit roll over from 9 to 10
+	 * in the year 2000 and continue counting up from there.
+	 *
+	 * If anyone has more information, or has software that either
+	 * works well or doesn't work well in 2000 and beyond with
+	 * this emulation, let me know.  mann@pa.dec.com
+	 */
+        if ((port >= 0x70 && port <= 0x7C) ||
+	    (port >= 0xB0 && port <= 0xBC) ||
+	    (port >= 0xC0 && port <= 0xCC)) {
+	  struct tm *time_info;
+	  time_t time_secs;
+           
+	  time_secs = time(NULL);
+	  time_info = localtime(&time_secs);
+
+	  switch (port & 0x0F) {
+	  case 0xC: /* year (high) */
+	    return (time_info->tm_year / 10);
+	  case 0xB: /* year (low) */
+	    return (time_info->tm_year % 10);
+	  case 0xA: /* month (high) */
+	    return ((time_info->tm_mon + 1) / 10);
+	  case 0x9: /* month (low) */
+	    return ((time_info->tm_mon + 1) % 10);
+	  case 0x8: /* date (high) */
+	    return (time_info->tm_mday / 10);
+	  case 0x7: /* date (low) */
+	    return (time_info->tm_mday % 10);
+	  case 0x6: /* day-of-week */
+	    return time_info->tm_wday;
+	  case 0x5: /* hours (high) and PM (bit 2) and 24hr (bit 3) */
+	    return ((time_info->tm_hour / 10) | 8);
+	  case 0x4: /* hours (low) */
+	    return (time_info->tm_hour % 10);
+	  case 0x3: /* minutes (high) */
+	    return (time_info->tm_min / 10);
+	  case 0x2: /* minutes (low) */
+	    return (time_info->tm_min % 10);
+	  case 0x1: /* seconds? (high) */
+	    return (time_info->tm_sec / 10);
+	  case 0x0: /* seconds? (low) */
+	    return (time_info->tm_sec % 10);
+	  }
+        }
     } else {
 	switch (port) {
 	  case 0x82:
@@ -248,4 +329,3 @@ int z80_in(int port)
     /* other ports -- unmapped */
     return 0xFF;
 }
-
