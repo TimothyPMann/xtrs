@@ -2,27 +2,53 @@
 ;	XTRSHARD/DCT
 ;	Emulate hard disk in a Unix file under xtrs
 ;	Tim Mann 1-10-98
-;       Last modified on Fri Jan 16 19:03:38 PST 1998 by mann
+;       Last modified on Mon Feb  9 20:27:42 PST 1998 by mann
 ;
 ;	To do:
-;	- Allow user to select a small drive max size.
-;	- Don't hardwire filename.
-;	- Allow more than one hard drive.
-;	- Port to LDOS 5 (Model I/III).
 ;	- Documentation.
-;	- Maybe tighten code a little.
 ;*=*=*
 
 
-LF      EQU     10
-CR	EQU	13
-@HIGH   EQU     100
-@DSPLY  EQU     10
-@FLAGS  EQU     101
-@LOGOT  EQU     12
-@GTDCB  EQU	82 
-@GTMOD	EQU	83
+; Number of drives to allow
+ndrive	equ	8	
 
+
+; ASCII chars
+LF      equ     10
+CR	equ	13
+ETX	equ	3
+
+; Model 4 SVC numbers
+@high   equ     100
+@dsply  equ     10
+@flags  equ     101
+@logot  equ     12
+@gtdcb  equ	82 
+@gtmod	equ	83
+@div8	equ	93
+@mul16	equ	91
+@keyin	equ	9
+
+; Model I/III hard addresses
+m3flag$ equ	0125h	; 'I' in ROM on Model III
+@logot1 equ     447bh
+@logot3	equ	428ah
+@dsply1	equ	4467h
+@dsply3	equ	4467h
+high$1  equ     4049h
+high$3  equ     4411h
+cflag$1 equ     4758h
+cflag$3 equ     4758h
+@icnfg1	equ	4303h
+@icnfg3	equ	421dh
+@mult1	equ	4b8fh
+@mult3	equ	444eh
+@divea1	equ	4b7bh
+@divea3	equ	4b7ah
+@keyin1	equ	0040h
+@keyin3	equ	0040h
+
+; Emulator trap instructions in byte-reversed form
 emt_read	equ	32EDH
 emt_write	equ	33EDH
 emt_lseek	equ	34EDH
@@ -31,306 +57,500 @@ emt_ftruncate	equ	3DEDH
 emt_opendisk	equ	3EEDH
 emt_closedisk	equ	3FEDH
 
-	ORG	3000H
+; Constants for emt_opendisk
+EO_RDONLY	equ    00o
+EO_WRONLY	equ    01o
+EO_RDWR		equ    02o
+EO_CREAT	equ  0100o
+EO_EXCL		equ  0200o
+EO_TRUNC	equ 01000o
+EO_APPEND	equ 02000o
+
+;*=*=*
+;	Set origin to be safe on both LDOS 5 and 6
+;*=*=*
+	org	6000h
 
 ;*=*=*
 ; 	Relocator for disk driver
 ;*=*=*
-INSTAL:	LD	(DCT),DE	;Save DCT pointer
-	LD      HL,HELLO_
-	LD      A,@DSPLY        ;Display hello
-	RST     40
+instal:	ld	(dct),de	;Save DCT address
+	ld	a,(000ah)	;Determine TRS-80 model
+	cp	40h
+	jp	nz,lsdos6	;Model 4 (or other LS-DOS, I hope)
+	ld	a,(m3flag$)
+	cp	'I'
+	jp	z,model3	;Go if Model III
+;*=*=*
+; 	LDOS 5 Model I - See LS-DOS 6 version for comments
+;*=*=*
+	ld	a,0cdh		;Insert Model I @LOGOT
+	ld	(logot),a
+	ld	hl,@logot1
+	ld	(logot+1),hl
+	ld	(domul),a	;Insert Model I MULT
+	ld	hl,@mult1
+	ld	(domul+1),hl
+	ld	(dodiv),a	;Insert Model I DIVEA
+	ld	hl,@divea1
+	ld	(dodiv+1),hl
+	ld	a,'1'		;Modify filename
+	ld	(hmod),a
+	ld	hl,hello_
+	call	@dsply1
+	ld      a,(cflag$1)
+	call	ckparm
+asku1:	ld	hl,unit_	;Ask which unit number
+	call	@dsply1
+	ld	hl,unit
+	ld	bc,100h
+	call	@keyin1
+	jp	c,hitbrk
+	jp	nz,hitbrk
+	ld	a,(unit)
+	cp	'0'
+	jr	c,asku1
+	cp	'0'+ndrive
+	jr	nc,asku1
+	ld	hl,(high$1)
+	call	xgtmod		;Module already loaded?
+	jp	z,setdct
+	ld      hl,(high$1)
+	ld      (newend),hl
+	ld	de,length
+	sub	a
+	sbc	hl,de
+	ld      (high$1),hl
+	call	dvrini
+	call	relo
+	ld	a,(@icnfg1)
+	ld	(link),a
+	ld	hl,(@icnfg1+1)
+        ld      (link+1),hl
+	ld	hl,dvrcfg
+rx16	equ	$-2
+        ld      (@icnfg1+1),hl
+	ld	a,0c3h
+	ld	(@icnfg1),a
+	jp	move
+;*=*=*
+; 	LDOS 5 Model III
+;*=*=*
+model3:
+	ld	a,0cdh		;Insert Model III @LOGOT
+	ld	(logot),a
+	ld	hl,@logot3
+	ld	(logot+1),hl
+	ld	(domul),a	;Insert Model III MULT
+	ld	hl,@mult3
+	ld	(domul+1),hl
+	ld	(dodiv),a	;Insert Model III DIVEA
+	ld	hl,@divea3
+	ld	(dodiv+1),hl
+	ld	a,'3'		;Modify filename
+	ld	(hmod),a
+	ld	hl,hello_
+	call	@dsply3
+	ld      a,(cflag$3)
+	call	ckparm
+asku3:	ld	hl,unit_	;Ask which unit number
+	call	@dsply3
+	ld	hl,unit
+	ld	bc,100h
+	call	@keyin3
+	jp	c,hitbrk
+	jp	nz,hitbrk
+	ld	a,(unit)
+	cp	'0'
+	jr	c,asku3
+	cp	'0'+ndrive
+	jr	nc,asku3
+	ld	hl,(high$3)
+	call	xgtmod		;Module already loaded?
+	jp	z,setdct
+	ld      hl,(high$3)
+	ld      (newend),hl
+	ld	de,length
+	sub	a
+	sbc	hl,de
+	ld      (high$3),hl
+	call	dvrini
+	call	relo
+	ld	a,(@icnfg3)
+	ld	(link),a
+	ld	hl,(@icnfg3+1)
+        ld      (link+1),hl
+	ld	hl,dvrcfg
+rx17	equ	$-2
+        ld      (@icnfg3+1),hl
+	ld	a,0c3h
+	ld	(@icnfg3),a
+	jp	move
+
+;*=*=*
+; 	LS-DOS 6
+;*=*=*
+lsdos6:	ld	a,'4'		;Modify filename
+	ld	(hmod),a
+	ld      hl,hello_
+	ld      a,@dsply        ;Display hello
+	rst     40
 ;*=*=*
 ;       Check if entry from SYSTEM command.
 ;*=*=*
-	LD      A,@FLAGS        ;Get flags pointer into IY
-	RST     40
-	BIT     3,(IY+'C'-'A')  ;System request?
-	JP      Z,VIASET
-	LD	DE,(DCT)
-	LD	A,D		;DRIVE= must be specified
-	OR	E
-	JP	Z,NEEDDR
+	ld      a,@flags        ;Get flags pointer into IY
+	rst     40
+	ld      a,(iy+'C'-'A')  ;Get CFLAG$
+	call	ckparm
+;*=*=*
+;	Ask which unit number
+;*=*=*
+asku4:	ld	hl,unit_	;Ask which unit number
+	ld	a,@dsply
+	rst	40
+	ld	hl,unit
+	ld	bc,100h
+	ld	a,@keyin
+	rst	40
+	jp	c,hitbrk
+	jp	nz,hitbrk
+	ld	a,(unit)
+	cp	'0'
+	jr	c,asku4
+	cp	'0'+ndrive
+	jr	nc,asku4
 ;*=*=*
 ;       Check if driver already loaded
 ;*=*=*
-	LD	DE,MODNAM
-	LD	A,@GTMOD
-	RST	40
-	JP	Z,LOADED	;Already loaded, skip loading
-;*=*=*
-;	Open Unix file.
-;*=*=*
-	CALL	DVRINI
-	JR	Z,INIOK
-	CP	2		;ENOENT (no such file or directory)
-	JP	NZ,UERROR	;OK if file doesn't exit; format will create it
-INIOK:
+	ld	de,modnam
+	ld	a,@gtmod
+	rst	40
+	jp	z,setdct	;Already loaded, skip loading
 ;*=*=*
 ;       Obtain low memory driver pointer.  Bizarre API here!
 ;*=*=*
-        LD      E,'K'           ;Locate pointer to *KI DCB
-	LD	D,'I'		;  via @GTDCB SVC
-        LD      A,@GTDCB        
-        RST     40
-        JP      NZ,CURDL        ;No error unless KI clobbered!
-        DEC     HL              ;Decrement to driver pointer
-        LD      D,(HL)          ;P/u hi-order of pointer,
-        DEC     HL              ;  decrement to and p/u
-        LD      E,(HL)          ;  lo-order of pointer
+        ld      e,'K'           ;Locate pointer to *KI DCB
+	ld	d,'I'		;  via @GTDCB SVC
+        ld      a,@gtdcb        
+        rst     40
+        jp      nz,curdl        ;No error unless KI clobbered!
+        dec     hl              ;Decrement to driver pointer
+        ld      d,(hl)          ;P/u hi-order of pointer,
+        dec     hl              ;  decrement to and p/u
+        ld      e,(hl)          ;  lo-order of pointer
 ;*=*=*
 ;       Check if driver will fit into [(LCPTR), X'12FF']
 ;*=*=*
-	PUSH	HL		;Save address of pointer
-        LD      HL,LENGTH	;New pointer will be
-        ADD     HL,DE		;  pointer + LENGTH
-	LD	D,H		;Save a copy in DE
-	LD	E,L
-        LD      BC,1301H        ;If > 1300H, driver won't fit
-        SUB     A               ;Reset carry flag
-        SBC     HL,BC
-	POP	HL		;Get back address of pointer
-        JR      NC,USEHI        ;Go if driver won't fit
-	LD	(HL),E		;Store new value of pointer
-	INC	HL
-	LD	(HL),D
-	DEC	DE		;Last byte of driver goes here
-	LD      (NEWEND),DE
-	JR	RELO
+	push	hl		;Save address of pointer
+        ld      hl,length	;New pointer will be
+        add     hl,de		;  pointer + LENGTH
+	ld	d,h		;Save a copy in DE
+	ld	e,l
+        ld      bc,1301h        ;If > 1300H, driver won't fit
+        sub     a               ;Reset carry flag
+        sbc     hl,bc
+	pop	hl		;Get back address of pointer
+        jr      nc,usehi        ;Go if driver won't fit
+	ld	(hl),e		;Store new value of pointer
+	inc	hl
+	ld	(hl),d
+	dec	de		;Last byte of driver goes here
+	ld      (newend),de
+	jr	dorelo
 ;*=*=*
 ;       Put in high memory instead.
 ;*=*=*
-USEHI:	LD      HL,0            ;Get current HIGH$
-	LD      B,L
-	LD      A,@HIGH 
-	RST     40
-	JP      NZ,NOMEM
-	LD      (NEWEND),HL	;Last byte of driver goes here
-	LD	DE,LENGTH
-	SUB	A		;Reset carry flag
-	SBC	HL,DE		;Compute new HIGH$
-	LD      A,@HIGH         ;Set new HIGH$ into the system
-	RST     40
+usehi:	ld      hl,0            ;Get current HIGH$
+	ld      b,l
+	ld      a,@high 
+	rst     40
+	jp      nz,nomem
+	ld      (newend),hl	;Last byte of driver goes here
+	ld	de,length
+	sub	a		;Reset carry flag
+	sbc	hl,de		;Compute new HIGH$
+	ld      a,@high         ;Set new HIGH$ into the system
+	rst     40
 ;*=*=*
 ;       Relocate internal references in driver.
 ;	HL = address for last byte of driver.
 ;*=*=*
-RELO:	LD	HL,(NEWEND)
-	LD      IY,RELTAB       ;Point to relocation tbl
-	LD      DE,DVREND
-	SUB     A               ;Clear carry flag
-	SBC     HL,DE
-	LD      B,H             ;Move to BC
-	LD      C,L
-RLOOP:  LD      L,(IY)          ;Get address to change
-	LD      H,(IY+1)
-	LD      A,H
-	OR      L
-	JR      Z,RXEND
-	LD      E,(HL)          ;P/U address
-	INC     HL
-	LD      D,(HL)
-	EX      DE,HL           ;Offset it
-	ADD     HL,BC
-	EX      DE,HL
-	LD      (HL),D          ;And put back
-	DEC     HL
-	LD      (HL),E
-	INC     IY
-	INC     IY
-	JR      RLOOP           ;Loop till done
-RXEND:
+dorelo:	call	dvrini		;Final driver init before move
+	call	relo
 ;*=*=*
 ;	Link to @ICNFG (must follow address relocation and precede movement)
 ;*=*=*
-	LD      A,@FLAGS        ;Get flags pointer into IY
-	RST     40
-        LD      A,(IY+28)       ;Copy current @ICNFG into LINK
-        LD      (LINK),A
-        LD      L,(IY+29)
-        LD      H,(IY+30)
-        LD      (LINK+1),HL
-	LD	HL,DVRCFG	;Get relocated init address
-RX10	EQU	$-2
-        LD      (IY+29),L       ;Save in @ICNFG vector
-        LD      (IY+30),H
-	LD	(IY+28),0C3H	;Insert JP opcode
+	ld      a,@flags        ;Get flags pointer into IY
+	rst     40
+        ld      a,(iy+28)       ;Copy current @ICNFG into LINK
+        ld      l,(iy+29)
+        ld      h,(iy+30)
+        ld      (link+1),hl
+	ld	hl,dvrcfg	;Get relocated init address
+rx10	equ	$-2
+        ld      (iy+29),l       ;Save in @ICNFG vector
+        ld      (iy+30),h
+	ld	(iy+28),0c3h	;Insert JP opcode
 ;*=*=*
 ;       Move driver into low or high memory.
 ;*=*=*
-	LD      DE,(NEWEND)     ;Destination address
-	LD      HL,DVREND       ;Last byte of module
-	LD      BC,LENGTH       ;Length of filter
-	LDDR
-	EX      DE,HL
-	INC     HL              ;Bump to driver entry
-LOADED:
+move:
+	ld      de,(newend)     ;Destination address
+	ld      hl,dvrend       ;Last byte of module
+	ld      bc,length       ;Length of filter
+	lddr
+	ex      de,hl
+	inc     hl              ;Bump to driver entry
 ;*=*=*
-;	Setup DCT
+;	Setup DCT (iy+5 to iy+9 are reset by ckopen if successful)
 ;*=*=*
-	LD	IY,(DCT)
-	LD      (IY+1),L          ;Driver address
-	LD      (IY+2),H
-	LD	(IY+3),00001100B  ;Flags: rigid, fixed, drive #0
-	LD	(IY+4),00010000B  ;Flags: alien (=no index pulses)
-	LD	(IY+5),0	  ;Scratch space (=last Unix error code)
-	LD	(IY+6),202	  ;203 logical cylinders (LDOS max)
-	LD	(IY+7),11111111B  ;8 heads (111), 32 sec/trk (11111)
-	LD	(IY+8),11111111B  ;8 gran/phycyl (111), 32 sec/gran (11111)
-	LD	(IY+9),0FFH	  ;Directory cylinder (initially invalid)
+setdct:
+	ld	iy,(dct)
+	ld      (iy+1),l          ;Driver address
+	ld      (iy+2),h
+	ld	(iy+3),00001100b  ;Flags: rigid, fixed, step rate 0
+	ld	a,(unit)
+	and	0fh
+	or	00010000b         ;Flags: alien (=no index pulses), unit#
+	ld	(iy+4),a
+	ld	(iy+5),0	  ;LDOS undefined; we use as sec/cyl (0=256).
+	ld	(iy+6),201	  ;high cylinder number
+	ld	(iy+7),11111111b  ;high head # (111), high sec/trak (11111)
+	ld	(iy+8),11111111b  ;high gran # (111), high sec/gran (11111)
+	ld	(iy+9),0ffh	  ;Directory cylinder
+;*=*=*
+;	Open file now so user can get error if any, and so geometry
+;	is established as early as possible.
+;*=*=*
+	call	ckopen
+	ld      hl,0            ;Successful completion
+	ret	z		;Fall thru if error
+;*=*=*
+uerror:	ld	hl,errbuf	;Unix error
+	ld	bc,256
+	defw	emt_strerror
+	defb	0ddh
+curdl:	ld	hl,curdl_	;Other error
+	defb	0ddh
+needdr:	ld	hl,needdr_
+	defb	0ddh
+viaset: ld      hl,viaset_
+	defb    0ddh
+nomem:  ld      hl,nomem_
+	defb    0ddh
+hitbrk:	ld	hl,hitbrk_
+logot:	ld	a,@logot 
+	rst	40
+	ld      hl,-1            ;Unuccessful completion
+	ret
 
-	LD      HL,0            ;Successful completion
-	RET
-;
-UERROR:	LD	IY,(DCT)
-	LD	(IY+5),A
-	LD	HL,ERRBUF
-	LD	BC,256
-	DEFW	emt_strerror
-	DEFB	0DDH
-CURDL:	LD	HL,CURDL_
-	DEFB	0DDH
-NEEDDR:	LD	HL,NEEDDR_
-	DEFB	0DDH
-VIASET: LD      HL,VIASET_
-	DEFB    0DDH
-NOMEM:  LD      HL,NOMEM_
-	LD	A,@LOGOT 
-	RST	40
-	LD      HL,-1
-	RET
-;
-HELLO_: DEFB    'XTRSHARD - Emulated hard disk driver for xtrs - 1/12/98',CR
-CURDL_:	DEFB	'LS-DOS is curdled!',CR
-NOMEM_: DEFB    'High memory is not available!',CR
-VIASET_:DEFB    'Must install via SYSTEM (DRIVE=,DRIVER=)!',CR
-NEEDDR_:DEFB	'DRIVE= must be specified!',CR
-LCPTR:	DEFW	0
-NEWEND:	DEFW	0
-DCT:    DEFW	0
-ERRBUF:	DEFS	256
+;*=*=*
+;	Check parameter validity
+;*=*=*
+ckparm:	bit     3,a		;System request?
+	jp      z,viaset
+	ld	de,(dct)
+	ld	a,d		;DRIVE= must be specified
+	or	e
+	jp	z,needdr
+	ret
+
+;*=*=*
+;       Relocate internal references in driver.
+;	HL = address for last byte of driver.
+;*=*=*
+relo:	ld	hl,(newend)
+	ld      iy,reltab       ;Point to relocation tbl
+	ld      de,dvrend
+	sub     a               ;Clear carry flag
+	sbc     hl,de
+	ld      b,h             ;Move to BC
+	ld      c,l
+rloop:  ld      l,(iy)          ;Get address to change
+	ld      h,(iy+1)
+	ld      a,h
+	or      l
+	ret	z
+	ld      e,(hl)          ;P/U address
+	inc     hl
+	ld      d,(hl)
+	ex      de,hl           ;Offset it
+	add     hl,bc
+	ex      de,hl
+	ld      (hl),d          ;And put back
+	dec     hl
+	ld      (hl),e
+	inc     iy
+	inc     iy
+	jr      rloop           ;Loop till done
+
+;*=*=*
+;	Search for existing copy of driver.
+;        Rough Model I/III emulation of Model 4 @GTMOD,
+;        hardcoded with driver address.
+;	Entry: HL holds HIGH$
+;	Exit Z: HL holds driver address
+;            NZ: driver not found
+;*=*=*
+xgtmod:	inc	hl
+	ld	a,h
+	or	l
+	jr	nz,xgtm1
+	dec	a		;not found
+	ret
+xgtm1:	ld	a,(hl)
+	cp	18h		;unconditional jr?
+	ret	nz		;not a module header
+	push	hl		;save start address
+	inc	hl		;skip jr
+	inc	hl		;skip offset
+	inc	hl		;skip start address
+	inc	hl
+	ld	a,(hl)		;compare name length
+	cp	modptr-modnam
+	jr	nz,nextmd	;different - skip
+	ld	b,a		;compare name
+	ld	de,modnam
+	inc	hl
+xgtm2:	ld	a,(de)
+	cp	(hl)
+	jr	nz,nextmd	;different - skip
+	inc	de
+	inc	hl
+	djnz	xgtm2
+	pop	hl		;same - found
+	ret
+nextmd:	pop	hl		;get back start of module
+	inc	hl
+	inc	hl
+	ld	e,(hl)		;pointer to last byte
+	inc	hl
+	ld	d,(hl)
+	ex	de,hl
+	jr	xgtmod
+
+;*=*=*
+;	Messages and globals
+;*=*=*
+hello_: defb    'XTRSHARD - Emulated hard disk driver for xtrs - 2/7/98',CR
+curdl_:	defb	'LS-DOS is curdled!',CR
+nomem_: defb    'High memory is not available!',CR
+viaset_:defb    'Must install via SYSTEM (DRIVE=,DRIVER=)!',CR
+needdr_:defb	'DRIVE= must be specified!',CR
+unit_:	defb	'Enter unit number ([0]-','0'+ndrive-1,'): ',ETX
+hitbrk_:defb	'Aborted!',CR
+lcptr:	defw	0
+newend:	defw	0
+dct:    defw	0
+unit:   defs	2
+errbuf:	defs	256
 
 ;
 ; Driver - Based on skeletal driver from the Guide
 ;
 
-ENTRY:  JR      BEGIN           ;The driver starts with the
-	DEFW    DVREND          ;  DOS standard header
-RX00	EQU	$-2
-	DEFB    MODPTR-ENTRY-5  ;Length of name
-MODNAM:	DEFB    'xtrshard'      ;Name for @GTMOD requests
-MODPTR: DEFW    0               ;These pointers are unused
-	DEFW    0
-FD:	DEFW	0		;Unix file descriptor to use
-OFFSET:	DEFW	0,0,0,0		;lseek offset
-BEGIN:  LD      A,B             ;The first test will return
-	OR      A               ;  to the caller on @DCSTAT
-	RET     Z               ;  and set the Z-flag with A=0
-	CP      7
-	JR      Z,RSLCT         ;Transfer on @RSLCT
-	JR      NC,DISKIO       ;Transfer on physical I/O request
-	CP	4
-	JR	Z,RSTOR
-	JR	NC,STPSK
+entry:  jr      begin           ;The driver starts with the
+	defw    dvrend          ;  DOS standard header
+rx00	equ	$-2
+	defb    modptr-modnam   ;Length of name
+modnam:	defb    'xtrshard'      ;Name for @GTMOD requests
+modptr: defw    0               ;These pointers are unused
+	defw    0
+fd:	defs	ndrive*2	;Unix file descriptors
+offset:	defw	0,0,0,0		;lseek offset buffer
+begin:  
 ;*=*=*
-SLCT:   SUB	A               ;@SLCT, @DCINIT, or @DCRES: no-op
-	RET
+;	First make sure the file is open and correct the geometry
+;       in the DCT if needed.
 ;*=*=*
-RSTOR:				;Zero CURCYL
-	SUB	A
-	LD      (IY+5),A
-	RET
+	push	ix
+	call	ckopen
+rx03	equ	$-2
+	call	body
+rx06	equ	$-2
+	pop	ix
+	ret
+body:	ld	a,32		;"Illegal drive number"
+	ret	nz
+	ld      a,b             ;The first test will return
+	and     a               ;  to the caller on @DCSTAT
+	ret	z       	;  and set the Z-flag with A=0
+notdcs:	cp      7
+	jr      z,rslct         ;Transfer on @RSLCT
+	jr      nc,diskio       ;Transfer on physical I/O request
 ;*=*=*
-STPSK:	CP	5
-	JR	NZ,SEEK
+;	@SLCT, @DCINIT, @DCRES, @RSTOR, @STEPI or @SEEK: no-op
 ;*=*=*
-STEPI:  INC     (IY+5)          ;Bump CURCYL
-	SUB	A
-	RET
-;*=*=*
-SEEK:   LD      (IY+5),D        ;Update CURCYL
-	SUB	A
-	RET
+retzer:	sub	a
+	ret
 ;*=*=*
 ;       The RSLCT function should return with the hardware
 ;       write protection status. Set bit 6 of the accumulator
 ;       to indicate the drive is write-protected
 ;*=*=*
-RSLCT:  SUB	A               ;No emulated hardware WP for now
-	RET
+rslct:  sub	a               ;No emulated hardware WP for now
+	ret
 ;*=*=*
-DISKIO: BIT     2,B             ;Test if read or write commands
-	JR      NZ,WRCMD        ;Transfer if functions <12-15>
-	CP	10
-	JR	Z,VRSEC
-	JR	NC,RDTRK
-	CP	9
-	JR	Z,RDSEC
-RDHDR:  LD	A,32		;Not supported ("Illegal drive number")
-        AND	A            
-	RET
+diskio: bit     2,b             ;Test if read or write commands
+	jr      nz,wrcmd        ;Transfer if functions <12-15>
+	cp	10
+	jr	z,vrsec
+	jr	nc,rdtrk
+	cp	9
+	jr	z,rdsec
+rdhdr:  ld	a,32		;Not supported ("Illegal drive number")
+        and	a            
+	ret
 ;*=*=*
-RDSEC:				;Read a sector of data
-	LD	A,(IY+6)	;Get high cyl #
-	CP	D		;At or below it?
-	JR	NC,RDOK
-	LD	A,2		;"Seek error during read"
-	RET			;NZ already set
-RDOK:	PUSH	DE
-	LD	(OFFSET+1),DE
-RX01	EQU	$-2
-	LD	DE,(FD)
-RX02	EQU	$-2
-	LD	A,D		;Check if file exists
-	AND	E
-	CP	0FFH
-	JR	Z,FAKE		;No, so fake an empty drive
-	PUSH	HL
-	LD	HL,OFFSET
-RX03	EQU	$-2
-	LD	BC,0
-	DEFW	emt_lseek
-	POP	HL
-	LD	(IY+5),A	;Unix error code
-	LD	A,5		;"Data record not found during read"
-	JR	NZ,RDDUN
-	LD	BC,256
-	DEFW	emt_read
-	LD	(IY+5),A	;Unix error code
-	LD	A,4		;"Parity error during read"
-RDDUN:	POP	DE
-	RET	NZ
-	LD	A,B		;Check for end of file
-	OR	C
-	JR	NZ,RDDUN2
-	PUSH	DE
-FAKE:	PUSH	HL		;Return a block full of 0E5H		
-	PUSH	BC
-	LD	(HL),0E5H
-	LD	D,H
-	LD	E,L
-	INC	DE
-	LD	BC,0FFH
-	LDIR
-	POP	BC
-	POP	HL
-	POP	DE
-	SUB	A
-	RET
-RDDUN2:	LD	A,D
-VROK:	SUB	(IY+9)
-	JR	NZ,RDDUN1
-	ADD	A,6		;"Attempted to read system data record"
-	RET
-RDDUN1:	SUB	A
-	RET
+rdsec:				;Read a sector of data
+	ld	a,(iy+6)	;Get high cyl #
+	cp	d		;At or below it?
+	jr	nc,rdok
+	ld	a,2		;"Seek error during read"
+	ret			;NZ already set
+rdok:	push	de
+	push	hl
+	call	doseek		;Setup and do lseek
+rx01	equ	$-2
+	pop	hl
+	ld	a,5		;"Data record not found during read"
+	jr	nz,rddun
+	ld	bc,256
+	defw	emt_read
+	ld	a,4		;"Parity error during read"
+rddun:	pop	de
+	ret	nz
+	ld	a,b		;Check for end of file
+	or	c
+	jr	nz,rddun2
+	push	de
+	push	hl		;Return a block full of 0E5H		
+	push	bc
+	ld	(hl),0e5h
+	ld	d,h
+	ld	e,l
+	inc	de
+	ld	bc,0ffh
+	ldir
+	pop	bc
+	pop	hl
+	pop	de
+	sub	a
+	ret
+rddun2:	ld	a,d
+	sub	(iy+9)
+	jr	nz,rddun1
+	add	a,6		;"Attempted to read system data record"
+	ret
+rddun1:	sub	a
+	ret
 ;*=*=*
-VRSEC:				;Read/verify -- no op  
-	LD	A,(IY+6)	;Get high cyl #
-	CP	D		;At or below it?
-	JR	NC,VROK		;Go if so
-	LD	A,2		;"Seek error during read"
-	RET			;NZ already set
+vrsec:				;Read/verify -- we don't bother reading
+	ld	a,(iy+6)	;Get high cyl #
+	cp	d		;At or below it?
+	jr	nc,rddun2	;Go if so
+	ld	a,2		;"Seek error during read"
+	ret			;NZ already set
 ;*=*=*
 ;       On RDSEC and VRSEC, if the read referenced the
 ;       directory cylinder and was successful,
@@ -339,115 +559,209 @@ VRSEC:				;Read/verify -- no op
 ;       Hard disk users may have to compare the requested
 ;       cylinder to DIRCYL in the DCT.
 ;*=*=*
-RDTRK:  LD	A,32		;Not supported ("Illegal drive number")
-        AND	A            
-	RET
+rdtrk:  ld	a,32		;Not supported ("Illegal drive number")
+        and	a            
+	ret
 ;*=*=*
-WRCMD:  BIT     7,(IY+3)        ;Check for software write protect
-	JR      Z,WRCMD1        ;Transfer if no soft WP
-	LD      A,15            ;Set "Write protected disk" error
-	RET
-WRCMD1: CP	14              ;Now parse functions 12-15
-	JR	Z,WRSSC
-	JR	NC,WRTRK
-	CP	13
-	JR	Z,WRSEC
+wrcmd:  bit     7,(iy+3)        ;Check for software write protect
+	jr      z,wrcmd1        ;Transfer if no soft WP
+	ld      a,15            ;Set "Write protected disk" error
+	ret
+wrcmd1: cp	14              ;Now parse functions 12-15
+	jr	z,wrssc
+	jr	nc,wrtrk
+	cp	13
+	jr	z,wrsec
 ;*=*=*
-HDFMT:                 		;Low-level format
-	LD	(IY+9),0FFH	;Invalidate directory cylinder
-	PUSH	DE
-	PUSH	HL
-	LD	DE,(FD)
-RX09	EQU	$-2
-	LD	A,D		;Does file exist?
-	AND	E
-	CP	0FFH
-	JR	NZ,EXISTS	
-	LD	HL,HARD_	;No, so create it
-RX14	EQU	$-2
-	LD	BC,03002O	;O_RDWR + O_CREAT + O_TRUNC
-	LD	DE,0666O	;mode
-	DEFW	emt_opendisk
-	LD	(FD),DE
-RX15	EQU	$-2
-	JR	CREATD
-EXISTS:	LD	HL,0		;Yes, so truncate it
-	LD	(OFFSET+1),HL
-RX07	EQU	$-2
-	LD	HL,OFFSET
-RX08	EQU	$-2
-	DEFW	emt_ftruncate
-CREATD:	LD	(IY+5),A	;Unix error code
-	POP	HL
-	POP	DE
-	LD	A,14		;"Write fault on disk drive"
-	RET	NZ
-	SUB	A
-	RET
+hdfmt:                 		;Low-level format (=erase)
+	ld	(iy+9),0ffh	;Invalidate directory cylinder
+	push	de
+	push	hl
+	ld	e,(ix)		;Get fd
+	ld	d,(ix+1)
+exists:	ld	hl,256		;Truncate file to just the header
+	ld	(offset+1),hl
+rx07	equ	$-2
+	ld	hl,offset
+rx08	equ	$-2
+	defw	emt_ftruncate
+creatd:	pop	hl
+	pop	de
+	ld	a,14		;"Write fault on disk drive"
+	ret	nz
+	sub	a
+	ret
 ;*=*=*
-WRSEC:				;Write with X'FB' data address mark
-	LD	A,(IY+9)	;Can't do on designated dir cylinder
-	CP	D		
-	JR	NZ,WROK
-BADDAM:	LD	A,12		;"Directory write error" (?)
-	AND	A
-	RET
+wrsec:				;Write with X'FB' data address mark
+	ld	a,(iy+9)	;Can't do on designated dir cylinder
+	cp	d		
+	jr	nz,wrok
+baddam:	ld	a,12		;"Directory write error" (?)
+	and	a
+	ret
 ;*=*=*
-WRSSC:				;Write with X'F8' data address mark
-	LD	A,(IY+9)	;Can do only on designated dir cylinder
-	CP	D
-	JR	NZ,BADDAM
+wrssc:				;Write with X'F8' data address mark
+	ld	a,(iy+9)	;Can do only on designated dir cylinder
+	cp	d
+	jr	nz,baddam
 ;*=*=*
-WROK:	LD	A,(IY+6)	;Get high cyl #
-	CP	D		;Cylinder 0FFH is invalid
-	JR	NC,WROK1
-	LD	A,10		;"Seek error during write"
-	RET			;NZ already set
-WROK1:  PUSH	DE
-	PUSH	HL
-	LD	(OFFSET+1),DE
-RX04	EQU	$-2
-	LD	BC,0
-	LD	DE,(FD)
-RX05	EQU	$-2
-	LD	HL,OFFSET
-RX06	EQU	$-2
-	DEFW	emt_lseek
-	POP	HL
-	LD	(IY+5),A	;Unix error code
-	LD	A,13		;"Data record not found during write"
-	JR	NZ,WRDUN
-	LD	BC,256
-	DEFW	emt_write
-	LD	(IY+5),A	;Unix error code
-	LD	A,12		;"Parity error during write"
-WRDUN:	POP	DE
-	RET	NZ
-	SUB	A
-	RET
+wrok:	ld	a,(iy+6)	;Get high cyl #
+	cp	d		;Beyond it?
+	jr	nc,wrok1
+	ld	a,10		;"Seek error during write"
+	ret			;NZ already set
 ;*=*=*
-WRTRK:  LD	A,32		;Write track
-        AND	A               ;Not supported ("Illegal drive number")
-	RET
+wrok1:  push	de
+	push	hl
+	call	doseek
+rx04	equ	$-2
+	pop	hl
+	ld	a,13		;"Data record not found during write"
+	jr	nz,wrdun
+	ld	bc,256
+	defw	emt_write
+	ld	a,12		;"Parity error during write"
+wrdun:	pop	de
+	ret	nz
+	sub	a
+	ret
 ;*=*=*
-;	Open Unix file
+wrtrk:  ld	a,32		;Write track
+        and	a               ;Not supported ("Illegal drive number")
+	ret
 ;*=*=*
-DVRCFG:	CALL	DVRINI		;@ICNFG chains in here
-RX13	EQU	$-2	
-LINK:	DEFB	'Tim'		;Replaced by next link in @ICNFG chain
-DVRINI:	LD	HL,HARD_
-RX11	EQU	$-2
-	LD	BC,00002O	;O_RDWR
-	LD	DE,0666O	;mode
-	DEFW	emt_opendisk
-	LD	(FD),DE
-RX12	EQU	$-2
-	RET
-HARD_:	DEFB	'harddisk',0
+;	Perform lseek before r/w
+;*=*=*
+doseek: sub	a		;sec/cyl to hl, xlate 0 to 256
+	ld	h,a
+	add	a,(iy+5)
+	ld	l,a
+	jr	nz,noinc
+	inc	h
+noinc:	ld	c,d		;cyl# to c
+	ld	b,e		;sec# to b
+	ld	a,c		;model I/III call uses a, not c
+domul:	ld	a,@mul16	;hla = hl * c, smash de
+	rst	40
+	ld	d,h		;sec# to de (h is 0)
+	ld	e,b
+	ld	h,l		;product to hl
+	ld	l,a
+	scf			;add 1 extra for header
+	adc	hl,de
+	ex	de,hl		;offset to de
+	ld	hl,offset+2
+rx15	equ	$-2
+	ld	(hl),d
+	dec	hl
+	ld	(hl),e
+	dec	hl
+	ld	bc,0
+	ld	(hl),c
+	ld	e,(ix)		;Get fd
+	ld	d,(ix+1)
+	defw	emt_lseek
+	ret
 
-DVREND  EQU     $-1
-LENGTH  EQU     $-ENTRY
-RELTAB: DEFW    RX00,RX01,RX02,RX03,RX04,RX05,RX06,RX07,RX08,RX09
-	DEFW	RX10,RX11,RX12,RX13,RX14,RX15,0
-	END     INSTAL
+;*=*=*
+;	Open file and read geometry if needed, and
+;       get address of correct fd to ix.
+;*=*=*
+ckopen: ld	ix,fd		;Compute fd address
+rx02	equ	$-2
+	push	de
+	ld	d,0
+	ld	a,(iy+4)
+	and	0fh
+	rlca
+	ld	e,a
+	add	ix,de
+	pop	de
+	ld	a,(ix)		;fd == -1?
+	and	(ix+1)
+	inc	a
+	jr	z,doopen
+	sub	a
+	ret
+doopen:	push	de
+	push	bc
+	push	hl
+	ld	bc,EO_RDWR	;Prepare to open
+	ld	de,0666o	;mode
+	ld	hl,hard_	;name
+rx05	equ	$-2
+	ld	a,(iy+4)
+	and	0fh
+	add	a,'0'
+	ld	(hadr),a
+rx09	equ	$-2
+	defw	emt_opendisk
+	ld	(ix),e	
+	ld	(ix+1),d
+	jr	nz,opnerr
+	ld	hl,offset	;Prepare to read geometry
+rx13	equ	$-2
+	ld	(hl),28		;offset to cyl/sec/gran params
+	ld	bc,0
+	ld	(offset+1),bc
+rx14	equ	$-2
+	defw	emt_lseek
+	jr	nz,opnerr
+	ld	bc,3		;length
+	defw	emt_read	;use offset buffer
+	jr	nz,opnerr
+	ld	a,(hl)		;cyl
+	dec	a
+	ld	(iy+6),a	;max cylinder
+	inc	hl
+	ld	b,(hl)		;sec
+	ld	(iy+5),b
+	inc	hl
+	ld	c,(hl)		;gran
+	ld	e,b		;compute sec/gran
+	ld	a,c		;model I/III call uses a, not c
+dodiv:	ld	a,@div8		;a = e / c, e = e % c
+	rst	40              ;remainder mbz, but we don't check here
+	dec	a
+	dec	c
+	rrc	c
+	rrc	c
+	rrc	c
+	or	c
+	ld	(iy+7),a	;heads, secs per track
+	ld	(iy+8),a	;grans, secs per gran
+	ld	(iy+9),0ffh	;dircyl unknown
+	sub	a		;no error
+opnerr:	pop	hl
+	pop	bc
+	pop	de
+	ret
+;*=*=*
+;	Boot-time initialization
+;*=*=*
+dvrcfg:	ld	de,-1		;@ICNFG chains in here
+	defw	emt_closedisk	;close any files left from before reboot
+	call	dvrini
+rx11	equ	$-2	
+link:	defb	'Tim'		;Replaced by next link in @ICNFG chain
+dvrini:	ld	hl,fd
+rx12	equ	$-2
+	ld	d,h
+	ld	e,l
+	inc	de
+	ld	(hl),0ffh
+	ld	bc,ndrive*2-1
+	ldir
+	ret
+;*=*=*
+;	Disk name: hardM-N for model M (1,3,4), number N (0-7)
+;*=*=*
+hard_:	defb	'hard'
+hmod:   defb	'1-'
+hadr:	defb	'0',0
 
+dvrend  equ     $-1
+length  equ     $-entry
+reltab: defw    rx00,rx01,rx02,rx03,rx04,rx05,rx06,rx07,rx08,rx09
+	defw	rx10,rx11,rx12,rx13,rx14,rx15,rx16,rx17,0
+	end     instal
