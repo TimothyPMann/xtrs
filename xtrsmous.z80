@@ -1,0 +1,256 @@
+;*=*=*
+;	xtrsmous/cmd
+;	LS-DOS driver for xtrs emulation of mouse
+;
+;	Copyright (c) 1998, Timothy Mann
+;
+;	This software may be copied, modified, and used for any
+;	purpose without fee, provided that (1) the above copyright
+;	notice is retained, and (2) modified versions are clearly
+;	marked as having been modified, with the modifier's name and
+;	the date included.  
+;
+;	Created 9-28-98
+;       Last modified on Sat Oct 10 20:57:36 PDT 1998 by mann
+;
+;	Usage:
+;	  xtrsmous		To load driver in high memory.
+;	  xtrsmous (low) 	To load driver in low memory if possible,
+;				  or in high memory if low memory is full.
+;
+;	The default is to use high memory because MDRAW/BAS contains a
+;	PEEK in the first line of code that looks for the driver in
+;	high memory; if it is in low memory, MDRAW thinks the driver
+;	is not installed and exits.  If you edit this line of code to
+;	remove the test, the driver will work fine in low memory.
+;*=*=*
+
+
+; ASCII chars
+LF      equ     10
+CR	equ	13
+ETX	equ	3
+
+; Model 4 SVC numbers
+@high   equ     100
+@dsply  equ     10
+@flags  equ     101
+@logot  equ     12
+@gtdcb  equ	82 
+@gtmod	equ	83
+@keyin	equ	9
+@param	equ	17
+@mouse	equ     120     ;unofficial value
+
+svcvec	equ	100h + 2*@mouse
+
+; xtrs emts (byte-reversed)
+emt_mouse  equ	029edh
+
+	org	3000h
+;*=*=*
+; 	Relocator for disk driver
+;*=*=*
+instal:	ld	de,prmtab
+	ld	a,@param	;Parse parameters
+	rst	40
+	jp	nz,prmerr
+	ld      hl,hello_
+	ld      a,@dsply        ;Display hello
+	rst     40
+;*=*=*
+;       Check if driver already loaded
+;*=*=*
+	ld	de,modnam
+	ld	a,@gtmod
+	rst	40
+	jp	z,loaded	;Already loaded
+;*=*=*
+;	Check if OK to use low memory.
+;*=*=*
+lparm:	ld	bc,0
+	ld	a,b
+	or	c
+	jr	z,usehi
+;*=*=*
+;       Obtain low memory driver pointer.  Bizarre API here!
+;*=*=*
+        ld      e,'K'           ;Locate pointer to *KI DCB
+	ld	d,'I'		;  via @GTDCB SVC
+        ld      a,@gtdcb        
+        rst     40
+        jp      nz,curdl        ;No error unless KI clobbered!
+        dec     hl              ;Decrement to driver pointer
+        ld      d,(hl)          ;P/u hi-order of pointer,
+        dec     hl              ;  decrement to and p/u
+        ld      e,(hl)          ;  lo-order of pointer
+;*=*=*
+;       Check if driver will fit into [(LCPTR), X'12FF']
+;*=*=*
+	push	hl		;Save address of pointer
+        ld      hl,length	;New pointer will be
+        add     hl,de		;  pointer + LENGTH
+	ld	d,h		;Save a copy in DE
+	ld	e,l
+        ld      bc,1301h        ;If > 1300H, driver won't fit
+        sub     a               ;Reset carry flag
+        sbc     hl,bc
+	pop	hl		;Get back address of pointer
+        jr      nc,usehi        ;Go if driver won't fit
+	ld	(hl),e		;Store new value of pointer
+	inc	hl
+	ld	(hl),d
+	dec	de		;Last byte of driver goes here
+	ld      (newend),de
+	jr	dorelo
+;*=*=*
+;       Put in high memory instead.
+;*=*=*
+usehi:	ld      hl,0            ;Get current HIGH$
+	ld      b,l
+	ld      a,@high 
+	rst     40
+	jp      nz,nomem
+	ld      (newend),hl	;Last byte of driver goes here
+	ld	de,length
+	sub	a		;Reset carry flag
+	sbc	hl,de		;Compute new HIGH$
+	ld      a,@high         ;Set new HIGH$ into the system
+	rst     40
+;*=*=*
+;       Relocate internal references in driver.
+;	HL = address for last byte of driver.
+;*=*=*
+dorelo:	call	relo
+;*=*=*
+;	Link to @ICNFG (must follow address relocation and precede movement)
+;*=*=*
+	ld      a,@flags        ;Get flags pointer into IY
+	rst     40
+        ld      a,(iy+28)       ;Copy current @ICNFG into LINK
+        ld      l,(iy+29)
+        ld      h,(iy+30)
+	ld	(link),a
+        ld      (link+1),hl
+	ld	hl,dvrcfg	;Get relocated init address
+rx01	equ	$-2
+        ld      (iy+29),l       ;Save in @ICNFG vector
+        ld      (iy+30),h
+	ld	(iy+28),0c3h	;Insert JP opcode
+;*=*=*
+;       Move driver into low or high memory.
+;*=*=*
+move:
+	ld      de,(newend)     ;Destination address
+	ld      hl,dvrend       ;Last byte of module
+	ld      bc,length       ;Length of filter
+	lddr
+	ex      de,hl
+	inc     hl              ;Bump to driver entry
+;*=*=*
+;	Driver is loaded; finish up.
+;*=*=*
+	call	dvrini		;Hook into SVC table
+
+	ld      hl,0            ;Successful completion
+	sub	a
+	ret
+
+;*=*=*
+;	Error vectors
+;*=*=*
+prmerr:	ld	hl,prmerr_
+	defb	0ddh
+loaded:	ld	hl,loaded_
+	defb	0ddh
+curdl:	ld	hl,curdl_
+	defb	0ddh
+nomem:  ld      hl,nomem_
+logot:	ld	a,@logot 
+	rst	40
+	ld      hl,-1            ;Unuccessful completion
+	ret
+
+;*=*=*
+;       Relocate internal references in driver.
+;	HL = address for last byte of driver.
+;*=*=*
+relo:	ld	hl,(newend)
+	ld      iy,reltab       ;Point to relocation tbl
+	ld      de,dvrend
+	sub     a               ;Clear carry flag
+	sbc     hl,de
+	ld      b,h             ;Move to BC
+	ld      c,l
+rloop:  ld      l,(iy)          ;Get address to change
+	ld      h,(iy+1)
+	ld      a,h
+	or      l
+	ret	z
+	ld      e,(hl)          ;P/U address
+	inc     hl
+	ld      d,(hl)
+	ex      de,hl           ;Offset it
+	add     hl,bc
+	ex      de,hl
+	ld      (hl),d          ;And put back
+	dec     hl
+	ld      (hl),e
+	inc     iy
+	inc     iy
+	jr      rloop           ;Loop till done
+
+;*=*=*
+;	Messages and globals
+;*=*=*
+hello_: defb    'XTRSMOUS - Emulated mouse driver for xtrs - 9/28/98',CR
+curdl_:	defb	'LS-DOS is curdled!',CR
+nomem_: defb    'High memory is not available!',CR
+loaded_:defb	'Mouse driver is already loaded!',CR
+prmerr_:defb	'Bad parameters!',CR
+lcptr:	defw	0
+newend:	defw	0
+
+;*=*=*
+;	Parameter table
+;*=*=*
+prmtab:	defb	'LOW   '
+	defw	lparm+1
+	defb	'L     '
+	defw	lparm+1
+	defb	0
+
+;*=*=*
+;	Driver
+;*=*=*
+entry:  jr      begin           ;The driver starts with the
+	defw    dvrend          ;  DOS standard header
+rx00	equ	$-2
+	defb    modptr-modnam   ;Length of name
+modnam:	defb    '$MOUSE'        ;Name for @GTMOD requests
+modptr: defw    0               ;These pointers are unused, but 1st byte MBZ
+	defw    0
+;*=*=*
+;	Do the real work using an emulator trap
+;*=*=*
+begin:	defw	emt_mouse
+	ret
+;*=*=*
+;	Boot-time initialization
+;*=*=*
+dvrcfg:				;@ICNFG chains in here
+	call	dvrini
+rx02	equ	$-2	
+link:	defb	'Tim'		;Replaced by next link in @ICNFG chain
+;*=*=*
+;	Hook into SVC table
+;*=*=*
+dvrini:	ld	hl,entry
+rx03	equ	$-2
+	ld	(svcvec),hl
+	ret
+
+dvrend  equ     $-1
+length  equ     $-entry
+reltab: defw    rx00,rx01,rx02,rx03,0
+	end     instal
