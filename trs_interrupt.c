@@ -226,7 +226,8 @@ trs_timer_init()
   }
 
   sa.sa_handler = trs_timer_event;
-  sa.sa_mask = sigmask(SIGALRM);
+  sigemptyset(&sa.sa_mask);
+  sigaddset(&sa.sa_mask, SIGALRM);
   sa.sa_flags = SA_RESTART;
   sigaction(SIGALRM, &sa, NULL);
 
