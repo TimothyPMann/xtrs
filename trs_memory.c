@@ -64,62 +64,6 @@ int romin = 0; /* Model 4p */
 /*SUPPRESS 53*/
 /*SUPPRESS 112*/
 
-/*
- * The video cache hacks are for speed, so that we don't send and flush
- * an X packet every time that we write a character to the screen.
- */
-
-#define VIDEO_CACHE_SIZE	(1024)
-static int video_cache_locations[VIDEO_CACHE_SIZE];
-static int video_cache_values[VIDEO_CACHE_SIZE];
-static int video_cache_count;
-static int video_cache_on;
-
-static void video_write(int location, int value)
-{
-    if(video_cache_on)
-    {
-	if(video_cache_count == VIDEO_CACHE_SIZE)
-	{
-	    /* flush the cache if it is full */
-	    trs_screen_write_chars(video_cache_locations,
-				   video_cache_values,
-				   video_cache_count);
-	    video_cache_count = 0;
-	}
-	video_cache_locations[video_cache_count] = location;
-	video_cache_values[video_cache_count] = value;
-	video_cache_count++;
-    }
-    else
-    {
-	/* ordinary write, no caching */
-	trs_screen_write_char(location, value, TRUE);
-    }
-}
-
-static void video_scroll()
-{
-    trs_screen_scroll();
-}
-
-static void cache_video_writes()
-{
-    video_cache_count = 0;
-    video_cache_on = 1;
-}
-
-static void uncache_video_writes()
-{
-    if(video_cache_count)
-    {
-	trs_screen_write_chars(video_cache_locations,
-			       video_cache_values,
-			       video_cache_count);
-    }
-    video_cache_on = 0;
-}
-
 void mem_video_page(int which)
 {
     video_offset = -VIDEO_START + (which ? VIDEO_PAGE_1 : VIDEO_PAGE_0);
@@ -228,7 +172,6 @@ void mem_init()
     mem_map(0);
     mem_bank(0);
     mem_video_page(0);
-    video_cache_on = 0;
     if (trs_model == 5) {
 	z80_out(0x9C, 1);
     }
@@ -353,7 +296,7 @@ void mem_write(int address, int value)
 #endif
 	    if (video[vaddr] != value) {
 		video[vaddr] = value;
-		video_write(vaddr, value);
+		trs_screen_write_char(vaddr, value);
 	    }
 	} else if (address == PRINTER_ADDRESS) {
 	    trs_printer_write(value);
@@ -378,7 +321,7 @@ void mem_write(int address, int value)
 	    if (grafyx_m3_write_byte(vaddr, value)) return;
 	    if (video[vaddr] != value) {
 	      video[vaddr] = value;
-	      video_write(vaddr, value);
+	      trs_screen_write_char(vaddr, value);
 	    }
 	} else if (address == PRINTER_ADDRESS) {
 	    trs_printer_write(value);
@@ -394,7 +337,7 @@ void mem_write(int address, int value)
 	    int vaddr = address+ video_offset;
 	    if (video[vaddr] != value) {
 		video[vaddr] = value;
-		video_write(vaddr, value);
+		trs_screen_write_char(vaddr, value);
 	    }
 	} else if (address == PRINTER_ADDRESS) {
 	    trs_printer_write(value);
@@ -410,7 +353,7 @@ void mem_write(int address, int value)
 	    int vaddr = address + video_offset;
 	    if (video[vaddr] != value) {
 		video[vaddr] = value;
-		video_write(vaddr, value);
+		trs_screen_write_char(vaddr, value);
 	    }
 	}
 	break;
@@ -424,7 +367,7 @@ void mem_write(int address, int value)
 	    int vaddr = address - 0xf800;
 	    if (video[vaddr] != value) {
 		video[vaddr] = value;
-		video_write(vaddr, value);
+		trs_screen_write_char(vaddr, value);
 	    }
 	}
 	break;
@@ -561,12 +504,12 @@ mem_block_transfer(Ushort dest, Ushort source, int direction, Ushort count)
     {
 	/* scroll screen one line */
         unsigned char *p = video, *q = video + 0x40;
-	video_scroll();
+	trs_screen_scroll();
 	do { *p++ = ret = *q++; } while (count--);
     }
     else
     {
-	cache_video_writes();
+	trs_screen_batch();
 	
 	if(direction > 0)
 	{
@@ -587,7 +530,7 @@ mem_block_transfer(Ushort dest, Ushort source, int direction, Ushort count)
 	    while(count);
 	}
 
-	uncache_video_writes();
+	trs_screen_unbatch();
     }
     return ret;
 }

@@ -483,7 +483,7 @@ static int assert_state(int state)
   }
 
 #if CASSDEBUG
-  printf("state %d -> %d\n", cassette_state, state);
+  debug("state %d -> %d\n", cassette_state, state);
 #endif
 
   if (cassette_state == ORCH90) {
@@ -728,9 +728,8 @@ transition_out(int value)
     cassette_roundoff_error =
       nsamples * (1000000.0/cassette_sample_rate) - ddelta_us;
 #if CASSDEBUG
-    printf("%d %4lu %d -> %3lu\n",
-	   cassette_value, z80_state.t_count - cassette_transition,
-	   value, nsamples);
+    debug("%d %4lu %d -> %3lu\n", cassette_value,
+	  z80_state.t_count - cassette_transition, value, nsamples);
 #endif
     while (nsamples-- > 0) {
       putc(sample, cassette_file);
@@ -881,8 +880,7 @@ transition_in()
       cassette_roundoff_error = cassette_delta - delta_ts;
       cassette_next = next;
 #if CASSDEBUG
-      printf("%d %4lu %d\n",
-	     cassette_value, cassette_delta, cassette_next);
+      debug("%d %4lu %d\n", cassette_value, cassette_delta, cassette_next);
 #endif
       ret = 1;
     }
@@ -906,8 +904,7 @@ transition_in()
     cassette_delta = (unsigned long)(delta_ts + 0.5);
     cassette_roundoff_error = cassette_delta - delta_ts;
 #if CASSDEBUG
-    printf("%d %4lu %d\n",
-	   cassette_value, cassette_delta, cassette_next);
+    debug("%d %4lu %d\n", cassette_value, cassette_delta, cassette_next);
 #endif
     ret = 1;
     break;
@@ -935,7 +932,7 @@ transition_in()
 	 */
 	cabs = abs(c - 127);
 #if CASSDEBUG2
-	printf("%f %f %d %d -> %d\n", cassette_avg, cassette_env,
+	debug("%f %f %d %d -> %d\n", cassette_avg, cassette_env,
 	       cassette_noisefloor, cabs, next);
 #endif
 	if (cabs > 1) {
@@ -959,8 +956,8 @@ transition_in()
     cassette_delta = (unsigned long) delta_ts + 0.5;
     cassette_roundoff_error = cassette_delta - delta_ts;
 #if CASSDEBUG
-    printf("%3lu -> %d %4lu %d\n",
-	   nsamples, cassette_value, cassette_delta, cassette_next);
+    debug("%3lu -> %d %4lu %d\n",
+	  nsamples, cassette_value, cassette_delta, cassette_next);
 #endif
     ret = 1;
     break;
@@ -999,8 +996,8 @@ transition_in()
     cassette_delta = (unsigned long)(delta_ts + 0.5);
     cassette_roundoff_error = cassette_delta - delta_ts;
 #if CASSDEBUG
-    printf("%d %4lu %d\n",
-	   cassette_value, cassette_delta, cassette_next);
+    debug("%d %4lu %d\n",
+	  cassette_value, cassette_delta, cassette_next);
 #endif
     ret = 1;
     break;
@@ -1042,7 +1039,7 @@ void trs_cassette_motor(int value)
     /* motor on */
     if (!cassette_motor) {
 #if CASSDEBUG3
-      printf("motor on %ld\n", z80_state.t_count);
+      debug("motor on %ld\n", z80_state.t_count);
 #endif
       cassette_motor = 1;
       cassette_transition = z80_state.t_count;
@@ -1080,7 +1077,7 @@ void trs_cassette_motor(int value)
 void trs_cassette_out(int value)
 {
 #if CASSDEBUG3
-  printf("out %ld\n", z80_state.t_count);
+  debug("out %ld\n", z80_state.t_count);
 #endif
   if (cassette_motor) {
     if (cassette_state == READ) {
@@ -1270,7 +1267,7 @@ int
 trs_cassette_in()
 {
 #if CASSDEBUG3
-  printf("in  %ld\n", z80_state.t_count);
+  debug("in  %ld\n", z80_state.t_count);
 #endif
   /* Heuristic to detect reading with Level 1 routines.  If the
      routine paused too long after resetting the flipflop before
@@ -1283,9 +1280,9 @@ trs_cassette_in()
       cassette_speed = SPEED_500;
     }
 #if CASSDEBUG4
-    printf("250 detector = %s (%f)\n",
-	   (cassette_speed == SPEED_250) ? "yes" : "no",
-	   (z80_state.t_count - cassette_firstoutread) / z80_state.clockMHz);
+    debug("250 detector = %s (%f)\n",
+	  (cassette_speed == SPEED_250) ? "yes" : "no",
+	  (z80_state.t_count - cassette_firstoutread) / z80_state.clockMHz);
 #endif
     cassette_firstoutread = 1; /* disable detector */
   }
@@ -1348,7 +1345,7 @@ void trs_sound_init(int ioport, int vol)
   major = inb(sb_address + 0xA);
   while ((inb(sb_address + 0xE) & 0x80) == 0) /*poll*/ ;
   minor = inb(sb_address + 0xA);
-  fprintf(stderr, "SoundBlaster DSP version %d.%d detected\n", major, minor);
+  debug("SoundBlaster DSP version %d.%d detected\n", major, minor);
 #endif
 
   /* Turn on DAC speaker */

@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <fcntl.h>
 #include <string.h>
 #include <signal.h>
@@ -26,7 +27,11 @@
 /*#define UARTDEBUG 1*/
 /*#define UARTDEBUG2 1*/
 
-char *trs_uart_name = NULL;
+#if __linux
+char *trs_uart_name = "/dev/ttyS0";
+#else
+char *trs_uart_name = "/dev/tty00";
+#endif
 int trs_uart_switches =
   0x7 | TRS_UART_NOPAR | TRS_UART_WORD8; /* Default: 9600 8N1 */
 
@@ -114,12 +119,13 @@ trs_uart_init(int reset_button)
 #if UARTDEBUG
   debug("trs_uart_init");
 #endif
-  if (initialized && uart.fd != -1) close(uart.fd);
-  initialized = 1;
-  if (trs_uart_name == NULL) {
+  if (initialized == 1 && uart.fd != -1) close(uart.fd);
+  if (trs_uart_name == NULL || trs_uart_name[0] == '\000') {
     /* Emulate having no serial port */
+    initialized = -1;
     return;
   }
+  initialized = 1;
   uart.fd = open(trs_uart_name, O_RDWR|O_NOCTTY|O_NONBLOCK);
   if (uart.fd == -1) {
     error("can't open %s: %s", trs_uart_name, strerror(errno));
@@ -168,8 +174,8 @@ int
 trs_uart_modem_in()
 {
   /* should poll hardware here, if we could */
-  if (trs_uart_name == NULL) return 0xff;
-  if (!initialized) trs_uart_init(0);
+  if (initialized == 0) trs_uart_init(0);
+  if (initialized == -1) return 0xff;
 #if UARTDEBUG2
   debug("trs_uart_modem_in returns 0x%02x", uart.modem);
 #endif
@@ -182,18 +188,18 @@ trs_uart_reset_out(int value)
 #if UARTDEBUG
   debug("trs_uart_reset_out");
 #endif
-  if (trs_uart_name == NULL) {
+  if (initialized == 0) trs_uart_init(0);
+  if (initialized == -1) {
     error("serial port emulation is not enabled");
     return;
   }
-  if (!initialized) trs_uart_init(0);
 }
 
 int
 trs_uart_switches_in()
 {
-  if (trs_uart_name == NULL) return 0xff;
-  if (!initialized) trs_uart_init(0);
+  if (initialized == 0) trs_uart_init(0);
+  if (initialized == -1) return 0xff;
 #if UARTDEBUG
   debug("trs_uart_switches_in returns 0x%02x", uart.switches);
 #endif
@@ -209,9 +215,9 @@ trs_uart_baud_out(int value)
   debug("trs_uart_baud_out 0x%02x", value);
 #endif
 
-  if (trs_uart_name == NULL) return;
-  if (initialized && uart.baud == value) return;
-  if (!initialized) trs_uart_init(0);
+  if (initialized == 1 && uart.baud == value) return;
+  if (initialized == 0) trs_uart_init(0);
+  if (initialized == -1) return;
   uart.baud = value;
 
   cfsetispeed(&uart.t, xlate_baud(TRS_UART_RCVBAUD(value)));
@@ -251,7 +257,7 @@ trs_uart_set_empty(int dummy)
 int
 trs_uart_check_avail()
 {
-  if (initialized && uart.bufleft == 0 && uart.fd != -1) {
+  if (initialized == 1 && uart.bufleft == 0 && uart.fd != -1) {
     /* check for data available */
     int rc;
     if (!(uart.fdflags & FNONBLOCK)) {
@@ -295,8 +301,8 @@ trs_uart_status_in()
 #if UARTDEBUG
   static int oldstatus = -1;
 #endif
-  if (trs_uart_name == NULL) return 0xff;
-  if (!initialized) trs_uart_init(0);
+  if (initialized == 0) trs_uart_init(0);
+  if (initialized == -1) return 0xff;
   trs_uart_check_avail();
 #if UARTDEBUG
   if (uart.status != oldstatus) {
@@ -315,9 +321,9 @@ trs_uart_control_out(int value)
 #if UARTDEBUG
   debug("trs_uart_control_out 0x%02x", value);
 #endif
-  if (trs_uart_name == NULL) return;
-  if (initialized && uart.control == value) return;
-  if (!initialized) trs_uart_init(0);
+  if (initialized == 1 && uart.control == value) return;
+  if (initialized == 0) trs_uart_init(0);
+  if (initialized == -1) return;
   uart.control = value;
   if (!(value & TRS_UART_EVENPAR)) cflag |= PARODD;
   switch (value & TRS_UART_WORDMASK) {
@@ -361,8 +367,8 @@ trs_uart_control_out(int value)
 int
 trs_uart_data_in()
 {
-  if (trs_uart_name == NULL) return 0xff;
-  if (!initialized) trs_uart_init(0);
+  if (initialized == 0) trs_uart_init(0);
+  if (initialized == -1) return 0xff;
   trs_uart_check_avail();
   if (uart.status & TRS_UART_RCVD) {
     uart.status &= ~TRS_UART_RCVD;
@@ -387,8 +393,8 @@ trs_uart_data_out(int value)
 #if UARTDEBUG
   debug("trs_uart_data_out 0x%02x", value);
 #endif
-  if (trs_uart_name == NULL) return;
-  if (!initialized) trs_uart_init(0);
+  if (initialized == 0) trs_uart_init(0);
+  if (initialized == -1) return;
   uart.odata = value;
   if (uart.fd != -1) {
     for (;;) {

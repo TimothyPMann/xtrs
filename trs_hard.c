@@ -153,7 +153,7 @@ int trs_hard_in(int port)
     v = 0xff;
   }
 #if HARDDEBUG1
-  fprintf(stderr, "%02x -> %02x\n", port, v);
+  debug("%02x -> %02x\n", port, v);
 #endif  
   return v;
 }
@@ -162,7 +162,7 @@ int trs_hard_in(int port)
 void trs_hard_out(int port, int value)
 {
 #if HARDDEBUG1
-  fprintf(stderr, "%02x <- %02x\n", port, value);
+  debug("%02x <- %02x\n", port, value);
 #endif  
   switch (port) {
   case TRS_HARD_WP:
@@ -252,7 +252,7 @@ void trs_hard_out(int port, int value)
 static void hard_restore(int cmd)
 {
 #if HARDDEBUG2
-  fprintf(stderr, "hard_restore drive %d\n", state.drive);
+  debug("hard_restore drive %d\n", state.drive);
 #endif
   state.cyl = 0;
   /*!! should anything else be zeroed? */
@@ -262,8 +262,8 @@ static void hard_restore(int cmd)
 static void hard_read(int cmd)
 {
 #if HARDDEBUG2
-  fprintf(stderr, "hard_read drive %d cyl %d hd %d sec %d\n",
-	  state.drive, state.cyl, state.head, state.secnum);
+  debug("hard_read drive %d cyl %d hd %d sec %d\n",
+	state.drive, state.cyl, state.head, state.secnum);
 #endif
   if (cmd & TRS_HARD_MULTI) {
     error("trs_hard: multi-sector read not supported (0x%02x)", cmd);
@@ -277,8 +277,8 @@ static void hard_read(int cmd)
 static void hard_write(int cmd)
 {
 #if HARDDEBUG2
-  fprintf(stderr, "hard_write drive %d cyl %d hd %d sec %d\n",
-	  state.drive, state.cyl, state.head, state.secnum);
+  debug("hard_write drive %d cyl %d hd %d sec %d\n",
+	state.drive, state.cyl, state.head, state.secnum);
 #endif
   if (cmd & TRS_HARD_MULTI) {
     error("trs_hard: multi-sector write not supported (0x%02x)", cmd);
@@ -292,8 +292,8 @@ static void hard_write(int cmd)
 static void hard_verify(int cmd)
 {
 #if HARDDEBUG2
-  fprintf(stderr, "hard_verify drive %d cyl %d hd %d sec %d\n",
-	  state.drive, state.cyl, state.head, state.secnum);
+  debug("hard_verify drive %d cyl %d hd %d sec %d\n",
+	state.drive, state.cyl, state.head, state.secnum);
 #endif
   find_sector(TRS_HARD_READY | TRS_HARD_SEEKDONE);
 }
@@ -301,8 +301,8 @@ static void hard_verify(int cmd)
 static void hard_format(int cmd)
 {
 #if HARDDEBUG2
-  fprintf(stderr, "hard_format drive %d cyl %d hd %d\n",
-	  state.drive, state.cyl, state.head);
+  debug("hard_format drive %d cyl %d hd %d\n",
+	state.drive, state.cyl, state.head);
 #endif
   if (state.seccnt != TRS_HARD_SEC_PER_TRK) {
     error("trs_hard: can only do %d sectors/track, not %d",
@@ -319,8 +319,8 @@ static void hard_format(int cmd)
 static void hard_init(int cmd)
 {
 #if HARDDEBUG2
-  fprintf(stderr, "hard_init drive %d cyl %d hd %d sec %d\n",
-	  state.drive, state.cyl, state.head, state.secnum);
+  debug("hard_init drive %d cyl %d hd %d sec %d\n",
+	state.drive, state.cyl, state.head, state.secnum);
 #endif
   /* I don't know what this command does */
   error("trs_hard: init command (0x%02x) not implemented", cmd);
@@ -330,8 +330,8 @@ static void hard_init(int cmd)
 static void hard_seek(int cmd)
 {
 #if HARDDEBUG2
-  fprintf(stderr, "hard_seek drive %d cyl %d hd %d sec %d\n",
-	  state.drive, state.cyl, state.head, state.secnum);
+  debug("hard_seek drive %d cyl %d hd %d sec %d\n",
+	state.drive, state.cyl, state.head, state.secnum);
 #endif
   find_sector(TRS_HARD_READY | TRS_HARD_SEEKDONE);
 }

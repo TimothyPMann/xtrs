@@ -14,18 +14,18 @@ Model 4, or Model 4P.
 Model 4 or Model 4P mode.  Floppy disks and hard disks are emulated
 using files to store the data; or under Linux only, real floppy drives
 can be used.  A printer is emulated by sending its output to standard
-output.  Cassette I/O is emulated using files to store the cassette
+output.  A serial port is emulated using a Unix tty device.
+Cassette I/O is emulated using files to store the cassette
 data; real cassettes can also be read or written (with luck), either
 directly through your sound card (on Linux and other systems with
 OSS-compatible sound drivers), or via .wav files.  Game sound and
 music output are also supported if you have an OSS-compatible sound
 driver; sound output though the cassette port, through the Model 4
 sound option, and through the optional Orchestra-85/90 music synthesizer
-card are all emulated.  In Model I mode, the HRG1B 384x192 graphics card
-is emulated.  In Model 4/4P mode, a 640x240 graphics card is
-emulated; you can select either the Radio Shack card or the Micro Labs
-Grafyx Solution card.  There is also a mouse driver for Model 4/4P
-mode.
+card are all emulated.  In Model I mode, the HRG1B graphics card
+is emulated.  In Model III and 4/4P mode, you can select whether
+the Radio Shack graphics card or Micro Labs Grafyx Solution is emulated.
+There is also a mouse driver for Model 4/4P mode.
 
 Because \fBxtrs\fP emulates the hardware, all known TRS-80 Model
 I/III/4/4P operating systems should run on it, including all flavors
@@ -738,13 +738,18 @@ Multiply the horizontal and vertical window size by \fIxfac\fP and
 \fIxfac\fP=1 and \fIyfac\fP=2*\fIxfac\fP.
 .TP
 .B \-resize
-In Model 4/4P mode, resize the X window whenever the emulated display
-mode changes between 64x16 and 80x24.
+In Model III or 4/4P mode, resize the X window whenever the emulated 
+display mode changes between 64x16 text (or 512x192 graphics) and 80x24
+text (or 640x240 graphics).
+This is the default in Model III mode, since 80x24 text is not available
+and the 640x240 graphics add-on card is seldom used. 
 .TP
 .B \-noresize
-In Model 4/4P mode, always keep the X window large enough for 80x24
-characters, putting a blank margin around the outside when the emulated
-display mode is 64x16.  This is the default.
+In Model III or 4/4P mode, always keep the X window large enough for
+80x24 text or 640x240 graphics, putting a blank margin around the
+outside when the emulated display mode is 64x16 text or 512x192
+graphics.  This is the default in Model 4/4P mode, since otherwise there
+is an annoying size switch during every reboot.
 .TP
 .B \-charset \fIname\fP
 Select among several sets of built-in character bitmaps.
@@ -801,12 +806,15 @@ use the specified X font for double width characters.
 The default uses a common X fixed-width font, scaled to double width:
 "-misc-fixed-medium-r-normal--20-200-75-75-*-200-iso8859-1".
 .TP
-.B \-microlabs
-In Model 4/4P mode, emulate the Micro Labs Grafyx Solution hi-res
-graphics card.  This is the default.
-.TP
 .B \-nomicrolabs
-In Model 4/4P mode, emulate the Radio Shack hi-res card.
+In Model I mode, emulate the HRG1B 384x192 hi-res graphics card.
+In Model III mode or Model 4/4P mode, emulate the Radio Shack hi-res card.
+This is now the default.
+.TP
+.B \-microlabs
+In Model III or 4/4P mode, emulate the Micro Labs Grafyx Solution hi-res
+graphics card.  Note that the Model III and Model 4/4P cards from Micro
+Labs are very different from one another.
 .TP
 .B \-debug
 Enter zbx, the z80 debugger.
@@ -919,6 +927,18 @@ cassette I/O to the sound card, and game sound output to the sound
 card.  Existing wav files will be read or modified using their
 original sample rate regardless of this flag.  The default is 44,100
 Hz.  See also the cassette(1) man page.
+.TP
+.B \-serial \fIttyname\fP
+Set the tty device to be used for I/O to the TRS-80's serial port.
+The default is /dev/ttyS0 on Linux, /dev/tty00 on other versions
+of Unix.  Setting the name to be empty (\-serial "") emulates having
+no serial port.
+.TP
+.B \-switches \fIttyname\fP
+Set the sense switches on the Model I serial port card.  This option
+is meaningful only in Model I mode, and only when the -serial option
+is not set to "".  The default is 0x6f, which Radio Shack software 
+conventionally interprets as 9600 bps, 8 bits/word, no parity, 1 stop bit.
 .SH Additional resources
 There are many other TRS-80 resources available on the Web, including
 shareware and freeware emulators that run under MSDOS and other
@@ -930,10 +950,16 @@ http://www.research.compaq.com/SRC/personal/Tim_Mann/trs80.html.
 Some of the more bizarre undocumented Z-80 instructions
 are not implemented.
 
+The emulated serial port's modem status and control signals are not
+tied to the signals on the real serial port, because the real signals
+are not available to software through the Unix tty device interface.
+The ability to check for parity, framing, and overrun errors and
+receive an interrupt when one occurs is not emulated.  Unix does not
+support 2000, 3600, or 7200 baud, so these TRS-80 data rates are
+remapped to 38400, 57600, and 115200 baud respectively.
+
 A better signal processing algorithm might help read real cassettes
 more reliably, especially at 1500bps.
-
-Serial ports are not emulated.
 
 Some features of the floppy disk controller are not currently
 emulated: Force Interrupt with condition bits 0x01, 0x02, or 0x04 is not

@@ -24,6 +24,10 @@
 /* IRQs */
 #define M1_TIMER_BIT    0x80
 #define M1_DISK_BIT     0x40
+#define M3_UART_ERR_BIT 0x40
+#define M3_UART_RCV_BIT 0x20
+#define M3_UART_SND_BIT 0x10
+#define M3_IOBUS_BIT    0x80 /* not emulated */
 #define M3_TIMER_BIT    0x04
 #define M3_CASSFALL_BIT 0x02
 #define M3_CASSRISE_BIT 0x01
@@ -171,6 +175,45 @@ trs_disk_drq_interrupt(int state)
 }
 
 void
+trs_uart_err_interrupt(int state)
+{
+  if (trs_model > 1) {
+    if (state) {
+      interrupt_latch |= M3_UART_ERR_BIT;
+    } else {
+      interrupt_latch &= ~M3_UART_ERR_BIT;
+    }
+    z80_state.irq = (interrupt_latch & interrupt_mask) != 0;
+  }
+}
+
+void
+trs_uart_rcv_interrupt(int state)
+{
+  if (trs_model > 1) {
+    if (state) {
+      interrupt_latch |= M3_UART_RCV_BIT;
+    } else {
+      interrupt_latch &= ~M3_UART_RCV_BIT;
+    }
+    z80_state.irq = (interrupt_latch & interrupt_mask) != 0;
+  }
+}
+
+void
+trs_uart_snd_interrupt(int state)
+{
+  if (trs_model > 1) {
+    if (state) {
+      interrupt_latch |= M3_UART_SND_BIT;
+    } else {
+      interrupt_latch &= ~M3_UART_SND_BIT;
+    }
+    z80_state.irq = (interrupt_latch & interrupt_mask) != 0;
+  }
+}
+
+void
 trs_reset_button_interrupt(int state)
 {
   if (trs_model == 1) {
@@ -220,8 +263,8 @@ trs_nmi_mask_write(unsigned char value)
   z80_state.nmi = (nmi_latch & nmi_mask) != 0;
 #if IDEBUG2
   if (z80_state.nmi && !z80_state.nmi_seen) {
-    fprintf(stderr, "mask write caused nmi, mask %02x latch %02x\n",
-	    nmi_mask, nmi_latch);
+    debug("mask write caused nmi, mask %02x latch %02x\n",
+	  nmi_mask, nmi_latch);
   }
 #endif
   if (!z80_state.nmi) z80_state.nmi_seen = 0;

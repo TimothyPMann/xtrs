@@ -236,6 +236,7 @@ Uchar *mem_pointer(int address, int writing);
 extern int mem_block_transfer(Ushort dest, Ushort source, int direction,
 			      Ushort count);
 extern int load_hex(); /* returns highest address loaded + 1 */
+extern void debug(const char *fmt, ...);
 extern void error(const char *fmt, ...);
 extern void fatal(const char *fmt, ...);
 extern void z80_out(int port, int value);

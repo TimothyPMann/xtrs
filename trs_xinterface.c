@@ -33,6 +33,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <sys/file.h>
 #include <malloc.h>
 #include <string.h>
 #include <stdlib.h>
@@ -617,6 +618,34 @@ void trs_fix_size (Window window, int width, int height)
   XSetWMNormalHints(display, window, &sizehints);
 }
 
+int trs_screen_batched = 0;
+
+void trs_screen_batch()
+{
+#if BATCH
+  /* Defer screen updates until trs_screen_unbatch, then redraw screen
+     if anything changed.  Unfortunately, this seems to slow things
+     down, so it's disabled.  Probably what we should really be doing
+     is rendering into an offscreen buffer when trs_screen_batched is
+     set, then copying to the real screen in trs_screen_unbatch.  Also
+     (and orthogonally) we should probably be keeping track of what
+     part of the screen changed and only redrawing that part. */
+  trs_screen_batched = 1;
+#endif
+}
+
+void trs_screen_unbatch()
+{
+#if BATCH
+  if (trs_screen_batched > 1) {
+    trs_screen_batched = 0;
+    trs_screen_refresh();
+  } else {
+    trs_screen_batched = 0;
+  }
+#endif
+}
+
 /* exits if something really bad happens */
 void trs_screen_init()
 {
@@ -861,9 +890,7 @@ void trs_event_init()
   sigaction(SIGIO, &sa, NULL);
 
   fd = ConnectionNumber(display);
-  if (fcntl(fd, F_SETOWN, getpid()) < 0) {
-    error("fcntl F_SETOWN: %s", strerror(errno));
-  }
+  (void) fcntl(fd, F_SETOWN, getpid()); /* is this needed? */
   if (fcntl(fd, F_SETFL, FASYNC) != 0) {
     error("fcntl F_SETFL async error: %s", strerror(errno));
   }
@@ -1031,7 +1058,7 @@ void trs_screen_inverse(int flag)
     currentmode ^= INVERSE;
     for (i = 0; i < screen_chars; i++) {
       if (trs_screen[i] & 0x80)
-	trs_screen_write_char(i,trs_screen[i],False);
+	trs_screen_write_char(i, trs_screen[i]);
     }
   }
 }
@@ -1044,7 +1071,7 @@ void trs_screen_alternate(int flag)
     currentmode ^= ALTERNATE;
     for (i = 0; i < screen_chars; i++) {
       if (trs_screen[i] >= 0xc0)
-	trs_screen_write_char(i,trs_screen[i],False);
+	trs_screen_write_char(i, trs_screen[i]);
     }
   }
 }
@@ -1256,6 +1283,11 @@ void trs_screen_refresh()
 {
   int i, srcx, srcy, dunx, duny;
 
+  if (trs_screen_batched) {
+    trs_screen_batched++;
+    return;
+  }
+
 #if XDEBUG
   debug("trs_screen_refresh\n");
 #endif
@@ -1293,15 +1325,12 @@ void trs_screen_refresh()
     }
   } else {
     for (i = 0; i < screen_chars; i++) {
-      trs_screen_write_char(i,trs_screen[i],False);
+      trs_screen_write_char(i, trs_screen[i]);
     }
   }
-#if DO_XFLUSH
-  XFlush(display);
-#endif
 }
 
-void trs_screen_write_char(int position, int char_index, Bool doflush)
+void trs_screen_write_char(int position, int char_index)
 {
   int row,col,destx,desty;
   int plane;
@@ -1315,6 +1344,10 @@ void trs_screen_write_char(int position, int char_index, Bool doflush)
     return;
   }
   if (grafyx_enable && !grafyx_overlay) {
+    return;
+  }
+  if (trs_screen_batched) {
+    trs_screen_batched++;
     return;
   }
   row = position / row_chars;
@@ -1418,10 +1451,6 @@ void trs_screen_write_char(int position, int char_index, Bool doflush)
   if (hrg_enable)
     hrg_update_char(position);
 #endif
-#if DO_XFLUSH
-  if (doflush)
-    XFlush(display);
-#endif
 }
 
  /* Copy lines 1 through col_chars-1 to lines 0 through col_chars-2.
@@ -1433,6 +1462,10 @@ void trs_screen_scroll()
   for (i = row_chars; i < screen_chars; i++)
     trs_screen[i-row_chars] = trs_screen[i];
 
+  if (trs_screen_batched) {
+    trs_screen_batched++;
+    return;
+  }
   if (grafyx_enable) {
     if (grafyx_overlay) {
       trs_screen_refresh();
@@ -1451,16 +1484,6 @@ void trs_screen_scroll()
   }
 }
 
-void trs_screen_write_chars(int *locations, int *values, int count)
-{
-  while (count--) {
-    trs_screen_write_char(*locations++, *values++ , False);
-  }
-#if DO_XFLUSH
-  XFlush(display);
-#endif
-}
-
 void grafyx_write_byte(int x, int y, char byte)
 {
   int i, j;
@@ -1471,12 +1494,16 @@ void grafyx_write_byte(int x, int y, char byte)
     screen_y < col_chars*cur_char_height/scale_y;
 
   if (grafyx_enable && grafyx_overlay && on_screen) {
-    /* Erase old byte, preserving text */
-    XPutImage(display, window, gc_xor, &image,
-	      x*cur_char_width, y*scale_y,
-	      left_margin + screen_x*cur_char_width,
-	      top_margin + screen_y*scale_y,
-	      cur_char_width, scale_y);
+    if (trs_screen_batched) {
+      trs_screen_batched++;
+    } else {
+      /* Erase old byte, preserving text */
+      XPutImage(display, window, gc_xor, &image,
+		x*cur_char_width, y*scale_y,
+		left_margin + screen_x*cur_char_width,
+		top_margin + screen_y*scale_y,
+		cur_char_width, scale_y);
+    }
   }
 
   /* Save new byte in local memory */
@@ -1515,19 +1542,23 @@ void grafyx_write_byte(int x, int y, char byte)
   }
 
   if (grafyx_enable && on_screen) {
-    /* Draw new byte */
-    if (grafyx_overlay) {
-      XPutImage(display, window, gc_xor, &image,
-		x*cur_char_width, y*scale_y,
-		left_margin + screen_x*cur_char_width,
-		top_margin + screen_y*scale_y,
-		cur_char_width, scale_y);
+    if (trs_screen_batched) {
+      trs_screen_batched++;
     } else {
-      XPutImage(display, window, gc, &image,
-		x*cur_char_width, y*scale_y,
-		left_margin + screen_x*cur_char_width,
-		top_margin + screen_y*scale_y,
-		cur_char_width, scale_y);
+      /* Draw new byte */
+      if (grafyx_overlay) {
+	XPutImage(display, window, gc_xor, &image,
+		  x*cur_char_width, y*scale_y,
+		  left_margin + screen_x*cur_char_width,
+		  top_margin + screen_y*scale_y,
+		  cur_char_width, scale_y);
+      } else {
+	XPutImage(display, window, gc, &image,
+		  x*cur_char_width, y*scale_y,
+		  left_margin + screen_x*cur_char_width,
+		  top_margin + screen_y*scale_y,
+		  cur_char_width, scale_y);
+      }
     }
   }
 }
@@ -1750,6 +1781,11 @@ hrg_write_data(int data)
   if ((currentmode & EXPANDED) && (hrg_addr & 1)) return;
   if ((data &= 0x3f) == (old_data &= 0x3f)) return;
 
+  if (trs_screen_batched) {
+    trs_screen_batched++;
+    return;
+  }
+
   position = hrg_addr & 0x3ff;	/* bits 0-9: "PRINT @" screen position */
   line = hrg_addr >> 10;	/* vertical offset inside character cell */
   bits0 = ~data & old_data;	/* pattern to clear */
@@ -1817,11 +1853,8 @@ hrg_write_data(int data)
        Call trs_screen_write_char to restore the text character
        (erasing the graphics). This function will in turn call
        hrg_update_char and restore 6*12 graphics pixels. Sigh. */
-    trs_screen_write_char(position, trs_screen[position], False);
+    trs_screen_write_char(position, trs_screen[position]);
   }
-#if DO_XFLUSH
-  XFlush(display);
-#endif
 }
 
 /* Read byte from HRG memory. */

@@ -694,7 +694,7 @@ static void change_keystate(int action)
     int key_down;
     int i;
 #ifdef KBDEBUG
-    fprintf(stderr, "change_keystate: action 0x%x\n", action);
+    debug("change_keystate: action 0x%x\n", action);
 #endif
 
     switch (action) {
@@ -778,14 +778,14 @@ int trs_kb_mem_read(int address)
            NEWDOS80, which pushes 2 extra bytes on the stack.
 	*/
 	wait = 0;
-       recursion = 1;
+	recursion = 1;
 	for (i=0; i<=4; i+=2) {
 	    if (mem_read_word(REG_SP + 2 + i) == 0x4015) {
 		wait = mem_read_word(REG_SP + 10 + i) == 0x004c;
 		break;
 	    }
 	}
-       recursion = 0;
+	recursion = 0;
 	key = trs_next_key(wait);
 	stretch = stretch_amount;
     }

@@ -24,7 +24,8 @@ OBJECTS = \
 	trs_disk.o \
 	trs_interrupt.o \
 	trs_imp_exp.o \
-	trs_hard.o
+	trs_hard.o \
+	trs_uart.o
 
 CR_OBJECTS = \
 	compile_rom.o \
@@ -67,6 +68,7 @@ SOURCES = \
 	trs_keyboard.c \
 	trs_memory.c \
 	trs_printer.c \
+	trs_uart.c \
 	trs_xinterface.c \
 	z80.c
 
@@ -79,6 +81,7 @@ HEADERS = \
 	trs_hard.h \
 	trs_imp_exp.h \
 	trs_iodefs.h \
+	trs_uart.h \
 	z80.h
 
 MISC = \

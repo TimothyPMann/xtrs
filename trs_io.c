@@ -18,6 +18,9 @@
    Last modified on Sat Oct 10 22:15:30 PDT 1998 by mann
 */
 
+/*#define PORTDEBUG1 1*/
+/*#define PORTDEBUG2 1*/
+
 #include <time.h>
 
 #include "z80.h"
@@ -25,6 +28,7 @@
 #include "trs_imp_exp.h"
 #include "trs_disk.h"
 #include "trs_hard.h"
+#include "trs_uart.h"
 
 static int modesel = 0;     /* Model I */
 static int modeimage = 0x8; /* Model III/4/4p */
@@ -34,25 +38,40 @@ static int rominimage = 0;  /* Model 4p */
 /*ARGSUSED*/
 void z80_out(int port, int value)
 {
+#if PORTDEBUG1
+  debug("out (0x%02x), 0x%02x", port, value);
+#endif
   /* First, ports common to all models */
   switch (port) {
-  case TRS_HARD_WP:      /* 0xC0 */
-  case TRS_HARD_CONTROL: /* 0xC1 */
-  case TRS_HARD_DATA:    /* 0xC8 */ 
-  case TRS_HARD_ERROR:   /* 0xC9 */ /*=TRS_HARD_PRECOMP*/ 
-  case TRS_HARD_SECCNT:  /* 0xCA */
-  case TRS_HARD_SECNUM:  /* 0xCB */
-  case TRS_HARD_CYLLO:   /* 0xCC */
-  case TRS_HARD_CYLHI:   /* 0xCD */
-  case TRS_HARD_SDH:     /* 0xCE */
-  case TRS_HARD_STATUS:  /* 0xCF */ /*=TRS_HARD_COMMAND*/
+  case TRS_HARD_WP:       /* 0xC0 */
+  case TRS_HARD_CONTROL:  /* 0xC1 */
+  case TRS_HARD_DATA:     /* 0xC8 */ 
+  case TRS_HARD_ERROR:    /* 0xC9 */ /*=TRS_HARD_PRECOMP*/ 
+  case TRS_HARD_SECCNT:   /* 0xCA */
+  case TRS_HARD_SECNUM:   /* 0xCB */
+  case TRS_HARD_CYLLO:    /* 0xCC */
+  case TRS_HARD_CYLHI:    /* 0xCD */
+  case TRS_HARD_SDH:      /* 0xCE */
+  case TRS_HARD_STATUS:   /* 0xCF */ /*=TRS_HARD_COMMAND*/
     trs_hard_out(port, value);
     break;
-  case IMPEXP_CMD: /* 0xD0 */
+  case IMPEXP_CMD:        /* 0xD0 */
     trs_impexp_cmd_write(value);
     break;
-  case IMPEXP_DATA: /* 0xD1 */
+  case IMPEXP_DATA:       /* 0xD1 */
     trs_impexp_data_write(value);
+    break;
+  case TRS_UART_RESET:    /* 0xE8 */
+    trs_uart_reset_out(value);
+    break;
+  case TRS_UART_BAUD:     /* 0xE9 */
+    trs_uart_baud_out(value);
+    break;
+  case TRS_UART_CONTROL:  /* 0xEA */
+    trs_uart_control_out(value);
+    break;
+  case TRS_UART_DATA:     /* 0xEB */
+    trs_uart_data_out(value);
     break;
   }
 
@@ -147,16 +166,16 @@ void z80_out(int port, int value)
       trs_orch90_out(2, value);
       break;
     case 0x80:
-      if (trs_model >= 4) grafyx_write_x(value);
+      if (trs_model >= 3) grafyx_write_x(value);
       break;
     case 0x81:
-      if (trs_model >= 4) grafyx_write_y(value);
+      if (trs_model >= 3) grafyx_write_y(value);
       break;
     case 0x82:
-      if (trs_model >= 4) grafyx_write_data(value);
+      if (trs_model >= 3) grafyx_write_data(value);
       break;
     case 0x83:
-      if (trs_model >= 4) grafyx_write_mode(value);
+      if (trs_model >= 3) grafyx_write_mode(value);
       break;
     case 0x84:
     case 0x85:
@@ -257,8 +276,13 @@ void z80_out(int port, int value)
     case 0xFD:
     case 0xFE:
     case 0xFF:
-      /* do cassette emulation */
-      trs_cassette_out(value & 3);
+      if (trs_model == 3 && (value & 0x20) && grafyx_get_microlabs()) {
+	/* do Model III Micro Labs graphics card */
+	grafyx_m3_write_mode(value);
+      } else {
+	/* do cassette emulation */
+	trs_cassette_out(value & 3);
+      }
       break;
     default:
       break;
@@ -271,6 +295,9 @@ void z80_out(int port, int value)
 int z80_in(int port)
 {
   /* First, ports common to all models */
+#if PORTDEBUG2
+  debug("in (0x%02x)", port);
+#endif
 
   /* Support for a special HW real-time clock (TimeDate80?)
    * I used to have.  It was a small card-edge unit with a
@@ -283,22 +310,18 @@ int z80_in(int port)
    * not say where the low ports were; Joe's code had 0x70-0x7C,
    * so I presume that's correct at least for the TimeDate80.
    * Note: 0xC0-0xCC conflicts with Radio Shack hard disk, so
-   * clock access at these ports is disabled in xtrs 4.1.
+   * clock access at these ports is disabled starting in xtrs 4.1.
    *
-   * I suspect the returned values should be or'ed with ASCII
-   * '0' (0x30), at least for some of these devices, but for now
-   * they aren't.
-   *
-   * The originals were probably not Y2K compliant at all; they
-   * returned the units digit of the year in one port, the
-   * tens digit in another, and the leading "19" nowhere.
-   * This emulation lets the tens digit roll over from 9 to 10
-   * in the year 2000 and continue counting up from there.
-   *
-   * If anyone has more information, or has software that either
-   * works well or doesn't work well in 2000 and beyond with
+   * The originals (based on the MSM5832 chip) were not Y2K compliant
+   * at all; they returned the units digit of the year in one port,
+   * the tens digit in another, and the leading "19" nowhere.  This
+   * emulation lets the tens digit roll over from 9 to 10 in the year
+   * 2000 and continue counting up from there, which gets us to 2159.
+   * It's not clear this is a good idea.  If anyone has software that
+   * either works well or doesn't work well in 2000 and beyond with
    * this emulation, let me know.  mann@pa.dec.com
    */
+
   if ((port >= 0x70 && port <= 0x7C)
       || (port >= 0xB0 && port <= 0xBC)
       /*|| (port >= 0xC0 && port <= 0xCC)*/) {
@@ -317,8 +340,8 @@ int z80_in(int port)
       return ((time_info->tm_mon + 1) / 10);
     case 0x9: /* month (low) */
       return ((time_info->tm_mon + 1) % 10);
-    case 0x8: /* date (high) */
-      return (time_info->tm_mday / 10);
+    case 0x8: /* date (high) and leap year (bit 2) */
+      return ((time_info->tm_mday / 10) | ((time_info->tm_year % 4) ? 0 : 4));
     case 0x7: /* date (low) */
       return (time_info->tm_mday % 10);
     case 0x6: /* day-of-week */
@@ -331,30 +354,38 @@ int z80_in(int port)
       return (time_info->tm_min / 10);
     case 0x2: /* minutes (low) */
       return (time_info->tm_min % 10);
-    case 0x1: /* seconds? (high) */
+    case 0x1: /* seconds (high) */
       return (time_info->tm_sec / 10);
-    case 0x0: /* seconds? (low) */
+    case 0x0: /* seconds (low) */
       return (time_info->tm_sec % 10);
     }
   }
 
   switch (port) {
-  case TRS_HARD_WP:      /* 0xC0 */
-  case TRS_HARD_CONTROL: /* 0xC1 */
-  case TRS_HARD_DATA:    /* 0xC8 */ 
-  case TRS_HARD_ERROR:   /* 0xC9 */ /*=TRS_HARD_PRECOMP*/ 
-  case TRS_HARD_SECCNT:  /* 0xCA */
-  case TRS_HARD_SECNUM:  /* 0xCB */
-  case TRS_HARD_CYLLO:   /* 0xCC */
-  case TRS_HARD_CYLHI:   /* 0xCD */
-  case TRS_HARD_SDH:     /* 0xCE */
-  case TRS_HARD_STATUS:  /* 0xCF */ /*=TRS_HARD_COMMAND*/
+  case TRS_HARD_WP:       /* 0xC0 */
+  case TRS_HARD_CONTROL:  /* 0xC1 */
+  case TRS_HARD_DATA:     /* 0xC8 */ 
+  case TRS_HARD_ERROR:    /* 0xC9 */ /*=TRS_HARD_PRECOMP*/ 
+  case TRS_HARD_SECCNT:   /* 0xCA */
+  case TRS_HARD_SECNUM:   /* 0xCB */
+  case TRS_HARD_CYLLO:    /* 0xCC */
+  case TRS_HARD_CYLHI:    /* 0xCD */
+  case TRS_HARD_SDH:      /* 0xCE */
+  case TRS_HARD_STATUS:   /* 0xCF */ /*=TRS_HARD_COMMAND*/
     return trs_hard_in(port);
     break;
-  case IMPEXP_STATUS: /* 0xD0 */
+  case IMPEXP_STATUS:     /* 0xD0 */
     return trs_impexp_status_read();
-  case IMPEXP_DATA: /* 0xD1 */
+  case IMPEXP_DATA:       /* 0xD1 */
     return trs_impexp_data_read();
+  case TRS_UART_MODEM:    /* 0xE8 */
+    return trs_uart_modem_in();
+  case TRS_UART_SWITCHES: /* 0xE9 */
+    return trs_uart_switches_in();
+  case TRS_UART_STATUS:   /* 0xEA */
+    return trs_uart_status_in();
+  case TRS_UART_DATA:     /* 0xEB */
+    return trs_uart_data_in();
   default:
     break;
   }
@@ -384,7 +415,7 @@ int z80_in(int port)
     /* Models III/4/4P only */
     switch (port) {
     case 0x82:
-      if (trs_model >= 4) {
+      if (trs_model >= 3) {
 	return grafyx_read_data();
       }
       break;

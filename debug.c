@@ -404,14 +404,6 @@ void debug_shell()
 	/*
 	 * Use the way cool gnu readline() utility.  Get completion,
 	 * history, way way cool.
-         *
-	 * ... but unfortunately, broken.  DO NOT USE THIS CODE.
-	 * Currently there is a bug in GNU readline() that makes it
-	 * incompatible with my timer interrupt implementation.
-	 * Readline thinks that it is always supposed to clean up its
-	 * state and exit when a SIGALRM comes in, but in fact, I
-	 * handle the signal and continue the read system call.  I've
-	 * reported this bug to readline's maintainer.  --tpm
          */
         {
 
@@ -476,13 +468,14 @@ void debug_shell()
 	    else if(!strcmp(command, "list"))
 	    {
 		int x, y;
-		Ushort start, end = 0;
+		Ushort start, old_start;
+		int bytes = 0;
 		int lines = 0;
 
 		if(sscanf(input, "list %x , %x", &x, &y) == 2)
 		{
 		    start = x;
-		    end = y;
+		    bytes = (y - x) & 0xffff;
 		}
 		else if(sscanf(input, "list %x", &x) == 1)
 		{
@@ -504,9 +497,9 @@ void debug_shell()
 		}
 		else
 		{
-		    while(start <= end)
-		    {
-			start = disassemble(start);
+		    while (bytes >= 0) {
+			start = disassemble(old_start = start);
+			bytes -= (start - old_start) & 0xffff;
 		    }
 		}
 	    }

@@ -21,6 +21,8 @@
 /*
  * trs.h
  */
+#ifndef _TRS_H
+#define _TRS_H
 
 #include "z80.h"
 
@@ -41,14 +43,15 @@ extern int trs_continuous; /* 1= run continuously,
 extern int trs_parse_command_line(int argc, char **argv, int *debug);
 
 extern void trs_screen_init(void);
-extern void trs_screen_write_char(int position, int char_index, int doflush);
-extern void trs_screen_write_chars(int *locations, int *values, int count);
+extern void trs_screen_write_char(int position, int char_index);
 extern void trs_screen_expanded(int flag);
 extern void trs_screen_alternate(int flag);
 extern void trs_screen_80x24(int flag);
 extern void trs_screen_inverse(int flag);
 extern void trs_screen_scroll(void);
 extern void trs_screen_refresh(void);
+extern void trs_screen_batch();
+extern void trs_screen_unbatch();
 
 extern void trs_reset(void);
 extern void trs_exit(void);
@@ -93,6 +96,9 @@ extern void trs_reset_button_interrupt(int state);
 extern void trs_disk_intrq_interrupt(int state);
 extern void trs_disk_drq_interrupt(int state);
 extern void trs_disk_motoroff_interrupt(int state);
+extern void trs_uart_err_interrupt(int state);
+extern void trs_uart_rcv_interrupt(int state);
+extern void trs_uart_snd_interrupt(int state);
 extern void trs_timer_interrupt(int state);
 extern void trs_timer_init(void);
 extern void trs_timer_off(void);
@@ -136,6 +142,11 @@ void grafyx_write_yoffset(int value);
 void grafyx_write_overlay(int value);
 void grafyx_set_microlabs(int on_off);
 int grafyx_get_microlabs(void);
+void grafyx_m3_reset();
+int grafyx_m3_active(); /* true if currently intercepting video i/o */
+void grafyx_m3_write_mode(int value);
+unsigned char grafyx_m3_read_byte(int position);
+int grafyx_m3_write_byte(int position, int value);
 
 #ifdef HRG1B
 void hrg_onoff(int enable);
@@ -153,3 +164,4 @@ int trs_get_mouse_type(void);
 void sb_set_volume(int vol);
 int sb_get_volume(void);
 
+#endif _TRS_H

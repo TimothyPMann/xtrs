@@ -24,11 +24,12 @@
 #define A_0       0  /* No arguments */
 #define A_8       1  /* 8-bit number */
 #define A_16      2  /* 16-bit number */
+#define A_0B   0xff  /* No arguments, backskip over last opcode byte */
+#define A_8P  0x100  /* 8-bit number preceding last opcode byte */
 #define A_8R  0x101  /* 8-bit relative address */
-#define A_8P  0x201  /* 8-bit number preceding last opcode byte */
 #define A_8X2 0x102  /* Two 8-bit numbers */
 
-#define arglen(a) ((a)&0xff)
+#define arglen(a) ((signed char)((a)&0xff))
 
 static char undefined[] = "undefined";
 
@@ -298,8 +299,8 @@ static struct opcode major[256] = {
 	{ "push	hl",		A_0 },		/* e5 */
 	{ "and	%02xh",		A_8 },		/* e6 */
 	{ "rst	20h",		A_0 },		/* e7 */
+
 	{ "ret	pe",		A_0 },		/* e8 */
-	
 	{ "jp	(hl)",		A_0 },		/* e9 */
 	{ "jp	pe,%02x%02xh",	A_16 },		/* ea */
 	{ "ex	de,hl",		A_0 },		/* eb */
@@ -618,114 +619,114 @@ static struct opcode minor[6][256] = {
 	{ "set	7,a",		A_0 },		/* cbff */
     },
     {							/* dd */
-	{ undefined,		A_0 },		/* dd00 */
-	{ undefined,		A_0 },		/* dd01 */
-	{ undefined,		A_0 },		/* dd02 */
-	{ undefined,		A_0 },		/* dd03 */
-	{ undefined,		A_0 },		/* dd04 */
-	{ undefined,		A_0 },		/* dd05 */
-	{ undefined,		A_0 },		/* dd06 */
-	{ undefined,		A_0 },		/* dd07 */
+	{ undefined,		A_0B },		/* dd00 */
+	{ undefined,		A_0B },		/* dd01 */
+	{ undefined,		A_0B },		/* dd02 */
+	{ undefined,		A_0B },		/* dd03 */
+	{ undefined,		A_0B },		/* dd04 */
+	{ undefined,		A_0B },		/* dd05 */
+	{ undefined,		A_0B },		/* dd06 */
+	{ undefined,		A_0B },		/* dd07 */
 
-	{ undefined,		A_0 },		/* dd08 */
+	{ undefined,		A_0B },		/* dd08 */
 	{ "add	ix,bc",		A_0 },		/* dd09 */
-	{ undefined,		A_0 },		/* dd0a */
-	{ undefined,		A_0 },		/* dd0b */
-	{ undefined,		A_0 },		/* dd0c */
-	{ undefined,		A_0 },		/* dd0d */
-	{ undefined,		A_0 },		/* dd0e */
-	{ undefined,		A_0 },		/* dd0f */
+	{ undefined,		A_0B },		/* dd0a */
+	{ undefined,		A_0B },		/* dd0b */
+	{ undefined,		A_0B },		/* dd0c */
+	{ undefined,		A_0B },		/* dd0d */
+	{ undefined,		A_0B },		/* dd0e */
+	{ undefined,		A_0B },		/* dd0f */
 
-	{ undefined,		A_0 },		/* dd10 */
-	{ undefined,		A_0 },		/* dd11 */
-	{ undefined,		A_0 },		/* dd12 */
-	{ undefined,		A_0 },		/* dd13 */
-	{ undefined,		A_0 },		/* dd14 */
-	{ undefined,		A_0 },		/* dd15 */
-	{ undefined,		A_0 },		/* dd16 */
-	{ undefined,		A_0 },		/* dd17 */
+	{ undefined,		A_0B },		/* dd10 */
+	{ undefined,		A_0B },		/* dd11 */
+	{ undefined,		A_0B },		/* dd12 */
+	{ undefined,		A_0B },		/* dd13 */
+	{ undefined,		A_0B },		/* dd14 */
+	{ undefined,		A_0B },		/* dd15 */
+	{ undefined,		A_0B },		/* dd16 */
+	{ undefined,		A_0B },		/* dd17 */
 
-	{ undefined,		A_0 },		/* dd18 */
+	{ undefined,		A_0B },		/* dd18 */
 	{ "add	ix,de",		A_0 },		/* dd19 */
-	{ undefined,		A_0 },		/* dd1a */
-	{ undefined,		A_0 },		/* dd1b */
-	{ undefined,		A_0 },		/* dd1c */
-	{ undefined,		A_0 },		/* dd1d */
-	{ undefined,		A_0 },		/* dd1e */
-	{ undefined,		A_0 },		/* dd1f */
+	{ undefined,		A_0B },		/* dd1a */
+	{ undefined,		A_0B },		/* dd1b */
+	{ undefined,		A_0B },		/* dd1c */
+	{ undefined,		A_0B },		/* dd1d */
+	{ undefined,		A_0B },		/* dd1e */
+	{ undefined,		A_0B },		/* dd1f */
 
-	{ undefined,		A_0 },		/* dd20 */
+	{ undefined,		A_0B },		/* dd20 */
 	{ "ld	ix,%02x%02xh",	A_16 },		/* dd21 */
 	{ "ld	(%02x%02xh),ix",A_16 },		/* dd22 */
 	{ "inc	ix",		A_0 },		/* dd23 */
 	{ "inc	ixh",		A_0 },		/* dd24 [undocumented] */
 	{ "dec	ixh",		A_0 },		/* dd25 [undocumented] */
 	{ "ld	ixh,%02xh",	A_8 },		/* dd26 [undocumented] */
-	{ undefined,		A_0 },		/* dd27 */
+	{ undefined,		A_0B },		/* dd27 */
 
-	{ undefined,		A_0 },		/* dd28 */
+	{ undefined,		A_0B },		/* dd28 */
 	{ "add	ix,ix",		A_0 },		/* dd29 */
 	{ "ld	ix,(%02x%02xh)",A_16 },		/* dd2a */
 	{ "dec	ix",		A_0 },		/* dd2b */
 	{ "inc	ixl",		A_0 },		/* dd2c [undocumented] */
 	{ "dec	ixl",		A_0 },		/* dd2d [undocumented] */
 	{ "ld	ixl,%02xh",	A_8 },		/* dd2e [undocumented] */
-	{ undefined,		A_0 },		/* dd2f */
+	{ undefined,		A_0B },		/* dd2f */
 
-	{ undefined,		A_0 },		/* dd30 */
-	{ undefined,		A_0 },		/* dd31 */
-	{ undefined,		A_0 },		/* dd32 */
-	{ undefined,		A_0 },		/* dd33 */
+	{ undefined,		A_0B },		/* dd30 */
+	{ undefined,		A_0B },		/* dd31 */
+	{ undefined,		A_0B },		/* dd32 */
+	{ undefined,		A_0B },		/* dd33 */
 	{ "inc	(ix+%02xh)",	A_8 },		/* dd34 */
 	{ "dec	(ix+%02xh)",	A_8 },		/* dd35 */
 	{ "ld	(ix+%02xh),%02xh",A_8X2 },	/* dd36 */
-	{ undefined,		A_0 },		/* dd37 */
+	{ undefined,		A_0B },		/* dd37 */
 
-	{ undefined,		A_0 },		/* dd38 */
+	{ undefined,		A_0B },		/* dd38 */
 	{ "add	ix,sp",		A_0 },		/* dd39 */
-	{ undefined,		A_0 },		/* dd3a */
-	{ undefined,		A_0 },		/* dd3b */
-	{ undefined,		A_0 },		/* dd3c */
-	{ undefined,		A_0 },		/* dd3d */
-	{ undefined,		A_0 },		/* dd3e */
-	{ undefined,		A_0 },		/* dd3f */
+	{ undefined,		A_0B },		/* dd3a */
+	{ undefined,		A_0B },		/* dd3b */
+	{ undefined,		A_0B },		/* dd3c */
+	{ undefined,		A_0B },		/* dd3d */
+	{ undefined,		A_0B },		/* dd3e */
+	{ undefined,		A_0B },		/* dd3f */
 
-	{ undefined,		A_0 },		/* dd40 */
-	{ undefined,		A_0 },		/* dd41 */
-	{ undefined,		A_0 },		/* dd42 */
-	{ undefined,		A_0 },		/* dd43 */
+	{ undefined,		A_0B },		/* dd40 */
+	{ undefined,		A_0B },		/* dd41 */
+	{ undefined,		A_0B },		/* dd42 */
+	{ undefined,		A_0B },		/* dd43 */
 	{ "ld	b,ixh",		A_0 },		/* dd44 [undocumented] */
 	{ "ld	b,ixl",		A_0 },		/* dd45 [undocumented] */
 	{ "ld	b,(ix+%02xh)",	A_8 },		/* dd46 */
-	{ undefined,		A_0 },		/* dd47 */
+	{ undefined,		A_0B },		/* dd47 */
 
-	{ undefined,		A_0 },		/* dd48 */
-	{ undefined,		A_0 },		/* dd49 */
-	{ undefined,		A_0 },		/* dd4a */
-	{ undefined,		A_0 },		/* dd4b */
+	{ undefined,		A_0B },		/* dd48 */
+	{ undefined,		A_0B },		/* dd49 */
+	{ undefined,		A_0B },		/* dd4a */
+	{ undefined,		A_0B },		/* dd4b */
 	{ "ld	c,ixh",		A_0 },		/* dd4c [undocumented] */
 	{ "ld	c,ixl",		A_0 },		/* dd4d [undocumented] */
 	{ "ld	c,(ix+%02xh)",	A_8 },		/* dd4e */
-	{ undefined,		A_0 },		/* dd4f */
-	
-	{ undefined,		A_0 },		/* dd50 */
-	{ undefined,		A_0 },		/* dd51 */
-	{ undefined,		A_0 },		/* dd52 */
-	{ undefined,		A_0 },		/* dd53 */
+	{ undefined,		A_0B },		/* dd4f */
+
+	{ undefined,		A_0B },		/* dd50 */
+	{ undefined,		A_0B },		/* dd51 */
+	{ undefined,		A_0B },		/* dd52 */
+	{ undefined,		A_0B },		/* dd53 */
 	{ "ld	d,ixh",		A_0 },		/* dd54 [undocumented] */
 	{ "ld	d,ixl",		A_0 },		/* dd55 [undocumented] */
 	{ "ld	d,(ix+%02xh)",	A_8 },		/* dd56 */
-	{ undefined,		A_0 },		/* dd57 */
+	{ undefined,		A_0B },		/* dd57 */
 
-	{ undefined,		A_0 },		/* dd58 */
-	{ undefined,		A_0 },		/* dd59 */
-	{ undefined,		A_0 },		/* dd5a */
-	{ undefined,		A_0 },		/* dd5b */
+	{ undefined,		A_0B },		/* dd58 */
+	{ undefined,		A_0B },		/* dd59 */
+	{ undefined,		A_0B },		/* dd5a */
+	{ undefined,		A_0B },		/* dd5b */
 	{ "ld	e,ixh",		A_0 },		/* dd5c [undocumented] */
 	{ "ld	e,ixl",		A_0 },		/* dd5d [undocumented] */
 	{ "ld	e,(ix+%02xh)",	A_8 },		/* dd5e */
-	{ undefined,		A_0 },		/* dd5f */
-	
+	{ undefined,		A_0B },		/* dd5f */
+
 	{ "ld	ixh,b",		A_0 },		/* dd60 [undocumented] */
 	{ "ld	ixh,c",		A_0 },		/* dd61 [undocumented] */
 	{ "ld	ixh,d",		A_0 },		/* dd62 [undocumented] */
@@ -743,168 +744,168 @@ static struct opcode minor[6][256] = {
 	{ "ld	ixl,ixl",	A_0 },		/* dd6d [undocumented] */
 	{ "ld	l,(ix+%02xh)",	A_8 },		/* dd6e */
 	{ "ld	ixl,a",		A_0 },		/* dd6f [undocumented] */
-	
+
 	{ "ld	(ix+%02xh),b",	A_8 },		/* dd70 */
 	{ "ld	(ix+%02xh),c",	A_8 },		/* dd71 */
 	{ "ld	(ix+%02xh),d",	A_8 },		/* dd72 */
 	{ "ld	(ix+%02xh),e",	A_8 },		/* dd73 */
 	{ "ld	(ix+%02xh),h",	A_8 },		/* dd74 */
 	{ "ld	(ix+%02xh),l",	A_8 },		/* dd75 */
-	{ undefined,		A_0 },		/* dd76 */
+	{ undefined,		A_0B },		/* dd76 */
 	{ "ld	(ix+%02xh),a",	A_8 },		/* dd77 */
 
-	{ undefined,		A_0 },		/* dd78 */
-	{ undefined,		A_0 },		/* dd79 */
-	{ undefined,		A_0 },		/* dd7a */
-	{ undefined,		A_0 },		/* dd7b */
+	{ undefined,		A_0B },		/* dd78 */
+	{ undefined,		A_0B },		/* dd79 */
+	{ undefined,		A_0B },		/* dd7a */
+	{ undefined,		A_0B },		/* dd7b */
 	{ "ld	a,ixh",		A_0 },		/* dd7c [undocumented] */
 	{ "ld	a,ixl",		A_0 },		/* dd7d [undocumented] */
 	{ "ld	a,(ix+%02xh)",	A_8 },		/* dd7e */
-	{ undefined,		A_0 },		/* dd7f */
+	{ undefined,		A_0B },		/* dd7f */
 
-	{ undefined,		A_0 },		/* dd80 */
-	{ undefined,		A_0 },		/* dd81 */
-	{ undefined,		A_0 },		/* dd82 */
-	{ undefined,		A_0 },		/* dd83 */
+	{ undefined,		A_0B },		/* dd80 */
+	{ undefined,		A_0B },		/* dd81 */
+	{ undefined,		A_0B },		/* dd82 */
+	{ undefined,		A_0B },		/* dd83 */
 	{ "add	a,ixh",		A_0 },		/* dd84 [undocumented] */
 	{ "add	a,ixl",		A_0 },		/* dd85 [undocumented] */
 	{ "add	a,(ix+%02xh)",	A_8 },		/* dd86 */
-	{ undefined,		A_0 },		/* dd87 */
+	{ undefined,		A_0B },		/* dd87 */
 
-	{ undefined,		A_0 },		/* dd88 */
-	{ undefined,		A_0 },		/* dd89 */
-	{ undefined,		A_0 },		/* dd8a */
-	{ undefined,		A_0 },		/* dd8b */
+	{ undefined,		A_0B },		/* dd88 */
+	{ undefined,		A_0B },		/* dd89 */
+	{ undefined,		A_0B },		/* dd8a */
+	{ undefined,		A_0B },		/* dd8b */
 	{ "adc	a,ixh",		A_0 },		/* dd8c [undocumented] */
 	{ "adc	a,ixl",		A_0 },		/* dd8d [undocumented] */
 	{ "adc	a,(ix+%02xh)",	A_8 },		/* dd8e */
-	{ undefined,		A_0 },		/* dd8f */
-	
-	{ undefined,		A_0 },		/* dd90 */
-	{ undefined,		A_0 },		/* dd91 */
-	{ undefined,		A_0 },		/* dd92 */
-	{ undefined,		A_0 },		/* dd93 */
+	{ undefined,		A_0B },		/* dd8f */
+
+	{ undefined,		A_0B },		/* dd90 */
+	{ undefined,		A_0B },		/* dd91 */
+	{ undefined,		A_0B },		/* dd92 */
+	{ undefined,		A_0B },		/* dd93 */
 	{ "sub	ixh",		A_0 },		/* dd94 [undocumented] */
 	{ "sub	ixl",		A_0 },		/* dd95 [undocumented] */
 	{ "sub	(ix+%02xh)",	A_8 },		/* dd96 */
-	{ undefined,		A_0 },		/* dd97 */
+	{ undefined,		A_0B },		/* dd97 */
 
-	{ undefined,		A_0 },		/* dd98 */
-	{ undefined,		A_0 },		/* dd99 */
-	{ undefined,		A_0 },		/* dd9a */
-	{ undefined,		A_0 },		/* dd9b */
+	{ undefined,		A_0B },		/* dd98 */
+	{ undefined,		A_0B },		/* dd99 */
+	{ undefined,		A_0B },		/* dd9a */
+	{ undefined,		A_0B },		/* dd9b */
 	{ "sbc	ixh",		A_0 },		/* dd9c [undocumented] */
 	{ "sbc	ixl",		A_0 },		/* dd9d [undocumented] */
 	{ "sbc	a,(ix+%02xh)",	A_8 },		/* dd9e */
-	{ undefined,		A_0 },		/* dd9f */
-	
-	{ undefined,		A_0 },		/* dda0 */
-	{ undefined,		A_0 },		/* dda1 */
-	{ undefined,		A_0 },		/* dda2 */
-	{ undefined,		A_0 },		/* dda3 */
+	{ undefined,		A_0B },		/* dd9f */
+
+	{ undefined,		A_0B },		/* dda0 */
+	{ undefined,		A_0B },		/* dda1 */
+	{ undefined,		A_0B },		/* dda2 */
+	{ undefined,		A_0B },		/* dda3 */
 	{ "and	ixh",		A_0 },		/* dda4 [undocumented] */
 	{ "and	ixl",		A_0 },		/* dda5 [undocumented] */
 	{ "and	(ix+%02xh)",	A_8 },		/* dda6 */
-	{ undefined,		A_0 },		/* dda7 */
+	{ undefined,		A_0B },		/* dda7 */
 
-	{ undefined,		A_0 },		/* dda8 */
-	{ undefined,		A_0 },		/* dda9 */
-	{ undefined,		A_0 },		/* ddaa */
-	{ undefined,		A_0 },		/* ddab */
+	{ undefined,		A_0B },		/* dda8 */
+	{ undefined,		A_0B },		/* dda9 */
+	{ undefined,		A_0B },		/* ddaa */
+	{ undefined,		A_0B },		/* ddab */
 	{ "xor	ixh",		A_0 },		/* ddac [undocumented] */
 	{ "xor	ixl",		A_0 },		/* ddad [undocumented] */
 	{ "xor	(ix+%02xh)",	A_8 },		/* ddae */
-	{ undefined,		A_0 },		/* ddaf */
-	
-	{ undefined,		A_0 },		/* ddb0 */
-	{ undefined,		A_0 },		/* ddb1 */
-	{ undefined,		A_0 },		/* ddb2 */
-	{ undefined,		A_0 },		/* ddb3 */
+	{ undefined,		A_0B },		/* ddaf */
+
+	{ undefined,		A_0B },		/* ddb0 */
+	{ undefined,		A_0B },		/* ddb1 */
+	{ undefined,		A_0B },		/* ddb2 */
+	{ undefined,		A_0B },		/* ddb3 */
 	{ "or	ixh",		A_0 },		/* ddb4 [undocumented] */
 	{ "or	ixl",		A_0 },		/* ddb5 [undocumented] */
 	{ "or	(ix+%02xh)",	A_8 },		/* ddb6 */
-	{ undefined,		A_0 },		/* ddb7 */
+	{ undefined,		A_0B },		/* ddb7 */
 
-	{ undefined,		A_0 },		/* ddb8 */
-	{ undefined,		A_0 },		/* ddb9 */
-	{ undefined,		A_0 },		/* ddba */
-	{ undefined,		A_0 },		/* ddbb */
+	{ undefined,		A_0B },		/* ddb8 */
+	{ undefined,		A_0B },		/* ddb9 */
+	{ undefined,		A_0B },		/* ddba */
+	{ undefined,		A_0B },		/* ddbb */
 	{ "cp	ixh",		A_0 },		/* ddbc [undocumented] */
 	{ "cp	ixl",		A_0 },		/* ddbd [undocumented] */
 	{ "cp	(ix+%02xh)",	A_8 },		/* ddbe */
-	{ undefined,		A_0 },		/* ddbf */
-	
-	{ undefined,		A_0 },		/* ddc0 */
-	{ undefined,		A_0 },		/* ddc1 */
-	{ undefined,		A_0 },		/* ddc2 */
-	{ undefined,		A_0 },		/* ddc3 */
-	{ undefined,		A_0 },		/* ddc4 */
-	{ undefined,		A_0 },		/* ddc5 */
-	{ undefined,		A_0 },		/* ddc6 */
-	{ undefined,		A_0 },		/* ddc7 */
+	{ undefined,		A_0B },		/* ddbf */
 
-	{ undefined,		A_0 },		/* ddc8 */
-	{ undefined,		A_0 },		/* ddc9 */
-	{ undefined,		A_0 },		/* ddca */
-	{ 0,	                4 },		/* ddcb */
-	{ undefined,		A_0 },		/* ddcc */
-	{ undefined,		A_0 },		/* ddcd */
-	{ undefined,		A_0 },		/* ddce */
-	{ undefined,		A_0 },		/* ddcf */
-	
-	{ undefined,		A_0 },		/* ddd0 */
-	{ undefined,		A_0 },		/* ddd1 */
-	{ undefined,		A_0 },		/* ddd2 */
-	{ undefined,		A_0 },		/* ddd3 */
-	{ undefined,		A_0 },		/* ddd4 */
-	{ undefined,		A_0 },		/* ddd5 */
-	{ undefined,		A_0 },		/* ddd6 */
-	{ undefined,		A_0 },		/* ddd7 */
+	{ undefined,		A_0B },		/* ddc0 */
+	{ undefined,		A_0B },		/* ddc1 */
+	{ undefined,		A_0B },		/* ddc2 */
+	{ undefined,		A_0B },		/* ddc3 */
+	{ undefined,		A_0B },		/* ddc4 */
+	{ undefined,		A_0B },		/* ddc5 */
+	{ undefined,		A_0B },		/* ddc6 */
+	{ undefined,		A_0B },		/* ddc7 */
 
-	{ undefined,		A_0 },		/* ddd8 */
-	{ undefined,		A_0 },		/* ddd9 */
-	{ undefined,		A_0 },		/* ddda */
-	{ undefined,		A_0 },		/* dddb */
-	{ undefined,		A_0 },		/* dddc */
-	{ undefined,		A_0 },		/* dddd */
-	{ undefined,		A_0 },		/* ddde */
-	{ undefined,		A_0 },		/* dddf */
-	
-	{ undefined,		A_0 },		/* dde0 */
+	{ undefined,		A_0B },		/* ddc8 */
+	{ undefined,		A_0B },		/* ddc9 */
+	{ undefined,		A_0B },		/* ddca */
+	{ 0,			4 },		/* ddcb */
+	{ undefined,		A_0B },		/* ddcc */
+	{ undefined,		A_0B },		/* ddcd */
+	{ undefined,		A_0B },		/* ddce */
+	{ undefined,		A_0B },		/* ddcf */
+
+	{ undefined,		A_0B },		/* ddd0 */
+	{ undefined,		A_0B },		/* ddd1 */
+	{ undefined,		A_0B },		/* ddd2 */
+	{ undefined,		A_0B },		/* ddd3 */
+	{ undefined,		A_0B },		/* ddd4 */
+	{ undefined,		A_0B },		/* ddd5 */
+	{ undefined,		A_0B },		/* ddd6 */
+	{ undefined,		A_0B },		/* ddd7 */
+
+	{ undefined,		A_0B },		/* ddd8 */
+	{ undefined,		A_0B },		/* ddd9 */
+	{ undefined,		A_0B },		/* ddda */
+	{ undefined,		A_0B },		/* dddb */
+	{ undefined,		A_0B },		/* dddc */
+	{ undefined,		A_0B },		/* dddd */
+	{ undefined,		A_0B },		/* ddde */
+	{ undefined,		A_0B },		/* dddf */
+
+	{ undefined,		A_0B },		/* dde0 */
 	{ "pop	ix",		A_0 },		/* dde1 */
-	{ undefined,		A_0 },		/* dde2 */
+	{ undefined,		A_0B },		/* dde2 */
 	{ "ex	(sp),ix",	A_0 },		/* dde3 */
-	{ undefined,		A_0 },		/* dde4 */
+	{ undefined,		A_0B },		/* dde4 */
 	{ "push	ix",		A_0 },		/* dde5 */
-	{ undefined,		A_0 },		/* dde6 */
-	{ undefined,		A_0 },		/* dde7 */
+	{ undefined,		A_0B },		/* dde6 */
+	{ undefined,		A_0B },		/* dde7 */
 
-	{ undefined,		A_0 },		/* dde8 */
+	{ undefined,		A_0B },		/* dde8 */
 	{ "jp	(ix)",		A_0 },		/* dde9 */
-	{ undefined,		A_0 },		/* ddea */
-	{ undefined,		A_0 },		/* ddeb */
-	{ undefined,		A_0 },		/* ddec */
-	{ undefined,		A_0 },		/* dded */
-	{ undefined,		A_0 },		/* ddee */
-	{ undefined,		A_0 },		/* ddef */
-	
-	{ undefined,		A_0 },		/* ddf0 */
-	{ undefined,		A_0 },		/* ddf1 */
-	{ undefined,		A_0 },		/* ddf2 */
-	{ undefined,		A_0 },		/* ddf3 */
-	{ undefined,		A_0 },		/* ddf4 */
-	{ undefined,		A_0 },		/* ddf5 */
-	{ undefined,		A_0 },		/* ddf6 */
-	{ undefined,		A_0 },		/* ddf7 */
+	{ undefined,		A_0B },		/* ddea */
+	{ undefined,		A_0B },		/* ddeb */
+	{ undefined,		A_0B },		/* ddec */
+	{ undefined,		A_0B },		/* dded */
+	{ undefined,		A_0B },		/* ddee */
+	{ undefined,		A_0B },		/* ddef */
 
-	{ undefined,		A_0 },		/* ddf8 */
+	{ undefined,		A_0B },		/* ddf0 */
+	{ undefined,		A_0B },		/* ddf1 */
+	{ undefined,		A_0B },		/* ddf2 */
+	{ undefined,		A_0B },		/* ddf3 */
+	{ undefined,		A_0B },		/* ddf4 */
+	{ undefined,		A_0B },		/* ddf5 */
+	{ undefined,		A_0B },		/* ddf6 */
+	{ undefined,		A_0B },		/* ddf7 */
+
+	{ undefined,		A_0B },		/* ddf8 */
 	{ "ld	sp,ix",		A_0 },		/* ddf9 */
-	{ undefined,		A_0 },		/* ddfa */
-	{ undefined,		A_0 },		/* ddfb */
-	{ undefined,		A_0 },		/* ddfc */
-	{ undefined,		A_0 },		/* ddfd */
-	{ undefined,		A_0 },		/* ddfe */
-	{ undefined,		A_0 },		/* ddff */
+	{ undefined,		A_0B },		/* ddfa */
+	{ undefined,		A_0B },		/* ddfb */
+	{ undefined,		A_0B },		/* ddfc */
+	{ undefined,		A_0B },		/* ddfd */
+	{ undefined,		A_0B },		/* ddfe */
+	{ undefined,		A_0B },		/* ddff */
     },
     {							/* ed */
 	{ undefined,		A_0 },		/* ed00 */
@@ -1200,293 +1201,293 @@ static struct opcode minor[6][256] = {
 	{ undefined,		A_0 },		/* edff */
     },
     {							/* fd */
-	{ undefined,		A_0 },		/* fd00 */
-	{ undefined,		A_0 },		/* fd01 */
-	{ undefined,		A_0 },		/* fd02 */
-	{ undefined,		A_0 },		/* fd03 */
-	{ undefined,		A_0 },		/* fd04 */
-	{ undefined,		A_0 },		/* fd05 */
-	{ undefined,		A_0 },		/* fd06 */
-	{ undefined,		A_0 },		/* fd07 */
+	{ undefined,		A_0B },		/* fd00 */
+	{ undefined,		A_0B },		/* fd01 */
+	{ undefined,		A_0B },		/* fd02 */
+	{ undefined,		A_0B },		/* fd03 */
+	{ undefined,		A_0B },		/* fd04 */
+	{ undefined,		A_0B },		/* fd05 */
+	{ undefined,		A_0B },		/* fd06 */
+	{ undefined,		A_0B },		/* fd07 */
 
-	{ undefined,		A_0 },		/* fd08 */
+	{ undefined,		A_0B },		/* fd08 */
 	{ "add	iy,bc",		A_0 },		/* fd09 */
-	{ undefined,		A_0 },		/* fd0a */
-	{ undefined,		A_0 },		/* fd0b */
-	{ undefined,		A_0 },		/* fd0c */
-	{ undefined,		A_0 },		/* fd0d */
-	{ undefined,		A_0 },		/* fd0e */
-	{ undefined,		A_0 },		/* fd0f */
+	{ undefined,		A_0B },		/* fd0a */
+	{ undefined,		A_0B },		/* fd0b */
+	{ undefined,		A_0B },		/* fd0c */
+	{ undefined,		A_0B },		/* fd0d */
+	{ undefined,		A_0B },		/* fd0e */
+	{ undefined,		A_0B },		/* fd0f */
 
-	{ undefined,		A_0 },		/* fd10 */
-	{ undefined,		A_0 },		/* fd11 */
-	{ undefined,		A_0 },		/* fd12 */
-	{ undefined,		A_0 },		/* fd13 */
-	{ undefined,		A_0 },		/* fd14 */
-	{ undefined,		A_0 },		/* fd15 */
-	{ undefined,		A_0 },		/* fd16 */
-	{ undefined,		A_0 },		/* fd17 */
+	{ undefined,		A_0B },		/* fd10 */
+	{ undefined,		A_0B },		/* fd11 */
+	{ undefined,		A_0B },		/* fd12 */
+	{ undefined,		A_0B },		/* fd13 */
+	{ undefined,		A_0B },		/* fd14 */
+	{ undefined,		A_0B },		/* fd15 */
+	{ undefined,		A_0B },		/* fd16 */
+	{ undefined,		A_0B },		/* fd17 */
 
-	{ undefined,		A_0 },		/* fd18 */
+	{ undefined,		A_0B },		/* fd18 */
 	{ "add	iy,de",		A_0 },		/* fd19 */
-	{ undefined,		A_0 },		/* fd1a */
-	{ undefined,		A_0 },		/* fd1b */
-	{ undefined,		A_0 },		/* fd1c */
-	{ undefined,		A_0 },		/* fd1d */
-	{ undefined,		A_0 },		/* fd1e */
-	{ undefined,		A_0 },		/* fd1f */
+	{ undefined,		A_0B },		/* fd1a */
+	{ undefined,		A_0B },		/* fd1b */
+	{ undefined,		A_0B },		/* fd1c */
+	{ undefined,		A_0B },		/* fd1d */
+	{ undefined,		A_0B },		/* fd1e */
+	{ undefined,		A_0B },		/* fd1f */
 
-	{ undefined,		A_0 },		/* fd20 */
+	{ undefined,		A_0B },		/* fd20 */
 	{ "ld	iy,%02x%02xh",	A_16 },		/* fd21 */
 	{ "ld	(%02x%02xh),iy",A_16 },		/* fd22 */
 	{ "inc	iy",		A_0 },		/* fd23 */
-	{ undefined,		A_0 },		/* fd24 */
-	{ undefined,		A_0 },		/* fd25 */
-	{ undefined,		A_0 },		/* fd26 */
-	{ undefined,		A_0 },		/* fd27 */
+	{ undefined,		A_0B },		/* fd24 */
+	{ undefined,		A_0B },		/* fd25 */
+	{ undefined,		A_0B },		/* fd26 */
+	{ undefined,		A_0B },		/* fd27 */
 
-	{ undefined,		A_0 },		/* fd28 */
+	{ undefined,		A_0B },		/* fd28 */
 	{ "add	iy,iy",		A_0 },		/* fd29 */
 	{ "ld	iy,(%02x%02xh)",A_16 },		/* fd2a */
 	{ "dec	iy",		A_0 },		/* fd2b */
-	{ undefined,		A_0 },		/* fd2c */
-	{ undefined,		A_0 },		/* fd2d */
-	{ undefined,		A_0 },		/* fd2e */
-	{ undefined,		A_0 },		/* fd2f */
+	{ undefined,		A_0B },		/* fd2c */
+	{ undefined,		A_0B },		/* fd2d */
+	{ undefined,		A_0B },		/* fd2e */
+	{ undefined,		A_0B },		/* fd2f */
 
-	{ undefined,		A_0 },		/* fd30 */
-	{ undefined,		A_0 },		/* fd31 */
-	{ undefined,		A_0 },		/* fd32 */
-	{ undefined,		A_0 },		/* fd33 */
+	{ undefined,		A_0B },		/* fd30 */
+	{ undefined,		A_0B },		/* fd31 */
+	{ undefined,		A_0B },		/* fd32 */
+	{ undefined,		A_0B },		/* fd33 */
 	{ "inc	(iy+%02xh)",	A_8 },		/* fd34 */
 	{ "dec	(iy+%02xh)",	A_8 },		/* fd35 */
 	{ "ld	(iy+%02xh),%02xh",A_8X2 },	/* fd36 */
-	{ undefined,		A_0 },		/* fd37 */
+	{ undefined,		A_0B },		/* fd37 */
 
-	{ undefined,		A_0 },		/* fd38 */
+	{ undefined,		A_0B },		/* fd38 */
 	{ "add	iy,sp",		A_0 },		/* fd39 */
-	{ undefined,		A_0 },		/* fd3a */
-	{ undefined,		A_0 },		/* fd3b */
-	{ undefined,		A_0 },		/* fd3c */
-	{ undefined,		A_0 },		/* fd3d */
-	{ undefined,		A_0 },		/* fd3e */
-	{ undefined,		A_0 },		/* fd3f */
+	{ undefined,		A_0B },		/* fd3a */
+	{ undefined,		A_0B },		/* fd3b */
+	{ undefined,		A_0B },		/* fd3c */
+	{ undefined,		A_0B },		/* fd3d */
+	{ undefined,		A_0B },		/* fd3e */
+	{ undefined,		A_0B },		/* fd3f */
 
-	{ undefined,		A_0 },		/* fd40 */
-	{ undefined,		A_0 },		/* fd41 */
-	{ undefined,		A_0 },		/* fd42 */
-	{ undefined,		A_0 },		/* fd43 */
-	{ undefined,		A_0 },		/* fd44 */
-	{ undefined,		A_0 },		/* fd45 */
+	{ undefined,		A_0B },		/* fd40 */
+	{ undefined,		A_0B },		/* fd41 */
+	{ undefined,		A_0B },		/* fd42 */
+	{ undefined,		A_0B },		/* fd43 */
+	{ undefined,		A_0B },		/* fd44 */
+	{ undefined,		A_0B },		/* fd45 */
 	{ "ld	b,(iy+%02xh)",	A_8 },		/* fd46 */
-	{ undefined,		A_0 },		/* fd47 */
+	{ undefined,		A_0B },		/* fd47 */
 
-	{ undefined,		A_0 },		/* fd48 */
-	{ undefined,		A_0 },		/* fd49 */
-	{ undefined,		A_0 },		/* fd4a */
-	{ undefined,		A_0 },		/* fd4b */
-	{ undefined,		A_0 },		/* fd4c */
-	{ undefined,		A_0 },		/* fd4d */
+	{ undefined,		A_0B },		/* fd48 */
+	{ undefined,		A_0B },		/* fd49 */
+	{ undefined,		A_0B },		/* fd4a */
+	{ undefined,		A_0B },		/* fd4b */
+	{ undefined,		A_0B },		/* fd4c */
+	{ undefined,		A_0B },		/* fd4d */
 	{ "ld	c,(iy+%02xh)",	A_8 },		/* fd4e */
-	{ undefined,		A_0 },		/* fd4f */
-	
-	{ undefined,		A_0 },		/* fd50 */
-	{ undefined,		A_0 },		/* fd51 */
-	{ undefined,		A_0 },		/* fd52 */
-	{ undefined,		A_0 },		/* fd53 */
-	{ undefined,		A_0 },		/* fd54 */
-	{ undefined,		A_0 },		/* fd55 */
+	{ undefined,		A_0B },		/* fd4f */
+
+	{ undefined,		A_0B },		/* fd50 */
+	{ undefined,		A_0B },		/* fd51 */
+	{ undefined,		A_0B },		/* fd52 */
+	{ undefined,		A_0B },		/* fd53 */
+	{ undefined,		A_0B },		/* fd54 */
+	{ undefined,		A_0B },		/* fd55 */
 	{ "ld	d,(iy+%02xh)",	A_8 },		/* fd56 */
-	{ undefined,		A_0 },		/* fd57 */
+	{ undefined,		A_0B },		/* fd57 */
 
-	{ undefined,		A_0 },		/* fd58 */
-	{ undefined,		A_0 },		/* fd59 */
-	{ undefined,		A_0 },		/* fd5a */
-	{ undefined,		A_0 },		/* fd5b */
-	{ undefined,		A_0 },		/* fd5c */
-	{ undefined,		A_0 },		/* fd5d */
+	{ undefined,		A_0B },		/* fd58 */
+	{ undefined,		A_0B },		/* fd59 */
+	{ undefined,		A_0B },		/* fd5a */
+	{ undefined,		A_0B },		/* fd5b */
+	{ undefined,		A_0B },		/* fd5c */
+	{ undefined,		A_0B },		/* fd5d */
 	{ "ld	e,(iy+%02xh)",	A_8 },		/* fd5e */
-	{ undefined,		A_0 },		/* fd5f */
-	
-	{ undefined,		A_0 },		/* fd60 */
-	{ undefined,		A_0 },		/* fd61 */
-	{ undefined,		A_0 },		/* fd62 */
-	{ undefined,		A_0 },		/* fd63 */
-	{ undefined,		A_0 },		/* fd64 */
-	{ undefined,		A_0 },		/* fd65 */
-	{ "ld	h,(iy+%02xh)",	A_8 },		/* fd66 */
-	{ undefined,		A_0 },		/* fd67 */
+	{ undefined,		A_0B },		/* fd5f */
 
-	{ undefined,		A_0 },		/* fd68 */
-	{ undefined,		A_0 },		/* fd69 */
-	{ undefined,		A_0 },		/* fd6a */
-	{ undefined,		A_0 },		/* fd6b */
-	{ undefined,		A_0 },		/* fd6c */
-	{ undefined,		A_0 },		/* fd6d */
+	{ undefined,		A_0B },		/* fd60 */
+	{ undefined,		A_0B },		/* fd61 */
+	{ undefined,		A_0B },		/* fd62 */
+	{ undefined,		A_0B },		/* fd63 */
+	{ undefined,		A_0B },		/* fd64 */
+	{ undefined,		A_0B },		/* fd65 */
+	{ "ld	h,(iy+%02xh)",	A_8 },		/* fd66 */
+	{ undefined,		A_0B },		/* fd67 */
+
+	{ undefined,		A_0B },		/* fd68 */
+	{ undefined,		A_0B },		/* fd69 */
+	{ undefined,		A_0B },		/* fd6a */
+	{ undefined,		A_0B },		/* fd6b */
+	{ undefined,		A_0B },		/* fd6c */
+	{ undefined,		A_0B },		/* fd6d */
 	{ "ld	l,(iy+%02xh)",	A_8 },		/* fd6e */
-	{ undefined,		A_0 },		/* fd6f */
-	
+	{ undefined,		A_0B },		/* fd6f */
+
 	{ "ld	(iy+%02xh),b",	A_8 },		/* fd70 */
 	{ "ld	(iy+%02xh),c",	A_8 },		/* fd71 */
 	{ "ld	(iy+%02xh),d",	A_8 },		/* fd72 */
 	{ "ld	(iy+%02xh),e",	A_8 },		/* fd73 */
 	{ "ld	(iy+%02xh),h",	A_8 },		/* fd74 */
 	{ "ld	(iy+%02xh),l",	A_8 },		/* fd75 */
-	{ undefined,		A_0 },		/* fd76 */
+	{ undefined,		A_0B },		/* fd76 */
 	{ "ld	(iy+%02xh),a",	A_8 },		/* fd77 */
 
-	{ undefined,		A_0 },		/* fd78 */
-	{ undefined,		A_0 },		/* fd79 */
-	{ undefined,		A_0 },		/* fd7a */
-	{ undefined,		A_0 },		/* fd7b */
-	{ undefined,		A_0 },		/* fd7c */
-	{ undefined,		A_0 },		/* fd7d */
+	{ undefined,		A_0B },		/* fd78 */
+	{ undefined,		A_0B },		/* fd79 */
+	{ undefined,		A_0B },		/* fd7a */
+	{ undefined,		A_0B },		/* fd7b */
+	{ undefined,		A_0B },		/* fd7c */
+	{ undefined,		A_0B },		/* fd7d */
 	{ "ld	a,(iy+%02xh)",	A_8 },		/* fd7e */
-	{ undefined,		A_0 },		/* fd7f */
+	{ undefined,		A_0B },		/* fd7f */
 
-	{ undefined,		A_0 },		/* fd80 */
-	{ undefined,		A_0 },		/* fd81 */
-	{ undefined,		A_0 },		/* fd82 */
-	{ undefined,		A_0 },		/* fd83 */
-	{ undefined,		A_0 },		/* fd84 */
-	{ undefined,		A_0 },		/* fd85 */
+	{ undefined,		A_0B },		/* fd80 */
+	{ undefined,		A_0B },		/* fd81 */
+	{ undefined,		A_0B },		/* fd82 */
+	{ undefined,		A_0B },		/* fd83 */
+	{ undefined,		A_0B },		/* fd84 */
+	{ undefined,		A_0B },		/* fd85 */
 	{ "add	a,(iy+%02xh)",	A_8 },		/* fd86 */
-	{ undefined,		A_0 },		/* fd87 */
+	{ undefined,		A_0B },		/* fd87 */
 
-	{ undefined,		A_0 },		/* fd88 */
-	{ undefined,		A_0 },		/* fd89 */
-	{ undefined,		A_0 },		/* fd8a */
-	{ undefined,		A_0 },		/* fd8b */
-	{ undefined,		A_0 },		/* fd8c */
-	{ undefined,		A_0 },		/* fd8d */
+	{ undefined,		A_0B },		/* fd88 */
+	{ undefined,		A_0B },		/* fd89 */
+	{ undefined,		A_0B },		/* fd8a */
+	{ undefined,		A_0B },		/* fd8b */
+	{ undefined,		A_0B },		/* fd8c */
+	{ undefined,		A_0B },		/* fd8d */
 	{ "adc	a,(iy+%02xh)",	A_8 },		/* fd8e */
-	{ undefined,		A_0 },		/* fd8f */
-	
-	{ undefined,		A_0 },		/* fd90 */
-	{ undefined,		A_0 },		/* fd91 */
-	{ undefined,		A_0 },		/* fd92 */
-	{ undefined,		A_0 },		/* fd93 */
-	{ undefined,		A_0 },		/* fd94 */
-	{ undefined,		A_0 },		/* fd95 */
+	{ undefined,		A_0B },		/* fd8f */
+
+	{ undefined,		A_0B },		/* fd90 */
+	{ undefined,		A_0B },		/* fd91 */
+	{ undefined,		A_0B },		/* fd92 */
+	{ undefined,		A_0B },		/* fd93 */
+	{ undefined,		A_0B },		/* fd94 */
+	{ undefined,		A_0B },		/* fd95 */
 	{ "sub	(iy+%02xh)",	A_8 },		/* fd96 */
-	{ undefined,		A_0 },		/* fd97 */
+	{ undefined,		A_0B },		/* fd97 */
 
-	{ undefined,		A_0 },		/* fd98 */
-	{ undefined,		A_0 },		/* fd99 */
-	{ undefined,		A_0 },		/* fd9a */
-	{ undefined,		A_0 },		/* fd9b */
-	{ undefined,		A_0 },		/* fd9c */
-	{ undefined,		A_0 },		/* fd9d */
+	{ undefined,		A_0B },		/* fd98 */
+	{ undefined,		A_0B },		/* fd99 */
+	{ undefined,		A_0B },		/* fd9a */
+	{ undefined,		A_0B },		/* fd9b */
+	{ undefined,		A_0B },		/* fd9c */
+	{ undefined,		A_0B },		/* fd9d */
 	{ "sbc	a,(iy+%02xh)",	A_8 },		/* fd9e */
-	{ undefined,		A_0 },		/* fd9f */
-	
-	{ undefined,		A_0 },		/* fda0 */
-	{ undefined,		A_0 },		/* fda1 */
-	{ undefined,		A_0 },		/* fda2 */
-	{ undefined,		A_0 },		/* fda3 */
-	{ undefined,		A_0 },		/* fda4 */
-	{ undefined,		A_0 },		/* fda5 */
+	{ undefined,		A_0B },		/* fd9f */
+
+	{ undefined,		A_0B },		/* fda0 */
+	{ undefined,		A_0B },		/* fda1 */
+	{ undefined,		A_0B },		/* fda2 */
+	{ undefined,		A_0B },		/* fda3 */
+	{ undefined,		A_0B },		/* fda4 */
+	{ undefined,		A_0B },		/* fda5 */
 	{ "and	(iy+%02xh)",	A_8 },		/* fda6 */
-	{ undefined,		A_0 },		/* fda7 */
+	{ undefined,		A_0B },		/* fda7 */
 
-	{ undefined,		A_0 },		/* fda8 */
-	{ undefined,		A_0 },		/* fda9 */
-	{ undefined,		A_0 },		/* fdaa */
-	{ undefined,		A_0 },		/* fdab */
-	{ undefined,		A_0 },		/* fdac */
-	{ undefined,		A_0 },		/* fdad */
+	{ undefined,		A_0B },		/* fda8 */
+	{ undefined,		A_0B },		/* fda9 */
+	{ undefined,		A_0B },		/* fdaa */
+	{ undefined,		A_0B },		/* fdab */
+	{ undefined,		A_0B },		/* fdac */
+	{ undefined,		A_0B },		/* fdad */
 	{ "xor	(iy+%02xh)",	A_8 },		/* fdae */
-	{ undefined,		A_0 },		/* fdaf */
-	
-	{ undefined,		A_0 },		/* fdb0 */
-	{ undefined,		A_0 },		/* fdb1 */
-	{ undefined,		A_0 },		/* fdb2 */
-	{ undefined,		A_0 },		/* fdb3 */
-	{ undefined,		A_0 },		/* fdb4 */
-	{ undefined,		A_0 },		/* fdb5 */
+	{ undefined,		A_0B },		/* fdaf */
+
+	{ undefined,		A_0B },		/* fdb0 */
+	{ undefined,		A_0B },		/* fdb1 */
+	{ undefined,		A_0B },		/* fdb2 */
+	{ undefined,		A_0B },		/* fdb3 */
+	{ undefined,		A_0B },		/* fdb4 */
+	{ undefined,		A_0B },		/* fdb5 */
 	{ "or	(iy+%02xh)",	A_8 },		/* fdb6 */
-	{ undefined,		A_0 },		/* fdb7 */
+	{ undefined,		A_0B },		/* fdb7 */
 
-	{ undefined,		A_0 },		/* fdb8 */
-	{ undefined,		A_0 },		/* fdb9 */
-	{ undefined,		A_0 },		/* fdba */
-	{ undefined,		A_0 },		/* fdbb */
-	{ undefined,		A_0 },		/* fdbc */
-	{ undefined,		A_0 },		/* fdbd */
+	{ undefined,		A_0B },		/* fdb8 */
+	{ undefined,		A_0B },		/* fdb9 */
+	{ undefined,		A_0B },		/* fdba */
+	{ undefined,		A_0B },		/* fdbb */
+	{ undefined,		A_0B },		/* fdbc */
+	{ undefined,		A_0B },		/* fdbd */
 	{ "cp	(iy+%02xh)",	A_8 },		/* fdbe */
-	{ undefined,		A_0 },		/* fdbf */
-	
-	{ undefined,		A_0 },		/* fdc0 */
-	{ undefined,		A_0 },		/* fdc1 */
-	{ undefined,		A_0 },		/* fdc2 */
-	{ undefined,		A_0 },		/* fdc3 */
-	{ undefined,		A_0 },		/* fdc4 */
-	{ undefined,		A_0 },		/* fdc5 */
-	{ undefined,		A_0 },		/* fdc6 */
-	{ undefined,		A_0 },		/* fdc7 */
+	{ undefined,		A_0B },		/* fdbf */
 
-	{ undefined,		A_0 },		/* fdc8 */
-	{ undefined,		A_0 },		/* fdc9 */
-	{ undefined,		A_0 },		/* fdca */
-	{ 0,	                5 },		/* fdcb */
-	{ undefined,		A_0 },		/* fdcc */
-	{ undefined,		A_0 },		/* fdcd */
-	{ undefined,		A_0 },		/* fdce */
-	{ undefined,		A_0 },		/* fdcf */
-	
-	{ undefined,		A_0 },		/* fdd0 */
-	{ undefined,		A_0 },		/* fdd1 */
-	{ undefined,		A_0 },		/* fdd2 */
-	{ undefined,		A_0 },		/* fdd3 */
-	{ undefined,		A_0 },		/* fdd4 */
-	{ undefined,		A_0 },		/* fdd5 */
-	{ undefined,		A_0 },		/* fdd6 */
-	{ undefined,		A_0 },		/* fdd7 */
+	{ undefined,		A_0B },		/* fdc0 */
+	{ undefined,		A_0B },		/* fdc1 */
+	{ undefined,		A_0B },		/* fdc2 */
+	{ undefined,		A_0B },		/* fdc3 */
+	{ undefined,		A_0B },		/* fdc4 */
+	{ undefined,		A_0B },		/* fdc5 */
+	{ undefined,		A_0B },		/* fdc6 */
+	{ undefined,		A_0B },		/* fdc7 */
 
-	{ undefined,		A_0 },		/* fdd8 */
-	{ undefined,		A_0 },		/* fdd9 */
-	{ undefined,		A_0 },		/* fdda */
-	{ undefined,		A_0 },		/* fddb */
-	{ undefined,		A_0 },		/* fddc */
-	{ undefined,		A_0 },		/* fddd */
-	{ undefined,		A_0 },		/* fdde */
-	{ undefined,		A_0 },		/* fddf */
-	
-	{ undefined,		A_0 },		/* fde0 */
+	{ undefined,		A_0B },		/* fdc8 */
+	{ undefined,		A_0B },		/* fdc9 */
+	{ undefined,		A_0B },		/* fdca */
+	{ 0,			5 },		/* fdcb */
+	{ undefined,		A_0B },		/* fdcc */
+	{ undefined,		A_0B },		/* fdcd */
+	{ undefined,		A_0B },		/* fdce */
+	{ undefined,		A_0B },		/* fdcf */
+
+	{ undefined,		A_0B },		/* fdd0 */
+	{ undefined,		A_0B },		/* fdd1 */
+	{ undefined,		A_0B },		/* fdd2 */
+	{ undefined,		A_0B },		/* fdd3 */
+	{ undefined,		A_0B },		/* fdd4 */
+	{ undefined,		A_0B },		/* fdd5 */
+	{ undefined,		A_0B },		/* fdd6 */
+	{ undefined,		A_0B },		/* fdd7 */
+
+	{ undefined,		A_0B },		/* fdd8 */
+	{ undefined,		A_0B },		/* fdd9 */
+	{ undefined,		A_0B },		/* fdda */
+	{ undefined,		A_0B },		/* fddb */
+	{ undefined,		A_0B },		/* fddc */
+	{ undefined,		A_0B },		/* fddd */
+	{ undefined,		A_0B },		/* fdde */
+	{ undefined,		A_0B },		/* fddf */
+
+	{ undefined,		A_0B },		/* fde0 */
 	{ "pop	iy",		A_0 },		/* fde1 */
-	{ undefined,		A_0 },		/* fde2 */
+	{ undefined,		A_0B },		/* fde2 */
 	{ "ex	(sp),iy",	A_0 },		/* fde3 */
-	{ undefined,		A_0 },		/* fde4 */
+	{ undefined,		A_0B },		/* fde4 */
 	{ "push	iy",		A_0 },		/* fde5 */
-	{ undefined,		A_0 },		/* fde6 */
-	{ undefined,		A_0 },		/* fde7 */
+	{ undefined,		A_0B },		/* fde6 */
+	{ undefined,		A_0B },		/* fde7 */
 
-	{ undefined,		A_0 },		/* fde8 */
+	{ undefined,		A_0B },		/* fde8 */
 	{ "jp	(iy)",		A_0 },		/* fde9 */
-	{ undefined,		A_0 },		/* fdea */
-	{ undefined,		A_0 },		/* fdeb */
-	{ undefined,		A_0 },		/* fdec */
-	{ undefined,		A_0 },		/* fded */
-	{ undefined,		A_0 },		/* fdee */
-	{ undefined,		A_0 },		/* fdef */
-	
-	{ undefined,		A_0 },		/* fdf0 */
-	{ undefined,		A_0 },		/* fdf1 */
-	{ undefined,		A_0 },		/* fdf2 */
-	{ undefined,		A_0 },		/* fdf3 */
-	{ undefined,		A_0 },		/* fdf4 */
-	{ undefined,		A_0 },		/* fdf5 */
-	{ undefined,		A_0 },		/* fdf6 */
-	{ undefined,		A_0 },		/* fdf7 */
+	{ undefined,		A_0B },		/* fdea */
+	{ undefined,		A_0B },		/* fdeb */
+	{ undefined,		A_0B },		/* fdec */
+	{ undefined,		A_0B },		/* fded */
+	{ undefined,		A_0B },		/* fdee */
+	{ undefined,		A_0B },		/* fdef */
 
-	{ undefined,		A_0 },		/* fdf8 */
+	{ undefined,		A_0B },		/* fdf0 */
+	{ undefined,		A_0B },		/* fdf1 */
+	{ undefined,		A_0B },		/* fdf2 */
+	{ undefined,		A_0B },		/* fdf3 */
+	{ undefined,		A_0B },		/* fdf4 */
+	{ undefined,		A_0B },		/* fdf5 */
+	{ undefined,		A_0B },		/* fdf6 */
+	{ undefined,		A_0B },		/* fdf7 */
+
+	{ undefined,		A_0B },		/* fdf8 */
 	{ "ld	sp,iy",		A_0 },		/* fdf9 */
-	{ undefined,		A_0 },		/* fdfa */
-	{ undefined,		A_0 },		/* fdfb */
-	{ undefined,		A_0 },		/* fdfc */
-	{ undefined,		A_0 },		/* fdfd */
-	{ undefined,		A_0 },		/* fdfe */
-	{ undefined,		A_0 },		/* fdff */
+	{ undefined,		A_0B },		/* fdfa */
+	{ undefined,		A_0B },		/* fdfb */
+	{ undefined,		A_0B },		/* fdfc */
+	{ undefined,		A_0B },		/* fdfd */
+	{ undefined,		A_0B },		/* fdfe */
+	{ undefined,		A_0B },		/* fdff */
     },
     {							/* dd cb */
 	{ undefined,		A_0 },		/* ddcb00 */
@@ -2094,38 +2095,33 @@ int disassemble(unsigned short pc)
 	code = &major[i];
     }
     printf ("%04x  ", addr);
-    for (i=0; i<4; i++) {
-	if (i < pc + arglen(code->args) - addr) {
-	    printf("%02x ", mem_read(addr + i));
-	} else {
-	    printf("   ");
-	}
-    }
+    for (i = 0; i < ((pc + arglen(code->args) - addr) & 0xffff); i++)
+	printf("%02x ", mem_read((addr + i) & 0xffff));
+    for (; i < 4; i++)
+	printf("   ");
     printf(" ");
     switch (code->args) {
       case A_16: /* 16-bit number */
 	printf (code->name, mem_read((pc + 1) & 0xffff), mem_read(pc));
-	pc += 2;
 	break;
       case A_8X2: /* Two 8-bit numbers */
 	printf (code->name, mem_read(pc), mem_read((pc + 1) & 0xffff));
-	pc += 2;
 	break;
       case A_8:  /* One 8-bit number */
 	printf (code->name, mem_read(pc));
-	pc += 1;
 	break;
       case A_8P: /* One 8-bit number before last opcode byte */
 	printf (code->name, mem_read((pc - 2) & 0xffff));
-        break;
+	break;
       case A_0:  /* No args */
+      case A_0B: /* No args, backskip over last opcode byte */
 	printf (code->name);
 	break;
       case A_8R: /* One 8-bit relative address */
 	printf (code->name, (pc + 1 + (char) mem_read(pc)) & 0xffff);
-	pc += 1;
 	break;
-    } 
+    }
     putchar ('\n');
+    pc += arglen(code->args);
     return pc;  /* return the location of the next instruction */
 }

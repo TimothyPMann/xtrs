@@ -12,12 +12,8 @@
  * hard disk controller.  This is a Western Digital WD1000/WD1010
  * mapped at ports 0xc8-0xcf, plus control registers at 0xc0-0xc1.
  * 
- * Definitions from LS-DOS 6.3.1 driver TRSHD6/DCT source code, with
- * some details filled in from Linux hdreg.h.  The latter is really
- * for IDE drives, which use a distant descendant of the WD1010
- * interface, so I may have accidentally filled in some things that
- * didn't exist or differed in a real WD1010.  Anyone have a WD1010
- * data sheet?
+ * Definitions inferred from various drivers and sketchy documents
+ * found in odd corners.  Anyone have a real WD10xx data sheet?
  */
 
 extern void trs_hard_init(int reset_button);
