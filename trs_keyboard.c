@@ -668,7 +668,7 @@ void trs_xlate_keycode(int keycode)
     if (keycode & 0xff00) {
       kt = &function_key_table[keycode & 0xff];
     } else {
-      kt = &ascii_key_table[keycode & 0x7f];
+      kt = &ascii_key_table[keycode & 0xff];
     }
     if (kt->bit_action == TK_NULL) return;
 

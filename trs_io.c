@@ -39,6 +39,10 @@ void z80_out(int port, int value)
 	  case IMPEXP_DATA: /* 0xD1 */
 	    trs_impexp_data_write(value);
 	    break;
+	  case 0xFD:
+	    /* GENIE location of printer port */
+	    trs_printer_write(value);
+	    break;
 	  case 0xFF:
 	    /* screen mode select is on D3 line */
 	    modesel = (value >> 3) & 1;
@@ -188,6 +192,9 @@ int z80_in(int port)
 	    return trs_impexp_status_read();
 	  case IMPEXP_DATA: /* 0xD1 */
 	    return trs_impexp_data_read();
+	  case 0xFD:
+	    /* GENIE location of printer port */
+	    return trs_printer_read();
 	  case 0xFF:
 	    return (modesel ? 0x7f : 0x3f) | trs_cassette_in();
 	  default:
