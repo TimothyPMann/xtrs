@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Jul 25 15:51:07 PDT 2000 by mann
+   Last modified on Sat Feb 17 17:32:18 PST 2001 by mann
 */
 
 /*#define PORTDEBUG1 1*/
@@ -312,14 +312,9 @@ int z80_in(int port)
    * Note: 0xC0-0xCC conflicts with Radio Shack hard disk, so
    * clock access at these ports is disabled starting in xtrs 4.1.
    *
-   * The originals (based on the MSM5832 chip) were not Y2K compliant
-   * at all; they returned the units digit of the year in one port,
-   * the tens digit in another, and the leading "19" nowhere.  This
-   * emulation lets the tens digit roll over from 9 to 10 in the year
-   * 2000 and continue counting up from there, which gets us to 2159.
-   * It's not clear this is a good idea.  If anyone has software that
-   * either works well or doesn't work well in 2000 and beyond with
-   * this emulation, let me know.  mann@pa.dec.com
+   * These devices were based on the MSM5832 chip, which returns only
+   * a 2-digit year.  It's not clear what software will do with the
+   * date in years beyond 1999.
    */
 
   if ((port >= 0x70 && port <= 0x7C)
@@ -333,7 +328,7 @@ int z80_in(int port)
 
     switch (port & 0x0F) {
     case 0xC: /* year (high) */
-      return (time_info->tm_year / 10);
+      return (time_info->tm_year / 10) % 10;
     case 0xB: /* year (low) */
       return (time_info->tm_year % 10);
     case 0xA: /* month (high) */
