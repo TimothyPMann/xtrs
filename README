@@ -10,11 +10,11 @@ us that, and we want a Model III.  Give us a Model III, and we want a
 Model 4!
 
 This is a snapshot of the work I've been doing on xtrs to add these
-niceties.  My main additions over xtrs-1.0 have been floppy disk
-emulation, timer interrupt emulation, a kludge to import and export
-data to the host system, Model III mode, Model 4 mode, a rewrite of
-the keyboard handling, support for most of the undocumented Z-80
-instructions, and a bunch of bug fixes and minor improvements.
+niceties.  My main additions over xtrs-1.0 have been floppy disk and
+hard disk emulation, timer interrupt emulation, a kludge to import and
+export data to the host system, Model III mode, Model 4 mode, a
+rewrite of the keyboard handling, support for most of the undocumented
+Z-80 instructions, and a bunch of bug fixes and minor improvements.
 
 This project has been a real (48KB?) trip down memory lane for me.  I
 worked as a programmer for Logical Systems, who produced LDOS, during
