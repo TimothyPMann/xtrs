@@ -17,7 +17,6 @@
 #include "trs.h"
 
 void trs_printer_write(value)
-    int value;
 {
     if(value == 0x0D)
     {
