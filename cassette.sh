@@ -3,12 +3,10 @@
 arrayitem () {
   INDEX=$1
   shift
-  set -- $*
   eval echo \$$INDEX;
 }
 
 arraycount () {
-  set -- $*
   echo $#;
 }
 
