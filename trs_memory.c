@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Fri Sep 25 19:49:40 PDT 1998 by mann
+   Last modified on Sun Apr  4 22:42:32 PDT 1999 by mann
 */
 
 /*
@@ -176,8 +176,8 @@ void trs_reset()
     }
     trs_kb_reset();  /* Part of keyboard stretch kludge */
 
-    if (trs_model == 5) {
-	/* Reset processor (!!guess this is what 4P does) */
+    if (trs_model >= 4) {
+        /* Reset processor */
 	z80_reset();
     } else {
 	/* Signal a nonmaskable interrupt. */
