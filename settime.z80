@@ -1,0 +1,203 @@
+Return-Path: ulm@a1i15.kph.uni-mainz.de 
+Delivery-Date: Mon, 23 Feb 98 07:28:03 -0800
+Return-Path: ulm@a1i15.kph.uni-mainz.de
+Received: by src-mail.pa.dec.com; id AA03471; Mon, 23 Feb 98 07:27:40 -0800
+Received: from mail1.digital.com by pobox1.pa.dec.com (5.65v3.2/1.1.10.5/07Nov97-1157AM)
+	id AA07059; Mon, 23 Feb 1998 07:27:35 -0800
+Received: from a1i15.kph.uni-mainz.de (a1i15.kph.uni-mainz.de [134.93.134.92])
+	by mail1.digital.com (8.8.8/8.8.8/WV1.0c) with ESMTP id HAA28166
+	for <mann@pa.dec.com>; Mon, 23 Feb 1998 07:26:34 -0800 (PST)
+Received: (from ulm@localhost)
+	by a1i15.kph.uni-mainz.de (8.8.5/8.8.5) id QAA03516;
+	Mon, 23 Feb 1998 16:26:21 +0100
+Message-Id: <199802231526.QAA03516@a1i15.kph.uni-mainz.de>
+From: Ulrich Mueller <ulm@kph.uni-mainz.de>
+To: Tim Mann <mann@pa.dec.com>
+Subject: settime.z for xtrs-1.9
+Date: Mon, 23 Feb 1998 16:26:21 +0100
+
+Hi again,
+
+below I include an assembly language version of settime. If you like
+it, you may include it in the xtrs distribution. It should run under
+Newdos/80 and under LDOS 5 and 6.
+
+I did not get the C version of settime running under Newdos. I would
+guess the program misses run-time libraries. (But since I never used
+Misosys C before, I did not really investigate what the problem is.)
+
+Best regards
+Ulrich
+
+--- cut here --- cut here --- cut here --- cut here --- cut here ---
+;; settime.z
+;;
+;; Read date and time from xtrs 1.9 emulator trap and set
+;; TRS-80 system date and time.
+;;
+;; Copyright (c) 1998 Ulrich Mueller
+;;
+;; This software may be copied, modified, and used for any
+;; purpose without fee, provided that (1) the above copyright
+;; notice is retained, and (2) modified versions are clearly
+;; marked as having been modified, with the modifier's name and
+;; the date included.  
+;;
+;; Last modified on Sun Feb 22 21:27:13 CET 1998 by ulm
+
+;; Model I/III addresses
+@exit	equ 402dh
+@abort	equ 4030h
+
+time1$	equ 4041h		; seconds/minutes/hours
+date1$	equ 4044h		; year/day/month
+time3$	equ 4217h
+date3$	equ 421ah
+
+;; Model 4 SVCs
+@svc	equ 40  ; rst address for SVCs
+;@svc	equ 5   ; older zmac requires 8080-style "rst 5"
+@exit6	equ 22
+@abort6	equ 21
+
+time4$	equ 002dh
+date4$	equ 0033h
+
+;; Emulator trap instructions
+emt_time	equ 36edh
+
+
+	org 5200h
+settime:
+	call initj		; init OS-dependent tables
+	ld bc, 0ffffh
+	ld a, 1			; get local time from Unix
+	defw emt_time		; BCDE: seconds since 1970
+	ld a, b
+	and c
+	inc a
+	jr z, abort
+	di
+	ld hl, (time)
+	ld a, 60
+	call divide
+	ld (hl), a		; seconds
+	inc hl
+	ld a, 60
+	call divide
+	ld (hl), a		; minutes
+	inc hl
+	ld a, 24
+	call divide
+	ld (hl), a		; hours
+	ex de, hl		; HL: days since 1970
+	ld bc, 19*256+70-1
+	ld de, 365
+year1:	inc c			; count years in C
+	ld a, c
+	sub 100
+	jr c, year2
+	ld c, a
+	inc b			; centuries
+	ld a, b
+year2:	and 3
+	sub 1
+	sbc hl, de
+	jr nc, year1
+	rlca
+	adc hl, de		; HL: days since 1 january
+	push hl
+	ld hl, (date)
+	ld (hl), c		; year
+	inc hl
+	ex (sp), hl
+	and 1			; A=1 for leap year, 0 else
+	add a, 28
+	ld c, a
+	ld b, 0
+	ld d, b
+month1:	inc b			; count months in B
+	ld a, b
+	ld e, c
+	cp 2
+	jr z, month2		; february
+	ld e, 31
+	and 9
+	jp po, month2		; 31 days
+	dec e			; 30 days
+month2:	sbc hl, de		; subtract length of month
+	jr nc, month1
+	adc hl, de
+	ld c, l
+	pop hl
+	ld (hl), c		; day
+	inc hl
+	ld (hl), b		; month
+	ei
+	jr exit
+
+;; divide BCDE / A
+;; returns quotient in BCDE, remainder in A
+divide:	push hl
+	neg
+	ld h, a
+	sub a
+	ld l, 33
+div1:	rla
+	add a, h
+	jr c, div2
+	sub h
+div2:	rl e
+	rl d
+	rl c
+	rl b
+	dec l
+	jr nz, div1
+	pop hl
+	ret
+
+;; Jump tables for OS independence
+;; Model 1
+startj:
+exit:	jp @exit
+abort:	jp @abort
+time:	defw time1$
+date:	defw date1$
+endj:
+
+;; Model 3
+startj3:
+	jp @exit
+	jp @abort
+	defw time3$
+	defw date3$
+
+;; Model 4
+startj4:
+	ld a, @exit6
+	rst @svc
+	ld a, @abort6
+	rst @svc
+	defw time4$
+	defw date4$
+
+;; Initialize tables
+initj:	ld a, (0004h)
+	cp 06h			; model 1?
+	ret z
+	ld hl, startj3
+	cp 30h			; model 3?
+	jr z, model3
+	ld hl, startj4
+model3:	ld de, startj
+	ld bc, endj - startj
+	ldir
+	ret
+
+	end settime
+--- cut here --- cut here --- cut here --- cut here --- cut here ---
+
+-- 
+Ulrich Mueller, Inst. fuer Kernphysik, Univ. Mainz, D-55099 Mainz
+ulm@kph.uni-mainz.de, Phone +49 6131 39-5812, Fax -2964
+
