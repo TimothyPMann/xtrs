@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Tue Dec 15 11:30:32 PST 1998 by mann */
+/* Last modified on Fri Dec 18 18:25:10 PST 1998 by mann */
 
 /*
  * trs_imp_exp.h
@@ -246,6 +246,8 @@
 #define EO_APPEND 02000
 
 extern void do_emt_system();
+extern void do_emt_getddir();
+extern void do_emt_setddir();
 extern void do_emt_mouse();
 extern void do_emt_open();
 extern void do_emt_close();
