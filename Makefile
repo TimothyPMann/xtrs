@@ -28,6 +28,7 @@ OBJECTS = \
 
 CR_OBJECTS = \
 	compile_rom.o \
+	error.o \
 	load_cmd.o \
 	load_hex.o
 
@@ -36,6 +37,7 @@ MD_OBJECTS = \
 
 HC_OBJECTS = \
 	cmd.o \
+	error.o \
 	load_hex.o \
 	hex2cmd.o
 
@@ -116,11 +118,19 @@ MISC = \
 	xtrsmous.lst \
 	xtrsmous.z
 
-default: xtrs mkdisk hex2cmd cmddump xtrs.txt mkdisk.txt cassette.txt
-
-z80code: export.cmd import.cmd settime.cmd xtrsmous.cmd \
+Z80CODE = export.cmd import.cmd settime.cmd xtrsmous.cmd \
 	xtrs8.dct xtrshard.dct \
 	fakerom.hex xtrsrom4p.hex
+
+MANPAGES = xtrs.txt mkdisk.txt cassette.txt
+
+PROGS = xtrs mkdisk hex2cmd cmddump 
+
+default: xtrs mkdisk hex2cmd cmddump $(MANPAGES)
+
+manpages: $(MANPAGES)
+
+z80code: $(Z80CODE)
 
 # Local customizations for make variables are done in Makefile.local:
 include Makefile.local
@@ -178,8 +188,11 @@ tar:		$(SOURCES) $(HEADERS)
 
 clean:
 		rm -f $(OBJECTS) $(MD_OBJECTS) $(CR_OBJECTS) $(HC_OBJECTS) \
-	                $(CD_OBJECTS) trs_rom*.c \
-			*~ xtrs mkdisk compile_rom hex2cmd cmddump
+	                $(CD_OBJECTS) trs_rom*.c *~ \
+			$(PROGS) $(MANPAGES)
+
+veryclean: clean
+		rm -f $(Z80CODE)
 
 link:	
 		rm -f xtrs
@@ -188,6 +201,8 @@ link:
 install:
 		install -c -m 555 xtrs $(BINDIR)
 		install -c -m 444 xtrs.man $(MANDIR)/man1/xtrs.1
+		install -c -m 444 cassette.man $(MANDIR)/man1/cassette.1
+		install -c -m 444 mkdisk.man $(MANDIR)/man1/mkdisk.1
 
 depend:
 	makedepend -- $(CFLAGS) -- $(SOURCES)

@@ -206,9 +206,9 @@
  *         After,  HL = 0 none, 1 Percom, 2 Tandy, 3 both
  *    17 = set doubler
  *         Before, HL = 0 none, 1 Percom, 2 Tandy, 3 both
- *    18 = query SoundBlaster volume
+ *    18 = query SoundBlaster volume (obsolete)
  *         After,  HL = 0-100
- *    19 = set SoundBlaster volume
+ *    19 = set SoundBlaster volume (obsolete)
  *         Before, HL = 0-100
  *    20 = query truedam flag
  *         After,  HL = 0 or 1

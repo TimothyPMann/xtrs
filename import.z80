@@ -14,15 +14,6 @@
 ;;  Unix pathname is used, with '.' changed to '/'.  If this is
 ;;  not a legal TRS-80 filename, you get an error message.
 
-;; EOF handling is different for NEWDOS/80:
-;;  For TRSDOS and LDOS, word (dcb+12) contains the number of
-;;  256 byte records in the file, byte (dcb+8) contains the EOF
-;;  offset in the last record (0=256).
-;;  For NEWDOS/80, byte (dcb+8) and word (dcb+12) form a 24 bit
-;;  number containing the relative byte address of EOF.
-;;  Thus (dcb+12) differs by one if the file length is not a
-;;  multiple of 256 bytes.
-
 ;; Model I/III addresses
 @fspec  equ 441ch
 @init   equ 4420h
@@ -75,6 +66,8 @@ abort:	call @abort
 	ret
 dsply:	call dsply5
 	ret
+setern:	call setern5
+	ret
 endj:
 
 ; Model 4
@@ -108,6 +101,8 @@ startj6:
 	ret
 	ld a, @dsply6
 	rst @svc
+	ret
+	call setern6
 	ret
 
 ; Emulator trap instructions, byte-reversed for use in defw:
@@ -280,15 +275,8 @@ closit:	defw emt_close		; close Unix file
         ld hl, uclser           ; close error (!!code in A)
 	jr uerror
 closok:	ld a, c
-	ld (dcb+8), a		; EOF offset
-	ld hl, (dcb+10)		; record number (in case shortening file)
-	ld a, (4427h)		; system id for Newdos/80...
-	sub 82h			; ...should be 82h (v2.0)
-	jr nz, notnwd
-	or c			; length multiple of 256 bytes?
-	jr z, notnwd
-	dec hl			; no, # of records - 1
-notnwd:	ld (dcb+12), hl
+	ld (dcb+8), a		; set EOF offset
+	call setern		; set ERN (in case shortening file)
 	ld de, dcb
         call close              ; close the TRS-80 file
         jr z, cls2ok
@@ -346,6 +334,37 @@ lconv2:	ld (de), a
 	pop hl
 	ret
 
+;; EOF handling is different for NEWDOS/80 and TRSDOS 1.3:
+;;  For TRSDOS 2.3 and LDOS, word (dcb+12) contains the number of
+;;  256 byte records in the file, byte (dcb+8) contains the EOF
+;;  offset in the last record (0=256).
+;;  For NEWDOS/80 and TRSDOS 1.3, byte (dcb+8) and word (dcb+12) 
+;;  form a 24 bit number containing the relative byte address of EOF.
+;;  Thus (dcb+12) differs by one if the file length is not a
+;;  multiple of 256 bytes.
+
+; Set ending record number of file to current position
+; EOF offset in C; destroys A, HL
+setern5:
+	ld hl, (dcb+10)		; current record number
+	ld a, (4427h)		; system id for Newdos/80...
+	sub 82h			; ...should be 82h (v2.0)
+	jr z, adj
+	ld a, (441fh)		; system version number for most other DOSes
+	sub 13h			; TRSDOS 1.3?
+	jr nz, noadj
+adj:	or c			; length multiple of 256 bytes?
+	jr z, noadj
+	dec hl			; no, # of records - 1
+noadj:	ld (dcb+12), hl
+	ret	
+
+; All Model 4 mode operating systems should be TRSDOS/LS-DOS 6.x compatible
+setern6:
+	ld hl, (dcb+10)
+	ld (dcb+12), hl
+	ret
+
 lflag:	defb 0
 nflag:	defb 0
 
@@ -354,7 +373,7 @@ uopner:	defb 'Error in Unix open: ', 03h
 urder:	defb 'Error in Unix read: ', 03h
 uclser:	defb 'Error in Unix close: ', 03h
 
-dcb:	defs 32   
+dcb:	defs 48			; 48 for Model III TRSDOS 1.3   
 iobuf:	defs iobsize
         
         end import

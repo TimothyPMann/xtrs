@@ -148,7 +148,7 @@ void mem_bank(int command)
 	bank_offset[1] = 0 << 15;
 	break;
       default:
-	fprintf(stderr, "unknown mem_bank command %d\n", command);
+	error("unknown mem_bank command %d", command);
 	break;
     }
 }

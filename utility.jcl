@@ -1,4 +1,6 @@
-format :#d# (sden,cyl=80,dir=17,name="xtrsutil",q=n,abs)
+. Note: Use TRSDOS 6.2.1 to get old-style dates and
+. thus avoid password problems with other DOSes.
+format :#d#(sden,sides=1,cyl=80,dir=17,name="xtrsutil",q=n,abs)
 import -n export.bas export/bas:#D#
 import export.cmd export/cmd:#D#
 import -n export.z export/z:#D#

@@ -26,6 +26,7 @@
 int trs_model = 1;
 int trs_paused = 1;
 int trs_autodelay = 0;
+char *program_name;
 
 static void check_endian()
 {
@@ -103,9 +104,10 @@ int main(int argc, char *argv[])
 
     check_endian();
 
+    program_name = argv[0];
     argc = trs_parse_command_line(argc, argv, &debug);
     if (argc > 1) {
-      fprintf(stderr, "%s: erroneous argument %s\n", argv[0], argv[1]);
+      fprintf(stderr, "%s: erroneous argument %s\n", program_name, argv[1]);
       exit(1);
     }
     mem_init();

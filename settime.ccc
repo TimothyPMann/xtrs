@@ -8,6 +8,7 @@
 
 /* Last modified on Sat Sep 20 13:41:00 PDT 1997 by mann */
 
+#option redirect 0
 #include "xtrsemt.h"
 #include "xtrsemt.ccc"  /* could use separate compilation instead */
 

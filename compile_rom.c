@@ -21,6 +21,7 @@
 #include "z80.h"
 #include "load_cmd.h"
 
+char *program_name;
 static int highest_address = 0;
 static Uchar memory[Z80_ADDRESS_LIMIT];
 static Uchar loadmap[Z80_ADDRESS_LIMIT];
@@ -85,12 +86,6 @@ static void load_rom(char *filename)
   }
 }
 
-void fatal(char *string)
-{
-    fprintf(stderr, "compile_rom fatal error: %s\n", string);
-    exit(1);
-}
-
 static void write_output(char *which)
 {
   int address = 0;
@@ -124,16 +119,17 @@ static void write_norom_output(char *which)
 
 int main(int argc, char *argv[])
 {
+  program_name = argv[0];
   if(argc == 2)
     {
       fprintf(stderr,
-	  "No specified ROM file, ROM %s will not be built into program.\n",
-	  argv[1]);
+        "%s: no specified ROM file, ROM %s will not be built into program.\n",
+	program_name, argv[1]);
       write_norom_output(argv[1]);
     }
   else if(argc != 3)
     {
-      fatal("usage: compile_rom model hexfile");
+      fprintf(stderr, "Usage: %s model hexfile", program_name);
     }
   else
     {

@@ -30,6 +30,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "crc.c"
 
@@ -448,15 +449,12 @@ trs_disk_done(int bits)
 static void
 trs_disk_unimpl(unsigned char cmd, char* more)
 {
-  char msg[2048];
   state.status = TRSDISK_NOTRDY|TRSDISK_WRITEFLT|TRSDISK_NOTFOUND;
   state.bytecount = state.format_bytecount = 0;
   state.format = FMT_DONE;
   trs_disk_drq_interrupt(0);
   trs_schedule_event(trs_disk_done, 0, 0);
-  sprintf(msg, "trs_disk_command(0x%02x) not implemented - %s",
-	  cmd, more);
-  error(msg);
+  error("trs_disk_command(0x%02x) not implemented - %s", cmd, more);
 }
 
 /* Sort first by track, second by side, third by position in emulated-disk
@@ -726,14 +724,14 @@ trs_disk_change(int drive)
     struct floppy_drive_params fdp;
     fd = open(diskname, O_ACCMODE|O_NDELAY);
     if (fd == -1) {
-      perror(diskname);
+      error("%s: %s", diskname, strerror(errno));
       d->file = NULL;
       d->emutype = JV3;
       return;
     }
     d->file = fdopen(fd, "r+");
     if (d->file == NULL) {
-      perror(diskname);
+      error("%s: %s", diskname, strerror(errno));
       d->emutype = JV3;
       return;
     }
@@ -2862,6 +2860,11 @@ real_check_empty(DiskState *d)
 
   if (time(NULL) <= d->u.real.empty_timeout) return d->u.real.empty;
   
+  if (d->file == NULL) {
+    d->u.real.empty = 1;
+    return 1;
+  }
+
   ioctl(fileno(d->file), FDRESET, &reset_now);
 
   /* Do a read id command.  Assume a disk is in the drive iff

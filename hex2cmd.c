@@ -9,6 +9,7 @@
 /* Last modified on Mon Jan 12 15:44:48 PST 1998 by mann */
 
 #include <stdio.h>
+#include <stdarg.h>
 #include "cmd.h"
 #include "z80.h"
 
@@ -26,13 +27,6 @@ hex_transfer_address(int address)
 {
     cmd_transfer_address(address);
 }
-
-void
-fatal(char* msg)
-{
-    fprintf(stderr, "%s: %s\n", program_name, msg);
-    exit(1);
-}    
 
 int
 main(int argc, char *argv[])

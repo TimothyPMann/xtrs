@@ -233,22 +233,25 @@ static void clear_trap_address(int address, int flag)
 
 void debug_print_registers()
 {
-    printf("\n       S Z   H  PV N C\n");
-    printf("Flags: %d %d   %d   %d %d %d\n\n",
+    printf("\n       S Z - H - PV N C    IFF1 IFF2 IM\n");
+    printf("Flags: %d %d %d %d %d  %d %d %d      %d    %d   %d\n\n",
 	   (SIGN_FLAG != 0),
 	   (ZERO_FLAG != 0),
+	   (REG_F & UNDOC5_MASK) != 0,
 	   (HALF_CARRY_FLAG != 0),
+	   (REG_F & UNDOC3_MASK) != 0,
 	   (OVERFLOW_FLAG != 0),
 	   (SUBTRACT_FLAG != 0),
-	   (CARRY_FLAG != 0));
+	   (CARRY_FLAG != 0),
+	   z80_state.iff1, z80_state.iff2, z80_state.interrupt_mode);
 
-    printf("A F: %.2x %.2x    IX: %.4x        AF': %.4x\n",
+    printf("A F: %.2x %.2x    IX: %.4x    AF': %.4x\n",
 	   REG_A, REG_F, REG_IX, REG_AF_PRIME);
-    printf("B C: %.2x %.2x    IY: %.4x        BC': %.4x\n",
+    printf("B C: %.2x %.2x    IY: %.4x    BC': %.4x\n",
 	   REG_B, REG_C, REG_IY, REG_BC_PRIME);
-    printf("D E: %.2x %.2x    PC: %.4x        DE': %.4x\n",
+    printf("D E: %.2x %.2x    PC: %.4x    DE': %.4x\n",
 	   REG_D, REG_E, REG_PC, REG_DE_PRIME);
-    printf("H L: %.2x %.2x    SP: %.4x        HL': %.4x\n",
+    printf("H L: %.2x %.2x    SP: %.4x    HL': %.4x\n",
 	   REG_H, REG_L, REG_SP, REG_HL_PRIME);
 }
 

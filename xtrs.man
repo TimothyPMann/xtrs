@@ -10,18 +10,17 @@ keyboard and video I/O through an X interface.
 The hardware emulation can operate as a TRS-80 Model I, Model III,
 Model 4, or Model 4P.
 
-\fBxtrs\fP supports 48K of RAM in Model I or Model III mode,
-128K in Model 4 or Model 4P mode. 
-Floppy disks and hard disks are emulated using files to store the data;
-or under Linux only, real floppy drives can be used.
-A printer is emulated by
-sending its output to standard output.  
-There is also a rudimentary emulation of cassette I/O
-that uses files for cassette tapes (Model I mode only).
-Crude sound support is available under Linux if you have 
-SoundBlaster-compatible hardware.
-In Model 4/4P mode, a hi-res graphics card is emulated; you can select either
-the Radio Shack card or the Micro Labs Grafyx Solution card.
+\fBxtrs\fP supports 48K of RAM in Model I or Model III mode, 128K in
+Model 4 or Model 4P mode.  Floppy disks and hard disks are emulated
+using files to store the data; or under Linux only, real floppy drives
+can be used.  A printer is emulated by sending its output to standard
+output.  Cassette I/O is emulated using files to store the cassette
+data; real cassettes can also be read or written (with luck), either
+directly through your sound card (on Linux and other systems with
+OSS-compatible sound drivers), or via .wav files.  Game sound output
+is also available if you have an OSS-compatible sound driver.  In
+Model 4/4P mode, a hi-res graphics card is emulated; you can select
+either the Radio Shack card or the Micro Labs Grafyx Solution card.
 There is also a mouse driver for Model 4/4P mode.
 
 Because \fBxtrs\fP emulates the hardware, all known TRS-80 Model
@@ -84,10 +83,11 @@ need to press Shift+Insert to get an underscore, etc.
 To control the emulated cassette, a file called ".cassette.ctl" in the
 current directory keeps track of what file is currently loaded as
 the cassette tape and the current position within that file.  The
-\fBcassette\fP shell script provides a way to manipulate this file; typing
-"help" shows its commands.  You may use this script to load and
+\fBcassette\fP(1) shell script provides a way to manipulate this file.
+You may use this script to load and
 position cassette tape files.  The operation works very much like an
-actual tape recorder.  The cassette emulation works only in Model I mode.
+actual tape recorder.  See the \fBcassette\fP man page for more information
+about the cassette shell script and the cassette file formats that are supported.
 .SH Printer
 For printer support, any text sent to the TRS-80's printer (using LPRINT
 or LLIST, for example) is sent to the standard output.
@@ -111,11 +111,13 @@ controller, which used a WD1793 chip (software-compatible with the
 WD1791) to provide both single and double density.
 
 Four 5.25-inch floppy drives are emulated, with storage in files named
-diskM-U, where M is the TRS-80 model (1, 3, 4, or 4p) and U is the drive
-unit number (0, 1, 2, or 3).  If a file of the required name is not
-found, a drive with no disk in it is emulated (but see below).  If the
-user does not have write permission for a floppy file, a write-protect
-tab is emulated.  To change floppies in an emulated drive, rename the
+diskM-U, where M is the TRS-80 model (1, 3, 4, or 4p) and U is the
+drive unit number (0, 1, 2, or 3).  If a file of the required name is
+not found, a drive with no disk in it is emulated (but see below).  If
+the user does not have write permission for a floppy file, and/or the
+file has an internal write protect flag set, a write-protect tab is
+emulated.  Use the \fBmkdisk\fP(1) program to turn the write protect
+flag on or off.  To change floppies in an emulated drive, rename the
 existing file for the drive (if any), rename the new floppy file to
 the proper name, and hit function key F7 in the emulator.
 
@@ -384,19 +386,23 @@ images.  These programs use special support in the emulator to read
 and write external Unix files, discussed further at the end of this section.
 
 The emulated floppy \fIutility.dsk\fP contains some programs for
-transferring data between the emulator and ordinary Unix files.  All
-these programs run on the emulator under Model I/III LDOS, Model I/III
-Newdos/80, and Model 4/4P TRSDOS/LS-DOS 6; they may also work under other
-TRS-80 operating systems.
+transferring data between the emulator and ordinary Unix files.
+IMPORT/CMD, IMPORT/BAS, EXPORT/CMD, EXPORT/BAS, and SETTIME/CMD run on
+the emulator under Model I/III TRSDOS, Model I/III LDOS, Model I/III
+Newdos/80, and Model 4/4P TRSDOS/LS-DOS 6; they may also work under
+other TRS-80 operating systems.  Model III TRSDOS users will have to
+use TRSDOS's CONVERT command to read utility.dsk.
 
 IMPORT/CMD imports a Unix file and writes it to an emulated disk.
 Usage: \fIIMPORT [-ln] unixfile [trsfile]\fP.  The -n flag converts
 Unix newlines (\\n) to TRS-80 newlines (\\r).  The -l flag converts
 the Unix filename to lower case, to compensate for TRS-80 operating
 systems such as Newdos/80 that convert all command line arguments to
-upper case.  If the destination file is omitted, IMPORT uses the last
-component of the Unix pathname, but with any "." changed to "/" to
-match TRS-80 DOS file extension syntax.  
+upper case.  When using the -l flag, you can put a [ or up-arrow in
+front of a character to keep it in upper case.  If the destination
+file is omitted, IMPORT uses the last component of the Unix pathname,
+but with any "." changed to "/" to match TRS-80 DOS file extension
+syntax.
 
 IMPORT/BAS is a much slower program that performs the same function as
 IMPORT/CMD but may work under more operating systems.  Simply run it
@@ -405,11 +411,11 @@ under Disk Basic and answer the prompts.
 EXPORT/CMD reads a file from an emulated disk and exports it to a Unix
 file. Usage: \fIEXPORT [-ln] trsfile [unixfile]\fP.  The -n flag
 converts TRS-80 newlines (\\r) to Unix newlines (\\n).  The -l flag
-converts the Unix filename to lower case, to compensate for TRS-80
-operating systems such as Newdos/80 that convert all command line
-arguments to upper case.  If the destination file is omitted, IMPORT
-uses the TRS-80 filename, but with any "/" changed to "." to match
-Unix file extension syntax.
+converts the Unix filename to lower case.  When using the -l flag, you
+can put a [ or up-arrow in front of a character to keep it in upper
+case.  If the destination file is omitted, IMPORT uses the TRS-80
+filename, but with any "/" changed to "." to match Unix file extension
+syntax.
 
 EXPORT/BAS is a much slower program that performs the same function as
 EXPORT/CMD but may work under more operating systems.  Simply run it
@@ -418,41 +424,47 @@ under Disk Basic and answer the prompts.
 SETTIME/CMD reads the date and time from Unix and sets the TRS-80
 DOS's date and time accordingly.
 
-CD/CMD (or CD6/CMD) changes xtrs's Unix working directory.  This
-will change the interpretation of any relative pathnames given to
-IMPORT or EXPORT.  (It will also change the interpretation of disk
+The next several programs were written in Misosys C and exist in two
+versions on utility.dsk.  The version one whose name ends in "6" runs
+on Model 4 TRSDOS/LS-DOS 6.x; the other runs on LDOS 5.x and most
+other Model I/III operating systems.
+
+CD/CMD (or CD6/CMD) changes xtrs's Unix working directory.  
+Usage: \fICD [-l] unixdir\fP.  The -l flag converts the Unix directory
+name to lower case.  When using the -l flag, you can put a [ or
+up-arrow in front of a character to keep it in upper case.  Running
+CD/CMD will change the interpretation of any relative pathnames given
+to IMPORT or EXPORT.  It will also change the interpretation of disk
 names at the next disk change, unless you specified an absolute
-pathname for xtrs's -diskdir parameter.)  CD/CMD runs on LDOS 5.x,
-CD6/CMD on LS-DOS 6.x.  They have not been tested on other TRS-80
-operating systems.
+pathname for xtrs's -diskdir parameter.
 
 PWD/CMD (or PWD6/CMD) prints xtrs's Unix working directory.
-PWD/CMD runs on LDOS 5.x, PWD6/CMD on LS-DOS 6.x.  They have not
-been tested on other TRS-80 operating systems.
 
-UNIX/CMD (or UNIX6/CMD) runs a Unix shell command.  Standard I/O for
+UNIX/CMD (or UNIX6/CMD) runs a Unix shell command.  
+Usage: \fIUNIX [-l] unix command line\fP.
+The -l flag converts the Unix command line
+to lower case.  When using the -l flag, you can put a [ or
+up-arrow in front of a character to keep it in upper case.
+Standard I/O for
 the command uses the xtrs program's standard I/O descriptors; it does
-not go to the TRS-80 screen or come from the TRS-80 keyboard.  UNIX/CMD
-runs on LDOS 5.x, UNIX6/CMD on LS-DOS 6.x.  They have not been tested
-on other TRS-80 operating systems.
+not go to the TRS-80 screen or come from the TRS-80 keyboard.
 
 MOUNT/CMD (or MOUNT6/CMD) is a convenience program that switches
-emulated floppy disks in the drives.  Usage: \fIMOUNT filename U\fP.
+emulated floppy disks in the drives.  Usage: \fIMOUNT [-l] filename U\fP.
+The -l flag converts the Unix filename
+to lower case.  When using the -l flag, you can put a [ or
+up-arrow in front of a character to keep it in upper case.
 The filename is any Unix filename; U is a single digit, 0 through 7.
 The command deletes the file diskM-U (where M is the TRS-80 model)
 from the disk directory (see -diskdir option), replaces it with a
 symbolic link to the given filename, and signals a disk change (as if
-F7 had been pressed).  MOUNT/CMD runs on LDOS 5.x, MOUNT6/CMD on
-LS-DOS 6.x.  They have not been tested on other TRS-80 operating
-systems.
+F7 had been pressed).
 
 UMOUNT/CMD (or UMOUNT6/CMD) is a convenience program that removes an
 emulated floppy disk from a drive.  Usage: \fIUMOUNT U\fP.  U is a
 single digit, 0 through 7.  The command deletes the file diskM-U
 (where M is the TRS-80 model) from the disk directory (see -diskdir
 option) and signals a disk change (as if F7 had been pressed).
-UMOUNT/CMD runs on LDOS 5.x, UMOUNT6/CMD on LS-DOS 6.x.  They have not
-been tested on other TRS-80 operating systems.
 
 The emulated floppy \fIcpmutil.dsk\fP contains import and export
 programs for Montezuma CP/M, written by Roland Gerlach.  It was
@@ -512,21 +524,28 @@ proper number of ticks per second.  For example, running in Model I
 mode on Intel Linux you'd see this pattern: (tick, 30ms, tick,
 20ms,...) instead of seeing ticks every 25ms.
 .SH Sound
-Crude sound support is available on Linux.  Unfortunately, the Linux
-sound drivers do not provide sufficiently low-level functionality, so
-the emulator must write directly to the hardware.  Thus in order for
-the sound support to work, you must have a true
-SoundBlaster-compatible sound card, and you must start \fBxtrs\fP as
-root.  (If you make \fBxtrs\fP setuid to root, it will disable its
-root privileges immediately after sound initialization.)
+Sound support has been completely rewritten in xtrs 3.7 and now uses
+the Open Sound System /dev/dsp device, standard on Linux and available
+on many other Unix versions as well.  This support is compiled in
+automatically on Linux; if you have OSS on another version of Unix,
+you'll need to define the symbol HAVE_OSS in your Makefile or in
+trs_cassette.c.  Any time TRS-80 software tries to write non-zero
+values to the cassette port (or the Model 4/4P optional sound port)
+with the cassette motor off, it is assumed to be trying to make sounds
+and xtrs opens /dev/dsp.  It automatically closes the device again
+after a few seconds of silence.
 
-Sound support is off by default, but can be turned on with the -sb
-option described below.  When sound support is on, any data written to
-the TRS-80 cassette port when the cassette motor is off, and any data
-written to the Model 4/4P optional sound port, is copied to the
-SoundBlaster.  TRS-80 sound depends on timing loops, so the pitches
-will be wildly wrong unless you use the -autodelay option described
-below.  Even with -autodelay, don't expect pitches to be accurate or stable.
+If you are playing a game with sound, you'll want to use the
+-autodelay flag to slow down instruction emulation to approximately
+the speed of a real TRS-80.  If you don't do this, sound will still
+play correctly, but the gameplay may be way too fast and get ahead of
+the sound.  On the other hand, if your machine is a bit too slow,
+you'll hear gaps and pops in the sound when the TRS-80 program lags
+behind the demand of the sound card for more samples.  The -autodelay
+feature includes a small speed boost whenever a sound starts to play
+to try to prevent this, but if the boost is too much or too little,
+you might either find that the game runs too fast when a lot of sound
+is playing, or that the sound has gaps in it anyway.
 .SH Mouse
 A few Model 4 programs could use a mouse, such as the shareware hi-res
 drawing program MDRAW-II. The program XTRSMOUS/CMD on the utility disk
@@ -552,15 +571,16 @@ Some games run rather well under \fBxtrs\fP now,
 provided that your
 machine is fast enough to run the emulation in real time and that you
 choose the right command line options.  
-Galaxy Invaders Plus by Big 5 Software is particularly good.
-You will usually want to turn on sound support and autodelay, and
+Galaxy Invaders Plus by Big 5 Software is particularly good.  (It's
+even better in xtrs 3.7 with the improved sound support!)
+You will usually want to turn on autodelay, and
 you'll often need to tweak the keystretch setting.  
 Running your X server in 8-bit/pixel mode 
-also seems to help. Sample command lines:
+also seems to help in some cases. Sample command lines:
 
 .nf
     startx -- -bpp 8
-    xtrs -sb 0x220,60 -keystretch 2,1,2 -autodelay
+    xtrs -keystretch 2,1,2 -autodelay
 .fi
 
 If the keyboard seems to miss keystrokes entirely, you may need to
@@ -697,7 +717,7 @@ The default delay is 0.
 .B \-autodelay
 Dynamically adjusts the value of -delay to run instructions at roughly
 the same rate as a real machine.  The tracking is only approximate,
-but it can be useful for running games and playing sounds.
+but it can be useful for running games.
 .TP
 .B \-autodelay
 Turn off -autodelay. This is the default.
@@ -768,10 +788,12 @@ at http://www.research.digital.com/SRC/personal/Tim_Mann/trs80/dskspec.html.
 .B \-notruedam
 The opposite of -truedam.  This setting is the default.
 .TP
-.B \-sb \fIportbase,vol\fP
-Enable sound support, using a SoundBlaster with I/O port base 
-at \fIportbase\fP, and playing sounds at \fIvol\fP percent of maximum
-volume.  A typical setting would be -sb 0x220,30.
+.B \-samplerate \fIrate\fP
+Set the default sample rate for new cassette wav files, direct
+cassette I/O to the sound card, and game sound output to the sound
+card.  Existing wav files will be read or modified using their
+original sample rate regardless of this flag.  The default is 11,025
+Hz.  See also the cassette(1) man page.
 .SH Additional resources
 There are many other TRS-80 resources available on the Web, including
 shareware and freeware emulators that run under MSDOS and other
@@ -783,12 +805,9 @@ http://www.research.digital.com/SRC/personal/Tim_Mann/trs80.html.
 Some of the more bizarre undocumented Z-80 instructions
 are not implemented.
 
-Cassette emulation works only in Model I mode, and only for programs
-that use the Level II ROM routines to access the cassette; the
-emulator looks for access to the cassette port from specific PC values
-to activate the feature.  If someone wants to disassemble the Model
-III ROM and figure out what PC values to look for, cassette emulation
-could be made to work there too.
+Cassette emulation is much improved in this version of xtrs, but
+a better signal processing algorithm is still needed to read real cassettes
+reliably, especially at 1500bps.
 
 Serial ports are not emulated.
 
@@ -832,15 +851,9 @@ blocks of 2901.  Again, this does not seem too useful.  5802 sectors
 is already enough for a 3.5-inch HD (1.44MB) floppy, which the TRS-80 didn't
 support anyway.
 
-JV3, DMK, and the emulated hard drive format all define flags for
-internally marking the disk as write-protected.  \fBxtrs\fP respects
-the JV3 and DMK write-protect flags if set by another emulator, but
-provides no way to turn them on or off.  It ignores the
-write-protected flag in hard drive images.  However, you can write
-protect any floppy or hard drive image file by using the Unix chmod(1)
-command to turn off write permission on it (and forcing a disk change
-if xtrs is currently using the image); xtrs will detect this and
-gracefully emulate the presence of a write-protect tab or switch.
+\fBxtrshard\fP ignores the internal write-protected flag in hard drive
+images, but a hard drive image can still be effectively write
+protected by turning off its Unix write permission bits.
 
 The emulator uses a heuristic to decide what format a ROM file is in.
 If a raw binary ROM image starts with 0x01, 0x05, or 0x22, it can be
@@ -863,12 +876,12 @@ David Keil for his MSDOS-based TRS-80 emulator.  The hard disk file
 format was designed by Matthew Reed for his MSDOS-based TRS-80
 emulators.  Al Petrofsky and Todd P. Cromwell III supplied font data.
 Roland Gerlach contributed the CP/M import and export programs as well
-as several bug reports and fixes for the emulator itself.  Fabio
-Ferrari contributed the sound support.  Ulrich Mueller added the
--borderwidth option and ported the import, export, and settime
-utilities to Newdos/80.  Branden Robinson supplied the cassette man
-page and fixed Makefile bugs.  Mark McDougall provided documentation
-for the Micro Labs Grafyx Solution card.
+as several bug reports and fixes for the emulator itself.  Ulrich
+Mueller added the -borderwidth option and ported the import, export,
+and settime utilities to Newdos/80.  Branden Robinson supplied the
+first version of the cassette man page and fixed Makefile bugs.  Mark
+McDougall provided documentation for the Micro Labs Grafyx Solution
+card.
 
 
 

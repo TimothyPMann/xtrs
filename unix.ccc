@@ -8,12 +8,13 @@
 
 /* Last modified on Tue Dec 15 16:59:54 PST 1998 by mann */
 
+#option redirect 0
 #include "xtrsemt.h"
 #include "xtrsemt.ccc"  /* could use separate compilation instead */
 
 usage()
 {
-    fprintf(stderr, "usage: unix command\n");
+    fprintf(stderr, "usage: unix [-l] command\n");
     exit(1);
 }
 
@@ -24,22 +25,55 @@ int main(argc, argv)
      int argc;
      char **argv;
 {
-    int ret, i;
+    int ret, i, lower;
     char errbuf[ERRBUFSIZE];
     char cmdbuf[CMDBUFSIZE];
+    char *p, *q;
+
     if (argc < 2) {
 	usage();
     }
-    cmdbuf[0] = '\000';
-    for (i=1; i<argc; i++) {
-	strcat(cmdbuf, argv[i]);
-	strcat(cmdbuf, " ");
+    i = 1;
+    if (argv[i][0] == '-') {
+	if (tolower(argv[i][1]) != 'l') {
+	    usage();
+        }
+	i++;
+	lower = 1;
+    } else {
+	lower = 0;
     }
+
+    p = cmdbuf;
+    for (; i<argc; i++) {
+	q = argv[i];
+	if (lower) {
+	    while (*q) {
+		if (*q == '[' && *(q+1)) {
+		   q++;
+		   *p++ = *q++;
+		} else if (isalpha(*q)) {
+		   *p++ = tolower(*q++);
+		} else {
+		   *p++ = *q++;
+ 		}
+	    }
+	} else {
+	    while (*q) *p++ = *q++;
+        }
+	*p++ = ' ';
+    }
+    *p = '\000';
     /*printf("$ %s\n", cmdbuf);*/
     ret = emt_system(cmdbuf);
-    if (ret != 0) {
+    if (ret == -1) {
 	emt_strerror(errno, errbuf, ERRBUFSIZE);
 	fprintf(stderr, "unix: %s\n", errbuf);
+	exit(1);
+    } else if (ret != 0) {
+	emt_strerror(errno, errbuf, ERRBUFSIZE);
+	fprintf(stderr, "unix: error (exit status %d, signal %d)\n",
+	        ret >> 8, ret & 0xff);
 	exit(1);
     }
     exit(0);

@@ -19,9 +19,11 @@
 #include <signal.h>
 
 /* IRQs */
-#define M1_TIMER_BIT 0x80
-#define M1_DISK_BIT  0x40
-#define M3_TIMER_BIT 0x04
+#define M1_TIMER_BIT    0x80
+#define M1_DISK_BIT     0x40
+#define M3_TIMER_BIT    0x04
+#define M3_CASSFALL_BIT 0x02
+#define M3_CASSRISE_BIT 0x01
 static unsigned char interrupt_latch = 0;
 static unsigned char interrupt_mask = 0;
 
@@ -57,6 +59,43 @@ static int timer_on = 1;
 #ifdef IDEBUG
 long lost_timer_interrupts = 0;
 #endif
+
+/* Note: the independent interrupt latch and mask model is not correct
+   for all interrupts.  The cassette rise/fall interrupt enable is
+   clocked into the interrupt latch when the event occurs (we get this
+   right), and is *not* masked against the latch output (we get this
+   wrong, but it doesn't really matter). */
+
+void
+trs_cassette_rise_interrupt(int dummy)
+{
+  interrupt_latch = (interrupt_latch & ~M3_CASSRISE_BIT) |
+    (interrupt_mask & M3_CASSRISE_BIT);
+  z80_state.irq = (interrupt_latch & interrupt_mask) != 0;
+  trs_cassette_update(0);
+}
+
+void
+trs_cassette_fall_interrupt(int dummy)
+{
+  interrupt_latch = (interrupt_latch & ~M3_CASSFALL_BIT) |
+    (interrupt_mask & M3_CASSFALL_BIT);
+  z80_state.irq = (interrupt_latch & interrupt_mask) != 0;
+  trs_cassette_update(0);
+}
+
+void
+trs_cassette_clear_interrupts()
+{
+  interrupt_latch &= ~(M3_CASSRISE_BIT|M3_CASSFALL_BIT);
+  z80_state.irq = (interrupt_latch & interrupt_mask) != 0;
+}
+
+int
+trs_cassette_interrupts_enabled()
+{
+  return interrupt_mask & (M3_CASSRISE_BIT|M3_CASSFALL_BIT);
+}
 
 void
 trs_timer_interrupt(int state)
@@ -178,6 +217,33 @@ trs_nmi_mask_write(unsigned char value)
   if (!z80_state.nmi) z80_state.nmi_seen = 0;
 }
 
+static int saved_delay;
+
+/* Temporarily reduce the delay, until trs_restore_delay is called.
+   Useful if we know we're about to do something that's emulated more
+   slowly than most instructions, such as video or real-time sound.
+   In case the boost is too big or too small, we allow the normal
+   autodelay algorithm to continue to run and adjust the new delay. */
+void
+trs_suspend_delay()
+{
+  if (!saved_delay) {
+    saved_delay = z80_state.delay;
+    z80_state.delay /= 2;  /* dividing by 2 is arbitrary */
+  }
+}
+
+/* Put back the saved delay */
+void
+trs_restore_delay()
+{
+  if (saved_delay) {
+    z80_state.delay = saved_delay;
+    saved_delay = 0;
+    trs_paused = 1;
+  }
+}
+
 #define UP_F   1.50
 #define DOWN_F 0.50 
 
@@ -199,7 +265,7 @@ trs_timer_event(int signo)
 #else
       static unsigned long oldtcount;
 #endif
-      if (!trs_paused) {
+      if (!trs_paused /*&& !saved_delay*/) {
 	int toofast = (z80_state.t_count - oldtcount) >
 	  ((tv.tv_sec*1000000 + tv.tv_usec) -
 	   (oldtv.tv_sec*1000000 + oldtv.tv_usec))*z80_state.clockMHz;
@@ -368,10 +434,10 @@ trs_cancel_event()
 }
 
 /*
- * Check if anything is scheduled.
+ * Check event scheduled
  */
-int
-trs_is_event_scheduled()
+trs_event_func
+trs_event_scheduled()
 {
-    return event_func != NULL;
+    return event_func;
 }

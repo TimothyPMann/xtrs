@@ -31,8 +31,9 @@
 #define FALSE	(0)
 #endif
 
-typedef unsigned short Ushort;
-typedef unsigned char Uchar;
+typedef unsigned int Uint;      /* 4 bytes */
+typedef unsigned short Ushort;  /* 2 bytes */
+typedef unsigned char Uchar;    /* 1 byte */
 
 #ifdef NOTDEF /*__GNUC__*/
 typedef unsigned long long tstate_t;
@@ -50,6 +51,15 @@ struct twobyte
     Uchar high, low;
 #else
     Uchar low, high;
+#endif
+};
+
+struct fourbyte
+{
+#ifdef big_endian
+    Uchar byte3, byte2, byte1, byte0;
+#else
+    Uchar byte0, byte1, byte2, byte3;
 #endif
 };
 
@@ -226,8 +236,8 @@ Uchar *mem_pointer(int address, int writing);
 extern int mem_block_transfer(Ushort dest, Ushort source, int direction,
 			      Ushort count);
 extern int load_hex(); /* returns highest address loaded + 1 */
-extern void error(char *string);
-extern void fatal(char *string);
+extern void error(const char *fmt, ...);
+extern void fatal(const char *fmt, ...);
 extern void z80_out(int port, int value);
 extern int z80_in(int port);
 extern int disassemble(unsigned short pc);

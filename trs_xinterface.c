@@ -126,6 +126,7 @@ static XrmOptionDescRec opts[] = {
 {"-charset",    "*charset",     XrmoptionSepArg,        (caddr_t)NULL},
 {"-truedam",    "*truedam",     XrmoptionNoArg,         (caddr_t)"on"},
 {"-notruedam",  "*truedam",     XrmoptionNoArg,         (caddr_t)"off"},
+{"-samplerate", "*samplerate",  XrmoptionSepArg,        (caddr_t)11025},
 #if __linux
 {"-sb",         "*sb",          XrmoptionSepArg,        (caddr_t)NULL},
 #endif /* linux */
@@ -230,7 +231,8 @@ int trs_next_key(int wait)
     for (;;) {
       if ((rval = dequeue_key()) >= 0) break;
       if ((z80_state.nmi && !z80_state.nmi_seen) ||
-	  (z80_state.irq && z80_state.iff1)) {
+	  (z80_state.irq && z80_state.iff1) ||
+	  trs_event_scheduled()) {
 	rval = -1;
 	break;
       }
@@ -338,9 +340,7 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
 	       strcasecmp(value.addr, "IVp") == 0) {
       trs_model = 5;
     } else {
-      fprintf(stderr, "%s: TRS-80 Model %s not supported\n",
-	      program_name, value.addr);
-      exit(1);
+      fatal("TRS-80 Model %s not supported", value.addr);
     }
   }
 
@@ -367,9 +367,7 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
 	trs_charset = 3;
 	cur_char_width = 8;
       } else {
-	fprintf(stderr, "%s: unknown charset name %s\n",
-		program_name, value.addr);
-	exit(1);
+	fatal("unknown charset name %s", value.addr);
       }
     }
   } else /* trs_model > 1 */ {
@@ -394,9 +392,7 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
       } else if (charset_name[0] == 'b'/*bold*/) {
 	trs_charset = 6 + 3*(trs_model > 3);
       } else {
-	fprintf(stderr, "%s: unknown charset name %s\n",
-		program_name, value.addr);
-	exit(1);
+	fatal("unknown charset name %s", value.addr);
       }
     }
   }
@@ -467,8 +463,7 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
   }
   for (i=0; i<=7; i++) {
     if (s[i] != 5 && s[i] != 8) {
-      fprintf(stderr, "bad value %d for disk %d size\n", s[i], i);
-      exit (1);
+      fatal("bad value %d for disk %d size", s[i], i);
     } else {
       trs_disk_setsize(i, s[i]);
     }
@@ -495,9 +490,7 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
   }
   for (i=0; i<=7; i++) {
     if (s[i] != 1 && s[i] != 2) {
-      fprintf(stderr, "bad value %d for disk %d single/double step\n",
-	      s[i], i);
-      exit (1);
+      fatal("bad value %d for disk %d single/double step\n", s[i], i);
     } else {
       trs_disk_setstep(i, s[i]);
     }
@@ -512,6 +505,10 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
     }
   }
 
+  (void) sprintf(option, "%s%s", program_name, ".samplerate");
+  if (XrmGetResource(x_db, option, "Xtrs.Samplerate", &type, &value)) {
+    cassette_default_sample_rate = strtol(value.addr, NULL, 0);
+  }
   return argc;
 }
 
@@ -520,6 +517,7 @@ save_repeat()
 {
   XGetKeyboardControl(display, &repeat_state);
   XAutoRepeatOff(display);
+  XSync(display, FALSE);
 }
 
 static void
@@ -632,8 +630,7 @@ void trs_screen_init()
 #ifdef DEFAULT_ROM
       trs_load_rom(DEFAULT_ROM);
 #else
-      fprintf(stderr,"%s: rom file not specified!\n",program_name);
-      exit(-1);
+      fatal("rom file not specified!");
 #endif
     }
   } else if (trs_model == 3 || trs_model == 4) {
@@ -646,8 +643,7 @@ void trs_screen_init()
 #ifdef DEFAULT_ROM3
       trs_load_rom(DEFAULT_ROM3);
 #else
-      fprintf(stderr,"%s: rom file not specified!\n",program_name);
-      exit(-1);
+      fatal("rom file not specified!");
 #endif
     }
   } else {
@@ -660,8 +656,7 @@ void trs_screen_init()
 #ifdef DEFAULT_ROM4P
       trs_load_rom(DEFAULT_ROM4P);
 #else
-      fprintf(stderr,"%s: rom file not specified!\n",program_name);
-      exit(-1);
+      fatal("rom file not specified!");
 #endif
     }
   }
@@ -694,13 +689,10 @@ void trs_screen_init()
 
   if (usefont) {
     if ((myfont = XLoadQueryFont(display,fontname)) == NULL) {
-      fprintf(stderr,"%s: Can't open font %s!\n",program_name,fontname);
-      exit(-1);
+      fatal("can't open font %s!\n", fontname);
     }
     if ((mywidefont = XLoadQueryFont(display,widefontname)) == NULL) {
-      fprintf(stderr,"%s: Can't open font %s!\n",
-	      program_name,widefontname);
-      exit(-1);
+      fatal("can't open font %s!", widefontname);
     }
     curfont = myfont;
     XSetFont(display,gc,myfont->fid);
@@ -851,7 +843,7 @@ void trs_get_event(int wait)
       (void) XLookupString((XKeyEvent *)&event,buf,10,&key,&status);
 #ifdef XDEBUG
       fprintf(stderr,"KeyPress: state 0x%x, keycode 0x%x, key 0x%x\n",
-	      event.xkey.state, event.xkey.keycode, key);
+	      event.xkey.state, event.xkey.keycode, (unsigned int) key);
 #endif
       switch (key) {
 	/* Trap some function keys here */
@@ -899,8 +891,8 @@ void trs_get_event(int wait)
 	trs_xlate_keycode(0x10000 | key);
       }
 #ifdef XDEBUG
-      fprintf(stderr,"KeyRelease: keycode 0x%x, last_key 0x%x\n",
-	      event.xkey.state, event.xkey.keycode, key);
+      fprintf(stderr,"KeyRelease: state 0x%x, keycode 0x%x, last_key 0x%x\n",
+	      event.xkey.state, event.xkey.keycode, (unsigned int) key);
 #endif
       break;
 

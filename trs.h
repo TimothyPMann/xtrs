@@ -32,6 +32,8 @@
 extern int trs_model; /* 1, 3, 4, 5(=4p) */
 extern int trs_paused;
 extern int trs_autodelay;
+void trs_suspend_delay(void);
+void trs_restore_delay(void);
 
 extern int trs_parse_command_line(int argc, char **argv, int *debug);
 
@@ -65,7 +67,7 @@ extern int trs_printer_read(void);
 
 extern void trs_cassette_motor(int value);
 extern void trs_cassette_out(int value);
-extern int trs_cassette_in(int modesel);
+extern int trs_cassette_in(void);
 extern void trs_sound_out(int value);
 extern void trs_sound_init(int ioport, int vol);
 
@@ -92,11 +94,17 @@ extern void trs_timer_init(void);
 extern void trs_timer_off(void);
 extern void trs_timer_on(void);
 extern void trs_timer_speed(int flag);
+extern void trs_cassette_rise_interrupt(int dummy);
+extern void trs_cassette_fall_interrupt(int dummy);
+extern void trs_cassette_clear_interrupts(void);
+extern int trs_cassette_interrupts_enabled(void);
+extern void trs_cassette_update(int dummy);
+extern int cassette_default_sample_rate;
 
 extern void trs_disk_change(int drive);
-extern void trs_disk_change_all();
-extern void trs_disk_debug();
-extern int trs_disk_motoroff();
+extern void trs_disk_change_all(void);
+extern void trs_disk_debug(void);
+extern int trs_disk_motoroff(void);
 
 extern void mem_video_page(int which);
 extern void mem_bank(int which);
@@ -110,7 +118,7 @@ void trs_schedule_event(trs_event_func f, int arg, int tstates);
 void trs_schedule_event_us(trs_event_func f, int arg, int us);
 void trs_do_event(void);
 void trs_cancel_event(void);
-int trs_is_event_scheduled(void);
+trs_event_func trs_event_scheduled(void);
 
 void grafyx_write_x(int value);
 void grafyx_write_y(int value);
@@ -121,13 +129,13 @@ void grafyx_write_xoffset(int value);
 void grafyx_write_yoffset(int value);
 void grafyx_write_overlay(int value);
 void grafyx_set_microlabs(int on_off);
-int grafyx_get_microlabs();
+int grafyx_get_microlabs(void);
 
 void trs_get_mouse_pos(int *x, int *y, unsigned int *buttons);
 void trs_set_mouse_pos(int x, int y);
 void trs_get_mouse_max(int *x, int *y, unsigned int *sens);
 void trs_set_mouse_max(int x, int y, unsigned int sens);
-int trs_get_mouse_type();
+int trs_get_mouse_type(void);
 
 void sb_set_volume(int vol);
-int sb_get_volume();
+int sb_get_volume(void);

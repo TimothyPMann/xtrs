@@ -1,6 +1,7 @@
 .TH mkdisk 1
 .SH Name
-mkdisk \- Make a blank emulated floppy or hard disk for xtrs
+mkdisk \- Make a blank emulated floppy or hard disk for xtrs,
+or add/remove an emulated write protect tab
 .SH Syntax
 .B mkdisk -1 filename
 .br
@@ -9,16 +10,21 @@ mkdisk \- Make a blank emulated floppy or hard disk for xtrs
 .B mkdisk -k [-s sides] [-d density] [-8] [-i] filename
 .br
 .B mkdisk -h [-c cyl] [-s sec] [-g gran] [-d dir] filename
+.br
+.B mkdisk {-p|-u} {-1|-3|-k|-h} filename
 .SH Description
-The mkdisk program is part of the \fBxtrs\fP(1) package.  It makes a
-blank (unformatted) emulated floppy or hard drive in a file.  See the
-xtrs man page for background information.
+The mkdisk program is part of the \fBxtrs\fP(1) package.  It has two
+distinct functions: (1) It can make a
+blank (unformatted) emulated floppy or hard drive in a file.  
+(2) With the -p or -u flag, it can
+turn the write protect flag on or off for an existing emulated floppy or hard 
+drive file.  See the xtrs man page for background information.
 
-The conventional file extensions are ".dsk" for emulated floppies and
-".hdv" for emulated hard drives, but \fBmkdisk\fP does not enforce this
-convention; you can use any filename.
-.SH Emulated Floppies
-
+The conventional file extensions are .dsk for emulated floppies 
+and .hdv for emulated hard drives, but \fBmkdisk\fP does not enforce this
+convention; you can use any filename.  Other extensions sometimes used
+for emulated floppies are .jv1, .jv3, .8in, and .dmk.
+.SH Making Emulated Floppies
 With the -1 flag, \fBmkdisk\fP makes an unformatted emulated floppy of
 type JV1.  No additional flags are accepted.
 
@@ -28,19 +34,18 @@ JV3.  No additional flags are accepted.
 
 With the -k flag, \fBmkdisk\fP makes an unformatted emulated floppy of
 type DMK.  With -k, the optional flags -s, -d, -8, and -i can be used
-to give the emulated floppy special properties.  Specifying -s 1
-limits the floppy to one side; with -s 2 (the default), the floppy can
-be formatted as either one- or two-sided.  Specifying -d 1 limits the
-floppy to single density; with -d 2 (the default), the floppy can be
+to give the emulated floppy special properties.  Specifying -s1
+limits the floppy to one side; with -s2 (the default), the floppy can
+be formatted as either one- or two-sided.  Specifying -d1 limits the
+floppy to single density; with -d2 (the default), the floppy can be
 formatted in either single or double density.  Specifying -8 allows
 the floppy to be formatted in an emulated 8" drive; by default it will
-work properly only in an emulated 5" drive.  Setting -s 1 or -d 1
+work properly only in an emulated 5" drive.  Setting -s1 or -d1
 saves space after the floppy is formatted; setting -8 consumes
 additional space.  Specifying -i activates a peculiar feature in some
 TRS-80 emulators that causes each formatted sector to appear to be
 both single and double density.
-.SH Emulated Hard Drives
-
+.SH Making Emulated Hard Drives
 With the -h flag, \fBmkdisk\fP makes an unformatted emulated hard
 drive with \fIcyl\fP cylinders, \fIsec\fP sectors, and \fIgran\fP
 granules (LDOS allocation units) per cylinder.  You should format the
@@ -90,6 +95,25 @@ the \fI-d dir\fP and \fIDIR=dir\fP values to agree is not essential
 unless you plan to share hard drive images with Matthew Reed's
 emulators; \fBxtrs\fP itself ignores the \fIdir\fP parameter and
 allows FORMAT to place the directory on any cylinder.
+.SH Write Protection
+With the -p flag, \fBmkdisk\fP turns on write protection
+for an existing emulated floppy or hard drive.  It turns off all Unix
+write permission bits on the file, and (except for JV1 floppies) also sets
+a write-protected flag inside the file.
+
+With the -u flag, \fBmkdisk\fP turns off write protection
+for an existing emulated floppy or hard drive.  It turns on Unix
+write permissions to the file, masked by your current umask and
+the file's current read permissions.
+It also (except for JV1 floppies) clears
+a write-protected flag inside the file.
+
+\fBmkdisk\fP currently does not have code to auto-recognize file
+formats, so the -p or -u flag must be accompanied by either -1 (JV1),
+-3 (JV3), -k (DMK), or -h (hard disk) to identify the file format.
+There is also no checking for the correct file format, so if you
+give the wrong flag, the wrong byte inside your file will be changed.
+
 .SH Technical data
 The JV1 format is just an array of 256-byte sectors, in the order
 (track 0 sector 0, track 0 sector 1, ... track 0 sector 9, track 1
@@ -108,12 +132,11 @@ The DMK format is documented in a file on David Keil's web site,
 http://discover-net.net/~dmkeil/trsdoc.htm#Technical-disks; this file
 is also included with his emulator.  Some updates to the 4.00 version
 of the document: (1) If neither the single density nor ignore density
-option is set and single density data is recorded, each byte of a
-single density sector (beginning with the byte after the IDAM) is
-written twice (i.e., the four bytes 12345678 would be written as
+option is set and single density data is recorded, each single density
+byte is written twice (i.e., the four bytes 12345678 would be written as
 1212343456567878).  This ensures that when single and double density
 sectors are mixed, each type occupies the correct relative amount of
-space in the track.  This change will be effective in version 4.3 of
+space in the track.  This update will be effective in version 4.3 of
 David's emulator; it is incompatible with previous versions. (2) Bit
 15 of an IDAM offset is 1 if the sector is double-density, 0 if single
 density.  Bit 14 is reserved; it currently must be 0.  The actual

@@ -9,13 +9,16 @@
 
 /*
  * mkdisk.c
- * Make a blank (unformatted) emulated floppy or hard drive in a file.
+ * Make a blank (unformatted) emulated floppy or hard drive in a file,
+ * or write protect/unprotect an existing one.
  */
 
 #include <stdio.h>
 #include <unistd.h>
 #include <time.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 void Usage(char *progname)
 {
@@ -23,8 +26,9 @@ void Usage(char *progname)
 	  "Usage:\t%s -1 file\n"
 	  "\t%s [-3] file\n"
 	  "\t%s -k [-s sides] [-d density] [-8] [-i] file\n"
-	  "\t%s -h [-c cyl] [-s sec] [-g gran] [-d dir] file\n",
-	  progname, progname, progname, progname);
+	  "\t%s -h [-c cyl] [-s sec] [-g gran] [-d dir] file\n"
+	  "\t%s mkdisk {-p|-u} [-1|-3|-k|-h]\n",
+	  progname, progname, progname, progname, progname);
   exit(2);
 }
 
@@ -85,13 +89,14 @@ main(int argc, char *argv[])
 {
   int jv1 = 0, jv3 = 0, dmk = 0, hard = 0;
   int cyl = -1, sec = -1, gran = -1, dir = -1, eight = 0, ignden = 0;
-  int i, c;
+  int writeprot = 0, unprot = 0;
+  int i, c, oumask;
   char *fname;
   FILE *f;
 
   opterr = 0;
   for (;;) {
-    c = getopt(argc, argv, "13khc:s:g:d:8i");
+    c = getopt(argc, argv, "13khc:s:g:d:8ipu");
     if (c == -1) break;
     switch (c) {
     case '1':
@@ -124,6 +129,12 @@ main(int argc, char *argv[])
     case 'i':
       ignden = 1;
       break;
+    case 'p':
+      writeprot = 1;
+      break;
+    case 'u':
+      unprot = 1;
+      break;
     case '?':
     default:
       Usage(argv[0]);
@@ -132,6 +143,87 @@ main(int argc, char *argv[])
   }
 
   if (argc - optind != 1) Usage(argv[0]);
+
+  fname = argv[optind];
+
+  if (writeprot || unprot) {
+    /* Completely different functionality here */
+    struct stat st;
+    int newmode;
+
+    if (writeprot && unprot) {
+      fprintf(stderr,
+	      "%s: -p and -u are mutually exclusive\n", argv[0]);
+      exit(2);
+    }    
+
+    if (jv1 + jv3 + dmk + hard != 1) {
+      fprintf(stderr,
+	      "%s: %s requires exactly one of -1, -3, -k, or -h\n",
+	      argv[0], writeprot ? "-p" : "-u");
+      exit(2);
+    }
+
+    if (stat(fname, &st) < 0) {
+      perror(fname);
+      exit(1);
+    }
+
+    /* Make writable so we can poke inside if need be */
+    if (chmod(fname, st.st_mode | (S_IWUSR|S_IWGRP|S_IWOTH)) < 0) {
+      perror(fname);
+      exit(1);
+    }
+
+    f = fopen(fname, "r+");
+    if (f == NULL) {
+      perror(fname);
+      exit(1);
+    }
+
+    /* Poke inside */
+    if (jv1) {
+      /* No indication inside; nothing to do here */
+
+    } else if (jv3) {
+      /* Set the magic byte */
+      fseek(f, 256*34-1, 0);
+      putc(writeprot ? 0 : 0xff, f);
+
+    } else if (dmk) {
+      /* Set the magic byte */
+      putc(writeprot ? 0xff : 0, f);
+
+    } else if (hard) {
+      /* Set the magic bit */
+      fseek(f, 7, 0);
+      newmode = getc(f);
+      if (newmode == EOF) {
+	perror(fname);
+	exit(1);
+      }
+      newmode = (newmode & 0x7f) | (writeprot ? 0x80 : 0);
+      fseek(f, 7, 0);
+      putc(newmode, f);
+
+    }
+
+    /* Finish by chmoding the file appropriately */
+    if (writeprot) {
+      newmode = st.st_mode & ~(S_IWUSR|S_IWGRP|S_IWOTH);
+    } else {
+      oumask = umask(0);
+      umask(oumask);
+      newmode = st.st_mode |
+	(( (st.st_mode & (S_IRUSR|S_IRGRP|S_IROTH)) >> 1 ) & ~oumask);
+    }
+    if (fchmod(fileno(f), newmode)) {
+      perror(fname);
+      exit(1);
+    }
+    fclose(f);
+    exit(0);
+  }
 
   switch (jv1 + jv3 + dmk + hard) {
   case 0:
@@ -160,8 +252,6 @@ main(int argc, char *argv[])
     fprintf(stderr, "%s: -8 and -i are only meaningful with -k\n", argv[0]);
     exit(2);
   }    
-
-  fname = argv[optind];
 
   if (jv1) {
     /* Unformatted JV1 disk - just an empty file! */

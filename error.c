@@ -14,14 +14,36 @@
  */
 
 #include "z80.h"
+#include <stdarg.h>
+#include <string.h>
 
-void error(char *string)
+extern char *program_name;
+
+void error(const char *fmt, ...)
 {
-    fprintf(stderr, "xtrs error: %s\n", string);
+  va_list args;
+  char xfmt[2048];
+
+  strcpy(xfmt, program_name);
+  strcat(xfmt, " error: ");
+  strcat(xfmt, fmt);
+  strcat(xfmt, "\n");
+  va_start(args, fmt);
+  vfprintf(stderr, xfmt, args);
+  va_end(args);
 }
 
-void fatal(char *string)
+void fatal(const char *fmt, ...)
 {
-    fprintf(stderr, "xtrs fatal error: %s\n", string);
-    exit(1);
+  va_list args;
+  char xfmt[2048];
+
+  strcpy(xfmt, program_name);
+  strcat(xfmt, " fatal error: ");
+  strcat(xfmt, fmt);
+  strcat(xfmt, "\n");
+  va_start(args, fmt);
+  vfprintf(stderr, xfmt, args);
+  va_end(args);
+  exit(1);
 }

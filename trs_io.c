@@ -189,7 +189,7 @@ int z80_in(int port)
 	  case IMPEXP_DATA: /* 0xD1 */
 	    return trs_impexp_data_read();
 	  case 0xFF:
-	    return trs_cassette_in(modesel);
+	    return (modesel ? 0x7f : 0x3f) | trs_cassette_in();
 	  default:
 	    break;
 	}
@@ -233,8 +233,7 @@ int z80_in(int port)
 	  case 0xF8:
 	    return trs_printer_read();
 	  case 0xFF:
-	    /* !!Add cassette bits, etc., later */
-	    return modeimage;
+	    return (modeimage & 0x7e) | trs_cassette_in();
 	  default:
 	    break;
 	}

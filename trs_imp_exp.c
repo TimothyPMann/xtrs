@@ -563,7 +563,7 @@ void do_emt_opendisk()
   if (*name == '/' || *trs_disk_dir == '\0') {
     qname = strdup(name);
   } else {
-    qname = (char *)malloc(strlen(trs_disk_dir) + 1 + strlen(name));
+    qname = (char *)malloc(strlen(trs_disk_dir) + 1 + strlen(name) + 1);
     strcpy(qname, trs_disk_dir);
     strcat(qname, "/");
     strcat(qname, name);

@@ -10,8 +10,10 @@ currently "loaded" as the cassette tape and the current position within
 that file. The \fBcassette\fP shell script provides a way to manipulate
 this file; typing "help" at its prompt shows its commands. You may use
 this script to load and position cassette tape files. The operation
-works very much like an actual tape recorder. The cassette emulation
-works only in Model I mode.
+works very much like an actual tape recorder.
+
+This manual page also describes the image formats that the emulator
+supports and their limitations.
 .SH Commands
 .B pos
 generates a status message including the filename being used as the
@@ -22,20 +24,108 @@ cassette image and the current position within the image, in bytes.
 changes the cassette image currently being used to the file specified, and
 resets the position counter to zero.
 
+.B type
+.I typename
+tells the emulator what type of image is loaded.  Usually this is
+detected from the file extension, but you can override the detected
+value with this command.  The supported types are listed in the next section.
+
 .B rew
 .I [position]
 changes the position counter to the position specified.
+If no position is given, the counter is reset to zero.
 
 .B ff
 .I [position]
 changes the position counter to the position specified.
+If no position is given, the counter is set to the end of the file.
 
 .B quit
 exits the \fBcassette\fP shell script.
+.SH Types
+\fBxtrs\fP supports several different types of cassette images,
+each of which represents cassette data in a different format.
+
+.I cas
+format is fairly compact and is compatible with other TRS-80 emulators
+that have cassette support.  This format represents the bit stream
+that (the emulator thinks) the TRS-80 cassette routines were trying to
+save to the tape, not the actual electrical signals on the tape.  On
+writing, the emulator monitors the values that the TRS-80 software is
+sending to the cassette port and their timing, auto-recognizes whether
+a 500-bps or 1500-bps format is being written, decodes the signals
+into a string of 0 and 1 bits, packs the bits into bytes, and writes
+them to the cas file.  (250 bps, used by Level 1 Basic, is currently
+not supported.)  On reading, the emulator auto-detects whether
+software is trying to read at 500 or 1500 bps and encodes the 0's and
+1's back into the signals that the TRS-80 software is expecting.
+
+This somewhat roundabout method should work with most TRS-80 cassette
+routines that read/write signals compatible with the ROM cassette
+routines, but will fail with routines that are too different.  Note
+that you can't read a 500-bps cas image at 1500 bps or vice versa;
+1500 bps uses a different bit pattern in the leader and writes an
+extra zero bit between every two data bytes.
+
+.I cpt
+format (for "cassette pulse train") encodes the exact values and
+timing of the signals that the TRS-80 cassette routine sends to the
+cassette output port to be recorded on the tape.  Timing is to the
+nearest microsecond.  This format emulates a perfect, noise-free
+cassette, so any cassette routines that even halfway worked on real
+hardware should work with it.
+
+.I wav
+format is a standard sound file format.  The wav format is
+intermediate in emulation accuracy between cas and cpt.  It does
+represent actual signals, not decoded bits, but its timing precision
+is limited by the sample rate used.  The default rate for new wav
+files is 11,025 Hz; you can change this with the -samplerate command
+line option to \fBxtrs\fP.
+
+You can play wav files written by \fBxtrs\fP through your sound card
+and hear roughly what a real TRS-80 cassette sounds like.  A real
+TRS-80 should be able to read wav files written by \fBxtrs\fP if you
+copy them to a cassette or connect the TRS-80 directly to the sound
+card's output, but that is untested at this writing.
+
+\fBxtrs\fP can also read wav files.  It can read back the wav files
+that it writes without error (since no noise has been introduced), but
+reading wav files sampled from real cassettes is more difficult.  At
+this writing it seems to work fairly well for 500bps cassettes but
+poorly for 1500bps.  Perhaps a higher sampling rate or better
+signal preprocessing inside xtrs would help.
+
+The wav file parsing code has several limitations.  Samples must be
+8-bit mono, and the wav file must contain only one data chunk and no
+extra optional RIFF chunks in the header.  If you have a wav file
+whose header xtrs rejects, try using sox(1) to convert it to a more
+vanilla format.
+
+.I direct
+format is similar to wav format, except that the samples go to (or
+come from) your sound card directly, not a wav file.  Direct format
+requires the Open Sound System /dev/dsp device.  Extending the code
+to work with other sound interfaces would probably not be
+hard, but is left as an exercise for the reader.  Please send me
+the changes if you do this.
+
+.I debug
+format is the same as cpt format except that the data is written in
+human-readable ASCII.  The cassette output is assumed to be 0
+initially.  Each line of output gives a new value (0, 1, or 2), and
+the amount of time (in microseconds) to wait before changing the
+output to this value.
+
+.I autodetect
+is not a real format.  Rather, setting the type to autodetect is
+supposed to tell \fBxtrs\fP to look inside the file and guess the type
+that way.  This is not implemented yet.
+
+
 .SH Authors
-\fBxtrs\fP was written by David Gingold <gingold@think.com> of Thinking
-Machines Corporation, Alec Wolman <wolman@crl.dec.com> of Digital
-Equipment Corporation, and Timothy Mann <mann@pa.dec.com> of Digital
-Equipment Corporation. This manual page was written by Branden Robinson
-for Debian GNU/Linux, though most of it will look familar from the
-"Emulated cassette" section of the \fBxtrs\fP manual page.
+\fBxtrs\fP was written by David Gingold <gingold@think.com> of
+Thinking Machines Corporation, Alec Wolman <wolman@crl.dec.com> of
+Digital Equipment Corporation, and Timothy Mann <mann@pa.dec.com> of
+Digital Equipment Corporation. An early version of this manual page
+was written by Branden Robinson for Debian GNU/Linux.
