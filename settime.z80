@@ -11,13 +11,14 @@
 ;; marked as having been modified, with the modifier's name and
 ;; the date included.  
 ;;
-;; Last modified on Fri Apr 24 22:16:17 PDT 1998 by mann
+;; Last modified on Fri May 19 00:38:41 PDT 2000 by mann
 ;;      modified on Sun Feb 22 21:27:13 CET 1998 by ulm
 
 ;; Model I/III addresses
 @exit	equ 402dh
 @abort	equ 4030h
 
+;; Model 1 and 3 store the last 2 digits of the year in the year byte
 time1$	equ 4041h		; seconds/minutes/hours
 date1$	equ 4044h		; year/day/month
 time3$	equ 4217h
@@ -29,12 +30,12 @@ date3$	equ 421ah
 @exit6	equ 22
 @abort6	equ 21
 
+;; Model 4 stores the offset from 1900 in the year byte
 time4$	equ 002dh
 date4$	equ 0033h
 
 ;; Emulator trap instructions
 emt_time	equ 36edh
-
 
 	org 5200h
 settime:
@@ -45,7 +46,7 @@ settime:
 	ld a, b
 	and c
 	inc a
-	jr z, abort
+	jp z, abort
 	di
 	ld hl, (time)
 	ld a, 60
@@ -77,7 +78,7 @@ year2:	and 3
 	adc hl, de		; HL: days since 1 january
 	push hl
 	ld hl, (date)
-	ld (hl), c		; year
+	call putyr		; year to (hl)
 	inc hl
 	ex (sp), hl
 	and 1			; A=1 for leap year, 0 else
@@ -133,6 +134,7 @@ exit:	jp @exit
 abort:	jp @abort
 time:	defw time1$
 date:	defw date1$
+putyr:	jp putyr1
 endj:
 
 ;; Model 3
@@ -141,6 +143,7 @@ startj3:
 	jp @abort
 	defw time3$
 	defw date3$
+	jp putyr3
 
 ;; Model 4
 startj4:
@@ -150,6 +153,7 @@ startj4:
 	rst @svc
 	defw time4$
 	defw date4$
+	jp putyr4
 
 ;; Initialize tables
 ;; Changed to work even on a Model III (or Model 4 in III mode)
@@ -168,4 +172,30 @@ movej:	ld de, startj
 	ldir
 	ret
 
+;; Create year byte.
+;; On entry, c has 2-digit year, b has century.
+;; On exit, (hl) has year byte.
+
+;; Model I/III, put 2-digit year
+putyr1:
+putyr3:	ld (hl), c
+	ret
+
+;; Model 4, put offset from 1900 (laboriously recomputed, sigh)
+putyr4:	push af
+	push bc
+	ld a, b
+	sub 19
+	ld b, a
+	ld a, c
+	jr z, py41
+py40:	add a, 100
+	djnz py40
+py41:	ld (hl), a
+	pop bc
+	pop af
+	ret
+
 	end settime
+
+
