@@ -80,16 +80,19 @@ actual tape recorder.  The cassette emulation works only in Model I mode.
 For printer support, any text sent to the TRS-80's printer (using LPRINT
 or LLIST, for example) is sent to the standard output.
 .SH Emulated floppy disks
-In Model I mode, \fBxtrs\fP emulates a Radio Shack Expansion Interface with
-the Percom Doubler or Radio Shack Doubler installed.  The Doubler
+In Model I mode, \fBxtrs\fP emulates a Radio Shack Expansion Interface
+with the Percom Doubler or Radio Shack Doubler installed.  The Doubler
 provided double-density disk access by allowing either the stock
 WD1771 FDC chip or a WD1791 chip to be selected under program control.
 At powerup the 1771 is selected, so operating systems with no Doubler
-driver see a stock system.  The emulator pretends to be both a Percom
-and Radio Shack Doubler at the same time -- it responds to the special
-commands of both -- so a driver for either should work.  Under LDOS,
-use the command "FDUBL" (newer versions of LDOS), or "PDUBL" or
-"RDUBL" (older versions) to install the driver.
+driver see a stock system.  By default, the emulator pretends to be
+both a Percom and Radio Shack Doubler at the same time -- it responds
+to the special commands of both -- so a driver for either should work.
+Under LDOS, use the command "FDUBL" (newer versions of LDOS), or
+"PDUBL" or "RDUBL" (older versions) to install the driver. Software that
+tries to detect which doubler you have (such as Super Utility) may be
+confused by the emulation of both at once, so you can choose to emulate
+only one with a command line option; see below.
 
 In Model III, 4, or 4P mode, \fBxtrs\fP emulates the stock floppy
 controller, which used a WD1793 chip (software-compatible with the
@@ -596,6 +599,13 @@ interrupts are disabled), the counter is decremented by
 \fIheartbeat\fP.  The default setting is "16,1,1"; this seems to work
 well with ordinary keyboard drivers, but you may want to experiment
 with different values for games if keyboard response seem sluggish.
+.TP
+.B \-doubler \fItype\fP
+Specify what type of double density adaptor to emulate (Model I mode only).
+The \fItype\fP may be \fIpercom\fP, \fIradioshack\fP (or \fItandy\fP),
+\fIboth\fP, or \fInone\fP. The type may be abbreviated to one character.
+The default is \fIboth\fP, which causes the double density adaptor emulation
+to respond to the special commands of both the Percom and Radio Shack cards.
 .TP
 .B \-doublestep
 Make real floppy drives double-step, allowing access to 35-track or

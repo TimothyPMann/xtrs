@@ -25,8 +25,15 @@ extern unsigned char trs_disk_interrupt_read(void); /* M3 only */
 extern void trs_disk_interrupt_write(unsigned char mask); /* M3 only */
 
 extern int trs_disk_doublestep;
+extern int trs_disk_doubler;
 extern char* trs_disk_dir;
 extern unsigned short trs_disk_changecount;
+
+/* Values for trs_disk_doubler flag word */
+#define TRSDISK_NODOUBLER 0
+#define TRSDISK_PERCOM    1
+#define TRSDISK_TANDY     2
+#define TRSDISK_BOTH      3
 
 /* Model I drive select register -- address bits 0,1 not decoded */
 #define TRSDISK_SELECT(addr) (((addr)&~3) == 0x37e0)

@@ -125,6 +125,7 @@ static XrmOptionDescRec opts[] = {
 {"-keystretch", "*keystretch",  XrmoptionSepArg,        (caddr_t)NULL},
 {"-microlabs",  "*microlabs",   XrmoptionNoArg,         (caddr_t)"on"},
 {"-nomicrolabs","*microlabs",   XrmoptionNoArg,         (caddr_t)"off"},
+{"-doubler",    "*doubler",     XrmoptionSepArg,        (caddr_t)NULL},
 #if __linux
 {"-sb",         "*sb",          XrmoptionSepArg,        (caddr_t)NULL},
 #endif /* linux */
@@ -374,6 +375,31 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
       grafyx_set_microlabs(True);
     } else if (strcmp(value.addr,"off") == 0) {
       grafyx_set_microlabs(False);
+    }
+  }
+
+  (void) sprintf(option, "%s%s", program_name, ".doubler");
+  if (XrmGetResource(x_db, option, "Xtrs.Doubler", &type, &value)) {
+    switch (*(char*)value.addr) {
+    case 'p':
+    case 'P':
+      trs_disk_doubler = TRSDISK_PERCOM;
+      break;
+    case 'r':
+    case 'R':
+    case 't':
+    case 'T':
+      trs_disk_doubler = TRSDISK_TANDY;
+      break;
+    case 'b':
+    case 'B':
+    default:
+      trs_disk_doubler = TRSDISK_BOTH;
+      break;
+    case 'n':
+    case 'N':
+      trs_disk_doubler = TRSDISK_NODOUBLER;
+      break;
     }
   }
 

@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Mon Oct 12 14:19:07 PDT 1998 by mann */
+/* Last modified on Mon Oct 12 23:28:08 PDT 1998 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
@@ -37,6 +37,7 @@
 
 int trs_disk_nocontroller = 0;
 int trs_disk_doublestep = 0;
+int trs_disk_doubler = TRSDISK_BOTH;
 char *trs_disk_dir = DISKDIR;
 unsigned short trs_disk_changecount = 0;
 float trs_disk_holewidth = 0.01;
@@ -61,7 +62,7 @@ typedef struct {
   int last_readadr_density;
 } FDCState;
 
-FDCState state;
+FDCState state, other_state;
 
 /* Format states - what is expected next? */
 #define FMT_GAP0    0
@@ -385,13 +386,20 @@ trs_disk_change(int drive)
 }
 
 static void
+trs_disk_done(int dummy)
+{
+    state.status &= ~TRSDISK_BUSY;
+    trs_disk_intrq_interrupt(1);
+}
+
+static void
 trs_disk_unimpl(unsigned char cmd, char* more)
 {
   state.status = TRSDISK_WRITEFLT|TRSDISK_NOTFOUND;
   state.bytecount = state.format_bytecount = 0;
   state.format = FMT_DONE;
   trs_disk_drq_interrupt(0);
-  trs_schedule_event(trs_disk_intrq_interrupt, 1, 0);
+  trs_schedule_event(trs_disk_done, 0, 0);
   fprintf(stderr, "trs_disk_command(0x%02x) not implemented - %s\n",
 	  cmd, more);
 }
@@ -711,20 +719,44 @@ trs_disk_sector_read(void)
 }
 
 void
+trs_disk_set_controller(int controller)
+{
+  /* Support for more accurate Doubler emulation */
+  FDCState tmp_state;
+  if (state.controller == controller) return;
+  tmp_state.status = state.status;
+  tmp_state.track = state.track;
+  tmp_state.sector = state.sector;
+  tmp_state.data = state.data;
+  tmp_state.lastdirection = state.lastdirection;
+  state.controller = controller;
+  state.status = other_state.status;
+  state.track = other_state.track;
+  state.sector = other_state.sector;
+  state.data = other_state.data;
+  state.lastdirection = other_state.lastdirection;
+  other_state.status = tmp_state.status;
+  other_state.track = tmp_state.track;
+  other_state.sector = tmp_state.sector;
+  other_state.data = tmp_state.data;
+  other_state.lastdirection = tmp_state.lastdirection;
+}
+
+void
 trs_disk_sector_write(unsigned char data)
 {
 #ifdef DISKDEBUG
   fprintf(stderr, "sector_write(0x%02x)\n", data);
 #endif
-  if (trs_model == 1) {
+  if (trs_model == 1 && (trs_disk_doubler & TRSDISK_TANDY)) {
     switch (data) {
       /* Emulate Radio Shack doubler */
     case TRSDISK_R1791:
-      state.controller = TRSDISK_P1791;
+      trs_disk_set_controller(TRSDISK_P1791);
       state.density = 1;
       break;
     case TRSDISK_R1771:
-      state.controller = TRSDISK_P1771;
+      trs_disk_set_controller(TRSDISK_P1771);
       state.density = 0;
       break;
     case TRSDISK_NOPRECMP:
@@ -767,9 +799,9 @@ trs_disk_data_read(void)
       state.bytecount--;
       if (state.bytecount <= 0) {
 	state.bytecount = 0;
-	state.status &= ~(TRSDISK_BUSY|TRSDISK_DRQ);
+	state.status &= ~TRSDISK_DRQ;
         trs_disk_drq_interrupt(0);
-	trs_schedule_event(trs_disk_intrq_interrupt, 1, 8);
+	trs_schedule_event(trs_disk_done, 0, 8);
       }
     }
     break;
@@ -837,9 +869,9 @@ trs_disk_data_read(void)
     state.bytecount--;
     if (state.bytecount <= 0) {
       state.bytecount = 0;
-      state.status &= ~(TRSDISK_BUSY|TRSDISK_DRQ);
+      state.status &= ~TRSDISK_DRQ;
       trs_disk_drq_interrupt(0);
-      trs_schedule_event(trs_disk_intrq_interrupt, 1, 8);
+      trs_schedule_event(trs_disk_done, 0, 8);
     }
     break;
   default:
@@ -876,9 +908,9 @@ trs_disk_data_write(unsigned char data)
       state.bytecount--;
       if (state.bytecount <= 0) {
 	state.bytecount = 0;
-	state.status = 0;
+	state.status &= ~TRSDISK_DRQ;
         trs_disk_drq_interrupt(0);
-	trs_schedule_event(trs_disk_intrq_interrupt, 1, 8);
+	trs_schedule_event(trs_disk_done, 0, 8);
 	c = fflush(d->file);
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
       }
@@ -1066,7 +1098,7 @@ trs_disk_data_write(unsigned char data)
       break;
     case FMT_GAP4:
       state.format = FMT_DONE;
-      state.status = 0;
+      state.status &= ~TRSDISK_DRQ;
       if (d->emutype == REAL) {
 	real_writetrk();
       } else {
@@ -1074,7 +1106,7 @@ trs_disk_data_write(unsigned char data)
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
       }
       trs_disk_drq_interrupt(0);
-      trs_schedule_event(trs_disk_intrq_interrupt, 1, 8);
+      trs_schedule_event(trs_disk_done, 0, 8);
       break;
     case FMT_DONE:
       break;
@@ -1133,25 +1165,25 @@ trs_disk_command_write(unsigned char cmd)
   case TRSDISK_RESTORE:
     d->phytrack = 0;
     state.track = 0;
-    state.status = TRSDISK_TRKZERO;
+    state.status = TRSDISK_TRKZERO|TRSDISK_BUSY;
     if (d->emutype == REAL) real_restore();
     /* Should this set lastdirection? */
     if (cmd & TRSDISK_VBIT) verify();
-    trs_schedule_event(trs_disk_intrq_interrupt, 1, 8);
+    trs_schedule_event(trs_disk_done, 0, 128);
     break;
   case TRSDISK_SEEK:
     d->phytrack += (state.data - state.track);
     state.track = state.data;
     if (d->phytrack <= 0) {
       d->phytrack = 0;		/* state.track too? */
-      state.status = TRSDISK_TRKZERO;
+      state.status = TRSDISK_TRKZERO|TRSDISK_BUSY;
     } else {
-      state.status = 0;
+      state.status = TRSDISK_BUSY;
     }
     if (d->emutype == REAL) real_seek();
     /* Should this set lastdirection? */
     if (cmd & TRSDISK_VBIT) verify();
-    trs_schedule_event(trs_disk_intrq_interrupt, 1, 8);
+    trs_schedule_event(trs_disk_done, 0, 64);
     break;
   case TRSDISK_STEP:
   case TRSDISK_STEPU:
@@ -1162,13 +1194,13 @@ trs_disk_command_write(unsigned char cmd)
     }
     if (d->phytrack <= 0) {
       d->phytrack = 0;		/* state.track too? */
-      state.status = TRSDISK_TRKZERO;
+      state.status = TRSDISK_TRKZERO|TRSDISK_BUSY;
     } else {
-      state.status = 0;
+      state.status = TRSDISK_BUSY;
     }
     if (d->emutype == REAL) real_seek();
     if (cmd & TRSDISK_VBIT) verify();
-    trs_schedule_event(trs_disk_intrq_interrupt, 1, 8);
+    trs_schedule_event(trs_disk_done, 0, 16);
     break;
   case TRSDISK_STEPIN:
   case TRSDISK_STEPINU:
@@ -1206,10 +1238,10 @@ trs_disk_command_write(unsigned char cmd)
       real_read();
       break;
     }
-    /*!! 1791 side compare logic belongs here? */
     id_index = search(state.sector);
     if (id_index == -1) {
-      trs_schedule_event(trs_disk_intrq_interrupt, 1, 128);
+      state.status |= TRSDISK_BUSY;
+      trs_schedule_event(trs_disk_done, 0, 128);
     } else {
       if (d->emutype == JV1) {
 	if (d->phytrack == 17) {
@@ -1274,10 +1306,10 @@ trs_disk_command_write(unsigned char cmd)
       state.status = TRSDISK_WRITEPRT;
       break;
     }
-    /*!! 1791 side compare logic belongs here? */
     id_index = search(state.sector);
     if (id_index == -1) {
-      trs_schedule_event(trs_disk_intrq_interrupt, 1, 128);
+      state.status |= TRSDISK_BUSY;
+      trs_schedule_event(trs_disk_done, 0, 128);
     } else {
       int dirdam = (state.controller == TRSDISK_P1771 ?
 		    (cmd & (TRSDISK_CBIT|TRSDISK_DBIT)) != 0 :
@@ -1386,7 +1418,8 @@ trs_disk_command_write(unsigned char cmd)
       }
     }
     if (state.last_readadr == -1) {
-      trs_schedule_event(trs_disk_intrq_interrupt, 1, 128);
+      state.status |= TRSDISK_BUSY;
+      trs_schedule_event(trs_disk_done, 0, 256);
     } else {
       state.last_readadr_density = state.density;
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
@@ -1406,9 +1439,11 @@ trs_disk_command_write(unsigned char cmd)
     if (trs_model == 1 && (cmd == TRSDISK_P1771 || cmd == TRSDISK_P1791)) {
       /* No; emulate Percom Doubler.  Shortcut: we don't really maintain
 	 separate state for the two controllers. */
-      state.controller = cmd;
-      /* The Doubler's 1791 is hardwired to double density */
-      state.density = (state.controller == TRSDISK_P1791);
+      if (trs_disk_doubler & TRSDISK_PERCOM) {
+	trs_disk_set_controller(cmd);
+	/* The Doubler's 1791 is hardwired to double density */
+	state.density = (state.controller == TRSDISK_P1791);
+      }
     } else {
       /* Yes; a real write track */
       if (d->emutype != REAL && d->writeprot) {
@@ -1469,7 +1504,7 @@ trs_disk_command_write(unsigned char cmd)
 	}
       }
       if ((cmd & 0x08) != 0) {
-	trs_schedule_event(trs_disk_intrq_interrupt, 1, 0);
+	trs_disk_intrq_interrupt(1);
       }
     }
     break;
@@ -1623,7 +1658,8 @@ real_read()
       return;
     }
   }
-  trs_schedule_event(trs_disk_intrq_interrupt, 1, 128);
+  state.status |= TRSDISK_BUSY;
+  trs_schedule_event(trs_disk_done, 0, 128);
 #else
   trs_disk_unimpl(state.currcommand, "read real floppy");
 #endif
@@ -1682,7 +1718,8 @@ real_write()
   }
   state.bytecount = 0;
   trs_disk_drq_interrupt(0);
-  trs_schedule_event(trs_disk_intrq_interrupt, 1, 128);
+  state.status |= TRSDISK_BUSY;
+  trs_schedule_event(trs_disk_done, 0, 128);
 #else
   trs_disk_unimpl(state.currcommand, "write real floppy");
 #endif
@@ -1738,7 +1775,8 @@ real_readadr()
       return;
     }
   }
-  trs_schedule_event(trs_disk_intrq_interrupt, 1, 128);
+  state.status |= TRSDISK_BUSY;
+  trs_schedule_event(trs_disk_done, 0, 128);
 #else
   trs_disk_unimpl(state.currcommand, "read address on real floppy");
 #endif
@@ -1798,7 +1836,8 @@ real_writetrk()
   }
   state.bytecount = 0;
   trs_disk_drq_interrupt(0);
-  trs_schedule_event(trs_disk_intrq_interrupt, 1, 128);
+  state.status |= TRSDISK_BUSY;
+  trs_schedule_event(trs_disk_done, 0, 128);
 #else
   trs_disk_unimpl(state.currcommand, "write track on real floppy");
 #endif
