@@ -1,0 +1,23 @@
+.TH hex2cmd 1 2001-02-22
+.SH Name
+hex2cmd \- convert Intel hex format to TRS-80 CMD format
+.SH Syntax
+\fBhex2cmd\fP \fI[infile]\fP
+.SH Description
+.B hex2cmd
+reads the specified \fIinfile\fP (or standard input if none is given)
+in Intel hex format (also known as S-record format), and writes a
+TRS-80 CMD file to standard output.
+An S-record that asks for 0 bytes to be loaded at address A 
+sets the transfer address (entry point) of the CMD file to A; otherwise
+the CMD file is given no transfer address.
+.SH Author
+.B hex2cmd
+was written by Timothy Mann.
+This man page was created by Branden Robinson.
+.SH See also
+.IR xtrs (1)
+.PP
+See the LDOS Quarterly, April 1, 1982 (Vol 1, No 4), for documentation of
+the TRS-80 DOS /cmd file format.
+It is available on the Web at http://www.tim-mann.org/misosys.html.
