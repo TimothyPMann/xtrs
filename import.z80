@@ -1,6 +1,6 @@
 ;; import.z
 ;; Timothy Mann, 8/24/97
-;; Last modified on Sat Aug 30 23:22:08 PDT 1997 by mann
+;; Last modified on Thu Sep  4 13:12:23 PDT 1997 by mann
 ;;
 ;; Use xtrs 1.4 emulator traps to copy a file from Unix to TRS-80
 ;; Usage: IMPORT [-n] unixfile tofile
@@ -23,12 +23,12 @@
 dodcb$	equ 401dh
 
 ; Emulator trap instructions, byte-reversed for use in defw:
-open	equ 30edh
-close	equ 31edh
-read	equ 32edh
-write	equ 33edh
-lseek	equ 34edh
-strerror equ 35edh
+emt_open	equ 30edh
+emt_close	equ 31edh
+emt_read	equ 32edh
+emt_write	equ 33edh
+emt_lseek	equ 34edh
+emt_strerror	equ 35edh
 
 iobsize	equ 8192		; must be divisible by 256
 
@@ -81,7 +81,7 @@ openok:
 uname:	ld hl, $-$              ; path
         ld bc, 0                ; oflag (O_RDONLY)
         ld de, 0                ; mode (ignored)
-        defw open
+        defw emt_open
         jr z, opn2ok            ; go if OK
         ld hl, uopner           ; error message and exit
 	jr uerror
@@ -90,7 +90,7 @@ uname:	ld hl, $-$              ; path
 rloop:
 opn2ok:	ld hl, iobuf            ; read a buffer
 	ld bc, iobsize
-	defw read
+	defw emt_read
 	jr z, readok
         ld hl, urder            ; read error (!!code in A)
 	jr uerror
@@ -141,7 +141,7 @@ wstrt:  djnz wloop
 	cp b
 	jr nz, rloop		; maybe not done (sloppy)
 
-closit:	defw close		; close Unix file
+closit:	defw emt_close		; close Unix file
 	jr z, closok
         ld hl, uclser           ; close error (!!code in A)
 	jr uerror
@@ -162,7 +162,7 @@ uerror: push af
 	pop af
 	ld hl, iobuf
 	ld bc, 256
-	defw strerror
+	defw emt_strerror
 	call dsply
         jp @abort
 

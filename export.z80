@@ -1,6 +1,6 @@
 ;; export.z
 ;; Timothy Mann, 8/24/97
-;; Last modified on Mon Sep  1 21:19:25 PDT 1997 by mann
+;; Last modified on Thu Sep  4 13:13:07 PDT 1997 by mann
 ;;
 ;; Use xtrs 1.4 emulator traps to copy a file from TRS-80 to Unix
 ;; Usage: EXPORT [-n] fromfile unixfile
@@ -20,12 +20,12 @@
 dodcb$	equ 401dh
 
 ; Emulator trap instructions, byte-reversed for use in defw:
-open	equ 30edh
-close	equ 31edh
-read	equ 32edh
-write	equ 33edh
-lseek	equ 34edh
-strerror equ 35edh
+emt_open	equ 30edh
+emt_close	equ 31edh
+emt_read	equ 32edh
+emt_write	equ 33edh
+emt_lseek	equ 34edh
+emt_strerror	equ 35edh
 
 	org 5200h
 export:
@@ -79,7 +79,7 @@ unix2:	inc hl                  ; now scan for end of Unix name
 uname:	ld hl, $-$              ; path
         ld bc, 3001q            ; oflag (O_WRONLY+O_CREAT+O_TRUNC)
         ld de, 0666q            ; mode
-        defw open		; open the Unix file
+        defw emt_open		; open the Unix file
         jr z, opn2ok            ; go if OK
         ld hl, uopner           ; error message and exit
         jr uerror
@@ -126,7 +126,7 @@ nlfals:	pop bc			; restore record count
 	ld c, a
 notlst:
 	ld hl, iobuf
-	defw write
+	defw emt_write
 	ld h, b
 	pop bc
 	jr z, wrok
@@ -137,7 +137,7 @@ wrok:	ld a, h
 	jr nz, loop
 
 ;; Close
-closit:	defw close		; close Unix file
+closit:	defw emt_close		; close Unix file
 	jr z, closok
         ld hl, uclser           ; close error
 	jr uerror
@@ -159,7 +159,7 @@ uerror: push af
 	pop af
 	ld hl, iobuf
 	ld bc, 256
-	defw strerror
+	defw emt_strerror
 	call dsply
         jp @abort
 
