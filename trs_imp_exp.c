@@ -500,6 +500,12 @@ void do_emt_misc()
   case 19:
     sb_set_volume(REG_HL);
     break;
+  case 20:
+    REG_HL = trs_disk_truedam;
+    break;
+  case 21:
+    trs_disk_truedam = REG_HL;
+    break;
   default:
     error("unsupported function code to emt_misc");
     break;

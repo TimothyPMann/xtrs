@@ -169,15 +169,20 @@ with the -1 flag it makes a JV1 floppy.  See the \fBmkdisk\fP man page
 for more information.
 
 Early Model I operating systems used an FA data address mark for the
-directory on single density disks (a nonstandard value supported only
-by the WD1771, but not the WD1791/3), while later ones wrote F8 (for
-Model III/4/4P compatibility) but could read either.  To deal nicely
-with this problem, \fBxtrs\fP implements the following kludge.  On
-writing in single density, an F8 data address mark is recorded as FA.
-On reading with an emulated WD1771 (available in Model I mode only),
-FA is returned as FA; on reading with a WD179x, FA is returned as F8.
-This trick makes the different operating systems perfectly compatible
-with each other, which is better than on a real Model I!
+directory on single density disks, while later ones wrote F8 but would
+accept either upon reading.  The change was needed because FA is a
+nonstandard DAM that is fully supported only by the WD1771 floppy disk
+controller used in the Model I; the controllers in the Model III and 4
+cannot distinguish between FA and FB (which is used for non-directory
+sectors) upon reading, and cannot write FA.  To deal nicely with this
+problem, \fBxtrs\fP implements the following kludge.  On writing in
+single density, an F8 data address mark is recorded as FA.  On reading
+with an emulated WD1771 (available in Model I mode only), FA is
+returned as FA; on reading with a WD179x, FA is returned as F8.  This
+trick makes the different operating systems perfectly compatible with
+each other, which is better than on a real Model I!  You can use the
+-truedam flag to turn off this kludge if you need to; in that case the
+original hardware is emulated exactly.
 
 TRS-80 programs that attempt to measure the rotational
 speed of their floppy disk drives using timing loops will get the
@@ -282,10 +287,18 @@ holds exactly the same number of bits per track as an 8-inch drive; a
 using one to emulate an 8-inch drive.  In both cases we also waste the
 top three tracks, since an 8-inch drive has only 77 tracks, not 80.
 
-If you try to access a real floppy drive with no disk in it,
-\fBxtrs\fP will print an error message, and the Z-80 program will get
-a somewhat different error than it should.  After inserting a disk,
-you must press F7 to clear the error condition.
+The nonstandard FA and F9 data address marks available in single
+density on a real Model I the with WD1771 controller also need special
+handling.  A PC-style floppy disk controller can neither read nor
+write sectors with such DAMs at all.  This raises three issues: (1) It
+will be impossible for you to read some Model I disks on your PC even
+if your PC otherwise supports single density.  In particular, Model I
+TRSDOS 2.3 directory tracks will be unreadable.  (2) On writing in
+single density, \fBxtrs\fP silently records a F9 or FA DAM as F8.  (3)
+On reading in single density with an emulated WD1771 (Model I mode
+only), F8 is returned as FA.  If you need more accurate behavior, the
+-truedam flag will turn on error messages on attempts to write F9 or
+FA DAMs and will turn off translation of F8 to FA on reading.
 .SH Emulated hard disks
 \fBxtrs\fP can emulate a hard disk in a file with the aid of a special
 LDOS driver called XTRSHARD/DCT.  This driver has been tested and
@@ -727,8 +740,9 @@ the unit you've selected is really being emulated as an 8-inch drive,
 however; you'll simply get errors during FORMAT if you get this wrong.
 .TP
 .B \-truedam
-Turn off the single density data address mark remapping kludge
-described in the "Emulated floppy disks" section above.  With this
+Turn off the single density data address mark remapping kludges
+described in the "Emulated floppy disks" and "Real floppy disks"
+sections above.  With this
 option given, the distinction between F8 and FA data address marks
 is strictly observed on both writing and reading.  This option is
 probably not useful unless you need to deal with Model I disks that use
@@ -768,18 +782,24 @@ Interrupt with condition bits 0x01, 0x02, or 0x04 is not
 implemented. Read Track is not implemented. The multiple-sector flags
 in Read and Write are not implemented.  Certain errors (such as Lost
 Data) cannot occur, which makes disk diagnostic programs that try to
-generate them on purpose unhappy.
+generate them on purpose unhappy.  The timing of returned sectors is
+emulated only for the Read Address command, and not very accurately
+there.  Partially reformatting a track (which TRS-80 programs like
+HyperZap and Model I Super Utility did to achieve mixed density) is
+not supported; however, switching densities while formatting (which
+Model III and 4 Super Utility did) works on emulated floppies.
 
 Real physical floppy disks are supported only under Linux, because
 Unix does not provide a portable interface to the low-level floppy
 controller functionality that \fBxtrs\fP needs.  There are some
 limitations even under Linux: Index holes are faked, not detected on
-the real disk.  Attempts to access a real drive with no disk in it are
-dealt with awkwardly (as documented above).  Due to a limitation of
-PC-style floppy disk controllers, \fBxtrs\fP does not support mixing
-sectors of different sizes on the same track when formatting a real
-floppy. However, \fBxtrs\fP can read and write to such floppies if
-they are already formatted (perhaps by a real TRS-80).
+the real disk, and the timing of returned sectors is not emulated at
+all.  Due to a limitation of PC-style floppy disk controllers,
+\fBxtrs\fP does not support mixing sectors of different sizes on the
+same track when formatting a physical floppy.  However, \fBxtrs\fP can
+read and write to such floppies if they are already formatted (perhaps
+by a real TRS-80).  Switching densities while formatting a physical
+floppy track does not work, nor does partially reformatting a track.
 
 The emulator arbitrarily limits both JV1 and JV3 disk images to 96
 tracks.  The limit could easily be increased to 255, but

@@ -69,3 +69,5 @@ extern int /*emt_closedisk*/ emt_dkclose(/* int fd */);
 #define EMT_MISC_SET_DOUBLER      17
 #define EMT_MISC_QUERY_VOLUME     18
 #define EMT_MISC_SET_VOLUME       19
+#define EMT_MISC_QUERY_TRUEDAM    20
+#define EMT_MISC_SET_TRUEDAM      21

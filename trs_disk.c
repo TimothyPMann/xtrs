@@ -5,18 +5,20 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Sat Jan  2 19:05:47 PST 1999 by mann */
+/* Last modified on Fri Jan 15 01:03:44 PST 1999 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
  */
 
-/*#define DISKDEBUG 1*/
-/*#define DISKDEBUG2 1*/
-/*#define DISKDEBUG3 1*/
-/*#define DISKDEBUG4 1*/
-#define TSTATEREV 1
-#define SIZERETRY 1
+/*#define DISKDEBUG  1*/  /* FDC register reads and writes */
+/*#define DISKDEBUG2 1*/  /* VTOS 3.0 kludges */
+/*#define DISKDEBUG3 1*/  /* Gaps and real_writetrk */
+/*#define DISKDEBUG4 1*/  /* REAL sector size detection */
+/*#define DISKDEBUG5 1*/  /* Read Address timing */
+#define TSTATEREV 1       /* Index holes timed by T-states, not real time */
+#define SIZERETRY 1       /* Retry in different sizes on real_read */
+#define REALRADLY 0       /* Read Address timing for real disks; nonworking */
 
 #include "z80.h"
 #include "trs.h"
@@ -66,7 +68,7 @@ typedef struct {
   unsigned density;		/* sden=0, dden=1 */
   unsigned char controller;	/* TRSDISK_P1771 or TRSDISK_P1791 */
   int last_readadr;             /* id index found by last readadr */
-  int last_readadr_density;
+  tstate_t motor_timeout;       /* 0 if stopped, else time when it stops */
 } FDCState;
 
 FDCState state, other_state;
@@ -88,6 +90,20 @@ FDCState state, other_state;
 #define FMT_GAP3    13
 #define FMT_GAP4    14
 #define FMT_DONE    15
+
+
+/* Gap 0+1 and gap 4 angular size, used in Read Address timing emulation.
+   Units: fraction of a complete circle. */
+#define GAP1ANGLE 0.020 
+#define GAP4ANGLE 0.050
+
+/* How long does emulated motor stay on after drive selected? (us of
+   emulated time) */
+#define MOTOR_USEC 2000000
+
+/* Heuristic: how often are we willing to check whether real drive
+   has a disk in it?  (seconds of real time) */
+#define EMPTY_TIMEOUT 3
 
 /*
  * The following rather quirky data structure is designed to be
@@ -152,7 +168,7 @@ typedef struct {
 } SectorId;
 
 /* Arbitrary maximum on tracks, chosen because LDOS can use at most 95 */
-#define MAXTRACKS     96
+#define MAXTRACKS    96
 #define JV1_SECSIZE 256
 #define MAXSECSIZE 1024
 
@@ -181,7 +197,8 @@ typedef struct {
 /* Values for emulated disk image type (emutype) below */
 #define JV1 1 /* compatible with Vavasour Model I emulator */
 #define JV3 3 /* compatible with Vavasour Model III/4 emulator */
-#define REAL 0
+#define REAL 100
+#define NONE 0
 
 typedef struct {
   int writeprot;		  /* emulated write protect tab */
@@ -191,6 +208,8 @@ typedef struct {
   int real_rps;                   /* phys rotations/sec; emutype REAL only */
   int real_size_code;             /* most recent sector size; REAL only */
   int real_step;                  /* 1=normal, 2=double-step; REAL only */
+  int real_empty;                 /* 1=emulate empty drive */
+  time_t empty_timeout;           /* real_empty valid until this time */
   FILE* file;
   int free_id[4];		  /* first free id, if any, of each size */
   int last_used_id;		  /* last used index */
@@ -214,13 +233,14 @@ unsigned char jv1_interleave[10] = {0, 5, 1, 6, 2, 7, 3, 8, 4, 9};
 
 /* Forward */
 void real_verify();
-void real_restore();
+void real_restore(int curdrive);
 void real_seek();
 void real_read();
 void real_write();
 void real_readadr();
 void real_readtrk();
 void real_writetrk();
+int real_check_empty(DiskState *d);
 
 void
 trs_disk_setsize(int unit, int value)
@@ -269,10 +289,12 @@ trs_disk_init(int reset_button)
   state.density = 0;
   state.controller = (trs_model == 1) ? TRSDISK_P1771 : TRSDISK_P1791;
   state.last_readadr = -1;
-  state.last_readadr_density = 0;
-  for (i=0; i<NDRIVES; i++) {
-    disk[i].phytrack = 0;
-    disk[i].emutype = JV3;
+  state.motor_timeout = 0;
+  if (!reset_button) {
+    for (i=0; i<NDRIVES; i++) {
+      disk[i].phytrack = 0;
+      disk[i].emutype = NONE;
+    }
   }
   trs_disk_change_all();
   trs_cancel_event();
@@ -292,10 +314,21 @@ trs_disk_change_all()
 
 
 static void
-trs_disk_done(int dummy)
+trs_disk_firstdrq(int restoredelay)
 {
-    state.status &= ~TRSDISK_BUSY;
-    trs_disk_intrq_interrupt(1);
+  if (restoredelay > 0) {
+    z80_state.delay = restoredelay;
+  }
+  state.status |= TRSDISK_DRQ;
+  trs_disk_drq_interrupt(1);
+}
+
+static void
+trs_disk_done(int bits)
+{
+  state.status &= ~TRSDISK_BUSY;
+  state.status |= bits;
+  trs_disk_intrq_interrupt(1);
 }
 
 
@@ -303,12 +336,12 @@ static void
 trs_disk_unimpl(unsigned char cmd, char* more)
 {
   char msg[2048];
-  state.status = TRSDISK_WRITEFLT|TRSDISK_NOTFOUND;
+  state.status = TRSDISK_NOTRDY|TRSDISK_WRITEFLT|TRSDISK_NOTFOUND;
   state.bytecount = state.format_bytecount = 0;
   state.format = FMT_DONE;
   trs_disk_drq_interrupt(0);
   trs_schedule_event(trs_disk_done, 0, 0);
-  sprintf(msg, "trs_disk_command(0x%02x) not implemented - %s\n",
+  sprintf(msg, "trs_disk_command(0x%02x) not implemented - %s",
 	  cmd, more);
   error(msg);
 }
@@ -465,14 +498,19 @@ free_sector(DiskState *d, int id_index)
   if (c == EOF) state.status |= TRSDISK_WRITEFLT;
 
   if (id_index == d->last_used_id) {
+    int newlen;
     while (d->id[d->last_used_id].track == JV3_FREE) {
       d->last_used_id--;
     }
     fflush(d->file);
     rewind(d->file);
-    ftruncate(fileno(d->file),
-	      offset(d, d->last_used_id) +
-	      id_index_to_size(d, d->last_used_id));
+    if (d->last_used_id >= 0) {
+      newlen = offset(d, d->last_used_id) +
+	id_index_to_size(d, d->last_used_id);
+    } else {
+      newlen = offset(d, 0);
+    }
+    ftruncate(fileno(d->file), newlen);
   }
 }
 
@@ -504,7 +542,6 @@ trs_disk_change(int drive)
     int fd;
     int reset_now = 0;
     struct floppy_drive_params fdp;
-    d->emutype = REAL;
     fd = open(diskname, O_ACCMODE|O_NDELAY);
     if (fd == -1) {
       perror(diskname);
@@ -523,6 +560,12 @@ trs_disk_change(int drive)
     ioctl(fileno(d->file), FDGETDRVPRM, &fdp);
     d->real_rps = fdp.rps;
     d->real_size_code = 1; /* initial guess: 256 bytes */
+    d->empty_timeout = 0;
+    if (d->emutype != REAL) {
+      d->emutype = REAL;
+      d->phytrack = 0;
+      real_restore(drive);
+    }
   } else
 #endif
   {
@@ -688,47 +731,31 @@ search(int sector)
 }
 
 
-/* Search for the first sector on the current physical track and
-   return its index within the sorted index array (JV3), or index
-   within the sector array (JV1).  Return -1 if there is no such sector. */
+/* Search for the first sector on the current physical track (in
+   either density) and return its index within the sorted index array
+   (JV3), or index within the sector array (JV1).  Return -1 if there
+   is no such sector, or if reading JV1 in double density.  Don't set
+   TRSDISK_NOTFOUND; leave the caller to do that. */
 static int
 search_adr()
 {
   DiskState *d = &disk[state.curdrive];
   if (d->file == NULL) {
-    state.status |= TRSDISK_NOTFOUND;
     return -1;
   }
   if (d->emutype == JV1) { 
     if (d->phytrack < 0 || d->phytrack >= MAXTRACKS ||
 	state.curside > 0 || d->file == NULL || state.density == 1) {
-      state.status |= TRSDISK_NOTFOUND;
       return -1;
     }
     return JV1_SECPERTRK * d->phytrack;
   } else {
-    int i;
-    SectorId *sid;
     if (d->phytrack < 0 || d->phytrack >= MAXTRACKS ||
 	state.curside >= JV3_SIDES || d->file == NULL) {
-      state.status |= TRSDISK_NOTFOUND;
       return -1;
     }
     if (!d->sorted_valid) sort_ids(state.curdrive);
-    i = d->track_start[d->phytrack][state.curside];
-    if (i != -1) {
-      for (;;) {
-	sid = &d->id[d->sorted_id[i]];
-	if (sid->track != d->phytrack ||
-	    (sid->flags & JV3_SIDE ? 1 : 0) != state.curside) break;
-	if (((sid->flags & JV3_DENSITY) ? 1 : 0) == state.density) {
-	  return i;
-	}
-	i++;
-      }
-    }
-    state.status |= TRSDISK_NOTFOUND;
-    return -1;
+    return d->track_start[d->phytrack][state.curside];
   }
 }
 
@@ -753,42 +780,53 @@ verify()
   }
 }
 
+/* Return a value in [0,1) indicating how far we've rotated
+ * from the leading edge of the index hole */
+float
+angle()
+{
+  DiskState *d = &disk[state.curdrive];
+  float a;
+  /* Set revus to number of microseconds per revolution */
+  int revus = d->inches == 5 ? 200000 /* 300 RPM */ : 166666 /* 360 RPM */;
+#if TSTATEREV
+  /* Lock revolution rate to emulated time measured in T-states */
+  /* Minor bug: there will be a glitch when t_count wraps around on
+     a 32-bit machine */
+  int revt = (int)(revus * z80_state.clockMHz);
+  a = ((float)(z80_state.t_count % revt)) / ((float)revt);
+#else
+  /* Old way: lock revolution rate to real time */
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  /* Ignore the seconds field; this is OK if there are a round number
+     of revolutions per second */
+  a = ((float)(tv.tv_usec % revus)) / ((float)revus);
+#endif
+  return a;
+}
 
 static void
 type1_status()
 {
   DiskState *d = &disk[state.curdrive];
 
-  if (cmd_type(state.currcommand) != 1) return;
-  if (d->file == NULL) {
+  switch (cmd_type(state.currcommand)) {
+  case 1:
+  case 4:
+    break;
+  default:
+    return;
+  }
+
+  if (d->file == NULL || (d->emutype == REAL && d->real_empty)) {
     state.status |= TRSDISK_INDEX;
   } else {
-    /* Simulate index hole going by at 300, 360, or 3000 RPM */
-    /* !! if (d->emutype == REAL) { check if disk in drive } */
-    /* Set revus to number of microseconds per revolution */
-    int revus = d->inches == 5 ? 200000 /* 300 RPM */ : 166666 /* 360 RPM */;
-#if TSTATEREV
-    /* Lock revolution rate to emulated time measured in T-states */
-    /* Minor bug: there will be a glitch when t_count wraps around on
-       a 32-bit machine */
-    if ((z80_state.t_count % (int)(revus * z80_state.clockMHz))
-	 < (int)(revus * z80_state.clockMHz * trs_disk_holewidth)) {
+    if (angle() < trs_disk_holewidth) {
       state.status |= TRSDISK_INDEX;
     } else {
       state.status &= ~TRSDISK_INDEX;
     }
-#else
-    /* Old way: lock revolution rate to real time */
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    /* Ignore the seconds field; this is OK if there are a round number
-       of revolutions per second */
-    if ((tv.tv_usec % revus) < (int)(revus * trs_disk_holewidth)) {
-      state.status |= TRSDISK_INDEX;
-    } else {
-      state.status &= ~TRSDISK_INDEX;
-    }
-#endif
     if (d->writeprot) {
       state.status |= TRSDISK_WRITEPRT;
     } else {
@@ -806,7 +844,11 @@ void
 trs_disk_select_write(unsigned char data)
 {
 #ifdef DISKDEBUG
-  fprintf(stderr, "select_write(0x%02x)\n", data);
+  static int old_data = -1;
+  if (data != old_data) {
+    fprintf(stderr, "select_write(0x%02x)\n", data);
+    old_data = data;
+  }
 #endif
   state.status &= ~TRSDISK_NOTRDY;
   if (trs_model == 1) {
@@ -859,7 +901,16 @@ trs_disk_select_write(unsigned char data)
     break;
   default:
     trs_disk_unimpl(data, "bogus drive select");
+    state.status |= TRSDISK_NOTRDY;
     break;
+  }
+  if (!(state.status & TRSDISK_NOTRDY)) {
+    DiskState *d = &disk[state.curdrive];
+    /* A drive was selected; retrigger emulated motor timeout */
+    state.motor_timeout = z80_state.t_count +
+      MOTOR_USEC * z80_state.clockMHz;
+    /* Also update our knowledge of whether there is a disk present */
+    if (d->emutype == REAL) real_check_empty(d);
   }
 }
 
@@ -973,7 +1024,7 @@ trs_disk_data_read(void)
 	state.bytecount = 0;
 	state.status &= ~TRSDISK_DRQ;
         trs_disk_drq_interrupt(0);
-	trs_schedule_event(trs_disk_done, 0, 8);
+	trs_schedule_event(trs_disk_done, 0, 32);
       }
     }
     break;
@@ -1033,7 +1084,7 @@ trs_disk_data_read(void)
       state.bytecount = 0;
       state.status &= ~TRSDISK_DRQ;
       trs_disk_drq_interrupt(0);
-      trs_schedule_event(trs_disk_done, 0, 8);
+      trs_schedule_event(trs_disk_done, 0, 32);
     }
     break;
   default:
@@ -1072,20 +1123,42 @@ trs_disk_data_write(unsigned char data)
 	state.bytecount = 0;
 	state.status &= ~TRSDISK_DRQ;
         trs_disk_drq_interrupt(0);
-	trs_schedule_event(trs_disk_done, 0, 8);
+	trs_schedule_event(trs_disk_done, 0, 32);
 	c = fflush(d->file);
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
       }
     }
     break;
   case TRSDISK_WRITETRK:
-    if (state.bytecount-- <= 0) {
+    state.bytecount = state.bytecount - 2 + state.density;
+    if (state.bytecount <= 0) {
       if (state.format == FMT_DONE) break;
-      if (state.format != FMT_GAP3) {
-	error("bad format data?\n");
+      if (state.format == FMT_GAP2) {
+	/* False ID: there was no DAM for following data */
+	if (d->emutype != JV3) {
+	  trs_disk_unimpl(state.currcommand, "false sector ID (no data)");
+	} else {
+	  /* We do not have a flag for this; try using CRC error */
+	  d->id[state.format_sec].flags |= JV3_ERROR;
+	  error("warning: recording false sector ID as CRC error");
+
+	  /* Write the sector id */
+	  fseek(d->file, idoffset(d, state.format_sec), 0);
+	  c = fwrite(&d->id[state.format_sec], sizeof(SectorId), 1, d->file);
+	  if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+	}
+      } else if (state.format != FMT_GAP3) {
+	/* If not in FMT_GAP3 state, format data was either too long,
+	   had extra garbage following, or was intentionally non-
+	   standard.  SuperUtility does a few tricks like "software
+	   bulk erase" and duplication of protected disks, so we
+	   do not complain about this any more. */
+#if BOGUS
+	error("format data end is not in gap4");
+#endif
 	state.format_gap[4] = 0;
       } else {
-	/* This was GAP4 */
+	/* This was really GAP4 */
 	state.format_gap[4] = state.format_gapcnt;
 	state.format_gapcnt = 0;
       }
@@ -1105,7 +1178,7 @@ trs_disk_data_write(unsigned char data)
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
       }
       trs_disk_drq_interrupt(0);
-      trs_schedule_event(trs_disk_done, 0, 8);
+      trs_schedule_event(trs_disk_done, 0, 32);
     }
     switch (state.format) {
     case FMT_GAP0:
@@ -1134,6 +1207,7 @@ trs_disk_data_write(unsigned char data)
       break;
     case FMT_GAP3:
       if (data == 0xfe) {
+      got_idam2:
 	/* We've received an ID address mark */
 	state.format_gap[3] = state.format_gapcnt;
 	state.format_gapcnt = 0;
@@ -1231,10 +1305,35 @@ trs_disk_data_write(unsigned char data)
       if ((data & 0xfc) == 0xf8) {
 	/* Found a DAM */
         if (d->emutype == REAL) {
-	  /* !!Could implement this by issuing a Write Deleted later */
-	  if (data != 0xfb) {
-	    trs_disk_unimpl(state.currcommand,
-			    "format DAM != FB on real floppy");
+	  switch (data) {
+	  case 0xfb:  /* Standard DAM */
+	    break;
+	  case 0xfa:
+	    if (state.density) {
+	      /* This DAM is illegal, but SuperUtility uses it, so
+		 ignore the error.  This seems to be a bug in SU for
+		 Model I, where it meant to use F8 instead.  I think
+		 the WD controller would read back the FA as FB, so we
+		 treat it as FB here.  */
+	    } else {
+	      if (trs_disk_truedam) {
+		error("format DAM FA on real floppy");
+	      }
+	    }
+	    break;
+	  case 0xf9:
+	    if (trs_disk_truedam) {
+	      error("format DAM F9 on real floppy");
+	    }
+	    break;
+	  case 0xf8:
+	    /* This is probably needed by Model III TRSDOS, but it is
+	       a pain to implement.  We would have to remember to do a
+	       Write Deleted after the format is complete to change
+	       the DAM.
+	    */
+	    error("format DAM F8 on real floppy");
+	    break;
 	  }
 	} else if (d->emutype == JV1) {
           switch (data) {
@@ -1255,15 +1354,13 @@ trs_disk_data_write(unsigned char data)
 	  if (state.density) {
 	    /* Double density */
 	    switch (data) {
-	    case 0xf8:
+	    case 0xf8: /* Standard deleted DAM */
+	    case 0xf9: /* Illegal, probably never used; ignore error. */
 	      d->id[state.format_sec].flags |= JV3_DAMDDF8;
 	      break;
-	    case 0xf9:
-	    case 0xfa:
-	      trs_disk_unimpl(state.currcommand, "illegal double density DAM");
-	      break;
-	    default: /* impossible */
-	    case 0xfb:
+	    case 0xfb: /* Standard DAM */
+	    case 0xfa: /* Illegal, but SuperUtility uses it! */
+	    default:   /* Impossible */
 	      d->id[state.format_sec].flags |= JV3_DAMDDFB;
 	      break;
 	    }
@@ -1302,6 +1399,21 @@ trs_disk_data_write(unsigned char data)
 	state.format_gap[2] = state.format_gapcnt;
 	state.format_gapcnt = 0;
 	state.format = FMT_DATA;
+      } else if (data == 0xfe) {
+	/* False ID: there was no DAM for following data */
+	if (d->emutype != JV3) {
+	  trs_disk_unimpl(state.currcommand, "false sector ID (no data)");
+	} else {
+	  /* We do not have a flag for this; try using CRC error */
+	  error("warning: recording false sector ID as CRC error");
+	  d->id[state.format_sec].flags |= JV3_ERROR;
+
+	  /* Write the sector id */
+	  fseek(d->file, idoffset(d, state.format_sec), 0);
+	  c = fwrite(&d->id[state.format_sec], sizeof(SectorId), 1, d->file);
+	  if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+	}
+	goto got_idam2;
       } else {
 	state.format_gapcnt++;
       }
@@ -1364,7 +1476,7 @@ trs_disk_data_write(unsigned char data)
     case FMT_IDCRC:
     case FMT_DAM:
     default:
-      error("error in format state machine\n");
+      error("error in format state machine");
       break;
     }      
   default:
@@ -1382,17 +1494,37 @@ trs_disk_status_read(void)
 #endif
   if (trs_disk_nocontroller) return 0xff;
   type1_status();
+  if (!(state.status & TRSDISK_NOTRDY)) {
+    if (state.motor_timeout - z80_state.t_count > TSTATE_T_MID) {
+      /* Subtraction wrapped; motor stopped */
+      state.status |= TRSDISK_NOTRDY;
+    }
+  }
 #ifdef DISKDEBUG
   if (state.status != last_status) {
     fprintf(stderr, "status_read() => 0x%02x\n", state.status);
     last_status = state.status;
   }
 #endif
-  /* Do this directly -- don't call trs_schedule_event, which would
-   *  cancel a pending interrupt that should occur later and prevent
-   *  it from ever happening.
+
+#if BOGUS
+  /* Clear intrq unless user did a Force Interrupt with immediate interrupt. */
+  /* The 17xx data sheets say this is how it is supposed to work, but it
+   * makes Model I SuperUtility hang due to the interrupt routine failing
+   * to clear the interrupt.
    */
-  trs_disk_intrq_interrupt(0);
+  if (!(((state.currcommand & TRSDISK_CMDMASK) == TRSDISK_FORCEINT) &&
+	((state.currcommand & 0x08) != 0)))
+#else
+  /* Clear intrq always */
+#endif
+    {
+      /* Don't call trs_schedule_event, which could cancel a pending
+       *  interrupt that should occur later and prevent it from ever
+       *  happening; just clear the interrupt right now.
+       */
+      trs_disk_intrq_interrupt(0);
+    }
 
   return state.status;
 }
@@ -1412,15 +1544,17 @@ trs_disk_command_write(unsigned char cmd)
   state.currcommand = cmd;
   switch (cmd & TRSDISK_CMDMASK) {
   case TRSDISK_RESTORE:
+    state.last_readadr = -1;
     d->phytrack = 0;
     state.track = 0;
     state.status = TRSDISK_TRKZERO|TRSDISK_BUSY;
-    if (d->emutype == REAL) real_restore();
+    if (d->emutype == REAL) real_restore(state.curdrive);
     /* Should this set lastdirection? */
     if (cmd & TRSDISK_VBIT) verify();
-    trs_schedule_event(trs_disk_done, 0, 128);
+    trs_schedule_event(trs_disk_done, 0, 512);
     break;
   case TRSDISK_SEEK:
+    state.last_readadr = -1;
     d->phytrack += (state.data - state.track);
     state.track = state.data;
     if (d->phytrack <= 0) {
@@ -1432,11 +1566,12 @@ trs_disk_command_write(unsigned char cmd)
     if (d->emutype == REAL) real_seek();
     /* Should this set lastdirection? */
     if (cmd & TRSDISK_VBIT) verify();
-    trs_schedule_event(trs_disk_done, 0, 64);
+    trs_schedule_event(trs_disk_done, 0, 256);
     break;
   case TRSDISK_STEP:
   case TRSDISK_STEPU:
   step:
+    state.last_readadr = -1;
     d->phytrack += state.lastdirection;
     if (cmd & TRSDISK_UBIT) {
       state.track += state.lastdirection;
@@ -1449,7 +1584,7 @@ trs_disk_command_write(unsigned char cmd)
     }
     if (d->emutype == REAL) real_seek();
     if (cmd & TRSDISK_VBIT) verify();
-    trs_schedule_event(trs_disk_done, 0, 16);
+    trs_schedule_event(trs_disk_done, 0, 64);
     break;
   case TRSDISK_STEPIN:
   case TRSDISK_STEPINU:
@@ -1460,6 +1595,7 @@ trs_disk_command_write(unsigned char cmd)
     state.lastdirection = -1;
     goto step;
   case TRSDISK_READ:
+    state.last_readadr = -1;
     state.status = 0;
     non_ibm = 0;
     if (state.controller == TRSDISK_P1771) {
@@ -1490,7 +1626,7 @@ trs_disk_command_write(unsigned char cmd)
     id_index = search(state.sector);
     if (id_index == -1) {
       state.status |= TRSDISK_BUSY;
-      trs_schedule_event(trs_disk_done, 0, 128);
+      trs_schedule_event(trs_disk_done, 0, 512);
     } else {
       if (d->emutype == JV1) {
 	if (d->phytrack == 17) {
@@ -1564,9 +1700,11 @@ trs_disk_command_write(unsigned char cmd)
     }
     break;
   case TRSDISK_READM:
+    state.last_readadr = -1;
     trs_disk_unimpl(cmd, "read multiple");
     break;
   case TRSDISK_WRITE:
+    state.last_readadr = -1;
     state.status = 0;
     non_ibm = 0;
     if (state.controller == TRSDISK_P1771) {
@@ -1603,7 +1741,7 @@ trs_disk_command_write(unsigned char cmd)
     id_index = search(state.sector);
     if (id_index == -1) {
       state.status |= TRSDISK_BUSY;
-      trs_schedule_event(trs_disk_done, 0, 128);
+      trs_schedule_event(trs_disk_done, 0, 512);
     } else {
       int dam = 0;
       if (state.controller == TRSDISK_P1771) {
@@ -1709,6 +1847,7 @@ trs_disk_command_write(unsigned char cmd)
     }
     break;
   case TRSDISK_WRITEM:
+    state.last_readadr = -1;
     if (d->writeprot) {
       state.status = TRSDISK_WRITEPRT;
       break;
@@ -1719,52 +1858,104 @@ trs_disk_command_write(unsigned char cmd)
     if (d->emutype == REAL) {
       real_readadr();
       break;
-    }
-    state.status = 0;
-    /* Note: not synchronized with emulated index hole */
-    if (d->emutype == JV1) {
-      if (state.last_readadr == -1 ||
-	  (state.last_readadr / JV1_SECPERTRK) != d->phytrack ||
-	  (state.last_readadr % JV1_SECPERTRK) == (JV1_SECPERTRK - 1) ||
-	  state.last_readadr_density != state.density) {
-	state.last_readadr = search_adr();
+    } else {
+      int totbyt, i, ts, denok;
+      float a, b, bytlen;
+      id_index = search_adr();
+      if (id_index == -1) {
+	state.status = TRSDISK_BUSY;
+	trs_schedule_event(trs_disk_done, TRSDISK_NOTFOUND,
+			   200000*z80_state.clockMHz);
+	break;
+      }
+      /* Compute how long it should have taken for this sector to come
+	 by and delay by an appropriate number of t-states.  This
+	 makes the "A" command in HyperZap work (on emulated floppies
+	 only).  It is not terribly useful, since other important HyperZap
+	 functions (like mixed-density formatting) do not work, while
+	 SuperUtility and Trakcess both work fine without the delay feature.
+	 Note: it would probably be better to assume the sectors are
+	 positioned using nominal gap sizes (say, the ones that HyperZap
+	 uses when generating tracks using the D/G subcommand) instead
+	 of the even spacing nonsense below.
+      */
+      if (d->emutype == JV1) {
+	/* Which sector header is next?  Use a rough assumption
+	   that the sectors are all the same angular length (bytlen).
+	*/
+	a = angle();
+	bytlen = (1.0 - GAP1ANGLE - GAP4ANGLE)/((float)JV1_SECPERTRK);
+	i = (int)( (a - GAP1ANGLE) / bytlen + 1.0 );
+	if (i >= JV1_SECPERTRK) {
+	  /* Wrap around to start of track */
+	  i = 0;
+	}
+	b = ((float)i) * bytlen + GAP1ANGLE;
+	if (b < a) b += 1.0;
+	i += id_index;
       } else {
-	state.last_readadr++;
-	if ((state.last_readadr % JV1_SECPERTRK) == 0) {
-	  state.last_readadr -= JV1_SECPERTRK;
+	/* Count data bytes on track.  Also check if there
+	   are any sectors of the correct density. */
+	i = id_index;
+	totbyt = 0;
+	denok = 0;
+	for (;;) {
+	  SectorId *sid = &d->id[d->sorted_id[i]];
+	  int dden = (sid->flags & JV3_DENSITY) != 0;
+	  if (sid->track != d->phytrack ||
+	      (sid->flags & JV3_SIDE ? 1 : 0) != state.curside) break;
+	  totbyt += (dden ? 1 : 2) * id_index_to_size(d, d->sorted_id[i]);
+	  if (dden == state.density) denok = 1;
+	  i++;
+	}
+	if (!denok) {
+	  /* No sectors of the correct density */
+	  state.status = TRSDISK_BUSY;
+	  trs_schedule_event(trs_disk_done, TRSDISK_NOTFOUND,
+			     200000*z80_state.clockMHz);
+	  break;
+	}
+	/* Which sector header is next?  Use a rough assumption that
+           sectors are evenly spaced, taking up room proportional to
+           their data length (and twice as much for single density).
+	   Here bytlen = angular size per byte.
+	*/
+	a = angle();
+	b = GAP1ANGLE;
+	bytlen = (1.0 - GAP1ANGLE - GAP4ANGLE)/((float)totbyt);
+	i = id_index;
+	for (;;) {
+	  SectorId *sid = &d->id[d->sorted_id[i]];
+	  if (sid->track != d->phytrack ||
+	      (sid->flags & JV3_SIDE ? 1 : 0) != state.curside) {
+	    /* Wrap around to start of track */
+	    i = id_index;
+	    b = 1 + GAP1ANGLE;
+	    break;
+	  }
+	  if (b > a && (((sid->flags & JV3_DENSITY) != 0) == state.density)) {
+	    break;
+	  }
+	  b += ((sid->flags & JV3_DENSITY) ? 1 : 2) *
+  	    id_index_to_size(d, d->sorted_id[i]) * bytlen;
+	  i++;
 	}
       }
-    } else {
-      if (state.last_readadr == -1 ||
-	  state.last_readadr_density != state.density) {
-	/* Start new track */
-	state.last_readadr = search_adr();
-      } else {
-	SectorId *sid = &d->id[d->sorted_id[state.last_readadr]];
-	SectorId *sid2 = &d->id[d->sorted_id[state.last_readadr + 1]];
-	if (sid->track != d->phytrack ||
-  	    ((sid->flags & JV3_SIDE) != 0) != state.curside ||
-	    sid2->track != d->phytrack ||
-  	    ((sid2->flags & JV3_SIDE) != 0) != state.curside) {
-	  /* Start new track */
-	  state.last_readadr = search_adr();
-        } else {
-	  /* Give next sector on this track */
-	  state.last_readadr = state.last_readadr + 1;
-        }
-      }
-    }
-    if (state.last_readadr == -1) {
-      state.status |= TRSDISK_BUSY;
-      trs_schedule_event(trs_disk_done, 0, 128);
-    } else {
-      state.last_readadr_density = state.density;
-      state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
-      trs_disk_drq_interrupt(1);
+      /* Convert angular delay to t-states */
+      ts = (d->inches == 5 ? 200000 : 166667) * (b - a) * z80_state.clockMHz;
+
+      state.status = TRSDISK_BUSY;
+      state.last_readadr = i;
       state.bytecount = 6;
+      trs_schedule_event(trs_disk_firstdrq, -1, ts);
+#if DISKDEBUG5
+      fprintf(stderr, "readadr phytrack %d angle %f i %d ts %d\n",
+	      d->phytrack, a, i, ts);
+#endif
     }
     break;
   case TRSDISK_READTRK:
+    state.last_readadr = -1;
     if (d->emutype == REAL) {
       real_readtrk();
       break;
@@ -1772,6 +1963,7 @@ trs_disk_command_write(unsigned char cmd)
     trs_disk_unimpl(cmd, "read track");
     break;
   case TRSDISK_WRITETRK:
+    state.last_readadr = -1;
     /* Really a write track? */
     if (trs_model == 1 && (cmd == TRSDISK_P1771 || cmd == TRSDISK_P1791)) {
       /* No; emulate Percom Doubler */
@@ -1789,7 +1981,7 @@ trs_disk_command_write(unsigned char cmd)
       if (d->file == NULL) {
 	/* How is this error indicated?  Did the controller just hang? */
 	state.status |= (TRSDISK_BUSY|TRSDISK_WRITEFLT);
-	trs_schedule_event(trs_disk_done, 0, 128);
+	trs_schedule_event(trs_disk_done, 0, 512);
 	break;
       }
       if (d->emutype == JV3) {
@@ -1810,38 +2002,24 @@ trs_disk_command_write(unsigned char cmd)
       state.format = FMT_GAP0;
       state.format_gapcnt = 0;
       if (disk[state.curdrive].inches == 5) {
-	if (state.density) {
-	  state.bytecount = TRKSIZE_DD;
-	} else {
-	  state.bytecount = TRKSIZE_SD;
-	}
+	state.bytecount = TRKSIZE_DD;  /* decrement by 2's if SD */
       } else {
-	if (state.density) {
-	  state.bytecount = TRKSIZE_8DD;
-	} else {
-	  state.bytecount = TRKSIZE_8SD;
-	}
+	state.bytecount = TRKSIZE_8DD; /* decrement by 2's if SD */
       }
     }
     break;
   case TRSDISK_FORCEINT:
+    trs_do_event(); /* finish whatever is going on */
+    state.status = 0;  /* and forget it */
+    type1_status();
     if ((cmd & 0x07) != 0) {
-      /* Interrupt features not implemented. */
+      /* Conditional interrupt features not implemented. */
       trs_disk_unimpl(cmd, "force interrupt with condition");
+    } else if ((cmd & 0x08) != 0) {
+      /* Immediate interrupt */
+      trs_disk_intrq_interrupt(1);
     } else {
-      if (state.status & TRSDISK_BUSY) {
-	state.status &= ~TRSDISK_BUSY;
-      } else {
-	state.currcommand = TRSDISK_SEEK; /* force type I status */
-	if (d->phytrack == 0) {
-	  state.status = TRSDISK_TRKZERO;
-	} else {
-	  state.status = 0;
-	}
-      }
-      if ((cmd & 0x08) != 0) {
-	trs_disk_intrq_interrupt(1);
-      }
+      trs_disk_intrq_interrupt(0);
     }
     break;
   }
@@ -1865,6 +2043,66 @@ real_rate(DiskState *d)
 }
 
 void
+real_error(DiskState *d, unsigned int flags, char *msg, unsigned char status)
+{
+  time_t now = time(NULL);
+  if (now > d->empty_timeout) {
+    d->empty_timeout = time(NULL) + EMPTY_TIMEOUT;
+    d->real_empty = 1;
+  }
+  state.status |= status;
+  /*fprintf(stderr, "error on real_%s\n", msg);*/
+}
+
+void
+real_ok(DiskState *d)
+{
+  d->empty_timeout = time(NULL) + EMPTY_TIMEOUT;
+  d->real_empty = 0;
+}
+
+int
+real_check_empty(DiskState *d)
+{
+#if __linux
+  int reset_now = 0;
+  struct floppy_raw_cmd raw_cmd;
+  int res, i = 0;
+  sigset_t set, oldset;
+
+  if (time(NULL) <= d->empty_timeout) return d->real_empty;
+  
+  ioctl(fileno(d->file), FDRESET, &reset_now);
+
+  /* Do a read id command.  Assume a disk is in the drive iff
+     we get a nonnegative status back from the ioctl. */
+  memset(&raw_cmd, 0, sizeof(raw_cmd));
+  raw_cmd.rate = real_rate(d);
+  raw_cmd.flags = FD_RAW_INTR;
+  raw_cmd.cmd[i++] = state.density ? 0x4a : 0x0a; /* read ID */
+  raw_cmd.cmd[i++] = state.curside ? 4 : 0;
+  raw_cmd.cmd_count = i;
+  raw_cmd.data = NULL;
+  raw_cmd.length = 0;
+  sigemptyset(&set);
+  sigaddset(&set, SIGALRM);
+  sigaddset(&set, SIGIO);
+  sigprocmask(SIG_BLOCK, &set, &oldset);
+  trs_paused = 1;
+  res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
+  sigprocmask(SIG_SETMASK, &oldset, NULL);
+  if (res < 0) {
+    real_error(d, raw_cmd.flags, "check_empty", 0);
+  } else {
+    real_ok(d);
+  }
+#else
+  trs_disk_unimpl(state.currcommand, "check for empty on real floppy");
+#endif
+  return d->real_empty;
+}
+
+void
 real_verify()
 {
   /* Verify that head is on the expected track */
@@ -1872,10 +2110,10 @@ real_verify()
 }
 
 void
-real_restore()
+real_restore(curdrive)
 {
 #if __linux
-  DiskState *d = &disk[state.curdrive];
+  DiskState *d = &disk[curdrive];
   struct floppy_raw_cmd raw_cmd;
   int res, i = 0;
   sigset_t set, oldset;
@@ -1888,13 +2126,11 @@ real_restore()
   sigaddset(&set, SIGALRM);
   sigaddset(&set, SIGIO);
   sigprocmask(SIG_BLOCK, &set, &oldset);
+  trs_paused = 1;
   res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
   sigprocmask(SIG_SETMASK, &oldset, NULL);
   if (res < 0) {
-    /*int reset_now = 0;*/
-    perror("real_restore");
-    /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
-    state.status |= TRSDISK_SEEKERR;
+    real_error(d, raw_cmd.flags, "restore", TRSDISK_SEEKERR);
     return;
   }
 #else
@@ -1911,6 +2147,7 @@ real_seek()
   int res, i = 0;
   sigset_t set, oldset;
 
+  state.last_readadr = -1;
   memset(&raw_cmd, 0, sizeof(raw_cmd));
   raw_cmd.length = 256;
   raw_cmd.data = NULL;
@@ -1924,13 +2161,11 @@ real_seek()
   sigaddset(&set, SIGALRM);
   sigaddset(&set, SIGIO);
   sigprocmask(SIG_BLOCK, &set, &oldset);
+  trs_paused = 1;
   res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
   sigprocmask(SIG_SETMASK, &oldset, NULL);
   if (res < 0) {
-    /*int reset_now = 0;*/
-    perror("real_seek");
-    /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
-    state.status |= TRSDISK_SEEKERR;
+    real_error(d, raw_cmd.flags, "seek", TRSDISK_SEEKERR);
     return;
   }
 #else
@@ -1971,14 +2206,13 @@ real_read()
     sigaddset(&set, SIGALRM);
     sigaddset(&set, SIGIO);
     sigprocmask(SIG_BLOCK, &set, &oldset);
+    trs_paused = 1;
     res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
     sigprocmask(SIG_SETMASK, &oldset, NULL);
     if (res < 0) {
-      /*int reset_now = 0;*/
-      perror("real_read");
-      /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
-      state.status |= TRSDISK_NOTFOUND;
+      real_error(d, raw_cmd.flags, "read", TRSDISK_NOTFOUND);
     } else {
+      real_ok(d); /* premature? */
       if (raw_cmd.reply[1] & 0x04) {
 	/* Could have been due to wrong sector size, so we'll retry
 	   internally in each other size before returning an error. */
@@ -2001,7 +2235,11 @@ real_read()
       if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
       if (raw_cmd.reply[2] & 0x40) {
 	if (state.controller == TRSDISK_P1771) {
-	  state.status |= TRSDISK_1771_FA;
+	  if (trs_disk_truedam) {
+	    state.status |= TRSDISK_1771_F8;
+	  } else {
+	    state.status |= TRSDISK_1771_FA;
+	  }
 	} else {
 	  state.status |= TRSDISK_1791_F8;
 	}
@@ -2020,7 +2258,7 @@ real_read()
   }
   /* Sector not found; fail */
   state.status |= TRSDISK_BUSY;
-  trs_schedule_event(trs_disk_done, 0, 128);
+  trs_schedule_event(trs_disk_done, 0, 512);
 #else
   trs_disk_unimpl(state.currcommand, "read real floppy");
 #endif
@@ -2039,6 +2277,19 @@ real_write()
   memset(&raw_cmd, 0, sizeof(raw_cmd));
   raw_cmd.rate = real_rate(d);
   raw_cmd.flags = FD_RAW_WRITE | FD_RAW_INTR;
+  if (trs_disk_truedam && !state.density) {
+    switch (state.currcommand & 0x03) {
+    case 0:
+    case 3:
+      break;
+    case 1:
+      error("writing FA DAM on real floppy");
+      break;
+    case 2:
+      error("writing F9 DAM on real floppy");
+      break;
+    }
+  }
   /* Use F8 DAM for F8, F9, or FA */
   raw_cmd.cmd[i++] = ((state.currcommand & 
 		       (state.controller == TRSDISK_P1771 ? 0x03 : 0x01))
@@ -2058,14 +2309,13 @@ real_write()
   sigaddset(&set, SIGALRM);
   sigaddset(&set, SIGIO);
   sigprocmask(SIG_BLOCK, &set, &oldset);
+  trs_paused = 1;
   res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
   sigprocmask(SIG_SETMASK, &oldset, NULL);
   if (res < 0) {
-    /*int reset_now = 0;*/
-    perror("real_write");
-    /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
-    state.status |= TRSDISK_WRITEFLT;
+    real_error(d, raw_cmd.flags, "write", TRSDISK_NOTFOUND);
   } else {
+    real_ok(d); /* premature? */
     if (raw_cmd.reply[1] & 0x04) {
       state.status |= TRSDISK_NOTFOUND;
       /* Could have been due to wrong sector size.  Presumably
@@ -2096,7 +2346,7 @@ real_write()
   state.bytecount = 0;
   trs_disk_drq_interrupt(0);
   state.status |= TRSDISK_BUSY;
-  trs_schedule_event(trs_disk_done, 0, 128);
+  trs_schedule_event(trs_disk_done, 0, 512);
 #else
   trs_disk_unimpl(state.currcommand, "write real floppy");
 #endif
@@ -2110,6 +2360,10 @@ real_readadr()
   struct floppy_raw_cmd raw_cmd;
   int res, i = 0;
   sigset_t set, oldset;
+#if REAL_READADR_DELAY
+  static struct timeval last_tv = {0, 0};
+  struct timeval tv;
+#endif
 
   state.status = 0;
   memset(&raw_cmd, 0, sizeof(raw_cmd));
@@ -2124,14 +2378,16 @@ real_readadr()
   sigaddset(&set, SIGALRM);
   sigaddset(&set, SIGIO);
   sigprocmask(SIG_BLOCK, &set, &oldset);
+  trs_paused = 1;
   res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
+#if REAL_READADR_DELAY
+  gettimeofday(&tv, NULL);
+#endif
   sigprocmask(SIG_SETMASK, &oldset, NULL);
   if (res < 0) {
-    /*int reset_now = 0;*/
-    perror("real_readadr");
-    /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
-    state.status |= TRSDISK_NOTFOUND;
+    real_error(d, raw_cmd.flags, "readadr", TRSDISK_NOTFOUND);
   } else {
+    real_ok(d); /* premature? */
     if (raw_cmd.reply[1] & 0x85) state.status |= TRSDISK_NOTFOUND;
     if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
     if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
@@ -2145,8 +2401,72 @@ real_readadr()
     if (raw_cmd.reply[2] & 0x20) state.status |= TRSDISK_CRCERR;
     if (raw_cmd.reply[2] & 0x13) state.status |= TRSDISK_NOTFOUND;
     if ((state.status & TRSDISK_NOTFOUND) == 0) {
+#if REAL_READADR_DELAY
+      /* Emulate spacing between sectors by delaying response an
+	 appropriate number of t-states, in an attempt to make
+	 HyperZap's A command work.  Problems: (1) On slow PCs, this
+	 can make us actually miss the next sector ID.  (2) We are not
+	 sync'd with the physical index hole, so results are not
+	 repeatable.  (3) Code is kludgy; only a witch's brew mixture
+	 of real time measurements and nominal times based on sector
+	 length works even partially.  (4) Other HyperZap features,
+	 like mixed density formatting, still do not work.
+      */
+      int ts, savedelay;
+      float us;
+
+      /* Did two read_adrs in a row? */
+      if (last_tv.tv_sec > 0 &&
+	  state.last_readadr == (d->phytrack | (state.curdrive << 8))) {
+	/* Yes; emulate the waiting time for this sector to come around */
+	float realus = ((tv.tv_usec - last_tv.tv_usec) +
+	      1000000.0 * (tv.tv_sec - last_tv.tv_sec)) *
+	  d->real_rps / (d->inches == 5 ? 5 : 6);
+	float nomus = ((float)size_code_to_size(d->real_size_code)) /
+	  ((d->inches ? TRKSIZE_DD : TRKSIZE_8DD) /
+	   (state.density ? 1 : 2)) *
+	  (1000000.0 / (d->inches == 5 ? 5 : 6));
+	/* Does the measurement look reasonable? */
+	if (realus > 0 && realus < nomus * 1.5) {
+	  /* Seems that way.  Emulate the time it really took. */
+	  us = realus;
+	} else {
+	  /* Apparently not.  Emulate approx time for last sector's
+	     length instead of the actual time.  This can happen if
+	     the previous sector was physically the last on the track
+	     and we had an extra large gap, or it may also be possible
+	     that the measurement came out as 0 because of coarse clock
+	     granularity.
+	  */
+	  us = nomus;
+	}
+#if DISKDEBUG5
+	/* Warning: the time to do this printout makes us miss sectors */
+	fprintf(stderr, "realus %f nomus %f us %f\n", realus, nomus, us);
+#endif
+      } else {
+	/* No, emulate being right after the index hole */
+	us = GAP1ANGLE * (1000000.0 / (d->inches == 5 ? 5 : 6));
+      }
+      ts = us * z80_state.clockMHz;
+#if DISKDEBUG5
+      /* Warning: the time to do this printout makes us miss sectors */
+      fprintf(stderr, "real_readadr phytrack %d id %d %d %d %d ts %d\n",
+	      d->phytrack, raw_cmd.reply[3], raw_cmd.reply[4],
+	      raw_cmd.reply[5], raw_cmd.reply[6], ts);
+#endif
+      savedelay = z80_state.delay;
+      z80_state.delay = 0;  /* disable delay to avoid falling behind disk */
+      trs_paused = 1; /* disable next autodelay measurement */
+      state.status |= TRSDISK_BUSY;
+      trs_schedule_event(trs_disk_firstdrq, savedelay, ts);
+      state.last_readadr = (d->phytrack | (state.curdrive << 8));
+      last_tv = tv;
+#else /*!REAL_READADR_DELAY*/
+      /* No delay */
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
+#endif
       memcpy(d->buf, &raw_cmd.reply[3], 4);
       d->buf[4] = d->buf[5] = 0; /* CRC not emulated */
       state.bytecount = 6;
@@ -2154,8 +2474,10 @@ real_readadr()
       return;
     }
   }
-  state.status |= TRSDISK_BUSY;
-  trs_schedule_event(trs_disk_done, 0, 128);
+  state.last_readadr = -1;
+  /* don't set error flags until the end */
+  trs_schedule_event(trs_disk_done, state.status, 200000*z80_state.clockMHz);
+  state.status = TRSDISK_BUSY;
 #else
   trs_disk_unimpl(state.currcommand, "read address on real floppy");
 #endif
@@ -2206,7 +2528,7 @@ real_writetrk()
     }
   }
   if (gap3 < 1) {
-    error("gap3 too small\n");
+    error("gap3 too small");
     gap3 = 1;
   } else if (gap3 > 0xff) {
     gap3 = 0xff;
@@ -2240,14 +2562,13 @@ real_writetrk()
   sigaddset(&set, SIGALRM);
   sigaddset(&set, SIGIO);
   sigprocmask(SIG_BLOCK, &set, &oldset);
+  trs_paused = 1;
   res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
   sigprocmask(SIG_SETMASK, &oldset, NULL);
   if (res < 0) {
-    /*int reset_now = 0;*/
-    perror("real_writetrk");
-    /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
-    state.status |= TRSDISK_WRITEFLT;
+    real_error(d, raw_cmd.flags, "writetrk", TRSDISK_WRITEFLT);
   } else {
+    real_ok(d); /* premature? */
     if (raw_cmd.reply[1] & 0x85) state.status |= TRSDISK_NOTFOUND;
     if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
     if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
@@ -2263,7 +2584,7 @@ real_writetrk()
   state.bytecount = 0;
   trs_disk_drq_interrupt(0);
   state.status |= TRSDISK_BUSY;
-  trs_schedule_event(trs_disk_done, 0, 128);
+  trs_schedule_event(trs_disk_done, 0, 512);
 #else
   trs_disk_unimpl(state.currcommand, "write track on real floppy");
 #endif

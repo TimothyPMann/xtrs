@@ -34,6 +34,14 @@
 typedef unsigned short Ushort;
 typedef unsigned char Uchar;
 
+#ifdef NOTDEF /*__GNUC__*/
+typedef unsigned long long tstate_t;
+#define TSTATE_T_MID (((unsigned long long) -1LL)/2ULL)
+#else
+typedef unsigned long tstate_t;
+#define TSTATE_T_MID (((unsigned long) -1L)/2UL)
+#endif
+
 struct twobyte
 {
 #ifdef big_endian
@@ -98,20 +106,15 @@ struct z80_state_struct
     /* Speed control.  0 = full speed */
     int delay;
 
-    /* Simple event scheduler.  If >= 0, counts down before each
-     * instruction is executed.  When count goes from 0 to -1, 
-     * trs_do_event() is called.
-     */
-    int sched;
-
     /* Cyclic T-state counter */
-#ifdef __GNUC__
-    unsigned long long t_count;
-#else
-    unsigned long t_count;
-#endif
+    tstate_t t_count;
+
     /* Clock in MHz = T-states per microsecond */
     float clockMHz;
+
+    /* Simple event scheduler.  If nonzero, when t_count passes sched,
+     * trs_do_event() is called and sched is set to zero. */
+    tstate_t sched;
 };
 
 #define Z80_ADDRESS_LIMIT	(1 << 16)
@@ -154,8 +157,7 @@ struct z80_state_struct
 #define HIGH(p) (((struct twobyte *)(p))->high)
 #define LOW(p) (((struct twobyte *)(p))->low)
 
-#define T_COUNT(n) z80_state.t_count += (n)
-/*#define T_COUNT(n)*/
+#define T_COUNT(n) (z80_state.t_count += (n))
 
 /*
  * Flag accessors:

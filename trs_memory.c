@@ -182,7 +182,7 @@ void trs_reset()
     } else {
 	/* Signal a nonmaskable interrupt. */
 	trs_reset_button_interrupt(1);
-	trs_schedule_event(trs_reset_button_interrupt, 0, 500);
+	trs_schedule_event(trs_reset_button_interrupt, 0, 2000);
     }
 }
 

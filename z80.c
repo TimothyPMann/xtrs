@@ -4335,9 +4335,10 @@ int z80_run(int continuous)
 	}
 
 	/* Event scheduler */
-	if (z80_state.sched > -1) {
-	    if (z80_state.sched == 0) trs_do_event();
-	    z80_state.sched--;
+	if (z80_state.sched &&
+	    (z80_state.sched - z80_state.t_count > TSTATE_T_MID)) {
+	  /* Subtraction wrapped; time for event to happen */
+	  trs_do_event();	    
 	}
 
 	/* Check for an interrupt */
@@ -4372,7 +4373,7 @@ void z80_reset()
     z80_state.iff2 = 0;
     z80_state.interrupt_mode = 0;
     z80_state.irq = z80_state.nmi = FALSE;
-    z80_state.sched = -1;
+    z80_state.sched = 0;
 
     /* z80_state.r = 0; */
     srand(time(NULL));  /* Seed the RNG, for reading the refresh register */

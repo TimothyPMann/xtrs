@@ -210,6 +210,10 @@
  *         After,  HL = 0-100
  *    19 = set SoundBlaster volume
  *         Before, HL = 0-100
+ *    20 = query truedam flag
+ *         After,  HL = 0 or 1
+ *    21 = set truedam flag
+ *         Before, HL = 0 or 1
  *
  * ED3D emt_ftruncate
  *         Before, DE =  fd

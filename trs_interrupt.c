@@ -318,7 +318,7 @@ trs_timer_speed(int fast)
 static trs_event_func event_func = NULL;
 static int event_arg;
 
-/* Schedule an event to occur after "countdown" more instructions have
+/* Schedule an event to occur after "countdown" more t-states have
  *  executed.  0 makes the event happen immediately -- that is, at
  *  the end of the current instruction, but before the emulator checks
  *  for interrupts.  It is legal for an event function to call 
@@ -339,7 +339,8 @@ trs_schedule_event(trs_event_func f, int arg, int countdown)
     }
     event_func = f;
     event_arg = arg;
-    z80_state.sched = countdown;
+    z80_state.sched = z80_state.t_count + (tstate_t) countdown;
+    if (z80_state.sched == 0) z80_state.sched--;
 }
 
 /*
@@ -352,7 +353,7 @@ trs_do_event()
     trs_event_func f = event_func;
     if (f) {
 	event_func = NULL;
-	z80_state.sched = -1;
+	z80_state.sched = 0;
 	f(event_arg);    
     }
 }
@@ -364,7 +365,7 @@ void
 trs_cancel_event()
 {
     event_func = NULL;
-    z80_state.sched = -1;
+    z80_state.sched = 0;
 }
 
 /*

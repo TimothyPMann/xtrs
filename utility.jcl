@@ -27,8 +27,10 @@ import pwd.cmd pwd/cmd:#D#
 import unix.cmd unix/cmd:#D#
 import mount.cmd mount/cmd:#D#
 import umount.cmd umount/cmd:#D#
+import truedam.cmd truedam/cmd:#D#
 import cd6.cmd cd6/cmd:#D#
 import pwd6.cmd pwd6/cmd:#D#
 import unix6.cmd unix6/cmd:#D#
 import mount6.cmd mount6/cmd:#D#
 import umount6.cmd umount6/cmd:#D#
+import truedam6.cmd truedam6/cmd:#D#

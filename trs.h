@@ -104,7 +104,8 @@ extern void mem_romin(int state);
 extern void trs_debug(void);
 
 typedef void (*trs_event_func)(int arg);
-void trs_schedule_event(trs_event_func f, int arg, int when);
+void trs_schedule_event(trs_event_func f, int arg, int tstates);
+void trs_schedule_event_us(trs_event_func f, int arg, int us);
 void trs_do_event(void);
 void trs_cancel_event(void);
 int trs_is_event_scheduled(void);
