@@ -103,8 +103,8 @@ MANDIR = $(PREFIX)/share/man
 INSTALL = install
 
 # If you are building in a subdirectory:
-#-vpath %.c ..
-#-vpath %.h ..
-#-vpath %.man ..
+#vpath %.c ..
+#vpath %.h ..
+#vpath %.man ..
 #old way:
 #VPATH = ..
