@@ -78,9 +78,9 @@ MISC = \
 	Makefile.local \
 	cassette \
 	xtrs.man \
-	xtrs.man.text
+	xtrs.man.txt
 
-default:	xtrs mkdisk hex2cmd xtrs.man.txt
+default:	xtrs mkdisk hex2cmd xtrs.man.txt mkdisk.man.txt
 
 # Local customizations for make variables are done in Makefile.local:
 include Makefile.local
@@ -126,7 +126,10 @@ tar:		$(SOURCES) $(CR_SOURCES) $(MF_SOURCES) $(HEADERS)
 		compress xtrs.tar
 
 xtrs.man.txt:	xtrs.man
-		tbl xtrs.man | nroff -man > xtrs.man.txt
+		nroff -man xtrs.man > xtrs.man.txt
+
+mkdisk.man.txt:	mkdisk.man
+		nroff -man mkdisk.man > mkdisk.man.txt
 
 clean:
 		rm -f $(OBJECTS) $(MF_OBJECTS) $(CR_OBJECTS) $(HC_OBJECTS) \

@@ -1,18 +1,18 @@
 .TH xtrs 1
 .SH Name
-xtrs \- TRS-80 Model I/III/4 Emulator for the X Window System
+xtrs \- TRS-80 Model I/III/4 emulator for the X Window System
 .SH Syntax
-.B xtrs
-.I [options]
+.B xtrs [-model m] [-diskdir d] [-debug]
+.I [other options]
 .SH Description
-\fIxtrs\fP is built on top of a Z-80 emulator, with added routines to support
+\fBxtrs\fP is built on top of a Z-80 emulator, with added routines to support
 keyboard and video I/O through an X interface.
 The hardware emulation can operate as a TRS-80 Model I, Model III, or Model 4.
 
-\fIxtrs\fP supports 48K of RAM in Model I or Model III mode,
+\fBxtrs\fP supports 48K of RAM in Model I or Model III mode,
 128K in Model 4 mode. 
-Floppy disks are emulated using files to store the data; or, under
-Linux only, real floppy drives can be used.
+Floppy disks and hard disks are emulated using files to store the data;
+or under Linux only, real floppy drives can be used.
 A printer is emulated by
 sending its output to standard output.  
 There is also a rudimentary emulation of cassette I/O
@@ -29,9 +29,8 @@ programs that wait for keyboard input using the standard Model I/III
 ROM call; the emulator decides whether to block the Z-80 program when
 it tries to read from the keyboard memory by pattern-matching its
 stack.
-
 .SH Keys
-The following keys have special meanings to \fIxtrs\fP:
+The following keys have special meanings to \fBxtrs\fP:
 
 LeftArrow, Backspace, or Delete is the TRS-80 left arrow key.
 RightArrow or Tab is the right arrow key.  UpArrow is the up arrow
@@ -63,22 +62,19 @@ characters under some TRS-80 keyboard drivers; under others, they do
 nothing.  F13 or Insert is equivalent to underscore (address bit 3,
 data bit 7), so that a shifted underscore can be obtained; this maps
 to ASCII code 0x7f under some TRS-80 keyboard drivers.
-
-.SH Cassette
-To control the cassette, a file called ".cassette.ctl" in the
+.SH Emulated cassette
+To control the emulated cassette, a file called ".cassette.ctl" in the
 current directory keeps track of what file is currently "loaded" as
 the cassette tape and the current position within that file.  The
 "cassette" shell script provides a way to manipulate this file; typing
 "help" shows its commands.  You may use this script to load and
 position cassette tape files.  The operation works very much like an
-actual tape recorder.
-
+actual tape recorder.  The cassette emulation works only in Model I mode.
 .SH Printer
 For printer support, any text sent to the TRS-80's printer (using LPRINT
 or LLIST, for example) is sent to the standard output.
-
-.SH Floppy disks
-In Model I mode, \fIxtrs\fP emulates a Radio Shack Expansion Interface with
+.SH Emulated floppy disks
+In Model I mode, \fBxtrs\fP emulates a Radio Shack Expansion Interface with
 the Percom Doubler or Radio Shack Doubler installed.  The Doubler
 provided double-density disk access by allowing either the stock
 WD1771 FDC chip or a WD1791 chip to be selected under program control.
@@ -89,12 +85,12 @@ commands of both -- so a driver for either should work.  Under LDOS,
 use the command "FDUBL" (newer versions of LDOS), or "PDUBL" or
 "RDUBL" (older versions) to install the driver.
 
-In Model III or 4 mode, \fIxtrs\fP emulates the stock Model III/4 floppy
+In Model III or 4 mode, \fBxtrs\fP emulates the stock Model III/4 floppy
 controller, which used a WD1793 chip (software-compatible with the
 WD1791) to provide both single and double density.
 
-Four floppy drives are emulated, with storage in files named diskX-0,
-diskX-1, diskX-2, diskX-3, where X=1 for Model I mode, 3 for Model III
+Four floppy drives are emulated, with storage in files named diskM-0,
+diskM-1, diskM-2, diskM-3, where X=1 for Model I mode, 3 for Model III
 mode, or 4 for Model 4 mode.  If a file of the required name is not
 found, a drive with no disk in it is emulated (but see below).  If the
 user does not have write permission for a floppy file, a write-protect
@@ -103,7 +99,7 @@ existing file for the drive (if any), rename the new floppy file to
 the proper name, and hit function key F7 in the emulator.
 
 If you try to boot with no file named diskX-0 (that is, no disk in
-drive 0), \fIxtrs\fP emulates having no disk controller.  The behavior of a
+drive 0), \fBxtrs\fP emulates having no disk controller.  The behavior of a
 real machine with a disk controller in this case didn't seem useful to
 emulate faithfully: A real Model I hangs with a screen full of
 garbage; a real Model III or 4 goes into a retry loop printing
@@ -117,10 +113,10 @@ double-sided, but the emulator is able to be more forgiving.
 Emulated floppy image files can be of either of two types: JV1,
 compatible with Jeff Vavasour's popular freeware Model I emulator for
 the PC; or JV3, a compatible extension of a format first used in
-Vavasour's commercial Model III/4 emulator.  Both types work in \fIxtrs\fP
-regardless of what model it is emulating.  A heuristic is used to
-decide which type of image is in a drive, as neither type has a "magic
-number" or signature.
+Vavasour's commercial Model III/4 emulator.  Both types work in
+\fBxtrs\fP regardless of what model it is emulating.  A heuristic is
+used to decide which type of image is in a drive, as neither type has
+a "magic number" or signature.
 
 JV1 supports only single density, single sided, with directory on
 track 17.  Sectors must be 256 bytes long.  Use FORMAT (DIR=17) to
@@ -135,28 +131,29 @@ either FB (normal) or F8 (deleted) data address mark on any sector.
 You cannot format a sector with an incorrect track number or head
 number, or with length other than 256 bytes.  You can format a sector
 with an intentional CRC error in the data field.  The original JV3
-format had a limit of 2901 total sectors, but \fIxtrs\fP allows up to 5802.
+format had a limit of 2901 total sectors, but \fBxtrs\fP allows up to 5802.
 If you format more than 2901 sectors on a disk image, however, other
 emulators may be unable to read the additional sectors.  An 80 track,
 double-sided, double-density (18 sector) 5-inch floppy will fit within
 the original 2901 sector limit; the extension to 5802 is primarily for
 future emulation of 8-inch drives.  
 
-The program \fImkfloppy\fP makes a blank emulated floppy or "bulk erases" an
-existing one.  By default, mkfloppy makes a JV3 floppy, but with the
--1 flag it makes a JV1 floppy.
+The program \fBmkdisk\fP(1) makes a blank emulated floppy or "bulk
+erases" an existing one.  By default, mkdisk makes a JV3 floppy, but
+with the -1 flag it makes a JV1 floppy.  See the \fBmkdisk\fP man page
+for more information.
 
 Early Model I operating systems used an FA data address mark for the
 directory (a nonstandard value supported only by the WD1771, but not
 the WD1791/3), while later ones wrote F8 (for Model III/4 compatibility)
-but could read either.  To deal nicely with this problem, \fIxtrs\fP
+but could read either.  To deal nicely with this problem, \fBxtrs\fP
 implements the following kludge.  On writing, any data address mark
 other than FB is recorded as F8.  On reading in single density with
 the emulated WD1771 (available in Model I mode only), F8 is returned
 as FA.  In all other modes, F8 is returned as F8.  This trick makes
 the different operating systems perfectly compatible with each other,
 which is better than on a real Model I!
- 
+.SH Real floppy disks
 Under Linux only, any diskX-N file can be a symbolic link to a real
 floppy disk drive, typically /dev/fd0 or /dev/fd1.  Most PCs should be
 able to read and write TRS-80 compatible floppies in this way.  Many
@@ -169,11 +166,80 @@ media in an 80-track drive, bulk-erase the media first and format it
 in the 80-track drive.  Don't write to a disk with -doublestep if it
 has ever been written to in a real 40-track drive.
 
+Note: If you have a DD floppy drive (i.e, not a modern 1.2MB HD drive,
+but something like a 360K or 180K drive), use /dev/fd0d360 or
+/dev/fd1d360 instead of /dev/fd0 or /dev/fd1, and let mann@pa.dec.com
+know whether it works.  This has not been tested to date.
+
 If you try to access a real floppy drive with no disk in it,
-\fIxtrs\fP will print an error message, and the Z-80 program will get
+\fBxtrs\fP will print an error message, and the Z-80 program will get
 a somewhat different error than it should.  After inserting a disk,
 you must press F7 to clear the error condition.
+.SH Emulated hard disks
+\fBxtrs\fP can emulate a hard disk in a file with the aid of a special
+LDOS driver called XTRSHARD/DCT.  This driver has been tested and
+works under both LDOS 5.3.1 for Model I or III and TRSDOS/LS-DOS 6.3.1
+for Model 4.  It may or may not work under earlier LDOS versions.  It
+definitely will not work under other TRS-80 operating systems or with
+emulators other than \fBxtrs\fP.  The hard disk format was designed by
+Matthew Reed for his Model I/III and Model 4 emulators; \fBxtrs\fP
+duplicates the format so that users can exchange hard drive images
+across the emulators.
 
+To use the hard disk emulation, first run the \fBmkdisk\fP program
+under Unix to create a blank hard drive (.hdv) file.  Typical usage
+would be: \fImkdisk -h mydisk.hdv\fP.  See the \fBmkdisk\fP(1) man
+page for other options.
+
+Second, link the file to an appropriate name.  \fBxtrs\fP supports up
+to eight hard drives, with names of the form hardM-U, where M=1 for
+Model I mode, 3 for Model III mode, or 4 for Model 4 mode, and U is a
+unit number from 0 to 7.  It looks for these files in the same
+directory as the floppy disk files diskM-U.
+
+Third, make sure an appropriate version of LDOS is in emulated floppy
+drive 0, and the supplied file \fIutility.dsk\fP is in another
+emulated floppy drive.  Boot LDOS.  If you are using Model I LDOS
+5.3.1, patch a bug in the FORMAT command by typing \fIPATCH
+FORMAT/CMD.UTILITY M1FORMAT/FIX\fP.  You need to apply this patch only
+once.  It must not be applied to Model III or Model 4 LDOS.
+
+Fourth, type the following commands.  Here \fId\fP is the LDOS drive number
+you want to use for the hard drive (a typical choice would be 4) and \fIu\fP
+is the unit number you chose when naming the file (most likely 0).
+
+.nf
+    SYSTEM (DRIVE=\fId\fP,DRIVER="XTRSHARD",ENABLE)
+    Enter unit number ([0]-7): \fIu\fP
+    FORMAT \fId\fP (DIR=1)
+.fi
+
+Answer the questions asked by FORMAT as you prefer.  If you are
+curious about the \fIDIR=1\fP parameter to FORMAT, see
+\fBmkdisk\fP(1).  You can repeat these steps with different values of
+\fId\fP and \fIu\fP to have more than one hard drive.
+
+Finally, it's a good idea to give the SYSTEM (SYSGEN) command (Model
+I/III) or SYSGEN command (Model 4).  This command saves the SYSTEM
+settings, so the drive will be available again the next time you
+reboot or restart the emulator.  If you need to access the hard disk
+file after booting from a floppy that hasn't been SYSGENed, simply use
+the same SYSTEM command(s) again, but don't FORMAT.  You can freely
+use a different drive number or (if you renamed the hard disk file) a
+different unit number.
+
+The F7 key currently doesn't allow hard disk changes to be recognized,
+but you can change to a different hard disk file for the same unit by
+renaming files as needed and rebooting LDOS.
+
+Technical note: XTRSHARD/DCT is a small Z-80 program that implements
+all the required functions of an LDOS disk driver.  Instead of talking
+to a real (or emulated) hard disk controller, however, it uses special
+support in \fBxtrs\fP that allows Z-80 programs to open, close, read,
+and write Unix files directly.  This support is described further in
+the next section.  Because \fBxtrs\fP does not emulate real hard drive
+controller hardware, hard disk drivers other than XTRSHARD/DCT will
+not work with it.
 .SH Data import and export
 The emulated floppy \fIutility.dsk\fP contains some programs for
 transferring data between the emulator and ordinary Unix files.  All
@@ -205,18 +271,16 @@ The emulator implements a set of pseudo-instructions (emulator traps)
 that give TRS-80 programs access to Unix files.  The programs listed
 above use them.  If you would like to write your own such programs,
 the traps are documented in the file trs_imp_exp.h, and source code
-for the existing programs is supplied in import.z, export.z,
+for the existing programs is supplied in xtrshard.z, import.z, export.z,
 xtrsemt.h, xtrsemt.ccc, and settime.ccc.  Don't base any future
 development on import.bas and export.bas, however.  They use an older,
 slower mechanism in the emulator that may be removed in a future
 release.
-
 .SH Interrupts
-
 The emulator supports only interrupt mode 1.  It will complain if your
 program enables interrupts after powerup without executing an IM 1
-instruction first.  All Model I/III/4 software does this, as these
-machines supported only IM 1.
+instruction first.  All Model I/III/4 software does this, as the
+built-in peripherals in these machines supported only IM 1.
 
 The Model I has a 40 Hz "heartbeat" clock interrupt, while the Model
 III used 30 Hz, and the Model 4 could run at either 30 Hz or 60 Hz.
@@ -230,76 +294,62 @@ net result is that some ticks may be late, but there are always the
 proper number of ticks per second.  For example, running in Model I
 mode on Intel Linux you'd see this pattern: (tick, 30ms, tick,
 20ms,...) instead of seeing ticks every 25ms.
-
 .SH Options
 Defaults for all options can be specified using the standard X resource
-mechanism, and the class name for \fIxtrs\fP is "Xtrs".
+mechanism, and the class name for \fBxtrs\fP is "Xtrs".
 .TP
 .B \-background \fIcolor\fP
-.IP 
-Specifies the background color of the \fIxtrs\fP window.
+Specifies the background color of the \fBxtrs\fP window.
 .TP
 .B \-bg \fIcolor\fP
-.IP 
 Same as -background.
 .TP
 .B \-foreground \fIcolor\fP
-.IP 
-Specifies the foreground color of the \fIxtrs\fP window.
+Specifies the foreground color of the \fBxtrs\fP window.
 .TP
 .B \-fg \fIcolor\fP
-.IP 
 Same as -foreground.
 .TP
 .B \-usefont
-.IP 
 Use X fonts instead of the built-in character bitmaps.
-Some suitable fonts are supplied with \fIxtrs\fP; they are
+Some suitable fonts are supplied with \fBxtrs\fP; they are
 exactly the same as the built-in bitmaps, but drawing performance
-may be better when using fonts.  See the xset(1) man page for
+may be better when using fonts.  See the \fBxset\fP(1) man page for
 documentation on how to install fonts in your X server.
 .TP
 .B \-nofont
-.IP 
 Use the built-in character bitmaps, not a X font.  This is the default.
 .TP
 .B \-font \fIfontname\fP
-.IP 
 If -usefont is also given,
 use the specified X font for normal width characters.
 The default uses the supplied fonts.
 .TP
 .B \-widefont \fIfontname\fP
-.IP 
 If -usefont is also given,
 use the specified X font for double width characters.
 The default uses the supplied fonts, scaled to double width.
 .TP
 .B \-trsfont
-.IP 
 Use the specified X fonts for TRS-80 graphics blocks as well as
 characters.  Meaningful only if -usefont is given.  This is the
 default if the X font name begins with "-trs80".
 .TP
 .B \-notrsfont
-.IP 
 Draw TRS-80 graphics blocks as bitmaps even if X fonts are being used
 for characters.  This is the
 default if the X font name does not begin with "-trs80".
 .TP
 .B \-display \fIdisplay\fP
-.IP 
 Set your X display to \fIdisplay\fP, instead of the default which is to
 use the DISPLAY environment variable.
 .TP
 .B \-debug
-.IP 
 Enter zbx, the z80 debugger.
 .TP
 .B \-romfile \fIfilename\fP
 .TP
 .B \-romfile3 \fIfilename3\fP
-.IP 
 Use the romfile specified by \fIfilename\fP in Model I mode, or the
 romfile specified by \fIfilename3\fP in Model III and Model 4 mode.  
 A romfile can be either a raw binary dump or in Intel hex format.
@@ -308,31 +358,20 @@ not set this option or the corresponding X resource, a default
 established at compile time is used (if any); see Makefile.local for
 instructions on compiling in default romfiles or default romfile names.
 .TP
-.B \-model1
-.IP
-Emulate a TRS-80 Model I.  This is the default.
-.TP
-.B \-model3
-.IP
-Emulate a TRS-80 Model III.
-.TP
-.B \-model4
-.IP
-Emulate a TRS-80 Model 4.
+.B \-model \fIm\fP
+Specifies which TRS-80 model to emulate.  Values accepted are 1 or I (Model
+I), 3 or III (Model III), and 4 or IV (Model 4).  Model I is the default.
 .TP
 .B \-resize
-.IP 
 In Model 4 mode, resize the X window whenever the emulated display
 mode changes between 64x16 and 80x24.
 .TP
 .B \-noresize
-.IP 
 In Model 4 mode, always keep the X window large enough for 80x24
 characters, putting a blank margin around the outside when the emulated
 display mode is 64x16.  This is the default.
 .TP
 .B \-spinfast
-.IP
 Make the floppy disk appear to spin at 10 times the normal rate.
 This works around a problem with some TRS-80 operating systems that
 detect whether a drive contains a floppy by polling for a fixed
@@ -343,28 +382,23 @@ time out too soon and the operating system will report that there is
 no disk in the drive.
 .TP
 .B \-nospinfast
-.IP
 Turn off -spinfast mode.  This is the default.
 .TP
 .B \-doublestep
-.IP
 Make real floppy drives double-step, allowing access to 35-track or
 40-track media in an 80-track drive.  Linux only.  See the Floppy Disks
 section for limitations.
 .TP
 .B \-nodoublestep
-.IP
 Turn off double-step mode.  Linux only.  This is the default.
-
 .SH Additional resources
 There are many other TRS-80 resources available on the Web, including
 shareware and freeware emulators that run under MSDOS and other
 operating systems, software for converting TRS-80 physical media to
 the emulator's disk file format, ROM images, and TRS-80 software that
 has already been converted.  For pointers, see
-http://www.research. digital.com/SRC/personal/Tim_Mann/trs80.html.
-
-.SH Bugs
+http://www.research.digital.com/SRC/personal/Tim_Mann/trs80.html.
+.SH Bugs and limitations
 There may be bugs in the Z-80 emulator which we haven't found yet.
 Some of the more bizarre undocumented Z-80 instructions are not
 implemented.
@@ -385,30 +419,31 @@ multiple-sector flags in Read and Write are not implemented.
 
 Real physical floppy disks are supported only under Linux, because
 Unix does not provide a portable interface to the low-level floppy
-controller functionality that \fIxtrs\fP needs.  There are some
+controller functionality that \fBxtrs\fP needs.  There are some
 limitations even under Linux: Sectors must be 256 bytes long.
 (Supporting multiple lengths would be difficult due to an interface
 difference between the PC and TRS-80 floppy controllers.)  Index holes
 are faked, not detected on the real disk.  Attempts to access a real
 drive with no disk in it are dealt with awkwardly (as documented
-above).  The code is new and not thoroughly tested.  Read/write
+above).  The code is not very thoroughly tested.  Read/write
 performance is poor; for example, the "verify" step of LDOS format
-seems to read only one sector per revolution.
+seems to read only one sector per revolution.  It is unknown whether
+the real floppy support works on DD (360KB or 180KB) drives; it has
+been tested only on HD drives (1.2MB).
 
 The emulator arbitrarily limits both JV1 and JV3 disk images to 96
 tracks.  The limit could easily be increased to 255 or maybe 256, but
 that would probably not be useful with existing TRS-80 operating
 systems, which don't expect floppies to have so many tracks.  For
-example, LDOS 5.3.1 allows at most 95 tracks on a floppy, but allows
-more on hard drives.  256 tracks is an absolute maximum for the TRS-80
-floppy disk controller and for the JV3 format.  
+example, LDOS 5.3.1 allows at most 95 tracks on a floppy, though it
+allows more on hard drives.  256 tracks is an absolute maximum for the
+TRS-80 floppy disk controller and for the JV3 format.
 
 The extended JV3 limit of 5802 sectors is somewhat arbitrary as well.
 It could be raised by generalizing the code to permit more than two
-blocks of 2901.  Again, this does not seem too useful.  It's not a good
-way to emulate a hard drive.  5802 sectors is already enough for a 3"
-HD (1.44MB) floppy, which is larger than anything the TRS-80
-supported.
+blocks of 2901.  Again, this does not seem too useful.  5802 sectors
+is already enough for a 3" HD (1.44MB) floppy, which the TRS-80 didn't
+support anyway.
 
 The emulator guesses a romfile is in .hex format if its first byte is
 a colon (':'), so a raw binary ROM image can't start with that byte
@@ -418,14 +453,16 @@ The import/cmd and export/cmd programs do not work on NEWDOS/80.
 
 If you discover other bugs, or write fixes for any of these, please let
 us know.  We expect to incorporate fixes into future releases.
-
-.SH Authors
-David Gingold <gingold@think.com>, Thinking Machines Corporation
-.br
-Alec Wolman <wolman@crl.dec.com>, Digital Equipment Corporation
-.br
-Timothy Mann <mann@pa.dec.com>, Digital Equipment Corporation
+.SH Authors and acknowledgements
+\fBxtrs\fP was written by David Gingold <gingold@think.com> of
+Thinking Machines Corporation, Alec Wolman <wolman@crl.dec.com> of
+Digital Equipment Corporation, and Timothy Mann <mann@pa.dec.com> of
+Digital Equipment Corporation.  See README and README.tpm for
+additional notes from the authors.
 
 Thanks to Al Petrofsky for supplying the TRS-80 fonts in bdf format.
-
-See README and README.tpm for additional notes from the authors.
+Thanks to Jeff Vavasour for designing and documenting the floppy disk
+file formats that \fBxtrs\fP and most other TRS-80 emulators use.
+Thanks to Matthew Reed for designing the hard disk file format used in
+his emulators and providing documentation so that \fBxtrs\fP could be
+compatible with it.

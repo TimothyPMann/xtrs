@@ -45,7 +45,7 @@ static struct opcode major[256] = {
 	"inc	b",		A_0,		/* 04 */
 	"dec	b",		A_0,		/* 05 */
 	"ld	b,%02xh",	A_8,		/* 06 */
-	"rlc	a",		A_0,		/* 07 */
+	"rlca",			A_0,		/* 07 */
 
 	"ex	af,af'",	A_0,		/* 08 */
 	"add	hl,bc",		A_0,		/* 09 */
@@ -54,7 +54,7 @@ static struct opcode major[256] = {
 	"inc	c",		A_0,		/* 0c */
 	"dec	c",		A_0,		/* 0d */
 	"ld	c,%02xh",	A_8,		/* 0e */
-	"rrc	a",		A_0,		/* 0f */
+	"rrca",			A_0,		/* 0f */
 
 	"djnz	%04xh",		A_8R,		/* 10 */
 	"ld	de,%02x%02xh",	A_16,		/* 11 */
