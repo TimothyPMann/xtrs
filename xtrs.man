@@ -1,6 +1,6 @@
 .TH xtrs 1
 .SH Name
-xtrs \- TRS-80 Model I/III/4 emulator for the X Window System
+xtrs \- TRS-80 Model I/III/4/4P emulator for the X Window System
 .SH Syntax
 .B xtrs [-model m] [-diskdir d] [-debug]
 .I [other options]
@@ -34,7 +34,7 @@ I/III/4/4P operating systems should run on it, including all flavors
 of TRSDOS, LDOS/LS-DOS, NEWDOS, DOSPLUS, MultiDOS, and TRS-80 CP/M.
 However, the emulator also includes some extensions to the standard
 hardware, and the special drivers, utilities, and instructions needed
-for these are not always provided for all systems.
+for these are not provided for all operating systems.
 
 The Z-80 emulator has a debugger called zbx.  You can enter the
 debugger either by starting \fBxtrs\fP with the -debug flag or by
@@ -54,7 +54,7 @@ The following keys have special meanings to \fBxtrs\fP:
 LeftArrow, Backspace, or Delete is the TRS-80 left arrow key.
 RightArrow or Tab is the right arrow key.  UpArrow is the up arrow
 key.  DownArrow or Linefeed is the down arrow key.  Esc or Break is
-the Break key.  Home, Clear or LeftAlt is the Clear key.  Control is
+the Break key.  Home, Clear, or LeftAlt is the Clear key.  Control is
 the Model 4 Ctrl key (address bit 7, data bit 2).  RightAlt is
 equivalent to the shifted down arrow key (used as a control key with
 some TRS-80 software).
@@ -114,7 +114,7 @@ or LLIST, for example) is sent to the standard output.
 .SH Emulated floppy disks
 In Model I mode, \fBxtrs\fP emulates a Radio Shack Expansion Interface
 with the Percom Doubler or Radio Shack Doubler installed.  The Doubler
-provided double-density disk access by allowing either the stock
+provides double-density disk access by allowing either the stock
 WD1771 FDC chip or a WD1791 chip to be selected under program control.
 At powerup the 1771 is selected, so operating systems with no Doubler
 driver see a stock system.  By default, the emulator pretends to be
@@ -127,7 +127,7 @@ confused by the emulation of both at once, so you can choose to emulate
 only one with a command line option; see below.
 
 In Model III, 4, or 4P mode, \fBxtrs\fP emulates the stock floppy
-controller, which used a WD1793 chip (software-compatible with the
+controller, which uses a WD1793 chip (software-compatible with the
 WD1791) to provide both single and double density.
 
 Four 5.25-inch floppy drives are emulated, with storage in files named
@@ -179,8 +179,8 @@ sectors, 1 or 2 sides, single or double density, with either FB
 density the nonstandard data address marks FA and F9 are also
 available.  You cannot format a sector with an incorrect track number
 or head number.  You can format a sector with an intentional CRC error
-in the data field.  \fBxtrs\fP supports at most 96 cylinders and at
-most 5802 total sectors on a JV3 image.
+in the data field.  \fBxtrs\fP supports at most 5802 total sectors on
+a JV3 image.
 
 The original Vavasour JV3 format supported only 256-byte sectors, and
 had a limit of 2901 total sectors.  If you use sector sizes other
@@ -220,13 +220,13 @@ original hardware is emulated exactly.
 
 TRS-80 programs that attempt to measure the rotational
 speed of their floppy disk drives using timing loops will get the
-answers they expect, even though \fBxtrs\fP does not
+answers they expect, even when \fBxtrs\fP does not
 emulate instructions at the same speed as the original
 machines. This works because \fBxtrs\fP keeps a virtual clock
 (technically, a T-state counter),
 which measures how much time it should have taken to execute the
 instruction stream on a real machine, and it ties the emulation of
-floppy disk index holes to this clock.
+floppy disk index holes to this clock, not to real time.
 .SH Emulated 8-inch floppy disks
 In addition to the four standard 5.25-inch drives, \fBxtrs\fP also
 emulates four 8-inch floppy drives.  There is no widely-accepted
@@ -340,7 +340,7 @@ FA DAMs and will turn off translation of F8 to FA on reading.
 \fBxtrs\fP can emulate a hard disk in a file in one of two ways: it
 can use a special, xtrs-specific LDOS driver called XTRSHARD/DCT,
 or it can emulate the Radio Shack hard drive controller (based on
-the Western Digital WD1010) and use the native drivers for the 
+the Western Digital WD1010) and use the native drivers for the
 original hardware.
 
 .B Using XTRSHARD/DCT
@@ -382,7 +382,7 @@ is the unit number you chose when naming the file (most likely 0).
     FORMAT \fId\fP (DIR=1)
 .fi
 
-Answer the questions asked by FORMAT as you prefer.  The 
+Answer the questions asked by FORMAT as you prefer.  The
 \fIDIR=1\fP parameter to FORMAT is optional; it causes the hard
 drive's directory to be on track 1, making the initial size of
 the image smaller.  You can repeat these steps with different values of
@@ -442,7 +442,7 @@ booting should work, but is untested.  Montezuma CP/M 2.2 does boot
 from the emulated hard drive.
 
 Finally, obtain the correct driver for the operating system you will be
-using, read its documentation, configure the driver, and format the drive.  
+using, read its documentation, configure the driver, and format the drive.
 Detailed instructions are beyond the scope of this manual page.
 .SH Data import and export
 Several Z-80 programs for data import and export from various TRS-80
@@ -478,7 +478,7 @@ file. Usage: \fIEXPORT [-ln] trsfile [unixfile]\fP.  The -n flag
 converts TRS-80 newlines (\\r) to Unix newlines (\\n).  The -l flag
 converts the Unix filename to lower case.  When using the -l flag, you
 can put a [ or up-arrow in front of a character to keep it in upper
-case.  If the destination file is omitted, IMPORT uses the TRS-80
+case.  If the destination file is omitted, EXPORT uses the TRS-80
 filename, but with any "/" changed to "." to match Unix file extension
 syntax.
 
@@ -552,7 +552,7 @@ inconvenient if your Unix file names are in lower case; in that case
 you'll need to let the program prompt for the filenames.
 
 EXPORT.COM reads a file from an emulated CP/M disk and exports it to a
-Unix file.  Usage: \fIEXPORT cpmfile [$[T][L]]\fP.  The cmpfile name
+Unix file.  Usage: \fIEXPORT cpmfile [$[T][L]]\fP.  The cpmfile name
 can use ? and * as wildcard characters.  The $T flag converts CP/M
 newlines (\\r\\n) to Unix newlines (\\n).  The $L flag converts the
 CP/M filename to lowercase to form the Unix filename; note that the
@@ -592,7 +592,7 @@ mode on Intel Linux you'd see this pattern: (tick, 30ms, tick,
 .SH Processor speed selection
 A standard Model 4 has a software-controlled switch to select
 operation at either 4.05504 MHz (with heartbeat clock at 60 Hz)
-or 2.02752 MHz (with heartbeat clock at 30 Hz)  xtrs emulates this
+or 2.02752 MHz (with heartbeat clock at 30 Hz).  xtrs emulates this
 feature.
 
 Model I's were often modified to operate at higher speeds than the
@@ -616,7 +616,7 @@ If you are playing a game with sound, you'll want to use the
 -autodelay flag to slow down instruction emulation to approximately
 the speed of a real TRS-80.  If you don't do this, sound will still
 play correctly, but the gameplay may be way too fast and get ahead of
-the sound.  
+the sound.
 
 On the other hand, if your machine is a bit too slow,
 you'll hear gaps and pops in the sound when the TRS-80 program lags
@@ -660,19 +660,18 @@ all. If you use mouse-aware programs that don't have this bug, or if
 you edit the first line of MDRAW to remove the test, you can install
 XTRSMOUS in low memory using the syntax "XTRSMOUS (LOW)".
 .SH Time of day clock
-Several battery-backed time of day clocks were sold for the various TRS-80 models,
-including the TimeDate80, TChron1, TRSWatch, and T-Timer.  They were
-essentially all the same hardware, but resided at a few different port
+Several battery-backed time of day clocks were sold for the various
+TRS-80 models,
+including the TimeDate80, TChron1, TRSWatch, and T-Timer.  They are
+essentially all the same hardware, but reside at a few different port
 ranges.  \fBxtrs\fP currently emulates them at port ranges 0x70-0x7C and
 0xB0-0xBC.  The T-Timer port range at 0xC0-0xCC conflicts with the Radio Shack
 hard drive controller and is not emulated.
 
-The clocks were apparently not Y2K compliant.  The current version of
-\fBxtrs\fP attempts to do better by allowing the tens digit of the
-year to roll over past 9 to 10, 11, etc.  It's not clear that this is
-the best solution.  If you have software that uses these clocks and
-another solution would work better for you, please send email with
-details.
+These clocks return only a 2-digit year, and it is unknown what their
+driver software will do in the year 2000 and beyond.  If you have
+software that works with one of them, please send email to report
+what happens when it is used with \fBxtrs\fP.
 
 Also see SETTIME/CMD in the "Data import and export" section above for
 another way to get the correct time into a Z-80 operating system
@@ -700,7 +699,7 @@ choose the right command line options.
 You will usually want to turn on autodelay,
 you'll often need to tweak the keystretch setting,
 and if your machine is slow you may need to reduce the sound sample rate.
-Running your X server in 8-bit/pixel mode 
+Running your X server in 8-bit/pixel mode
 also seems to help in some cases. Example command lines:
 
 .nf
@@ -713,8 +712,7 @@ increase the first number in the keystretch setting.  If you get an
 unwanted type-ahead effect, where keys that you hit after one screen
 is finished show up on the next screen, try reducing the first number,
 and set the last number equal to the first number.
-See -keystretch below for more information.  This aspect of the
-emulator seems to need a bit more work.
+See -keystretch below for more information.
 
 If you have a slow machine and the sound breaks up, it is possible
 that your machine is not fast enough to generate samples at the default
@@ -757,11 +755,11 @@ Multiply the horizontal and vertical window size by \fIxfac\fP and
 \fIxfac\fP=1 and \fIyfac\fP=2*\fIxfac\fP.
 .TP
 .B \-resize
-In Model III or 4/4P mode, resize the X window whenever the emulated 
+In Model III or 4/4P mode, resize the X window whenever the emulated
 display mode changes between 64x16 text (or 512x192 graphics) and 80x24
 text (or 640x240 graphics).
 This is the default in Model III mode, since 80x24 text is not available
-and the 640x240 graphics add-on card is seldom used. 
+and the 640x240 graphics add-on card is seldom used.
 .TP
 .B \-noresize
 In Model III or 4/4P mode, always keep the X window large enough for
@@ -849,7 +847,7 @@ Use the romfile specified by \fIfilename\fP in Model I mode, the
 romfile specified by \fIfilename3\fP in Model III and Model 4 mode,
 or the romfile specified by \fIfilename4p\fP in Model 4P mode,
 A romfile can be either a raw binary dump, Intel hex format, or
-TRS-80 cmd format (for example, a modela/iii file).
+TRS-80 cmd format (for example, a MODELA/III file).
 If you do not set this option or the corresponding X resource, a default
 established at compile time is used (if any); see Makefile.local for
 instructions on compiling in default romfiles or default romfile names.
@@ -935,13 +933,13 @@ is strictly observed on both writing and reading.  This option is
 probably not useful unless you need to deal with Model I disks that use
 the distinction as part of a copy-protection scheme.  See also
 "Common File Formats for Emulated TRS-80 Floppy Disks", available
-at http://www.research.compaq.com/SRC/personal/Tim_Mann/trs80/dskspec.html.
+at http://www.tim-mann.org/trs80/dskspec.html.
 .TP
 .B \-notruedam
 The opposite of -truedam.  This setting is the default.
 .TP
 .B \-samplerate \fIrate\fP
-Set the default sample rate for new cassette wav files, direct
+Set the sample rate for new cassette wav files, direct
 cassette I/O to the sound card, and game sound output to the sound
 card.  Existing wav files will be read or modified using their
 original sample rate regardless of this flag.  The default is 44,100
@@ -953,10 +951,10 @@ The default is /dev/ttyS0 on Linux, /dev/tty00 on other versions
 of Unix.  Setting the name to be empty (\-serial "") emulates having
 no serial port.
 .TP
-.B \-switches \fIttyname\fP
+.B \-switches \fIvalue\fP
 Set the sense switches on the Model I serial port card.  This option
 is meaningful only in Model I mode, and only when the -serial option
-is not set to "".  The default is 0x6f, which Radio Shack software 
+is not set to "".  The default value is 0x6f, which Radio Shack software
 conventionally interprets as 9600 bps, 8 bits/word, no parity, 1 stop bit.
 .SH Additional resources
 There are many other TRS-80 resources available on the Web, including
@@ -964,7 +962,7 @@ shareware and freeware emulators that run under MSDOS and other
 operating systems, software for converting TRS-80 physical media to
 the emulator's disk file format, ROM images, and TRS-80 software that
 has already been converted.  For pointers, see
-http://www.research.compaq.com/SRC/personal/Tim_Mann/trs80.html.
+http://www.tim-mann.org/trs80.html.
 .SH Bugs and limitations
 Some of the more bizarre undocumented Z-80 instructions
 are not implemented.
@@ -986,6 +984,10 @@ implemented. Read Track is implemented only for DMK emulated
 floppies. The multiple-sector flags in Read and Write are not
 implemented.  The timing of returned sectors is emulated only for the
 Read Address command, and not very accurately for JV1 or JV3.
+If a disk has more than one sector with the same number on a track,
+\fBxtrs\fP will always see the first (counting from the index hole)
+when reading or writing; a real machine would see the next one to come
+under the head depending on the current rotational position of the disk.
 Partially reformatting a track (which TRS-80 programs like HyperZap
 and Model I Super Utility do to achieve mixed density) is supported
 for DMK but not JV3; however, switching densities while formatting
@@ -996,26 +998,19 @@ Unix does not define a portable interface to the low-level floppy
 controller functionality that \fBxtrs\fP needs.  There are some
 limitations even under Linux: Index holes are faked, not detected on
 the real disk, and the timing of returned sectors is not emulated at
-all.  Due to a limitation of PC-style floppy disk controllers,
-\fBxtrs\fP does not support mixing sectors of different sizes on the
-same track when formatting a physical floppy.  However, \fBxtrs\fP can
-read and write to such floppies if they are already formatted (perhaps
-by a real TRS-80).  Switching densities while formatting a physical
-floppy track does not work, nor does partially reformatting a track.
+all.  Due to the limitations of PC-style floppy disk controllers, when
+formatting a physical floppy under \fBxtrs\fP, you cannot mix sectors
+of different sizes on the same track, switch densities in the middle
+of a track, or reformat only part of a track.  However, \fBxtrs\fP can
+read and write to physical floppies that have already been formatted
+in these ways (perhaps by a real TRS-80).
 
-The emulator arbitrarily limits both JV1 and JV3 disk images to 96
-tracks.  The limit could easily be increased to 255, but
-that would probably not be useful with existing TRS-80 operating
-systems, which don't expect floppies to have so many tracks.  For
-example, LDOS 5.3.1 allows at most 95 tracks on a floppy, though it
-allows more on hard drives.  255 tracks is an absolute maximum for the
-TRS-80 floppy disk controller and for the JV3 format.
-
-The extended JV3 limit of 5802 sectors is somewhat arbitrary as well.
-It could be raised by generalizing the code to permit more than two
-blocks of 2901.  Again, this does not seem too useful.  5802 sectors
-is already enough for a 3.5-inch HD (1.44MB) floppy, which the TRS-80 didn't
-support anyway.
+The extended JV3 limit of 5802 sectors is somewhat arbitrary.  It
+could be raised by generalizing the code to permit more than two
+blocks of 2901, but this does not seem too useful.  5802 sectors is
+already enough for a 3.5-inch HD (1.44MB) floppy, which the TRS-80
+didn't support anyway.  If you need more space, use emulated hard
+drives instead of emulated floppies with huge numbers of tracks.
 
 XTRSHARD/DCT ignores the internal write-protected flag in hard drive
 images, but a hard drive image can still be effectively write
@@ -1029,8 +1024,9 @@ to occur, as ROMs typically begin with 0xF3, the DI instruction.
 The joystick emulation could be made to work with real joysticks using
 the X input extension, but this is not implemented yet.
 
-If you discover other bugs, or write fixes for any of these, please let
-us know.  We expect to incorporate fixes into future releases.
+If you discover other bugs, write fixes for any of these, or make any
+other enhancements, please let us know so that we can incorporate
+the changes into future releases.
 .SH Authors and acknowledgements
 \fBxtrs\fP 1.0 was written by David Gingold, then at
 Thinking Machines Corporation, and Alec Wolman, then at
