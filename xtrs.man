@@ -509,10 +509,10 @@ emulator traps.
 The emulator supports only interrupt mode 1.  It will complain if your
 program enables interrupts after powerup without executing an IM 1
 instruction first.  All Model I/III/4/4P software does this, as the
-built-in peripherals in these machines supported only IM 1.
+built-in peripherals in these machines support only IM 1.
 
 The Model I has a 40 Hz heartbeat clock interrupt, while the Model
-III used 30 Hz, and the Model 4/4P could run at either 30 Hz or 60 Hz.
+III uses 30 Hz, and the Model 4/4P can run at either 30 Hz or 60 Hz.
 The emulator approximates this rather well even on a system where
 clock ticks come at some frequency that isn't divisible by the
 emulated frequency (e.g., 100 Hz on Intel Linux), as long as the true
@@ -557,7 +557,7 @@ XTRSMOUS accesses the X mouse pointer using an emulator trap.
 XTRSMOUS implements the same TRSDOS/LS-DOS 6 SVC interface as the
 David Goben and Matthew Reed mouse drivers. (It does not implement the
 interface of the older Scott McBurney mouse driver, which may be
-required by some older programs.)
+required by some programs.)
 
 By default XTRSMOUS installs itself in high memory. This is done
 because MDRAW-II tests for the presence of a mouse by
@@ -726,7 +726,7 @@ Dynamically adjusts the value of -delay to run instructions at roughly
 the same rate as a real machine.  The tracking is only approximate,
 but it can be useful for running games.
 .TP
-.B \-autodelay
+.B \-noautodelay
 Turn off -autodelay. This is the default.
 .TP
 .B \-keystretch \fIamount,poll,heartbeat\fP
@@ -830,7 +830,7 @@ for DMK but not JV3; however, switching densities while formatting
 (which Model III and 4 Super Utility do) works on both DMK and JV3.
 
 Real physical floppy disks are supported only under Linux, because
-Unix does not provide a portable interface to the low-level floppy
+Unix does not define a portable interface to the low-level floppy
 controller functionality that \fBxtrs\fP needs.  There are some
 limitations even under Linux: Index holes are faked, not detected on
 the real disk, and the timing of returned sectors is not emulated at
