@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Sep 30 17:44:40 PDT 1997 by mann
+   Last modified on Mon Dec  1 15:13:27 PST 1997 by mann
 */
 
 /*
@@ -119,7 +119,7 @@ static int num_opts = (sizeof opts / sizeof opts[0]);
 /*
  * Key event queueing routines
  */
-#define KEY_QUEUE_SIZE	(16)
+#define KEY_QUEUE_SIZE	(32)
 static int key_queue[KEY_QUEUE_SIZE];
 static int key_queue_head;
 static int key_queue_entries;
@@ -130,7 +130,7 @@ static void clear_key_queue()
     key_queue_entries = 0;
 }
 
-static void queue_key(state)
+void queue_key(state)
     int state;
 {
     key_queue[(key_queue_head + key_queue_entries) % KEY_QUEUE_SIZE] = state;
@@ -147,7 +147,7 @@ static void queue_key(state)
     }
 }
 
-static int dequeue_key()
+int dequeue_key()
 {
     int rval = -1;
 
@@ -466,7 +466,8 @@ void trs_event_init()
 
     /* set up event handler */
     sa.sa_handler = trs_event;
-    sa.sa_mask = sigmask(SIGIO);
+    sigemptyset(&sa.sa_mask);
+    sigaddset(&sa.sa_mask, SIGIO);
     sa.sa_flags = SA_RESTART;
     sigaction(SIGIO, &sa, NULL);
 
@@ -553,14 +554,14 @@ void trs_get_event(wait)
 #ifdef XDEBUG
 	    fprintf(stderr,"EnterNotify\n");
 #endif
-	    queue_key(0x10000); /* all keys up */
+	    trs_xlate_keycode(0x10000); /* all keys up */
 	    break;
 
 	  case LeaveNotify:
 #ifdef XDEBUG
 	    fprintf(stderr,"LeaveNotify\n");
 #endif
-	    queue_key(0x10000); /* all keys up */
+	    trs_xlate_keycode(0x10000); /* all keys up */
 	    break;
 
 	  case KeyPress:
@@ -600,11 +601,11 @@ void trs_get_event(wait)
 		key = XK_Shift_L;
 	    }
 	    if (last_key[event.xkey.keycode] != 0) {
-		queue_key(0x10000 | last_key[event.xkey.keycode]);
+		trs_xlate_keycode(0x10000 | last_key[event.xkey.keycode]);
 	    }
 	    last_key[event.xkey.keycode] = key;
 	    if (key != 0) {
-		queue_key(key);
+		trs_xlate_keycode(key);
 	    }
 	    break;
 
@@ -612,7 +613,7 @@ void trs_get_event(wait)
 	    key = last_key[event.xkey.keycode];
 	    last_key[event.xkey.keycode] = 0;
 	    if (key != 0) {
-		queue_key(0x10000 | key);
+		trs_xlate_keycode(0x10000 | key);
 	    }
 #ifdef XDEBUG
 	    fprintf(stderr,"KeyRelease: keycode 0x%x, last_key 0x%x\n",
