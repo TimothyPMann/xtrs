@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Thu Jun 17 20:09:27 PDT 1999 by mann */
+/* Last modified on Mon Jul 26 12:53:42 PDT 1999 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
@@ -1166,7 +1166,7 @@ type1_status()
 void
 trs_disk_select_write(unsigned char data)
 {
-#ifdef DISKDEBUG
+#if DISKDEBUG
   static int old_data = -1;
   if (data != old_data) {
     fprintf(stderr, "select_write(0x%02x)\n", data);
@@ -1242,7 +1242,7 @@ trs_disk_select_write(unsigned char data)
 unsigned char
 trs_disk_track_read(void)
 {
-#ifdef DISKDEBUG
+#if DISKDEBUG
   fprintf(stderr, "track_read() => 0x%02x\n", state.track);
 #endif
   return state.track;
@@ -1251,7 +1251,7 @@ trs_disk_track_read(void)
 void
 trs_disk_track_write(unsigned char data)
 {
-#ifdef DISKDEBUG
+#if DISKDEBUG
   fprintf(stderr, "track_write(0x%02x)\n", data);
 #endif
   state.track = data;
@@ -1260,7 +1260,7 @@ trs_disk_track_write(unsigned char data)
 unsigned char
 trs_disk_sector_read(void)
 {
-#ifdef DISKDEBUG
+#if DISKDEBUG
   fprintf(stderr, "sector_read() => 0x%02x\n", state.sector);
 #endif
   return state.sector;
@@ -1293,7 +1293,7 @@ trs_disk_set_controller(int controller)
 void
 trs_disk_sector_write(unsigned char data)
 {
-#ifdef DISKDEBUG
+#if DISKDEBUG
   fprintf(stderr, "sector_write(0x%02x)\n", data);
 #endif
   if (trs_model == 1 && (trs_disk_doubler & TRSDISK_TANDY)) {
@@ -1462,7 +1462,7 @@ trs_disk_data_read(void)
   default:
     break;
   }
-#ifdef DISKDEBUG
+#if DISKDEBUG
   fprintf(stderr, "data_read() => 0x%02x\n", state.data);
 #endif
   return state.data;
@@ -1474,7 +1474,7 @@ trs_disk_data_write(unsigned char data)
   DiskState *d = &disk[state.curdrive];
   int c;
 
-#ifdef DISKDEBUG
+#if DISKDEBUG
   fprintf(stderr, "data_write(0x%02x)\n", data);
 #endif
   switch (state.currcommand & TRSDISK_CMDMASK) {
@@ -2024,7 +2024,7 @@ trs_disk_data_write(unsigned char data)
 unsigned char
 trs_disk_status_read(void)
 {
-#ifdef DISKDEBUG
+#if DISKDEBUG
   static int last_status = -1;
 #endif
   if (trs_disk_nocontroller) return 0xff;
@@ -2035,7 +2035,7 @@ trs_disk_status_read(void)
       state.status |= TRSDISK_NOTRDY;
     }
   }
-#ifdef DISKDEBUG
+#if DISKDEBUG
   if (state.status != last_status) {
     fprintf(stderr, "status_read() => 0x%02x\n", state.status);
     last_status = state.status;
@@ -2070,7 +2070,7 @@ trs_disk_command_write(unsigned char cmd)
   int id_index, non_ibm, goal_side;
   DiskState *d = &disk[state.curdrive];
 
-#ifdef DISKDEBUG
+#if DISKDEBUG
   fprintf(stderr, "command_write(0x%02x)\n", cmd);
 #endif
   /* Handle DMK partial track reformat */

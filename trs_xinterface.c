@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sun Apr  4 22:36:42 PDT 1999 by mann
+   Last modified on Mon Jul 26 12:52:10 PDT 1999 by mann
 */
 
 /*#define MOUSEDEBUG 1*/
@@ -194,12 +194,12 @@ static void clear_key_queue()
 void queue_key(int state)
 {
   key_queue[(key_queue_head + key_queue_entries) % KEY_QUEUE_SIZE] = state;
-#ifdef KBDEBUG
+#if KBDEBUG
   fprintf(stderr, "queue_key 0x%x", state);
 #endif
   if (key_queue_entries < KEY_QUEUE_SIZE) {
     key_queue_entries++;
-#ifdef KBDEBUG
+#if KBDEBUG
     fprintf(stderr, "\n");
   } else {
     fprintf(stderr, " (overflow)\n");
@@ -216,7 +216,7 @@ int dequeue_key()
       rval = key_queue[key_queue_head];
       key_queue_head = (key_queue_head + 1) % KEY_QUEUE_SIZE;
       key_queue_entries--;
-#ifdef KBDEBUG
+#if KBDEBUG
       fprintf(stderr, "dequeue_key 0x%x\n", rval);
 #endif
     }
@@ -627,7 +627,7 @@ void trs_screen_init()
     } else if (trs_rom1_size > 0) {
       trs_load_compiled_rom(trs_rom1_size, trs_rom1);
     } else {
-#ifdef DEFAULT_ROM
+#if DEFAULT_ROM
       trs_load_rom(DEFAULT_ROM);
 #else
       fatal("rom file not specified!");
@@ -640,7 +640,7 @@ void trs_screen_init()
     } else if (trs_rom3_size > 0) {
       trs_load_compiled_rom(trs_rom3_size, trs_rom3);
     } else {
-#ifdef DEFAULT_ROM3
+#if DEFAULT_ROM3
       trs_load_rom(DEFAULT_ROM3);
 #else
       fatal("rom file not specified!");
@@ -653,7 +653,7 @@ void trs_screen_init()
     } else if (trs_rom4p_size > 0) {
       trs_load_compiled_rom(trs_rom4p_size, trs_rom4p);
     } else {
-#ifdef DEFAULT_ROM4P
+#if DEFAULT_ROM4P
       trs_load_rom(DEFAULT_ROM4P);
 #else
       fatal("rom file not specified!");
@@ -725,12 +725,12 @@ void trs_screen_init()
   screen_init();
   XClearWindow(display,window);
 
-#ifdef HAVE_SIGIO
+#if HAVE_SIGIO
   trs_event_init();
 #endif
 }
 
-#ifdef HAVE_SIGIO
+#if HAVE_SIGIO
 void trs_event_init()
 {
   int fd, rc;
@@ -783,7 +783,7 @@ void trs_get_event(int wait)
 
     switch(event.type) {
     case Expose:
-#ifdef XDEBUG
+#if XDEBUG
       fprintf(stderr,"Expose\n");
 #endif
       if (event.xexpose.count == 0) {
@@ -793,7 +793,7 @@ void trs_get_event(int wait)
       break;
 
     case ResizeRequest:
-#ifdef XDEBUG
+#if XDEBUG
       fprintf(stderr,"ResizeRequest w %d-->%d, h %d-->%d\n",
 	      OrigWidth, event.xresizerequest.width,
 	      OrigHeight, event.xresizerequest.height);
@@ -805,26 +805,26 @@ void trs_get_event(int wait)
 	XConfigureWindow(display,event.xresizerequest.window,
 			 (CWWidth | CWHeight),&xwc);
       }
-#ifdef DO_XFLUSH
+#if DO_XFLUSH
       XFlush(display);
 #endif
       break;
 
     case ConfigureNotify:
-#ifdef XDEBUG
+#if XDEBUG
       fprintf(stderr,"ConfigureNotify\n");
 #endif
       break;
 
     case MapNotify:
-#ifdef XDEBUG
+#if XDEBUG
       fprintf(stderr,"MapNotify\n");
 #endif
       trs_screen_refresh();
       break;
 
     case EnterNotify:
-#ifdef XDEBUG
+#if XDEBUG
       fprintf(stderr,"EnterNotify\n");
 #endif
       save_repeat();
@@ -832,7 +832,7 @@ void trs_get_event(int wait)
       break;
 
     case LeaveNotify:
-#ifdef XDEBUG
+#if XDEBUG
       fprintf(stderr,"LeaveNotify\n");
 #endif
       restore_repeat();
@@ -841,7 +841,7 @@ void trs_get_event(int wait)
 
     case KeyPress:
       (void) XLookupString((XKeyEvent *)&event,buf,10,&key,&status);
-#ifdef XDEBUG
+#if XDEBUG
       fprintf(stderr,"KeyPress: state 0x%x, keycode 0x%x, key 0x%x\n",
 	      event.xkey.state, event.xkey.keycode, (unsigned int) key);
 #endif
@@ -890,14 +890,14 @@ void trs_get_event(int wait)
       if (key != 0) {
 	trs_xlate_keycode(0x10000 | key);
       }
-#ifdef XDEBUG
+#if XDEBUG
       fprintf(stderr,"KeyRelease: state 0x%x, keycode 0x%x, last_key 0x%x\n",
 	      event.xkey.state, event.xkey.keycode, (unsigned int) key);
 #endif
       break;
 
     default:
-#ifdef XDEBUG	    
+#if XDEBUG	    
       fprintf(stderr,"Unhandled event: type %d\n", event.type);
 #endif
       break;
@@ -1117,7 +1117,7 @@ void trs_screen_refresh()
       trs_screen_write_char(i,trs_screen[i],False);
     }
   }
-#ifdef DO_XFLUSH
+#if DO_XFLUSH
   XFlush(display);
 #endif
 }
@@ -1165,7 +1165,7 @@ void trs_screen_write_char(int position, int char_index, Bool doflush)
   } else if (usefont) {
     /* Draw character using a font */
     if (trs_model == 1) {
-#ifndef UPPERCASE
+#if !UPPERCASE
       /* Emulate Radio Shack lowercase mod.  The replacement character
 	 generator ROM had another copy of the uppercase characters in
 	 the control character positions, to compensate for a bug in the
@@ -1225,7 +1225,7 @@ void trs_screen_write_char(int position, int char_index, Bool doflush)
 	      (row*cur_char_height + grafyx_yoffset*2) % (2*G_YSIZE),
 	      destx, desty, TRS_CHAR_WIDTH, cur_char_height);
   }
-#ifdef DO_XFLUSH
+#if DO_XFLUSH
   if (doflush)
     XFlush(display);
 #endif
@@ -1257,7 +1257,7 @@ void trs_screen_write_chars(int *locations, int *values, int count)
   while (count--) {
     trs_screen_write_char(*locations++, *values++ , False);
   }
-#ifdef DO_XFLUSH
+#if DO_XFLUSH
   XFlush(display);
 #endif
 }

@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sun Apr  4 22:42:32 PDT 1999 by mann
+   Last modified on Mon Jul 26 12:52:24 PDT 1999 by mann
 */
 
 /*
@@ -320,7 +320,7 @@ void mem_write(int address, int value)
 	    memory[address] = value;
 	} else if (address >= VIDEO_START) {
 	    int vaddr = address + video_offset;
-#ifdef UPPERCASE
+#if UPPERCASE
 	    /*
 	     * Video write.  Hack here to make up for the missing bit 6
 	     * video ram, emulating the gate in Z30.
