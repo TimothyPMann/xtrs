@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Wed Apr 15 19:27:45 PDT 1998 by mann */
+/* Last modified on Fri Apr 24 18:53:42 PDT 1998 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
@@ -59,12 +59,15 @@ typedef struct {
   int last_readadr;             /* id index found by last readadr */
   int last_readadr_density;
 #if DELAYED_INTRQ_KLUDGE
-  /* This ugly kludge is to make SuperUtility (and Trakcess)
-     happy.  They assume they can execute a few dozen instructions
-     between issuing a command and receiving a completion
+  /* This ugly kludge is to make SuperUtility, Trakcess, and the
+     Model 4P boot ROM happy.  They assume they can execute a few
+     instructions between issuing a command and receiving a completion
      interrupt.  In particular, SuperUtility assumes it will get
      the interrupt inside a procedure call that it makes shortly
-     after issuing the command, not before the call. */
+     after issuing the command, not before the call.  The Model 4P
+     boot ROM assumes it will get to execute at least two more 
+     instructions after the ini that reads the last byte of a sector.
+  */
   int delayed_intrq_kludge;
 #endif
 } FDCState;
@@ -298,7 +301,11 @@ trs_disk_change(int drive)
     c = fclose(d->file);
     if (c == EOF) state.status |= TRSDISK_WRITEFLT;
   }
-  sprintf(diskname, "%s/disk%d-%d", trs_disk_dir, trs_model, drive);
+  if (trs_model == 5) {
+    sprintf(diskname, "%s/disk4p-%d", trs_disk_dir, drive);
+  } else {
+    sprintf(diskname, "%s/disk%d-%d", trs_disk_dir, trs_model, drive);
+  }
   res = stat(diskname, &st);
   if (res == -1) {
     d->file = NULL;
@@ -620,6 +627,12 @@ trs_disk_select_write(unsigned char data)
 #ifdef DISKDEBUG
   fprintf(stderr, "select_write(0x%02x)\n", data);
 #endif
+#if DELAYED_INTRQ_KLUDGE
+  if (state.delayed_intrq_kludge) {
+    trs_disk_intrq_interrupt(1);
+    state.delayed_intrq_kludge = 0;
+  }
+#endif
   state.status &= ~TRSDISK_NOTRDY;
   if (trs_model == 1) {
     /* Disk 3 and side select share a bit.  You can't have a drive :3
@@ -632,6 +645,10 @@ trs_disk_select_write(unsigned char data)
   } else {
     state.curside = (data & TRSDISK3_SIDE) != 0;
     state.density = (data & TRSDISK3_MFM) != 0;
+    if (data & TRSDISK3_WAIT) {
+	/* If there was an event pending, deliver it right now */
+	trs_do_event();
+    }
   }
   switch (data & (TRSDISK_0|TRSDISK_1|TRSDISK_2|TRSDISK_3)) {
   case 0:
@@ -757,7 +774,14 @@ trs_disk_data_read(void)
 	state.bytecount = 0;
 	state.status &= ~(TRSDISK_BUSY|TRSDISK_DRQ);
         trs_disk_drq_interrupt(0);
+/******!!
+#if DELAYED_INTRQ_KLUDGE > 1
+	state.delayed_intrq_kludge = 1;
+#else
 	trs_disk_intrq_interrupt(1);
+#endif
+******/
+	trs_schedule_event(trs_disk_intrq_interrupt, 1, 2);
       }
     }
     break;
@@ -827,7 +851,11 @@ trs_disk_data_read(void)
       state.bytecount = 0;
       state.status &= ~(TRSDISK_BUSY|TRSDISK_DRQ);
       trs_disk_drq_interrupt(0);
+#if DELAYED_INTRQ_KLUDGE > 1
+      state.delayed_intrq_kludge = 1;
+#else
       trs_disk_intrq_interrupt(1);
+#endif
     }
     break;
   default:
@@ -866,7 +894,11 @@ trs_disk_data_write(unsigned char data)
 	state.bytecount = 0;
 	state.status = 0;
         trs_disk_drq_interrupt(0);
+#if DELAYED_INTRQ_KLUDGE > 2
+	state.delayed_intrq_kludge = 1;
+#else
 	trs_disk_intrq_interrupt(1);
+#endif
 	c = fflush(d->file);
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
       }
@@ -1038,7 +1070,11 @@ trs_disk_data_write(unsigned char data)
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
       }
       trs_disk_drq_interrupt(0);
+#if DELAYED_INTRQ_KLUDGE > 2
+      state.delayed_intrq_kludge = 1;
+#else
       trs_disk_intrq_interrupt(1);
+#endif
       break;
     case FMT_DONE:
       break;
@@ -1103,7 +1139,11 @@ trs_disk_command_write(unsigned char cmd)
     if (d->emutype == REAL) real_restore();
     /* Should this set lastdirection? */
     if (cmd & TRSDISK_VBIT) verify();
+#if DELAYED_INTRQ_KLUDGE > 2
+    state.delayed_intrq_kludge = 1;
+#else
     trs_disk_intrq_interrupt(1);
+#endif
     break;
   case TRSDISK_SEEK:
     d->phytrack += (state.data - state.track);
@@ -1117,7 +1157,11 @@ trs_disk_command_write(unsigned char cmd)
     if (d->emutype == REAL) real_seek();
     /* Should this set lastdirection? */
     if (cmd & TRSDISK_VBIT) verify();
+#if DELAYED_INTRQ_KLUDGE > 2
+    state.delayed_intrq_kludge = 1;
+#else
     trs_disk_intrq_interrupt(1);
+#endif
     break;
   case TRSDISK_STEP:
   case TRSDISK_STEPU:
@@ -1134,7 +1178,11 @@ trs_disk_command_write(unsigned char cmd)
     }
     if (d->emutype == REAL) real_seek();
     if (cmd & TRSDISK_VBIT) verify();
+#if DELAYED_INTRQ_KLUDGE > 2
+    state.delayed_intrq_kludge = 1;
+#else
     trs_disk_intrq_interrupt(1);
+#endif
     break;
   case TRSDISK_STEPIN:
   case TRSDISK_STEPINU:
@@ -1375,7 +1423,11 @@ trs_disk_command_write(unsigned char cmd)
 	}
       }
       if ((cmd & 0x08) != 0) {
-	trs_disk_intrq_interrupt(1);
+#if DELAYED_INTRQ_KLUDGE > 2
+	  state.delayed_intrq_kludge = 1;
+#else
+	  trs_disk_intrq_interrupt(1);
+#endif
       }
     }
     break;
@@ -1592,7 +1644,11 @@ real_write()
   }
   state.bytecount = 0;
   trs_disk_drq_interrupt(0);
+#if DELAYED_INTRQ_KLUDGE > 2
+  state.delayed_intrq_kludge = 1;
+#else
   trs_disk_intrq_interrupt(1);
+#endif
 #else
   trs_disk_unimpl(state.currcommand, "write real floppy");
 #endif
@@ -1712,7 +1768,11 @@ real_writetrk()
   }
   state.bytecount = 0;
   trs_disk_drq_interrupt(0);
+#if DELAYED_INTRQ_KLUDGE > 2
+  state.delayed_intrq_kludge = 1;
+#else
   trs_disk_intrq_interrupt(1);
+#endif
 #else
   trs_disk_unimpl(state.currcommand, "write track on real floppy");
 #endif
