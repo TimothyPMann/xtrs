@@ -164,4 +164,4 @@ int trs_get_mouse_type(void);
 void sb_set_volume(int vol);
 int sb_get_volume(void);
 
-#endif _TRS_H
+#endif /*_TRS_H*/
