@@ -89,7 +89,7 @@ MISC = \
 	Makefile \
 	Makefile.local \
 	README \
-	README.tpm \
+	README-1.0 \
 	cassette \
 	cassette.man \
 	cassette.txt \
