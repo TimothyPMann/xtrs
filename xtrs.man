@@ -890,6 +890,11 @@ shifted.  This is the default in Model I and III modes, and it
 works well with many TRS-80 keyboard drivers.  With some
 keyboard drivers these keys do not work at all, however.
 .TP
+.B \-diskdir \fIdir\fP
+Specify the directory containing floppy and hard disk images.
+If the value starts with "~/" (or is just "~"), it is relative to your
+home directory.  The default value is ".".
+.TP
 .B \-doubler \fItype\fP
 Specify what type of double density adaptor to emulate (Model I mode only).
 The \fItype\fP may be \fIpercom\fP, \fIradioshack\fP (or \fItandy\fP),

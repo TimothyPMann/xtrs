@@ -123,6 +123,16 @@ void do_emt_getddir()
 void do_emt_setddir()
 {
   trs_disk_dir = strdup(mem_pointer(REG_HL, 0));
+  if (trs_disk_dir[0] == '~' &&
+      (trs_disk_dir[1] == '/' || trs_disk_dir[1] == '\0')) {
+    char* home = getenv("HOME");
+    if (home) {
+      char *p = (char*)malloc(strlen(home) + strlen(trs_disk_dir) + 2);
+      sprintf(p, "%s/%s", home, trs_disk_dir+1);
+      free(trs_disk_dir);
+      trs_disk_dir = p;
+    }
+  }
   REG_A = 0;
   REG_F |= ZERO_MASK;
 }

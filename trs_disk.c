@@ -51,7 +51,7 @@
 
 int trs_disk_nocontroller = 0;
 int trs_disk_doubler = TRSDISK_BOTH;
-char *trs_disk_dir = DISKDIR;
+char *trs_disk_dir;
 unsigned short trs_disk_changecount = 0;
 static int trs_disk_needchange = 0;
 float trs_disk_holewidth = 0.01;

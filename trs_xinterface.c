@@ -476,6 +476,15 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
   if (XrmGetResource(x_db, option, "Xtrs.Diskdir", &type, &value)) {
     trs_disk_dir = strdup(value.addr);
   }
+  if (trs_disk_dir[0] == '~' &&
+      (trs_disk_dir[1] == '/' || trs_disk_dir[1] == '\0')) {
+    char* home = getenv("HOME");
+    if (home) {
+      char *p = (char*)malloc(strlen(home) + strlen(trs_disk_dir) + 1);
+      sprintf(p, "%s/%s", home, trs_disk_dir+1);
+      trs_disk_dir = p;
+    }
+  }
 
   (void) sprintf(option, "%s%s", program_name, ".delay");
   if (XrmGetResource(x_db, option, "Xtrs.Delay", &type, &value)) {
