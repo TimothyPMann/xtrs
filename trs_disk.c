@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Mon Oct 12 23:28:08 PDT 1998 by mann */
+/* Last modified on Thu Oct 15 15:35:10 PDT 1998 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
@@ -37,7 +37,6 @@
 #define NDRIVES 8
 
 int trs_disk_nocontroller = 0;
-int trs_disk_doublestep = 0;
 int trs_disk_doubler = TRSDISK_BOTH;
 char *trs_disk_dir = DISKDIR;
 unsigned short trs_disk_changecount = 0;
@@ -180,6 +179,7 @@ typedef struct {
   int inches;                     /* 5 or 8, as seen by TRS-80 */
   int real_rps;                   /* phys rotations/sec; emutype REAL only */
   int real_size_code;             /* most recent sector size; REAL only */
+  int real_step;                  /* 1=normal, 2=double-step; REAL only */
   FILE* file;
   int free_id[4];		  /* first free id, if any, of each size */
   int last_used_id;		  /* last used index */
@@ -208,6 +208,34 @@ void real_readtrk();
 void real_writetrk();
 
 void
+trs_disk_setsize(int unit, int value)
+{
+  if (unit < 0 || unit > 7) return;
+  disk[unit].inches = (value == 8) ? 8 : 5;
+}
+
+void
+trs_disk_setstep(int unit, int value)
+{
+  if (unit < 0 || unit > 7) return;
+  disk[unit].real_step = (value == 2) ? 2 : 1;
+}
+
+int
+trs_disk_getsize(int unit)
+{
+  if (unit < 0 || unit > 7) return 0;
+  return disk[unit].inches;
+}
+
+int
+trs_disk_getstep(int unit)
+{
+  if (unit < 0 || unit > 7) return 0;
+  return disk[unit].real_step;
+}
+
+void
 trs_disk_init(int reset_button)
 {
   int i;
@@ -231,14 +259,6 @@ trs_disk_init(int reset_button)
     disk[i].phytrack = 0;
     disk[i].emutype = JV3;
   }
-  disk[0].inches = 5;
-  disk[1].inches = 5;
-  disk[2].inches = 5;
-  disk[3].inches = 5;
-  disk[4].inches = 8;
-  disk[5].inches = 8;
-  disk[6].inches = 8;
-  disk[7].inches = 8;
   trs_disk_change_all();
   trs_cancel_event();
 
@@ -1695,7 +1715,7 @@ real_seek()
   raw_cmd.flags = FD_RAW_INTR;
   raw_cmd.cmd[i++] = FD_SEEK;
   raw_cmd.cmd[i++] = 0;
-  raw_cmd.cmd[i++] = d->phytrack * (trs_disk_doublestep ? 2 : 1);
+  raw_cmd.cmd[i++] = d->phytrack * d->real_step;
   raw_cmd.cmd_count = i;
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);

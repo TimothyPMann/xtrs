@@ -145,15 +145,57 @@
  *                 BC =  strlen(buffer), 0xFFFF if error
  *
  * ED3C emt_misc
- *         Before, A  = function code, one of the following:
- *                      0 = disk change
- *                      1 = exit emulator
- *                      2 = enter debugger (if active)
- *                      3 = press reset button
- *                      4 = query disk change count
- *         After,  HL = result, depending on function code
- *                      0,4: disk change count (F7 or emt_misc)
- *                      1-3: no result; HL unchanged
+ *         Before, A  = function code, other registers as listed
+ *         After, other registers as listed
+ *
+ *   Function codes:
+ *     0 = disk change
+ *         After, HL = disk change count (F7 presses + emt_misc 0 calls)
+ *     1 = exit emulator
+ *     2 = enter debugger (if active)
+ *     3 = press reset button
+ *     4 = query disk change count
+ *         After, HL = disk change count (F7 presses + emt_misc 0 calls)
+ *     5 = query model
+ *         After, HL = model: 1, 3, 4, or 5 (=4P)
+ *     6 = query disk size
+ *         Before, BC = unit number, 0-7
+ *         After,  HL = size, 5 or 8
+ *     7 = set disk size
+ *         Before, BC = unit number, 0-7
+ *                 HL = new size, 5 or 8
+ *     8 = query disk single/double step
+ *         Before, BC = unit number, 0-7
+ *         After,  HL = step, 1 or 2
+ *     9 = set disk single/double step
+ *         Before, BC = unit number, 0-7
+ *                 HL = new step, 1 or 2
+ *    10 = query graphics type
+ *         Before, HL = 0 Radio Shack, 1 Micro Labs
+ *    11 = set graphics type
+ *         Before, HL = 0 Radio Shack, 1 Micro Labs
+ *    12 = query delay
+ *         After,  HL = delay
+ *                 BC = autodelay flag (0 or 1)
+ *    13 = set delay
+ *         Before, HL = new delay
+ *                 BC = autodelay flag (0 or 1)
+ *    14 = query keystretch
+ *         After,  HL = amount
+ *                 BC = poll
+ *                 DE = heartbeat
+ *    15 = set keystretch
+ *         Before, HL = amount
+ *                 BC = poll
+ *                 DE = heartbeat
+ *    16 = query doubler
+ *         After,  HL = 0 none, 1 Percom, 2 Tandy, 3 both
+ *    17 = set doubler
+ *         Before, HL = 0 none, 1 Percom, 2 Tandy, 3 both
+ *    18 = query SoundBlaster volume
+ *         After,  HL = 0-100
+ *    19 = set SoundBlaster volume
+ *         Before, HL = 0-100
  *
  * ED3D emt_ftruncate
  *         Before, DE =  fd

@@ -115,6 +115,7 @@ static int assert_state(int state)
 static unsigned int sb_address=0;
 static unsigned char sb_cass_volume[4];
 static unsigned char sb_sound_volume[2];
+static int sb_volume = 0;
 
 /* try to initialize SoundBlaster. Usual ioport is 0x220 */
 void trs_sound_init(int ioport, int vol)
@@ -167,9 +168,19 @@ void trs_sound_init(int ioport, int vol)
   while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
   outb(0xD1, sb_address + 0xC);
 
+  sb_set_volume(vol);
+#endif
+}
+
+void
+sb_set_volume(int vol)
+{
+#if __linux
+  if (sb_address == 0) return;
   /* Set up volume values */
   if (vol < 0) vol = 0;
   if (vol > 100) vol = 100;
+  sb_volume = vol;
   /* Values in comments from Model I technical manual.  Model III/4 used
      a different value for one resistor in the network, so these
      voltages are not exactly right.  In particular 3 and 0 are no
@@ -182,6 +193,12 @@ void trs_sound_init(int ioport, int vol)
   sb_sound_volume[0] = 0;
   sb_sound_volume[1] = (vol*255)/100;
 #endif
+}
+
+int
+sb_get_volume()
+{
+  return sb_volume;
 }
 
 void trs_cassette_motor(int value)

@@ -427,6 +427,57 @@ void do_emt_misc()
   case 4:
     REG_HL = trs_disk_changecount;
     break;
+  case 5:
+    REG_HL = trs_model;
+    break;
+  case 6:
+    REG_HL = trs_disk_getsize(REG_BC);
+    break;
+  case 7:
+    trs_disk_setsize(REG_BC, REG_HL);
+    break;
+  case 8:
+    REG_HL = trs_disk_getstep(REG_BC);
+    break;
+  case 9:
+    trs_disk_setstep(REG_BC, REG_HL);
+    break;
+  case 10:
+    REG_HL = grafyx_get_microlabs();
+    break;
+  case 11:
+    grafyx_set_microlabs(REG_HL);
+    break;
+  case 12:
+    REG_HL = z80_state.delay;
+    REG_BC = trs_autodelay;
+    break;
+  case 13:
+    z80_state.delay = REG_HL;
+    trs_autodelay = REG_BC;
+    break;
+  case 14:
+    REG_HL = stretch_amount;
+    REG_BC = stretch_poll;
+    REG_DE = stretch_heartbeat;
+    break;
+  case 15:
+    stretch_amount = REG_HL;
+    stretch_poll = REG_BC;
+    stretch_heartbeat = REG_DE;
+    break;
+  case 16:
+    REG_HL = trs_disk_doubler;
+    break;
+  case 17:
+    trs_disk_doubler = REG_HL;
+    break;
+  case 18:
+    REG_HL = sb_get_volume();
+    break;
+  case 19:
+    sb_set_volume(REG_HL);
+    break;
   default:
     error("unsupported function code to emt_misc");
     break;

@@ -324,8 +324,58 @@ emt_misc(func)
 #endasm
 }
 
+void
+emt_misc2(func, hl, bc, de)
+     int func;
+     int *hl;
+     int *bc;
+     int *de;
+{
+#asm
+    PUSH IX
+    LD IX,4		;point IX to argument frame, skipping
+    ADD IX,SP           ;  return address and old IX value
+    LD L,(IX+4)         ;bc arg to HL
+    LD H,(IX+5)
+    LD C,(HL)           ;*bc to BC
+    INC HL
+    LD B,(HL)
+    LD L,(IX+6)         ;de arg to HL
+    LD H,(IX+7)
+    LD E,(HL)           ;*de to DE
+    INC HL
+    LD D,(HL)
+    LD L,(IX+2)         ;hl arg to HL
+    LD H,(IX+3)
+    LD A,(HL)           ;*hl to HL
+    INC HL
+    LD H,(HL)
+    LD L,A
+    LD A,(IX+0)         ;func to A
+    DEFW 3CEDH		;emt_misc
+    PUSH HL             ;save HL return
+    LD L,(IX+4)         ;bc arg to HL
+    LD H,(IX+5)
+    LD (HL),C           ;BC return to *bc
+    INC HL
+    LD (HL),B
+    LD L,(IX+6)         ;de arg to HL
+    LD H,(IX+7)
+    LD (HL),E           ;DE return to *de
+    INC HL
+    LD (HL),D
+    POP DE              ;HL return to DE
+    LD L,(IX+2)         ;hl arg to HL
+    LD H,(IX+3)
+    LD (HL),E           ;DE (HL return) to *hl
+    INC HL
+    LD (HL),D
+    EX DE,HL		;HL return back to HL (not needed)
+#endasm
+}
+
 int
-emt_ftruncate(fd, length);
+emt_ftruncate(fd, length)
      int fd;
      long length; /* 4 bytes */
 {

@@ -10,7 +10,10 @@
 # ENDIAN = -Dbig_endian
 
 # If you would like the TRS-80 ROM to be built into the application,
-# use the following lines (with the appropriate file names).
+# use the following lines (with the appropriate file names).  You can
+# get a ROM image from a real TRS-80 with moderate effort, if you have 
+# one.  There are also Web sites with TRS-80 ROMs that can be downloaded, 
+# but none are included with this package due to copyright concerns.
 
 BUILT_IN_ROM = fakerom.hex
 BUILT_IN_ROM3 = fakerom.hex

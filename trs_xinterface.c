@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Mon Oct 12 13:42:36 PDT 1998 by mann
+   Last modified on Thu Oct 15 14:51:14 PDT 1998 by mann
 */
 
 /*#define MOUSEDEBUG 1*/
@@ -126,6 +126,8 @@ static XrmOptionDescRec opts[] = {
 {"-microlabs",  "*microlabs",   XrmoptionNoArg,         (caddr_t)"on"},
 {"-nomicrolabs","*microlabs",   XrmoptionNoArg,         (caddr_t)"off"},
 {"-doubler",    "*doubler",     XrmoptionSepArg,        (caddr_t)NULL},
+{"-sizemap",    "*sizemap",     XrmoptionSepArg,        (caddr_t)NULL},
+{"-stepmap",    "*stepmap",     XrmoptionSepArg,        (caddr_t)NULL},
 #if __linux
 {"-sb",         "*sb",          XrmoptionSepArg,        (caddr_t)NULL},
 #endif /* linux */
@@ -262,6 +264,7 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
   char *type;
   XrmValue value;
   char *xrms;
+  int stepdefault, i, s[8];
 
   program_name = strrchr(argv[0], '/');
   if (program_name == NULL) {
@@ -320,15 +323,6 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
       trs_autodelay = True;
     } else if (strcmp(value.addr,"off") == 0) {
       trs_autodelay = False;
-    }
-  }
-
-  (void) sprintf(option, "%s%s", program_name, ".doublestep");
-  if (XrmGetResource(x_db, option, "Xtrs.doublestep", &type, &value)) {
-    if (strcmp(value.addr,"on") == 0) {
-      trs_disk_doublestep = True;
-    } else if (strcmp(value.addr,"off") == 0) {
-      trs_disk_doublestep = False;
     }
   }
 
@@ -400,6 +394,58 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
     case 'N':
       trs_disk_doubler = TRSDISK_NODOUBLER;
       break;
+    }
+  }
+
+  /* Defaults for sizemap */
+  s[0] = 5;
+  s[1] = 5;
+  s[2] = 5;
+  s[3] = 5;
+  s[4] = 8;
+  s[5] = 8;
+  s[6] = 8;
+  s[7] = 8;
+  (void) sprintf(option, "%s%s", program_name, ".sizemap");
+  if (XrmGetResource(x_db, option, "Xtrs.Sizemap", &type, &value)) {
+    sscanf((char*)value.addr, "%d,%d,%d,%d,%d,%d,%d,%d",
+	   &s[0], &s[1], &s[2], &s[3], &s[4], &s[5], &s[6], &s[7]);
+  }
+  for (i=0; i<=7; i++) {
+    if (s[i] != 5 && s[i] != 8) {
+      fprintf(stderr, "bad value %d for disk %d size\n", s[i], i);
+      exit (1);
+    } else {
+      trs_disk_setsize(i, s[i]);
+    }
+  }
+
+  /* Defaults for stepmap */
+  (void) sprintf(option, "%s%s", program_name, ".doublestep");
+  stepdefault = 1;
+  if (XrmGetResource(x_db, option, "Xtrs.doublestep", &type, &value)) {
+    if (strcmp(value.addr,"on") == 0) {
+      stepdefault = 2;
+    } else if (strcmp(value.addr,"off") == 0) {
+      stepdefault = 1;
+    }
+  }
+
+  for (i=0; i<=7; i++) {
+    s[i] = stepdefault;
+  }
+  (void) sprintf(option, "%s%s", program_name, ".stepmap");
+  if (XrmGetResource(x_db, option, "Xtrs.Stepmap", &type, &value)) {
+    sscanf((char*)value.addr, "%d,%d,%d,%d,%d,%d,%d,%d",
+	   &s[0], &s[1], &s[2], &s[3], &s[4], &s[5], &s[6], &s[7]);
+  }
+  for (i=0; i<=7; i++) {
+    if (s[i] != 1 && s[i] != 2) {
+      fprintf(stderr, "bad value %d for disk %d single/double step\n",
+	      s[i], i);
+      exit (1);
+    } else {
+      trs_disk_setstep(i, s[i]);
     }
   }
 
@@ -1278,6 +1324,11 @@ void grafyx_write_overlay(int value)
     trs_screen_640x240((grafyx_enable && !grafyx_overlay) || text80x24);
     trs_screen_refresh();
   }
+}
+
+int grafyx_get_microlabs()
+{
+  return grafyx_microlabs;
 }
 
 void grafyx_set_microlabs(int on_off)

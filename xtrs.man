@@ -27,7 +27,7 @@ There is also a mouse driver for Model 4/4P mode.
 The Z-80 emulator has a debugger called zbx.  It works sort of
 like dbx.  If you run with debugging turned on (see the options section for
 how to do this), you'll enter the debugger, and
-you can type "help" for more information.
+you can type ``help'' for more information.
 
 Special support in the emulator allows the program to block when
 waiting for information from the keyboard.  This will work only for
@@ -69,11 +69,11 @@ nothing.  F13 or Insert is equivalent to underscore (address bit 3,
 data bit 7), so that a shifted underscore can be obtained; this maps
 to ASCII code 0x7f under some TRS-80 keyboard drivers.
 .SH Emulated cassette
-To control the emulated cassette, a file called ".cassette.ctl" in the
-current directory keeps track of what file is currently "loaded" as
+To control the emulated cassette, a file called ``.cassette.ctl'' in the
+current directory keeps track of what file is currently loaded as
 the cassette tape and the current position within that file.  The
-"cassette" shell script provides a way to manipulate this file; typing
-"help" shows its commands.  You may use this script to load and
+\fBcassette\fP shell script provides a way to manipulate this file; typing
+``help'' shows its commands.  You may use this script to load and
 position cassette tape files.  The operation works very much like an
 actual tape recorder.  The cassette emulation works only in Model I mode.
 .SH Printer
@@ -88,8 +88,8 @@ At powerup the 1771 is selected, so operating systems with no Doubler
 driver see a stock system.  By default, the emulator pretends to be
 both a Percom and Radio Shack Doubler at the same time -- it responds
 to the special commands of both -- so a driver for either should work.
-Under LDOS, use the command "FDUBL" (newer versions of LDOS), or
-"PDUBL" or "RDUBL" (older versions) to install the driver. Software that
+Under LDOS, use the command ``FDUBL'' (newer versions of LDOS), or
+``PDUBL'' or ``RDUBL'' (older versions) to install the driver. Software that
 tries to detect which doubler you have (such as Super Utility) may be
 confused by the emulation of both at once, so you can choose to emulate
 only one with a command line option; see below.
@@ -112,7 +112,7 @@ drive 0), \fBxtrs\fP emulates having no disk controller.  The behavior of a
 real machine with a disk controller in this case didn't seem useful to
 emulate faithfully: A real Model I hangs with a screen full of
 garbage; a real Model III or 4 goes into a retry loop printing
-"Diskette?" on the screen and rechecking whether you've inserted one.
+``Diskette?'' on the screen and rechecking whether you've inserted one.
 
 Due to a limitation of the original Model I hardware, drive :3 cannot
 be double-sided in Model I mode.  In the original Model I, you could
@@ -125,7 +125,7 @@ the PC; or JV3, a compatible extension of a format first used in
 Vavasour's commercial Model III/4 emulator.  Both types work in
 \fBxtrs\fP regardless of what model it is emulating.  A heuristic is
 used to decide which type of image is in a drive, as neither type has
-a "magic number" or signature.
+a magic number or signature.
 
 JV1 supports only single density, single sided, with directory on
 track 17.  Sectors must be 256 bytes long.  Use FORMAT (DIR=17) to
@@ -150,8 +150,8 @@ an 80 track, double-sided, double-density (18 sector) 5.25-inch floppy
 will fit within the original 2901 sector limit; the extension to 5802
 is primarily for emulation of 8-inch drives (see below).
 
-The program \fBmkdisk\fP(1) makes a blank emulated floppy or "bulk
-erases" an existing one.  By default, mkdisk makes a JV3 floppy, but
+The program \fBmkdisk\fP(1) makes a blank emulated floppy or ``bulk
+erases'' an existing one.  By default, mkdisk makes a JV3 floppy, but
 with the -1 flag it makes a JV1 floppy.  See the \fBmkdisk\fP man page
 for more information.
 
@@ -406,7 +406,7 @@ program enables interrupts after powerup without executing an IM 1
 instruction first.  All Model I/III/4/4P software does this, as the
 built-in peripherals in these machines supported only IM 1.
 
-The Model I has a 40 Hz "heartbeat" clock interrupt, while the Model
+The Model I has a 40 Hz heartbeat clock interrupt, while the Model
 III used 30 Hz, and the Model 4/4P could run at either 30 Hz or 60 Hz.
 The emulator approximates this rather well even on a system where
 clock ticks come at some frequency that isn't divisible by the
@@ -479,7 +479,7 @@ See -keystretch below for more information.  This aspect of the
 emulator seems to need a bit more work.
 .SH Options
 Defaults for all options can be specified using the standard X resource
-mechanism, and the class name for \fBxtrs\fP is "Xtrs".
+mechanism, and the class name for \fBxtrs\fP is ``Xtrs''.
 .TP
 .B \-display \fIdisplay\fP
 Set your X display to \fIdisplay\fP. The default is to
@@ -535,12 +535,12 @@ The default uses the supplied fonts, scaled to double width.
 .B \-trsfont
 Use the specified X fonts for TRS-80 graphics blocks as well as
 characters.  Meaningful only if -usefont is given.  This is the
-default if the X font name begins with "-trs80".
+default if the X font name begins with ``-trs80''.
 .TP
 .B \-notrsfont
 Draw TRS-80 graphics blocks as bitmaps even if X fonts are being used
 for characters.  This is the
-default if the X font name does not begin with "-trs80".
+default if the X font name does not begin with ``-trs80''.
 .TP
 .B \-microlabs
 In Model 4/4P mode, emulate the Micro Labs Grafyx Solution hi-res
@@ -590,7 +590,7 @@ Turn off -autodelay. This is the default.
 .TP
 .B \-keystretch \fIamount,poll,heartbeat\fP
 Fine-tune the keyboard behavior.  To prevent keystrokes from being
-lost, xtrs "stretches" the intervals between key transitions, so that
+lost, xtrs ``stretches'' the intervals between key transitions, so that
 the Z-80 program has time to see each transition before the next one
 occurs.  Whenever an emulated key goes up or down, xtrs sets a counter
 to \fIamount\fP.  While the counter is greater than zero, (1) any
@@ -599,7 +599,7 @@ immediately to the Z-80, (2) whenever the Z-80 program reads from the
 keyboard matrix, the counter is decremented by \fIpoll\fP, and (3)
 whenever a TRS-80 heartbeat interrupt is scheduled to occur (even if
 interrupts are disabled), the counter is decremented by
-\fIheartbeat\fP.  The default setting is "16,1,1"; this seems to work
+\fIheartbeat\fP.  The default setting is ``16,1,1''; this seems to work
 well with ordinary keyboard drivers, but you may want to experiment
 with different values for games if keyboard response seem sluggish.
 .TP
@@ -611,12 +611,34 @@ The default is \fIboth\fP, which causes the double density adaptor emulation
 to respond to the special commands of both the Percom and Radio Shack cards.
 .TP
 .B \-doublestep
-Make real floppy drives double-step, allowing access to 35-track or
+Make all real floppy drives double-step, allowing access to 35-track or
 40-track media in an 80-track drive.  Linux only.  See the Floppy Disks
 section for limitations.
 .TP
 .B \-nodoublestep
-Turn off double-step mode.  Linux only.  This is the default.
+Turn off double-step mode for all real floppy drives.  Linux only.  
+This is the default.
+.TP
+.B \-stepmap s0,s1,s2,s3,s4,s5,s6,s7
+Selectively set double-step mode for individual real floppy drives.
+If \fIsU\fP is 2 and \fIdiskM-U\fP is a real drive, the drive will
+be double-stepped; if \fIsU\fP is 1, it will be single-stepped.
+You can omit values from the end of the list; those drives will get the
+default value set by -doublestep or -nodoublestep.
+.TP
+.B \-sizemap z0,z1,z2,z3,z4,z5,z6,z7
+Selectively set whether drives are emulated as 5-inch or 8-inch; see
+the section ``Emulated 8-inch floppy disks'' above.  If \fIzU\fP is 5,
+the drive will appear to Z-80 software as 5-inch; if 8, as 8-inch.
+The default setting (as reflected in the documentation above) is
+5,5,5,5,8,8,8,8.  You can omit values from the end of the list; those
+drives will get the default values.  Setting one or more of the first
+four drives to 8-inch may be useful for CP/M software that supports
+8-inch drives.  You can also use XTRS8/DCT with 8-inch drives in the
+first four positions; even though the prompt suggests the unit number
+must be 4-7, numbers 0-3 are accepted. XTRS8 does not check whether
+the unit you've selected is really being emulated as an 8-inch drive,
+however; you'll simply get errors during FORMAT if you get this wrong.
 .TP
 .B \-sb \fIportbase,vol\fP
 Enable sound support, using a SoundBlaster with I/O port base 

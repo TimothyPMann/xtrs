@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Thu Sep 24 20:42:26 PDT 1998 by mann */
+/* Last modified on Thu Oct 15 14:28:21 PDT 1998 by mann */
 
 /*
  * Emulate Model-I or Model-III disk controller
@@ -24,7 +24,11 @@ extern void trs_disk_command_write(unsigned char cmd);
 extern unsigned char trs_disk_interrupt_read(void); /* M3 only */
 extern void trs_disk_interrupt_write(unsigned char mask); /* M3 only */
 
-extern int trs_disk_doublestep;
+extern void trs_disk_setstep(int unit, int value);
+extern int trs_disk_getstep(int unit);
+extern void trs_disk_setsize(int unit, int value);
+extern int trs_disk_getsize(int unit);
+
 extern int trs_disk_doubler;
 extern char* trs_disk_dir;
 extern unsigned short trs_disk_changecount;

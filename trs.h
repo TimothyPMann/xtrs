@@ -115,9 +115,13 @@ void grafyx_write_xoffset(int value);
 void grafyx_write_yoffset(int value);
 void grafyx_write_overlay(int value);
 void grafyx_set_microlabs(int on_off);
+int grafyx_get_microlabs();
 
 void trs_get_mouse_pos(int *x, int *y, unsigned int *buttons);
 void trs_set_mouse_pos(int x, int y);
 void trs_get_mouse_max(int *x, int *y, unsigned int *sens);
 void trs_set_mouse_max(int x, int y, unsigned int sens);
 int trs_get_mouse_type();
+
+void sb_set_volume(int vol);
+int sb_get_volume();

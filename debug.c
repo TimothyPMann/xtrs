@@ -29,6 +29,7 @@
 
 #ifdef READLINE
 #include <readline/readline.h>
+#include <readline/history.h>
 #endif
 
 /*SUPPRESS 112*/
@@ -302,6 +303,7 @@ void debug_shell()
     char input[MAXLINE];
     char command[MAXLINE];
     int done = 0;
+    sigset_t set, oldset;
 
 #ifdef READLINE
     char *line;
@@ -318,6 +320,11 @@ void debug_shell()
     {
 	printf("\n");
 	disassemble(REG_PC);
+
+	sigemptyset(&set);
+	sigaddset(&set, SIGALRM);
+	sigaddset(&set, SIGIO);
+	sigprocmask(SIG_BLOCK, &set, &oldset);
 
 #ifdef READLINE
 	/*
@@ -346,15 +353,16 @@ void debug_shell()
 	    }
 	    else
 	    {
-		done = 1;
+		break;
 	    }
 	}
 #else
 	printf("(zbx) ");  fflush(stdout);
 
-	if (fgets(input, MAXLINE, stdin) == NULL) 
-	  done = 1;
+	if (fgets(input, MAXLINE, stdin) == NULL) break;
 #endif
+
+	sigprocmask(SIG_SETMASK, &oldset, NULL);
 
 	if(sscanf(input, "%s", command))
 	{

@@ -23,6 +23,9 @@
 
 #define BUFFER_SIZE 256
 
+extern void hex_transfer_address(int address);
+extern void hex_data(int address, int value);
+
 static int hex_byte(char *string)
 {
     char buf[3];

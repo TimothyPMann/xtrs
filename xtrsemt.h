@@ -26,6 +26,7 @@ extern int emt_dread(/* int dirfd, char *buffer, int bytes */);
 extern int emt_chdir(/* char *fname */);
 extern int emt_getcwd(/* char *buffer, int bytes */);
 extern int emt_misc(/* int func */);
+extern void emt_misc2(/* int func, int *hl, int *bc, int *de */);
 extern int emt_ftruncate(/* int fd, long length */);
 extern int emt_opendisk(/* char *fname, int oflag, int mode */);
 extern int emt_closedisk(/* int fd */);
@@ -45,8 +46,23 @@ extern int emt_closedisk(/* int fd */);
 #define EMT_TIME_LOCAL 1
 
 /* func values for emt_misc */
-#define EMT_MISC_DISK_CHANGE 0
-#define EMT_MISC_EXIT 1
-#define EMT_MISC_DEBUG 2
-#define EMT_MISC_RESET_BUTTON 3
+#define EMT_MISC_DISK_CHANGE       0
+#define EMT_MISC_EXIT              1
+#define EMT_MISC_DEBUG             2
+#define EMT_MISC_RESET_BUTTON      3
 #define EMT_MISC_QUERY_DISK_CHANGE 4
+#define EMT_MISC_QUERY_MODEL       5
+#define EMT_MISC_QUERY_DISK_SIZE   6
+#define EMT_MISC_SET_DISK_SIZE     7
+#define EMT_MISC_QUERY_DBL_STEP    8
+#define EMT_MISC_SET_DBL_STEP      9
+#define EMT_MISC_QUERY_MICROLABS  10
+#define EMT_MISC_SET_MICROLABS    11
+#define EMT_MISC_QUERY_DELAY      12
+#define EMT_MISC_SET_DELAY        13
+#define EMT_MISC_QUERY_KEYSTRETCH 14
+#define EMT_MISC_SET_KEYSTRETCH   15
+#define EMT_MISC_QUERY_DOUBLER    16
+#define EMT_MISC_SET_DOUBLER      17
+#define EMT_MISC_QUERY_VOLUME     18
+#define EMT_MISC_SET_VOLUME       19
