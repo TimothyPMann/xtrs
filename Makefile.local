@@ -10,17 +10,18 @@
 # ENDIAN = -Dbig_endian
 
 # If you would like the TRS-80 ROM to be built into the application,
-# use the following line (with the appropriate file name).  Warning: you
-# cannot build both a Model I and Model III ROM into xtrs, and if a
-# ROM is built in, only that ROM can be used.
+# use the following lines (with the appropriate file names).
 
-# BUILT_IN_ROM = level2rom.hex
+BUILT_IN_ROM = level2rom.hex
+BUILT_IN_ROM3 = romimage.m3
 
 # If you would like the application to load a default ROM file at startup
-# time, use this line (with the appropriate file name):
+# time, use these lines (with the appropriate file names).  The default file
+# name is ignored and may be omitted if the ROM for that model is built in.
 
-# DEFAULT_ROM = -DDEFAULT_ROM='"/usr/local/lib/level2rom.hex"'
-DEFAULT_ROM = -DDEFAULT_ROM='"level2rom.hex"' -DDEFAULT_ROM3='"romimage.m3"'
+# DEFAULT_ROM = -DDEFAULT_ROM='"/usr/local/lib/level2rom.hex"' \
+#               -DDEFAULT_ROM3='"/usr/local/lib/romimage.m3"'
+# DEFAULT_ROM = -DDEFAULT_ROM='"level2rom.hex"' -DDEFAULT_ROM3='"romimage.m3"'
 
 # If you have the GNU readline package (the README file tells you where to
 # get it) and would like to use it with the built-in Z-80 debugger, use
@@ -33,6 +34,7 @@ DEFAULT_ROM = -DDEFAULT_ROM='"level2rom.hex"' -DDEFAULT_ROM3='"romimage.m3"'
 # If you want to debug the emulator, use the -g flag instead:
 
 #DEBUG = -O
+#DEBUG = -g -DKBDEBUG -DXDEBUG
 DEBUG = -g
 
 # If you have gcc, and you want to use it:

@@ -1,0 +1,187 @@
+;; export.z
+;; Timothy Mann, 8/24/97
+;; Last modified on Mon Aug 25 15:58:14 PDT 1997 by mann
+;;
+;; Use xtrs 1.4 emulator traps to copy a file from TRS-80 to Unix
+;; Usage: EXPORT fromfile unixfile (NL)
+;; If the (NL) parameter is given, each carriage return ('\r')
+;;  in the TRS-80 file is converted to a newline ('\n') in the Unix file.
+
+@fspec  equ 441ch
+@init   equ 4420h
+@open   equ 4424h
+@close  equ 4428h
+@param  equ 4476h
+@param3 equ 4454h
+@logot  equ 447bh
+@logot3 equ 428ah
+@read   equ 4436h
+@write  equ 4439h
+@error  equ 4409h
+@exit   equ 402dh
+@abort  equ 4030h       
+
+model   equ 0125h ;'I' here => M3
+
+; Emulator trap instructions, byte-reversed for use in defw:
+open	equ 30edh
+close	equ 31edh
+read	equ 32edh
+write	equ 33edh
+lseek	equ 34edh
+strerror equ 35edh
+
+	org 5200h
+export: ld a, (model)           ; model 1 or 3?
+        cp 'I'
+        jr nz, model1           ; go if 1
+        push hl
+        ld hl, param+1
+        ld de, @param3
+        ld (hl), e
+        inc hl
+        ld (hl), d
+        ld hl, logot+1
+        ld de, @logot3
+        ld (hl), e
+        inc hl
+        ld (hl), d
+        pop hl
+model1: 
+	ld de, dcb              ; ready to get LDOS filename from (HL)
+        call @fspec
+        jr nz, usage
+
+skipsp:	ld a, (hl)              ; scan over Unix filename
+        cp ' '		        ; first skip spaces
+	jr c, usage             ; error if line ends here
+        jr nz, unix1
+        inc hl
+	jr skipsp
+unix1:  ld (uname+1), hl        ; save pointer
+unix2:	inc hl                  ; now scan for end of Unix name
+        ld a, (hl)
+	cp ' '+1
+	jr nc, unix2
+
+	push hl			; save end of Unix name
+	ld de, prmtbl           ; ready to parse params
+        call param
+	pop hl
+	ld (hl), 0		; NUL terminate Unix name
+        jr z, prmok             ; go if OK
+usage:  ld hl, usager           ; error message and exit
+        call logot
+        jp @abort
+prmok:  
+        ld hl, iobuf
+        ld de, dcb
+        ld b, 0
+        call @open              ; open the TRS-80 file
+        pop hl
+        jr z, uname
+        call @error
+        jp @abort
+
+uname:	ld hl, $-$              ; path
+        ld bc, 3001q            ; oflag (O_WRONLY+O_CREAT+O_TRUNC)
+        ld de, 0666q            ; mode
+        defw open		; open the Unix file
+        jr z, opn2ok            ; go if OK
+        ld hl, uopner           ; error message and exit
+        jr uerror
+
+;; Read
+opn2ok:	
+	ld bc, 0		; count records in bc
+
+loop:	push de			; save fd
+	ld de, dcb
+	call @read              ; read 256 bytes from file
+	pop de
+        jr z, rdok		; got a full 256 bytes
+	cp 28			; eof?
+	jr z, closit		; yes, OK
+        call @error             ; oops, i/o error
+        jp @abort
+rdok:	inc bc
+
+;; Translate
+	push bc			; save record count
+        ld a, (nlparam)		; check for NL feature
+	and a
+	jr z, nlfals
+	ld hl, iobuf
+	ld a, 0dh
+	ld bc, 000ah		; b := 0, c := 0ah
+tloop:	cp (hl)
+	jr nz, notlf
+	ld (hl), c
+notlf:	inc hl
+	djnz tloop
+nlfals:	pop bc			; restore record count
+
+;; Write
+	ld hl, (dcb+12)		; check if last record
+	sub a
+	sbc hl, bc
+	push bc			; save record count
+	ld bc, 0100h		; byte count
+	jr nz, notlst
+	ld b, 0
+	ld a, (dcb+8)
+	ld c, a
+notlst:
+	ld hl, iobuf
+	defw write
+	ld h, b
+	pop bc
+	jr z, wrok
+	ld hl, uwrer            ; write error
+        jr uerror
+wrok:	ld a, h
+	and a
+	jr nz, loop
+
+;; Close
+closit:	defw close		; close Unix file
+	jr z, closok
+        ld hl, uclser           ; close error
+	jr uerror
+closok:	ld de, dcb
+        call @close             ; close the TRS-80 file
+        jr z, cls2ok
+        call @error             ; oops, i/o error
+        jp @abort
+cls2ok: jp @exit                ; all is well
+
+;; Unix error, msg in hl, errno in a
+uerror: push af
+	call logot
+	pop af
+	ld hl, iobuf
+	ld bc, 256
+	defw strerror
+	call logot
+        jp @abort
+
+logot:  jp @logot               ; jump vectors, modified for M3
+param:  jp @param
+
+prmtbl: 
+        defb 'NL    '
+        defw nlparam
+        defb 0    
+
+nlparam:
+	defw 0
+
+usager: defb 'Usage: EXPORT fromfile unixfile (NL=y/n)', 0dh
+uopner:	defb 'Error in Unix open: ', 03h
+uwrer:	defb 'Error in Unix write: ', 03h
+uclser:	defb 'Error in Unix close: ', 03h
+
+dcb:   defs 32   
+iobuf: defs 256
+        
+        end export

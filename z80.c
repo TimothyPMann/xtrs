@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Dec 17 13:06:19 PST 1996 by mann
+   Last modified on Tue Aug 26 00:12:26 PDT 1997 by mann
 */
 
 /*
@@ -413,8 +413,11 @@ static void do_negate()
     a = REG_A;
     REG_A = - a;
     do_sub_flags(0, a, REG_A);
+#ifdef WRONG
+    /* This is utterly wrong.  Why was it here? --tpm */
     if(a == 0)
       REG_F |= CARRY_MASK;
+#endif
 }
 
 static void do_sbc_byte(value)
@@ -689,12 +692,7 @@ static int rrc_byte(value)
     }
     else
     {
-#if 0
-        /* oops! */
-	result = (value << 1);
-#else
 	result = (value >> 1);
-#endif
     }
 
     if(result & 0x80)
@@ -2221,9 +2219,6 @@ static void do_indexed_instruction(ixp)
 	break;
 
       case 0x23:	/* inc ix */
-#ifdef OOPS
-	(*ixp)--;  /* amazing we got far with this mistake! --tpm */
-#endif
 	(*ixp)++;
 	break;
 
@@ -2662,12 +2657,35 @@ static void do_ED_instruction()
 	do_sbc_word(REG_SP);
 	break;
 
+      /* Emulator traps -- not real Z-80 instructions */
+      case 0x30:        /* open */
+	do_emt_open();
+	break;
+      case 0x31:	/* close */
+	do_emt_close();
+	break;
+      case 0x32:	/* read */
+	do_emt_read();
+	break;
+      case 0x33:	/* write */
+	do_emt_write();
+	break;
+      case 0x34:	/* lseek */
+	do_emt_lseek();
+	break;
+      case 0x35:	/* strerror */
+	do_emt_strerror();
+	break;
+
       default:
 	REG_PC -= 2;
 	disassemble(REG_PC);
 	error("unsupported instruction");
     }
 }
+
+int x_poll_count = 0;
+#define X_POLL_INTERVAL 10000
 
 /* Hack, hack, see if we can speed this up. */
 /*extern Uchar *memory;*/
@@ -2684,6 +2702,16 @@ int z80_run(continuous)
 
     /* loop to do a z80 instruction */
     do {
+	if (x_poll_count <= 0) {
+	    x_poll_count = X_POLL_INTERVAL;
+	    trs_get_event(0);
+	}
+#ifndef HAVE_SIGIO
+	/* If we aren't using SIGIO, we need to poll periodically.
+	   If we are using it, the SIGIO handler tells us when to poll
+	   by setting x_poll_count to 0 */
+	x_poll_count--;
+#endif
 	instruction = mem_read(REG_PC++);
 	/* instruction = MEM_READ(REG_PC);  REG_PC++; */
 	

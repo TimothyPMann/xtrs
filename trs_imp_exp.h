@@ -5,15 +5,61 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Tue Dec 17 13:06:18 PST 1996 by mann */
+/* Last modified on Mon Aug 25 15:41:19 PDT 1997 by mann */
 
 /*
  * trs_imp_exp.h
  *
  * Features to make transferring files into and out of the emulator
- * easier.  
+ * easier.  There are two sets of features implemented.  The old, slow
+ * ones use some special reserved ports.  The interface is something
+ * that could conceivably be implemented in real hardware.  The new,
+ * fast, flexible ones use a set of emulator traps (instructions that
+ * don't exist in a real Z-80).  The old ones should probably go away
+ * at some point.
  *
- * Import: 
+ * ED30 open
+ *         Before, HL => path, null terminated
+ *                 BC =  oflag
+ *                 DE =  mode
+ *         After,  AF =  0 if OK, error number if not (Z flag affected)
+ *                 DE =  fd, 0xFFFF if error
+ *
+ * ED31 close
+ *         Before, DE =  fd
+ *         After,  AF =  0 if OK, error number if not (Z flag affected)
+ *
+ * ED32 read
+ *         Before, BC =  nbytes
+ *                 DE =  fd
+ *                 HL => buffer
+ *         After,  AF =  0 if OK, error number if not (Z flag affected)
+ *                 BC =  nbytes read, 0xFFFF if error
+ *
+ * ED33 write
+ *         Before, BC =  nbytes
+ *                 DE =  fd
+ *                 HL => buffer
+ *         After,  AF =  0 if OK, error number if not (Z flag affected)
+ *                 BC =  nbytes written, 0xFFFF if error
+ *
+ * ED34 lseek
+ *         Before, BC =  whence
+ *                 DE =  fd
+ *                 HL => offset (8-byte little-endian integer)
+ *         After,  AF =  0 if OK, error number if not (Z flag affected)
+ *                 HL => location in file (8-byte little-endian integer)
+ *
+ * ED35 strerror
+ *         Before, A  =  error number
+ *                 HL => buffer for error string
+ *                 BC =  buffer size
+ *         After,  AF =  0 if OK, new error number if not (Z flag affected)
+ *                 HL => same buffer, containing \r-terminated error string
+ *
+ * ED36-ED3F reserved
+ *
+ * Old import feature
  *  1) Write IMPEXP_CMD_IMPORT to the command port, write a Unix
  *     filename to the data port, and read the status port to
  *     check for errors on the fopen() call.
@@ -24,7 +70,7 @@
  *     available from the status port.  Normal completion will be
  *     indicated by IMPEXP_EOF.
  *
- * Export:
+ * Old export feature
  * 1) Write IMPEXP_CMD_EXPORT to the command port, write a Unix
  *    filename to the data port, and read the status port to
  *    check for errors on the fopen() call.
@@ -35,12 +81,18 @@
  *    available from the status port.  Normal completion will be
  *    indicated by IMPEXP_EOF.
  *
- * Reset:
+ * Reset old import/export feature
  *    Write IMPEXP_CMD_RESET to the command port.  This closes the file if
  *    it is currently open and makes the return status of fclose 
  *    available from the status port.  If no file was open,
- *    the status will be IMPEXP_EOF.
- */
+ *    the status will be IMPEXP_EOF.  */
+
+extern void do_emt_open();
+extern void do_emt_close();
+extern void do_emt_read();
+extern void do_emt_write();
+extern void do_emt_lseek();
+extern void do_emt_strerror();
 
 #define IMPEXP_CMD     0xd0
 #define IMPEXP_STATUS  0xd0
@@ -63,3 +115,4 @@ extern void trs_impexp_cmd_write(unsigned char data);
 extern unsigned char trs_impexp_status_read(void);
 extern void trs_impexp_data_write(unsigned char data);
 extern unsigned char trs_impexp_data_read(void);
+

@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Dec 17 13:06:20 PST 1996 by mann
+   Last modified on Wed Aug 27 17:36:02 PDT 1997 by mann
 */
 
 /*
@@ -33,6 +33,7 @@
 #include "trs_disk.h"
 
 Uchar *memory;
+int trs_rom_size;
 
 #define MEMORY_SIZE	Z80_ADDRESS_LIMIT
 
@@ -66,8 +67,6 @@ Uchar *memory;
 
 /*SUPPRESS 53*/
 /*SUPPRESS 112*/
-
-#ifdef XTRASH
 
 /*
  * The video cache hacks are for speed, so that we don't send and flush
@@ -137,41 +136,6 @@ static void uncache_video_writes()
     }
     video_cache_on = 0;
 }
-#else
-
-/* Versions of the video routines for non-X hacking */
-
-/*ARGSUSED*/
-static void video_write(location, value)
-    int location;
-    int value;
-{
-    /* video write */
-    if(isprint(value))
-    {
-	printf("%c", value);
-	if(value == 'M')
-	  printf("");
-    }
-    else
-    {
-	printf(".");
-    }
-    fflush(stdout);
-}
-
-static void video_scroll()
-{
-}
-
-static void cache_video_writes()
-{
-}
-
-static void uncache_video_writes()
-{
-}
-#endif
 
 void trs_exit()
 {
@@ -184,16 +148,15 @@ void trs_reset()
     trs_disk_init(1);
     /* Signal a nonmaskable interrupt. */
     trs_reset_button_interrupt(1);
+    /* Part of keyboard stretch kludge */
+    trs_kb_reset();
 }
 
 void mem_init()
 {
     memory = (Uchar *) malloc(MEMORY_SIZE);
-
     bzero(memory, MEMORY_SIZE);
-#ifdef XTRASH
     video_cache_on = 0;
-#endif
 }
 
 /*

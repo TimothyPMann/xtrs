@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Aug  5 20:24:13 PDT 1997 by mann
+   Last modified on Wed Aug 27 21:50:55 PDT 1997 by mann
 */
 
 /*
@@ -78,11 +78,8 @@ static XrmOptionDescRec opts[] = {
 
 static int num_opts = (sizeof opts / sizeof opts[0]);
 
-static int key_state = 0;
-
-#ifdef KBQUEUE
 /*
- * Key event queueing routines:
+ * Key event queueing routines
  */
 #define KEY_QUEUE_SIZE	(16)
 static int key_queue[KEY_QUEUE_SIZE];
@@ -98,11 +95,17 @@ static void clear_key_queue()
 static void queue_key(state)
     int state;
 {
-    if(key_queue_entries < KEY_QUEUE_SIZE)
-    {
-	key_queue[(key_queue_head + key_queue_entries) % KEY_QUEUE_SIZE] =
-	  state;
+    key_queue[(key_queue_head + key_queue_entries) % KEY_QUEUE_SIZE] = state;
+#ifdef KBDEBUG
+	fprintf(stderr, "queue_key 0x%x", state);
+#endif
+    if (key_queue_entries < KEY_QUEUE_SIZE) {
 	key_queue_entries++;
+#ifdef KBDEBUG
+	fprintf(stderr, "\n");
+    } else {
+	fprintf(stderr, " (overflow)\n");
+#endif
     }
 }
 
@@ -115,26 +118,18 @@ static int dequeue_key()
 	rval = key_queue[key_queue_head];
 	key_queue_head = (key_queue_head + 1) % KEY_QUEUE_SIZE;
 	key_queue_entries--;
+#ifdef KBDEBUG
+	fprintf(stderr, "dequeue_key 0x%x\n", rval);
+#endif
     }
     return rval;
 }
 
-#ifdef BAD_IDEA
-static int peek_key_queue()
-{
-    if(key_queue_entries > 0)
-	return key_queue[key_queue_head];
-    else
-        return key_state;
-}
-#endif
-#endif
-
 /* Private routines */
 void bitmap_init();
 void screen_init();
+void trs_event_init();
 void trs_event();
-XEvent get_event();
 
 /* exits if something really bad happens */
 int trs_screen_init(argc,argv,debug)
@@ -142,7 +137,6 @@ int argc;
 char **argv;
 int *debug;
 {
-    int fd,rc;
     Window root_window;
     unsigned long fore_pixel, back_pixel, foreground, background;
     XrmDatabase x_db = NULL;
@@ -242,42 +236,38 @@ int *debug;
 	}
     }
 
-    /* UGLY: romfile garbage */
-    if (trs_rom_size > 0) {
-	/* use compiled in rom */
-	trs_load_compiled_rom();
-    } else {
-	if (trs_model == 1) {
-	    /* try resources */
-	    (void) sprintf(option, "%s%s", program_name, ".romfile");
-	    if (XrmGetResource(x_db, option, "Xtrs.Romfile", &type, &value)) {
-		trs_load_rom(value.addr);
-	    } else {
-#ifdef DEFAULT_ROM
-		trs_load_rom(DEFAULT_ROM);
-#else
-		fprintf(stderr,"%s: rom file not specified!\n",program_name);
-		exit(-1);
-#endif
-	    }
+    if (trs_model == 1) {
+	/* try resources first */
+	(void) sprintf(option, "%s%s", program_name, ".romfile");
+	if (XrmGetResource(x_db, option, "Xtrs.Romfile", &type, &value)) {
+	    trs_load_rom(value.addr);
+	} else if (trs_rom1_size > 0) {
+	    trs_load_compiled_rom(trs_rom1_size, trs_rom1);
 	} else {
-	    (void) sprintf(option, "%s%s", program_name, ".romfile3");
-	    if (XrmGetResource(x_db, option, "Xtrs.Romfile3", &type, &value)) {
-		trs_load_rom(value.addr);
-	    } else {
-#ifdef DEFAULT_ROM3
-		trs_load_rom(DEFAULT_ROM3);
+#ifdef DEFAULT_ROM
+	    trs_load_rom(DEFAULT_ROM);
 #else
-		fprintf(stderr,"%s: rom file not specified!\n",program_name);
-		exit(-1);
+	    fprintf(stderr,"%s: rom file not specified!\n",program_name);
+	    exit(-1);
 #endif
-	    }
+	}
+    } else {
+	(void) sprintf(option, "%s%s", program_name, ".romfile3");
+	if (XrmGetResource(x_db, option, "Xtrs.Romfile3", &type, &value)) {
+	    trs_load_rom(value.addr);
+	} else if (trs_rom3_size > 0) {
+	    trs_load_compiled_rom(trs_rom3_size, trs_rom3);
+	} else {
+#ifdef DEFAULT_ROM3
+	    trs_load_rom(DEFAULT_ROM3);
+#else
+	    fprintf(stderr,"%s: rom file not specified!\n",program_name);
+	    exit(-1);
+#endif
 	}
     }
 
-#ifdef KBQUEUE
     clear_key_queue(); /* init the key queue */
-#endif
 
     /* setup root window, and gc */
     root_window = DefaultRootWindow(display);
@@ -313,214 +303,155 @@ int *debug;
 
     bitmap_init(foreground, background);
 
-    /* screen_init(); */
+    screen_init();
     XClearWindow(display,window);
 
+#ifdef HAVE_SIGIO
+    trs_event_init();
+#endif
+
+    return(argc);
+}
+
+#ifdef HAVE_SIGIO
+void trs_event_init()
+{
+    int fd, rc;
+    struct sigaction sa;
+
     /* set up event handler */
-    signal(SIGIO,trs_event);
+    sa.sa_handler = trs_event;
+    sa.sa_mask = sigmask(SIGIO);
+    sa.sa_flags = SA_RESTART;
+    sigaction(SIGIO, &sa, NULL);
+
     fd = ConnectionNumber(display);
     if (fcntl(fd,F_SETOWN,getpid()) < 0)
 	perror("fcntl F_SETOWN");
     rc = fcntl(fd,F_SETFL,FASYNC);
     if (rc != 0)
 	perror("fcntl F_SETFL async error");
-
-    return(argc);
 }
 
 /* ARGSUSED */
 void trs_event(signo)
     int signo;
 {
-    fd_set rd_mask;
-    int fd,nfds,nfound,sig_mask;
-    struct timeval zero_timeout,*timeout;
-
-    sig_mask = sigblock(sigmask(SIGIO));
-    zero_timeout.tv_sec = 0;
-    zero_timeout.tv_usec = 0;
-
-    while (Death && Taxes) {
-	FD_ZERO(&rd_mask);
-	fd = ConnectionNumber(display);
-	FD_SET(fd,&rd_mask);
-	timeout = &zero_timeout;
-	nfds = fd + 1;
-	nfound = select(nfds,&rd_mask,NULL,NULL,timeout);
-	if (nfound == 0) {
-	    signal(SIGIO, trs_event);
-	    sigsetmask(sig_mask);
-	    return;
-	}
-	(void) get_event();
-    }
+    x_poll_count = 0;
 }
+#endif /*HAVE_SIGIO*/
 
-XEvent get_event()
+KeySym last_key[256];
+
+/* 
+ * Get and process X event(s).
+ *   If wait is true, process one event, blocking until one is available.
+ *   If wait is false, process as many events as are available, returning
+ *     when none are left.
+ */ 
+void trs_get_event(wait)
+     int wait;
 {
     XEvent event;
     KeySym key;
     char buf[10];
     XComposeStatus status;
     XWindowChanges xwc;
+    int trs_key;
 
-    XNextEvent(display,&event);
-    switch(event.type) {
-	case Expose:
+    do {
+	if (wait) {
+	    XNextEvent(display, &event);
+	} else {
+	    if (!XCheckMaskEvent(display, ~0, &event)) return;
+	}
+
+	switch(event.type) {
+	  case Expose:
+#ifdef XDEBUG
+	    fprintf(stderr,"Expose\n");
+#endif
 	    trs_screen_refresh();
 	    break;
-	case ResizeRequest:
+	  case ResizeRequest:
+#ifdef XDEBUG
+	    fprintf(stderr,"ResizeRequest\n");
+#endif
 	    xwc.width = OrigWidth;
 	    xwc.height = OrigHeight;
 	    XConfigureWindow(display,event.xresizerequest.window,
 			     (CWWidth | CWHeight),&xwc);
 	    XFlush(display);
 	    break;
-	case ConfigureNotify:
+	  case ConfigureNotify:
+#ifdef XDEBUG
+	    fprintf(stderr,"ConfigureNotify\n");
+#endif
 	    break;
-	case MapNotify:
+	  case MapNotify:
+#ifdef XDEBUG
+	    fprintf(stderr,"MapNotify\n");
+#endif
 	    trs_screen_refresh();
 	    break;
-	case KeyPress:
+	  case KeyPress:
 	    (void) XLookupString((XKeyEvent *)&event,buf,10,&key,&status);
-	    switch (key) {
-		case XK_c:
-		    if (event.xkey.state & ControlMask)
-			key_state = 0x3; /* ctrl-c is break */
-		    else
-			key_state = (int) key;
-		    break;
-		case XK_l:
-		    if (event.xkey.state & ControlMask)
-			key_state = 0x7f; /* ctrl-l is clear */
-		    else
-			key_state = (int) key;
-		    break;
-		case XK_r:
-		    if (event.xkey.state & ControlMask)
-			trs_reset(); /* ctrl-r is reset button */
-		    else
-			key_state = (int) key;
-		    break;
-		case XK_q:
-		    if (event.xkey.state & ControlMask)
-			trs_exit(); /* ctrl-q quits the program */
-		    else
-			key_state = (int) key;
-		    break;
-	        case XK_t:
-		    if (event.xkey.state & ControlMask)
-		        /* ctrl-t is shift-0 (caps lock under LDOS) */
-			key_state = '0' | 0x80; 
-		    else
-			key_state = (int) key;
-		    break;
-	        case XK_d:
-		    if (event.xkey.state & ControlMask)
-		        /* ctrl-d checks for a disk change */
-		        trs_disk_change_all();
-		    else
-			key_state = (int) key;
-		    break;
-	        case XK_p:
-		    if (event.xkey.state & ControlMask)
-		        /* ctrl-p is shift-@ (pause in BASIC) */
-			key_state = '@' | 0x80; 
-		    else
-			key_state = (int) key;
-		    break;
-		case XK_Break:
-		case XK_Escape:
-		    key_state = 0x3;
-		    if (event.xkey.state & ShiftMask)
-		      key_state |= 0x80;
-		    break;
-		case XK_Return:
-		case XK_KP_Enter:
-		    key_state = 0x0d;
-		    if (event.xkey.state & ShiftMask)
-		      key_state |= 0x80;
-		    break;
-		case XK_Up:
-		    key_state = 0x11;
-		    if (event.xkey.state & ShiftMask)
-		      key_state |= 0x80;
-		    break;
-		case XK_Down:
-		    key_state = 0x12;
-		    if (event.xkey.state & ShiftMask)
-		      key_state |= 0x80;
-		    break;
-		case XK_Left:
-		case XK_BackSpace:
-		case XK_Delete:
-		    key_state = 0x13;
-		    if (event.xkey.state & ShiftMask)
-		      key_state |= 0x80;
-		    break;
-		case XK_Right:
-		case XK_Tab:
-		    key_state = 0x14;
-		    if (event.xkey.state & ShiftMask)
-		      key_state |= 0x80;
-		    break;
-	        case XK_Alt_L:
-	        case XK_Alt_R:
-	        case XK_Meta_L:
-	        case XK_Meta_R:
-		case XK_Clear:
-		case XK_Home:
-		    key_state = 0x7f;
-		    if (event.xkey.state & ShiftMask)
-		      key_state |= 0x80;
-		    break;
-	        case XK_Pause:
-		    key_state = '@' | 0x80;
-                    break;
-		default:
-		    if(key < 0x80) {
-			/* Kludge, nice for TRS80 ROM keyboard driver:
-			   CapsLock *on* undoes driver's caps/lc reversal.
-		        */
-		        if(((event.xkey.state & (ShiftMask|LockMask))
-			    == (ShiftMask|LockMask))
-			   && key >= 'A' && key <= 'Z') {
-			    key_state = (int) key + 0x20;
-			} else {
-			    key_state = (int) key;
-			}
-		    }
-		    break;
-	    }
-	    if(event.xkey.state & Mod1Mask) key_state |= 0x100;
-#ifdef KBQUEUE
-	    queue_key(key_state);
+#ifdef XDEBUG
+	    fprintf(stderr,"KeyPress: state 0x%x, keycode 0x%x, key 0x%x\n",
+		    event.xkey.state, event.xkey.keycode, key);
 #endif
-	    break;
-	case KeyRelease:
-	    (void) XLookupString((XKeyEvent *)&event,buf,10,&key,&status);
-	    key_state = 0;
 	    switch (key) {
-	        case XK_Alt_L:
-	        case XK_Alt_R:
-	        case XK_Meta_L:
-	        case XK_Meta_R:
-		    break;
-		default:
-		    if(event.xkey.state & Mod1Mask) key_state |= 0x100;    
-		    break;
+	      /* Trap some function keys here */
+	      case XK_F10:
+		trs_reset();
+		key = 0;
+		break;
+	      case XK_F9:
+		trs_debug();
+		key = 0;
+		break;
+	      case XK_F8:
+		trs_exit();
+		key = 0;
+		break;
+	      case XK_F7:
+		trs_disk_change_all();
+		key = 0;
+		break;
+	      default:
+		break;
 	    }
-#ifdef KBQUEUE
-	    queue_key(key_state);
-#endif
+	    if ( ((event.xkey.state & (ShiftMask|LockMask))
+		  == (ShiftMask|LockMask))
+		   && key >= 'A' && key <= 'Z' ) {
+		/* Make Shift + CapsLock give lower case */
+		key = (int) key + 0x20;
+	    }
+	    if (key == XK_Shift_R && trs_model == 1) {
+		key = XK_Shift_L;
+	    }
+	    if (key != 0) {
+		queue_key(key);
+	    }
+	    last_key[event.xkey.keycode] = key;
 	    break;
-	default:
+	  case KeyRelease:
+	    key = last_key[event.xkey.keycode];
+#ifdef XDEBUG
+	    fprintf(stderr,"KeyRelease: keycode 0x%x, last_key 0x%x\n",
+		    event.xkey.state, event.xkey.keycode, key);
+#endif
+	    if (key != 0) {
+		queue_key(0x10000 | key);
+	    }
+	    break;
+	  default:
 #ifdef XDEBUG	    
-	    fprintf(stderr,"Unhandled event, type is %d \n",event.type);
+	    fprintf(stderr,"Unhandled event: type %d\n", event.type);
 #endif
 	    break;
-    }
-    return(event);
+	}
+    } while (!wait);
 }
 
 void trs_screen_mode_select(mode)
@@ -675,43 +606,25 @@ int count;
     XFlush(display);
 }
 
-
-int trs_kb_poll()
-{
-    /* if (key_state != 0)
-	printf("key is %d\n",key_state); */
-    return key_state;
-}
-
-int trs_next_key_nowait()
-{
-#ifdef KBQUEUE
-    int rval;
-    if((rval = dequeue_key()) >= 0) return rval;
-#endif
-    return key_state;
-}
-
-int trs_next_key()
+int trs_next_key(wait)
+     int wait;
 {
 #if KBWAIT
-    int rval;
-    for(;;) 
-    {
-#if KBQUEUE
-        if((rval = dequeue_key()) >= 0) break;
-#else
-	if((rval = key_state) > 0) break;
-#endif
-        if(z80_state.irq && z80_state.iff1)
-        {
-	  rval = key_state;
-	  break;
-        }
-        pause();
+    if (wait) {
+	int rval;
+	for (;;) {
+	    if ((rval = dequeue_key()) >= 0) break;
+	    if ((z80_state.nmi && !z80_state.nmi_seen) ||
+		(z80_state.irq && z80_state.iff1)) {
+		rval = -1;
+		break;
+	    }
+	    pause(); /* Wait for SIGALRM or SIGIO */
+	    trs_get_event(0);
+	}
+	return rval;
     }
-    return rval;
-#else
-    return key_state;
 #endif
+    return dequeue_key();
+
 }

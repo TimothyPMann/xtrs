@@ -10,27 +10,59 @@ keyboard and video I/O through an X interface.  The hardware
 emulation is based on the TRS-80 Model I and Model III designs.
 
 \fIxtrs\fP supports 48K of RAM. 
-There is support for rudimentary cassette I/O
-emulation that uses files for cassette tapes.  A printer is emulated by
-sending its output to standard output.  Floppy disks are also emulated
-using files.
+Floppy disks are emulated using files to store the data.
+A printer is emulated by
+sending its output to standard output.  
+There is also a rudimentary emulation of cassette I/O
+that uses files for cassette tapes (Model I mode only).
 
 The Z-80 emulator has a debugger called zbx.  It works sort of
 like dbx.  If you run with debugging turned on (see the options section for
 how to do this), you'll enter the debugger, and
 you can type "help" for more information.
 
-Special support in the emulator allows the program to block when waiting
-for information from the keyboard.  This will only work for programs which
-get keyboard input via the standard ROM calls.  We do similar tricks to
-make the cassette I/O work.
+Special support in the emulator allows the program to block when
+waiting for information from the keyboard.  This will work only for
+programs that wait for keyboard input using the standard ROM call; the
+emulator decides whether to block the Z-80 program when it tries to
+read from the keyboard memory by pattern-matching its stack.
 
-When running \fIxtrs\fP, the following special keys are used to
-control it: Ctrl-C or Esc is the "break" key (for those keyboards that
-don't have a break key), Ctrl-L or Alt is the "clear" key, Ctrl-T is
-the shifted zero key, Ctrl-P or Pause is the shifted @ key, Ctrl-R is
-the reset button, and Ctrl-Q exits the program.  The Break key, Clear
-key, and arrow keys are all mapped appropriately if they are present.
+The following keys have special meanings to \fIxtrs\fP:
+
+LeftArrow, Backspace, or Delete is the TRS-80 left arrow key.
+RightArrow or Tab is the right arrow key.
+UpArrow is the up arrow key.
+DownArrow or Linefeed is the down arrow key.
+Esc or Break is the Break key.
+Home, Clear, or LeftAlt is the Clear key. 
+Control is the Model III Ctrl key.
+RightAlt is equivalent to the shifted down arrow key (used
+as a control key with some TRS-80 software).  
+
+F1, F2, and F3 are the Model III function keys.  (F1 is
+also the nonstandard Model I Electric Pencil control key that some
+users added to their machines.)
+F4 is the Model III Caps Lock key.
+F5, Compose, or ScrollLock is equivalent to the @ key (so that @ can
+be used as a modifier key).
+F6 is equivalent to the 0 key (so that a shifted 0 can be obtained).
+F7 signals a disk change in the emulated floppy drives (see below). 
+F8 exits the program.
+F9 requests entry to the debugger if it is active.
+F10 is the reset button.  
+
+In Model III mode, the left and right shift keys are distinct; in
+Model I mode, they are the same.  The F11 or F14 key activates the
+position in the TRS-80 keyboard matrix that corresponds to the Model
+III right shift key (address bit 7, data bit 1) even in Model I mode.
+F12 or End activates an unused position in the keyboard matrix
+(address bit 7, data bit 2).  The keys [, \\, ], ^, _, {, |, },
+and ~ also activate unused positions in the keyboard matrix (address
+bit 3, data bits 3-7).  These keys map to the corresponding ASCII
+characters under some TRS-80 keyboard drivers; under others, they do
+nothing.  F13 or Insert is equivalent to underscore (address bit 3,
+data bit 7), so that a shifted underscore can be obtained; this maps
+to ASCII code 0x7f under some TRS-80 keyboard drivers.
 
 To control the cassette, a file called ".cassette.ctl" in the
 current directory keeps track of what file is currently "loaded" as
@@ -65,13 +97,12 @@ no disk in it is emulated.  If the user does not have write permission
 for a floppy file, a write-protect tab is emulated.  To change
 floppies in an emulated drive, rename the existing file for the drive
 (if any), rename the new floppy file to the proper name, and hit
-ctrl-D (for "disk change") in the emulator.
+function key F7 in the emulator.
 
-Recall that in a true Model I, the system hangs if you have a disk
-controller but attempt to boot with no disk in drive 0.  This behavior
-is emulated faithfully.  Hold down Esc (the emulated break key) and
-press Ctrl-R (the emulated reset button) if you want to boot into
-non-disk Basic.
+In a true Model I, if you have a disk controller but attempt to boot
+with no disk in drive 0, the system hangs.  As a convenience feature
+this behavior is not emulated; instead, if you try to boot in Model I
+mode with no disk in drive 0, xtrs emulates having no disk controller.
 
 Due to a limitation of the original Model I hardware, drive :3 cannot
 be double-sided in Model I mode.  In the original Model I, you could
@@ -117,14 +148,19 @@ as FA.  In all other modes, F8 is returned as F8.  This trick makes
 the different operating systems perfectly compatible with each other,
 which is better than on a real Model I!
  
-The emulator contains a kludge that gives TRS-80 programs access to
-Unix files.  The supplied Basic programs import.bas and export.bas
-exercise the feature, but are quite slow.  The Z-80 assembly language
-program import.cmd is a faster version of import.bas that
-(unfortunately) runs only under LDOS.  Its source code is in import.z.
-All four files are included on an emulated disk, imp_exp.dsk.
+The emulator implements a set of pseudo-instructions (emulator traps)
+that give TRS-80 programs access to Unix files.  The supplied Z-80
+assembly language programs import.z and export.z exercise these
+features; see the top of each file for usage instructions.
+Unfortunately, these programs currently run only under LDOS.  The
+Basic programs import.bas and export.bas are much slower, and use a
+different mechanism in the emulator that may be removed in the future,
+but they should work under all TRS-80 operating systems.  All these
+programs are supplied (in both source and executable form) on the
+emulated floppy disk imp_exp.dsk to get you started.
 
-See README and README.tpm in this package for additional technical data.
+See README and README.tpm in this package for additional technical
+(and historical) data.
 
 .SH Options
 Defaults for all options can be specified using the standard X resource
@@ -168,11 +204,12 @@ Enter zbx, the z80 debugger.
 .B \-romfile3 \fIfilename3\fP
 .IP 
 Use the romfile specified by \fIfilename\fP in Model I mode, or the
-romfile specified by \fIfilename3\fP in Model III mode.  You can
-specify a default location at compile time, and then override it using
-this option.  \fIxtrs\fP will complain if it cannot locate a romfile.
-If you compile the romfile in to the executable, then this option is
-ignored.
+romfile specified by \fIfilename3\fP in Model III mode.  A romfile can
+be either a raw binary dump or in Intel hex format.
+If you do
+not set this option or the corresponding X resource, a default
+established at compile time is used (if any); see Makefile.local for
+instructions on compiling in default romfiles or default romfile names.
 .TP
 .B \-model1
 .IP
@@ -203,26 +240,21 @@ http://www.research.digital.com/SRC/personal/Tim_Mann/trs80.html.
 
 .SH Bugs
 There may be bugs in the Z-80 emulator which we haven't found yet.
-The undocumented Z-80 instructions are not implemented.
+The undocumented Z-80 instructions are not implemented.  The HALT
+instruction causes an exit from the emulator.
 
 We don't draw the original Model I character set.  Instead of the four
-arrows you get '[', '\', ']', and '^'.
+arrows you get '[', '\\', ']', and '^'.
 
-Double-width characters (32-character wide mode) are not emulated.
+Double-width (32-column) mode is not supported.
 
 The alternate character set and probably a pile of other esoteric
 Model III features are not emulated.
 
-The keyboard emulation isn't perfect.  Sometimes a key won't be
-recognized immediately until another key is pressed.  Programs which
-poll the keyboard for input may not work well, due to a nasty
-interaction with auto-repeat in some X servers (try turning off your
-auto-repeat if this is a problem).  There is some bug in emulating the
-Break key, such that hitting Break does not take you into LDOS DEBUG
-when it should.  This may also be affecting the use of Break to stop
-LDOS Basic programs.
-
-Cassette emulation does not work in Model III mode.
+Cassette emulation does not work in Model III mode.  Even in Model I
+mode, it works only for programs that use the Level II ROM routines to
+access the cassette; the emulator looks for access to the cassette
+port from specific PC values to activate the feature.
 
 Some features of the disk controller are not emulated, but could be
 added without too much difficulty: (1) Force Interrupt with nonzero
@@ -230,7 +262,15 @@ condition bits is not implemented. (2) Read Address is not
 implemented.  (3) Read Track is not implemented.  (4) The
 multiple-sector flags in Read and Write are not implemented.
 
-There is no support for real physical floppy disks.
+There is no support for real physical floppy disks.  It seems too
+non-portable to try to put this directly into the emulator.  Also,
+today's controllers often cannot handle the formats that were
+generated by the old 1771s and 1791/3s.  Still, partial support that
+works only under Linux may appear some day.
+
+The emulator guesses a romfile is in .hex format if its first byte is
+a colon (':'), so a raw binary ROM image can't start with that byte
+value.  In the future it would be nice to accept MODELA/III files too.
 
 If you discover other bugs, or write fixes for any of these, please let
 us know.  We expect to incorporate fixes into future releases.

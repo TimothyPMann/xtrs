@@ -949,11 +949,12 @@ static struct opcode minor[6][256] = {
 	undefined,		0,		/* ed2e */
 	undefined,		0,		/* ed2f */
 
-	undefined,		0,		/* ed30 */
-	undefined,		0,		/* ed31 */
-	undefined,		0,		/* ed32 */
-	undefined,		0,		/* ed33 */
-	undefined,		0,		/* ed34 */
+	/* Emulator traps; not real Z80 instructions */
+	"open",			0,		/* ed30 */
+	"close",		0,		/* ed31 */
+	"read",			0,		/* ed32 */
+	"write",		0,		/* ed33 */
+	"lseek",		0,		/* ed34 */
 	undefined,		0,		/* ed35 */
 	undefined,		0,		/* ed36 */
 	undefined,		0,		/* ed37 */

@@ -1,11 +1,11 @@
-/* Copyright (c) 1996, Timothy Mann */
+/* Copyright (c) 1996-97, Timothy Mann */
 
 /* This software may be copied, modified, and used for any purpose
  * without fee, provided that (1) the above copyright notice is
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Tue Aug  5 20:08:32 PDT 1997 by mann */
+/* Last modified on Sat Aug 23 02:13:19 PDT 1997 by mann */
 
 /*
  * Emulate Model I or III disk controller
@@ -19,8 +19,10 @@
 #include <sys/stat.h>
 
 #define TRSDISK_NONE TRSDISK_FORCEINT
+#define NDRIVES 8
 
 int trs_disk_spinfast = 0;
+int trs_disk_nocontroller = 0;
 
 typedef struct {
   /* Registers */
@@ -90,7 +92,7 @@ typedef struct {
 #define SECSIZE       256
 #define MAXTRACKS     96
 
-/* Max bytes per unformatted track.  Not really sure these are right.
+/* Max bytes per unformatted track.  Not sure these are exactly right.
    If they are too big, some formatting programs will pass extra
    garbage bytes past the maximum length they are prepared for the
    track to be, which the formatting state machine might interpret as
@@ -99,6 +101,21 @@ typedef struct {
    track. */
 #define TRKSIZE_SD    3125  /* 250kHz / 5 Hz [i.e. 300rpm] / (2 * 8) */
 #define TRKSIZE_DD    6250  /* 250kHz / 5 Hz [i.e. 300rpm] / 8 */
+
+/* Following are partially supported, as an undocumented kludge.
+   Drives with select codes 1, 2, 4, 8 are 5" drives, disk?-0 to disk?-3.
+   Drives with select codes 3, 5, 6, 7 are 8" drives, disk?-4 to disk?-7.
+   The JV3 data structure does not allow enough sectors for an 8" DSDD 
+   diskette.  I might extend this by adding a second, optional array of 
+   ids after the last data sector that JV3 can represent, followed by
+   more data sectors.
+*/
+#define TRKSIZE_8SD   5208  /* 500kHz / 6 Hz [i.e. 360rpm] / (2 * 8) */
+#define TRKSIZE_8DD  10416  /* 500kHz / 6 Hz [i.e. 360rpm] / 8 */
+
+/* Following not currently supported */
+#define TRKSIZE_5HD  10416  /* 500kHz / 6 Hz [i.e. 360rpm] / 8 */
+#define TRKSIZE_3HD  12500  /* 500kHz / 5 Hz [i.e. 300rpm] / 8 */
 
 #define JV3_SIDES     2
 #define JV3_SECSTART  (34*256) /* start of sectors within file */
@@ -114,6 +131,7 @@ typedef struct {
   int writeprot;		/* emulated write protect tab */
   int phytrack;			/* where are we really? */
   int emutype;
+  int inches;                   /* 5 or 8 */
   FILE* file;
   SectorId id[JV3_MAXSECS + 1]; /* extra one is a loop sentinel */
   int unused_id;		/* first unused index in id array */
@@ -123,7 +141,7 @@ typedef struct {
   int track_start[MAXTRACKS][JV3_SIDES];
 } DiskState;
 
-DiskState disk[4];
+DiskState disk[NDRIVES];
 
 void
 trs_disk_init(int reset_button)
@@ -141,17 +159,28 @@ trs_disk_init(int reset_button)
   state.curdrive = state.curside = 0;
   state.density = 0;
   state.controller = (trs_model == 1) ? TRSDISK_P1771 : TRSDISK_P1791;
-  for (i=0; i<4; i++) {
+  for (i=0; i<NDRIVES; i++) {
     disk[i].phytrack = 0;
   }
+  disk[0].inches = 5;
+  disk[1].inches = 5;
+  disk[2].inches = 5;
+  disk[3].inches = 5;
+  disk[4].inches = 8;
+  disk[5].inches = 8;
+  disk[6].inches = 8;
+  disk[7].inches = 8;
   trs_disk_change_all();
+
+  trs_disk_nocontroller = 
+    (trs_model == 1 && disk[0].file == NULL);
 }
 
 void
 trs_disk_change_all()
 {
   int i;
-  for (i=0; i<4; i++) {
+  for (i=0; i<NDRIVES; i++) {
     trs_disk_change(i);
   }
 }
@@ -439,6 +468,22 @@ trs_disk_select_write(unsigned char data)
   case TRSDISK_3:
     state.curdrive = 3;
     break;
+  case TRSDISK_4:
+    /* fake value for emulator only */
+    state.curdrive = 4;
+    break;
+  case TRSDISK_5:
+    /* fake value for emulator only */
+    state.curdrive = 5;
+    break;
+  case TRSDISK_6:
+    /* fake value for emulator only */
+    state.curdrive = 6;
+    break;
+  case TRSDISK_7:
+    /* fake value for emulator only */
+    state.curdrive = 7;
+    break;
   default:
     fprintf(stderr, "trs_disk: bogus drive select 0x%02x\n", data);
     break;
@@ -698,6 +743,7 @@ trs_disk_data_write(unsigned char data)
 unsigned char
 trs_disk_status_read(void)
 {
+  if (trs_disk_nocontroller) return 0xff;
   type1_status();
   /*printf("status_read() => 0x%02x\n", state.status);*/
   trs_disk_intrq_interrupt(0);
@@ -884,10 +930,18 @@ trs_disk_command_write(unsigned char cmd)
       state.status = TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
       state.format = FMT_GAP0;
-      if (state.density) {
-	state.bytecount = TRKSIZE_DD;
+      if (disk[state.curdrive].inches == 5) {
+	if (state.density) {
+	  state.bytecount = TRKSIZE_DD;
+	} else {
+	  state.bytecount = TRKSIZE_SD;
+	}
       } else {
-	state.bytecount = TRKSIZE_SD;
+	if (state.density) {
+	  state.bytecount = TRKSIZE_8DD;
+	} else {
+	  state.bytecount = TRKSIZE_8SD;
+	}
       }
     }
     break;

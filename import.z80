@@ -1,8 +1,8 @@
 ;; import.z
-;; Timothy Mann, 10/30/96
-;; Last modified on Mon Aug  4 17:16:42 PDT 1997 by mann
+;; Timothy Mann, 8/24/97
+;; Last modified on Mon Aug 25 15:56:53 PDT 1997 by mann
 ;;
-;; Use xtrs 1.0.tpm2 import feature to copy a file from Unix to TRS-80
+;; Use xtrs 1.4 emulator traps to copy a file from Unix to TRS-80
 ;; Usage: IMPORT unixfile tofile (NL)
 ;; If the (NL) parameter is given, each newline ('\n') in the Unix
 ;;  file is converted to a carriage return ('\r'), the TRS-80 end of
@@ -22,14 +22,20 @@
 
 model   equ 0125h ;'I' here => M3
 
-impctrl equ 0d0h
-impstat equ 0d0h
-impdata equ 0d1h
+; Emulator trap instructions, byte-reversed for use in defw:
+open	equ 30edh
+close	equ 31edh
+read	equ 32edh
+write	equ 33edh
+lseek	equ 34edh
+strerror equ 35edh
+
+iobsize	equ 8192		; must be divisible by 256
 
 	org 5200h
-import: ld a, (model)           ; Model 1 or 3?
+import: ld a, (model)           ; model 1 or 3?
         cp 'I'
-        jr nz, model1           ; Go if 1
+        jr nz, model1           ; go if 1
         push hl
         ld hl, param+1
         ld de, @param3
@@ -42,12 +48,13 @@ import: ld a, (model)           ; Model 1 or 3?
         inc hl
         ld (hl), d
         pop hl
-model1: ld a, (hl)              ; scan over Unix filename
+model1: 
+skipsp:	ld a, (hl)              ; scan over Unix filename
         cp ' '		        ; first skip spaces
 	jr c, usage             ; error if line ends here
         jr nz, unix1
         inc hl
-	jr import
+	jr skipsp
 unix1:  ld (uname+1), hl        ; save pointer
 unix2:	inc hl                  ; now scan for end of Unix name
         ld a, (hl)
@@ -74,69 +81,94 @@ openok: ld de, prmtbl           ; ready to parse command line
 usage:  ld hl, usager           ; error message and exit
         call logot
         jp @abort
-prmok:  xor a			; reset import/export state machine
-	out (impctrl), a
-	inc a			; request import
-	out (impctrl), a
-uname:	ld hl, $-$              ; ready to pass command to unix
-cloop:  ld a, (hl)              ; get next command char
-        and a			; check for end
-        out (impdata), a        ; feed to emulator
-        jr z, cmddun
-	inc hl
-        jr cloop
-cmddun:
-dloop:  in a, (impstat)         ; get status
-        and a
-        jr z, cmdok             ; go if OK
-        ld hl, cmder            ; error message and exit
-        call logot
-        jp @abort
-cmdok:  ld a, (nlparam)		; check for NL feature
-	ld c, 0dh		; init to do nothing
+prmok:  
+uname:	ld hl, $-$              ; path
+        ld bc, 0                ; oflag (O_RDONLY)
+        ld de, 0                ; mode (ignored)
+        defw open
+        jr z, opn2ok            ; go if OK
+        ld hl, uopner           ; error message and exit
+	jr uerror
+
+;; Read
+rloop:
+opn2ok:	ld hl, iobuf            ; read a buffer
+	ld bc, iobsize
+	defw read
+	jr z, readok
+        ld hl, urder            ; read error (!!code in A)
+	jr uerror
+readok:	push de			; save fd
+
+;; Translate
+        ld a, (nlparam)		; check for NL feature
 	and a
-	jr z, iloop
-	ld c, 0ah		; translate 0ah -> 0dh
-iloop:  ld hl, iobuf            ; outer loop reading unix output
-        ld b, 0
-iilp:   in a, (impdata)         ; inner loop
-        and a
-        jr nz, noteof
-        in a, (impstat)         ; really end of file?
-        cp 0ffh
-        jr z, zero              ; go if really a zero data byte
-        and a
-        jr z, eof               ; go if really eof
-        ld hl, imper            ; really a read error
-        call logot
-        jp @abort
-zero:   xor a
-noteof: cp c			; translate?
-	jr nz, noxlat
-	ld a, 0dh
-noxlat: ld (hl), a              ; save the byte
-        inc hl
-        djnz iilp
-        ld de, dcb              ; write 256 bytes to file
-        call @write
-        jr z, iloop             ; back for more
+	jr z, nlfals
+	ld hl, iobuf
+	push bc			; save byte count
+	ld a, 0ah
+	ld d, 0dh
+	inc c			; deal with b=0 and/ c=0
+	inc b
+	jr tstrt
+tloop:	cp (hl)
+	jr nz, notcr
+	ld (hl), d
+notcr:	inc hl
+tstrt:	dec c
+	jr nz, tloop
+	djnz tloop
+	pop bc			; restore byte count
+
+;; Write
+nlfals:	push bc			; save byte count
+	ld hl, iobuf
+	ld de, dcb
+	inc b			; deal with b=0 and/or c=0
+	ld a, c
+	and a
+	jr z, wstrt
+wloop:  ld (dcb+3), hl
+	call @write             ; write 256 bytes to file
+        jr z, wrok
         call @error             ; oops, i/o error
         jp @abort
-eof:    ld de, dcb              ; write last sector of file
-        ld hl, iobuf
-        call @write
-        jr z, eofok
+wrok:	inc h
+wstrt:  djnz wloop
+	pop bc			; restore byte count
+
+;; Done?
+	pop de			; restore fd
+	ld a, c
+	and a
+	jr nz, closit		; done for sure
+	cp b
+	jr nz, rloop		; maybe not done (sloppy)
+
+closit:	defw close		; close Unix file
+	jr z, closok
+        ld hl, uclser           ; close error (!!code in A)
+	jr uerror
+closok:	ld a, c
+	ld (dcb+8), a		; EOF offset
+	ld hl, (dcb+10)		; record number (in case shortening file)
+	ld (dcb+12), hl
+	ld de, dcb
+        call @close             ; close the TRS-80 file
+        jr z, cls2ok
         call @error             ; oops, i/o error
         jp @abort
-eofok:  xor a                   ; compute EOF offset
-        sub b
-        ld (dcb+8), a
-        ld de, dcb
-        call @close             ; close the file
-        jr z, closok
-        call @error             ; oops, i/o error
+cls2ok: jp @exit                ; all is well
+
+;; Unix error, msg in hl, errno in a
+uerror: push af
+	call logot
+	pop af
+	ld hl, iobuf
+	ld bc, 256
+	defw strerror
+	call logot
         jp @abort
-closok: jp @exit                ; all is well
 
 logot:  jp @logot               ; jump vectors, modified for M3
 param:  jp @param
@@ -150,10 +182,11 @@ nlparam:
 	defw 0
 
 usager: defb 'Usage: IMPORT unixfile tofile (NL=y/n)', 0dh
-cmder: defb 'Error writing command to Unix', 0dh
-imper: defb 'Error reading output from Unix', 0dh        
+uopner:	defb 'Error in Unix open: ', 03h
+urder:	defb 'Error in Unix read: ', 03h
+uclser:	defb 'Error in Unix close: ', 03h
 
 dcb:   defs 32   
-iobuf: defs 256  
+iobuf: defs iobsize
         
         end import

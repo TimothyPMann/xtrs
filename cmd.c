@@ -6,7 +6,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Tue Dec 17 13:06:19 PST 1996 by mann */
+/* Last modified on Wed Aug 13 19:46:49 PDT 1997 by mann */
 
 #include <stdio.h>
 
@@ -37,7 +37,10 @@ cmd_data(int address, int value)
 	    putc(block_address & 0xff, file);
 	    putc((block_address >> 8) & 0xff, file);
 	    p = block;
-	    while (block_size--) putc(*p++, file);
+	    while (block_size) {
+		putc(*p++, file);
+		block_size--;
+	    }
 	}
 	last_address = block_address = address;
 	if (value == -2) {

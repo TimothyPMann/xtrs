@@ -15,9 +15,10 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Dec 17 13:00:27 PST 1996 by mann
+   Last modified on Wed Aug 27 16:53:33 PDT 1997 by mann
 */
 
+#include "trs.h"
 #include "z80.h"
 #include <string.h>
 
@@ -116,6 +117,16 @@ static int assert_state(state)
 
 void trs_cassette_out(value)
 {
+#ifdef CASSDEBUG
+    fprintf(stderr, 
+    "cass out %02x, pc %04x, stack %04x %04x %04x %04 x%04x %04x %04x %04x\n",
+	    value, REG_PC, mem_read_word(REG_SP), mem_read_word(REG_SP + 2),
+	    mem_read_word(REG_SP + 4), mem_read_word(REG_SP + 6),
+	    mem_read_word(REG_SP + 8), mem_read_word(REG_SP + 10),
+	    mem_read_word(REG_SP + 12), mem_read_word(REG_SP + 14));
+#endif
+    if (trs_model == 3) return; /* not implemented */
+
     if(value & 4)
     {
 	/* motor on */
@@ -164,6 +175,16 @@ void trs_cassette_out(value)
 int trs_cassette_in(modesel)
     int modesel;
 {
+#ifdef CASSDEBUG
+    fprintf(stderr, 
+    "cass in, pc %04x, stack %04x %04x %04x %04x %04x %04x %04x %04x\n",
+	    REG_PC, mem_read_word(REG_SP), mem_read_word(REG_SP + 2),
+	    mem_read_word(REG_SP + 4), mem_read_word(REG_SP + 6),
+	    mem_read_word(REG_SP + 8), mem_read_word(REG_SP + 10),
+	    mem_read_word(REG_SP + 12), mem_read_word(REG_SP + 14));
+#endif
+    if (trs_model == 3) return 0xff;
+
     if(REG_PC == 0x0245)
     {
 	if(mem_read_word(REG_SP + 4) == 0x029b)

@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Dec 17 13:00:14 PST 1996 by mann
+   Last modified on Sat Aug 23 14:44:05 PDT 1997 by mann
 */
 
 /*
@@ -36,9 +36,11 @@ extern void trs_screen_mode_select(/*ScreenMode mode*/);
 extern void trs_screen_scroll();
 extern void trs_screen_refresh();
 extern void trs_refresh();
-extern int trs_kb_poll();
 extern void trs_reset();
 extern void trs_exit();
+extern void trs_get_event(/*int wait*/);
+extern int trs_next_key(/*int wait*/);
+extern int x_poll_count;
 
 extern void trs_printer_write();
 extern int trs_printer_read();
@@ -47,9 +49,12 @@ extern void trs_cassette_out();
 extern int trs_cassette_in();
 
 extern int trs_rom_size;
-extern unsigned char trs_rom[];
+extern int trs_rom1_size;
+extern int trs_rom3_size;
+extern unsigned char trs_rom1[];
+extern unsigned char trs_rom3[];
 
-extern void trs_load_compiled_rom();
+extern void trs_load_compiled_rom(/*int size, unsigned char rom[]*/);
 extern void trs_load_rom(/*char *filename*/);
 
 extern unsigned char trs_interrupt_latch_read();
@@ -59,3 +64,4 @@ extern void trs_timer_on();
 
 extern void trs_disk_change(/*int drive*/);
 extern void trs_disk_change_all();
+

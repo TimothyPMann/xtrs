@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Dec 17 13:06:19 PST 1996 by mann
+   Last modified on Sat Aug 23 02:22:57 PDT 1997 by mann
 */
 
 #include "config.h"
@@ -87,7 +87,7 @@ struct z80_state_struct
      * when tickled (or after a timeout).  NMI is edge triggered, so
      * it has to be turned off and back on again before it can cause
      * another interrupt.  nmi_seen remembers that an edge has been seen,
-     * so turn off both nmi and nmi2 when the interrupt is acknowledged.
+     * so turn off both nmi and nmi_seen when the interrupt is acknowledged.
      */
     int nmi, nmi_seen;
 };

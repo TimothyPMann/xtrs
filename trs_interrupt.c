@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Wed Jul  9 09:21:17 PDT 1997 by mann */
+/* Last modified on Wed Aug 27 17:35:01 PDT 1997 by mann */
 
 /*
  * Emulate Model-I interrupts
@@ -37,6 +37,9 @@ static unsigned char nmi_mask = M3_RESET_BIT;
 #define LDOS_MONTH 0x4306
 #define LDOS_DAY   0x4307
 #define LDOS_YEAR  0x4466
+#define LDOS3_MONTH 0x442f
+#define LDOS3_DAY   0x4457
+#define LDOS3_YEAR  0x4413
 
 static int timer_on = 1;
 
@@ -161,6 +164,7 @@ trs_timer_event(signo)
   if (!timer_on) return;
 
   trs_timer_interrupt(1); /* generate */
+  trs_kb_heartbeat(); /* part of keyboard stretch kludge */
 
   /* Schedule next tick.  We do it this way because the host system
      probably didn't wake us up at exactly the right time.  For
@@ -195,9 +199,15 @@ trs_timer_init()
   /* Also initialize the clock in memory - hack */
   tt = time(NULL);
   lt = localtime(&tt);
-  mem_write(LDOS_MONTH, (lt->tm_mon + 1) ^ 0x50);
-  mem_write(LDOS_DAY, lt->tm_mday);
-  mem_write(LDOS_YEAR, lt->tm_year - 80);
+  if (trs_model == 1) {
+      mem_write(LDOS_MONTH, (lt->tm_mon + 1) ^ 0x50);
+      mem_write(LDOS_DAY, lt->tm_mday);
+      mem_write(LDOS_YEAR, lt->tm_year - 80);
+  } else {
+      mem_write(LDOS3_MONTH, (lt->tm_mon + 1) ^ 0x50);
+      mem_write(LDOS3_DAY, lt->tm_mday);
+      mem_write(LDOS3_YEAR, lt->tm_year - 80);
+  }
 }
 
 void

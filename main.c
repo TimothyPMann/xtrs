@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Dec 17 12:59:51 PST 1996 by mann
+   Last modified on Sat Aug 23 14:50:44 PDT 1997 by mann
 */
 
 #include "z80.h"
@@ -61,13 +61,16 @@ void trs_load_rom(filename)
     fclose(program);
 }
 
-void trs_load_compiled_rom()
+void trs_load_compiled_rom(size, rom)
+     int size;
+     unsigned char rom[];
 {
     int i;
-
-    for(i = 0; i < trs_rom_size; ++i)
+    
+    trs_rom_size = size;
+    for(i = 0; i < size; ++i)
     {
-	mem_write_rom(i, trs_rom[i]);
+	mem_write_rom(i, rom[i]);
     }
 }
 
@@ -99,15 +102,13 @@ main(argc, argv)
         } else if (!strcmp(argv[i],"-model1")) {
 	    trs_model = 1;
         } else if (!strcmp(argv[i],"-model3")) {
-	    trs_model = 3;  /* !!not fully implemented yet */
+	    trs_model = 3;
 	}
     }
 	
     mem_init();
     trs_disk_init(0);
-#ifdef XTRASH
     argc = trs_screen_init(argc,argv,&debug);
-#endif
     trs_timer_init();
 
     if(instrument)

@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Tue Dec 17 13:06:18 PST 1996 by mann */
+/* Last modified on Thu Aug 21 16:36:28 PDT 1997 by mann */
 
 /*
  * Emulate Model-I or Model-III disk controller
@@ -32,8 +32,11 @@ extern int trs_disk_spinfast;  /* see main.c */
 #define TRSDISK_1       0x2
 #define TRSDISK_2       0x4
 #define TRSDISK_3       0x8
-#define TRSDISK_SIDE    0x8     /* shared: can't use drive 3 if system
-				   includes double-sided drives */
+#define TRSDISK_SIDE    0x8     /* shared on Model I */
+#define TRSDISK_4       0x3     /* fake value for emulator only */
+#define TRSDISK_5       0x5     /* fake value for emulator only */
+#define TRSDISK_6       0x6     /* fake value for emulator only */
+#define TRSDISK_7       0x7     /* fake value for emulator only */
 
 /* FDC address space in Model I */
 #define TRSDISK_FDC     0x37ec

@@ -9,12 +9,10 @@ and we long for the Expansion Interface and floppy disk drives.  Give
 us that, and we want a Model III!
 
 This is a snapshot of the work I've been doing on xtrs to add these
-niceties.  The documentation needs some work; not all the data in this
-file has been transferred to the man page.
-
-My main additions to xtrs-1.0 have been floppy disk emulation, timer
-interrupt emulation, a kludge to import and export data to the host
-system, Model III mode, and a bunch of bug fixes and minor improvements.
+niceties.  My main additions over xtrs-1.0 have been floppy disk
+emulation, timer interrupt emulation, a kludge to import and export
+data to the host system, Model III mode, a rewrite of the keyboard
+handling, and a bunch of bug fixes and minor improvements.
 
 This project has been a real (48KB?) trip down memory lane for me.  I
 worked as a programmer for Logical Systems, who produced LDOS, during
@@ -27,130 +25,11 @@ write.
 At some point it would be fun to extend this code to emulate a Model 4
 or 4P.  I don't have the technical data for those systems, however.
 
-* Model I and Model III mode differences
+****
+Technical information omitted from the man page
+****
 
-Use the -model3 command line flag to get Model III mode.  Model I mode
-is the default; the -model1 command line flag is also accepted.  It is
-best to configure the emulator to load the ROM from a file if you want
-to use both modes.  Currently it can choose between different default
-ROM files based on the mode, but it can't have two ROMs compiled in or
-accept two different X resource names.  This should be fixed.
-
-ROM files loaded at runtime can now be either in Intel .hex format or
-raw binary images.  The emulator guesses a file is in .hex format if
-its first byte is a colon (':'), so a raw binary ROM image can't start
-with that byte value.  This is ugly but convenient.  In the future a
-copy of a MODELA/III file might be accepted too.  Also, perhaps
-compile_rom will be updated in the future too; currently it still
-accepts only .hex files.
-
-* Floppy disk emulation
-
-In Model I mode, xtrs emulates a Radio Shack Expansion Interface with
-the Percom Doubler or Radio Shack Doubler installed.  The Doubler
-provided double-density disk access by allowing either the stock
-WD1771 FDC chip or a WD1791 chip to be selected under program control.
-At powerup the 1771 is selected, so operating systems with no Doubler
-driver see a stock system.  The emulator pretends to be both a Percom
-and Radio Shack Doubler at the same time -- it responds to the special
-commands of both -- so a driver for either should work.  Under LDOS,
-use the command "FDUBL" (newer versions of LDOS), or "PDUBL" or
-"RDUBL" (older versions) to install the driver.  I'm less sure that
-the Radio Shack Doubler emulation is correct, though it does work with
-LDOS.  Try a Percom Doubler driver if a Radio Shack Doubler driver
-gives problems.
-
-In Model III mode, xtrs emulates the stock Model III floppy
-controller, which used a WD1793 chip (software compatible with the
-WD1791) to provide both single and double density.
-
-Four floppy drives are emulated, with storage in files named disk0-x,
-disk1-x, disk2-x, disk3-x, where x=1 for Model I mode, x=3 for Model
-III mode.  If a file of the required name is not found, a drive with
-no disk in it is emulated.  If the user does not have write permission
-for a floppy file, a write-protect tab is emulated.  To change
-floppies in an emulated drive, rename the existing file for the drive
-(if any), rename the new floppy file to the proper name, and hit
-ctrl-D (for "disk change") in the emulator.
-
-Due to a limitation of the original Model I hardware, drive :3 cannot
-be double-sided in Model I mode.  In the original Model I, you could
-not have a drive :3 at all if any drive in the system was
-double-sided, but the emulator is able to be more forgiving.
-
-The floppy image files can be of either of two types: JV1, compatible
-with Jeff Vavasour's popular shareware Model I emulator for the PC; or
-JV3, compatible with Vavasour's commercial Model III/4 emulator.  Both
-types work in both Model I and Model III mode.  The emulator uses a
-heuristic to decide which type of image it is looking at in each
-drive, as neither type has a "magic number" or signature.
-
-JV1 supports only single density, single sided, with directory on
-track 17.  Sectors must be 256 bytes long, and up to 96 tracks are
-allowed.  Use FORMAT (DIR=17) to format JV1 disks under LDOS.
-
-JV3 is much more flexible, though it still does not support everything
-the real controllers could do.  I recommend using JV3 for all the disk
-images you create, unless you need to exchange images with someone who
-is using the Vavasour Model I emulator.  A JV3 disk can be formatted
-with 256 byte sectors, 1 or 2 sides, single or double density, with
-either FB (normal) or F8 (deleted) data address mark on any sector.
-You cannot format a sector with an incorrect track number or head
-number, or with length other than 256 bytes.  You can format a sector
-with an intentional CRC error in the data field.  The total number of
-sectors on the disk can be at most 2901, which is enough for an 80
-track, double-sided, double-density (18 sector) disk.  In addition,
-xtrs imposes an upper limit of 96 tracks.
-
-The program mkfloppy makes a blank emulated floppy or "bulk erases" an
-existing one.  By default, mkfloppy makes a JV3 floppy, but with the
--1 flag it makes a JV1 floppy.
-
-Early Model I operating systems used an FA data address mark for the
-directory (a nonstandard value supported only by the WD1771, but not
-the WD1791/3), while later ones wrote F8 (for Model III compatibility)
-but could read either.  To deal nicely with this problem, xtrs
-implements the following kludge.  On writing, any data address mark
-other than FB is recorded as F8.  On reading in single density with
-the emulated WD1771 (available in Model I mode only), F8 is returned
-as FA.  In all other modes, F8 is returned as F8.  This trick makes
-the different operating systems perfectly compatible with each other,
-which is better than on a real Model I!
-
-Some features of the disk controller are not emulated, but could be
-added without too much difficulty: (1) Force Interrupt with nonzero
-condition bits is not implemented. (2) Read Address is not
-implemented.  (3) Read Track is not implemented.  (4) The
-multiple-sector flags in Read and Write are not implemented.
-
-The floppy disk emulation is fairly extensively tested with LDOS Model
-I 5.3.1, moderately tested with Model III LDOS 5.3.0, and very lightly
-tested with Model I TRSDOS 2.3, Model I NEWDOS 80, and Model III
-TRSDOS 1.3.  Under both LDOS versions, I got as far as making an
-80-track, double-sided, double-density system disk, copying the whole
-system onto it, and booting and running with it.  This was a pretty
-stringent test and shook out lots of bugs!  Under the other systems I
-just checked that I could boot and run a few simple commands.
-
-I added one kludge to make NEWDOS 80 work better.  The -spinfast
-command line flag makes index holes go by at 10 times the normal
-frequency.  NEWDOS 80 apparently looks to see if a drive contains a
-disk by polling for some fixed number of iterations, looking for an
-index hole to go by.  But it seems we emulate the instructions in the
-loop too fast, so that sometimes no hole has gone by yet when NEWDOS
-80 gives up.
-
-There is no support for real physical floppy disks.  It seems too
-non-portable to try to put this directly into the emulator.  Also,
-today's controllers often cannot handle the formats that were
-generated by the old 1771s and 1791/3s.  If you have disks to convert,
-Vavasour's Model 4 emulator for the PC has some programs that seem to
-do the best that can be done.  His Model I emulator has a pair of
-programs that can be used to transfer disk images between a real Model
-I and a PC through their parallel ports.  Also, Computer News 80 has a
-mail-order service that will convert disks for you.
-
-* Timer interrupt emulation
+* Interrupts
 
 The emulator supports only interrupt mode 1.  It will complain if your
 program enables interrupts after powerup without executing an im 1
@@ -188,53 +67,38 @@ read system call.  I've reported this bug to readline's maintainer.
 
 * Data import/export
 
-This is a major kludge.  I added the ability to write a string into a
-specific I/O port, have the emulator pass it as a filename to the
-Unix fopen() library function, and either provide input or read output
-on the I/O port.
+There are two mechanisms for getting data into and out of the
+emulator.  See trs_imp_exp.h for technical details.  The old way that
+uses I/O ports is likely to go away eventually.  Before this can
+happen, either import.z and export.z need to be fixed to work under
+NEWDOS and friends, or import.bas and export.bas need to be hacked to
+use the new mechanism by calling out to assembly code.
 
-The BASIC programs import.bas and export.bas exercise the feature.
-They work, but are hideously slow.  I also wrote a Z-80 assembly
-language version of the importer, import.cmd.  This currently runs
-only under LDOS.  It's much faster than the BASIC version, but still
-rather leisurely.
+The new mechanism is quite flexible.  It's a tempting thought to
+implement hard disk emulation by writing an LDOS hard disk driver that
+uses it.  This would save all the bother of getting technical data on
+a real TRS-80 hard disk controller, finding the drivers for it, and
+emulating the controller well enough that the drivers work.  On the
+other hand, it would require writing Z-80 assembly code, which I find
+quite painful now that I'm out of practice.
 
-A faster alternative would be to provide a hook in the emulator that
-imports or exports larger blocks of data for each Z-80 instruction.
-
-A much faster method would be to write Unix utilities to copy files
-directly to/from emulated floppy files.  This would also be more work,
-as it amounts to rewriting part of the TRS-80 DOS in C.  Writing
-operating system code is part of my TRS-80 experience I'm not eager to
-relive.  Vavasour's Model I emulator has such utilities for the JV1
-format, but they run only under MS-DOS or MS Windows.
-
-* Bug fixes and minor features
-
-I fixed bugs in the instructions rrc, inc ix, inc iy, and sra.  I
-didn't notice the sra bug until I tried to get Model III mode working;
-the Model III LDOS disk driver uses it.
-
-I got the emulator running under Linux.  Now it might have minor
-problems elsewhere, on less ANSI- and POSIX-compliant systems.
-
-I added a bunch of missing key combinations to the keyboard emulation,
-such as shift-uparrow, shift-break, shift-zero (emulated with ctrl-T),
-shift-@ (ctrl-P or Pause key).  Most of these are used for various
-things by BASIC and/or LDOS.  The LDOS use of Clear as a meta key is
-also supported, if you use your Alt or Meta key (and have it mapped as
-X modifier Mod1).
-
-I fixed up the KBWAIT feature to work fairly well with the LDOS
-keyboard drivers.  This feature tries to avoid burning host CPU cycles
-when the emulated program is sitting in a loop polling the keyboard.
-NEWDOS 80 fools it, though.  (The keyboard does work under NEWDOS 80,
-but it eats the CPU.)
+* Minor features
 
 I put in a silly kludge that lets LDOS know the correct date whenever
 it boots up.  It simulates the case where you just rebooted LDOS
 without power cycling and the date was left in memory.  Unfortunately
 LDOS doesn't provide a way to do this trick with the time of day.
+
+* Bug fix history
+
+I fixed bugs in the instructions rrc, inc ix, inc iy, sra, and neg.  I
+didn't notice the sra bug until I tried to get Model III mode working;
+the Model III LDOS disk driver uses it.  The neg bug was keeping the
+break key from working right under LDOS in xtrs-1.3 and earlier.
+
+I got the emulator running both Linux and Digital Unix.  Now it might
+have minor problems elsewhere, on less ANSI- and POSIX-compliant
+systems.
 
 I fixed two bugs in the disassembler.  The ld (bc),a instruction was
 erroneously disassembled as ld bc,a, and instructions that start "dd
@@ -246,33 +110,19 @@ already there.  If you tried to read from a cassette with nothing on
 it, it would lock up so hard that even the emulated boot button
 wouldn't work.  Now at least the boot button works.
 
-* Remaining problems
+SIGIO is now used in a much safer way than before, and the emulator
+will work without it if needed.
 
-The Z-80 HALT instruction (which is really a wait-for-interrupt
-instruction) is not emulated correctly, and I didn't change it.  The
-instruction has rather odd general-case behavior on the Z-80, and it
-would be fun to write a correct emulation of it.  On the Model I,
-however, the HALT output from the Z-80 chip is wired to the reset
-button circuit, so executing HALT has exactly the same effect as if
-the user had pushed the boot button.  (It resets external devices via
-the SYSRES line on the bus, and issues an NMI to the Z-80.)  The LDOS
-"BOOT" command takes advantage of this feature.  The emulator,
-however, simply exits on HALT.
+I reworked the keyboard support substantially.  A full state vector is
+now kept, including all 64 possible TRS-80 keys.  Key queueing is now
+always used, and a "stretching" feature prevents the emulated keyboard
+state from changing too often, to avoid losing keystrokes.  Keyboard
+response is quite snappy and reliable now.  I added enough key
+mappings that it should be possible to do about everything you could
+do with a real TRS-80 keyboard (and more than on a Model I, because
+modern keyboards have N-key rollover).  More key mappings are easily
+added by changing tables; there is very little special-case code.
 
-The undocumented Z-80 instructions are neither emulated nor
-disassembled.
-
-The keyboard support in the emulator really needs a rework; it's
-pretty kludgey right now.
-
-Double-width characters are not emulated.
-
-Cassette emulation does not yet work in Model III mode.  It is a
-kludge even in Model I mode.
-
-The alternate character set and probably a pile of other esoteric
-Model III features are not emulated.
-
-There is some bug in emulating the Break key, such that hitting Break
-does not take you into LDOS DEBUG when it should.  This may also be
-affecting the use of Break to stop LDOS Basic programs.
+I did some work on the KBWAIT feature, which tries to avoid burning
+host CPU cycles when the emulated program is sitting in a loop polling
+the keyboard.  It now works in a lot more cases.

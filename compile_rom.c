@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Aug  5 19:44:52 PDT 1997 by mann
+   Last modified on Sat Aug 23 14:21:45 PDT 1997 by mann
 */
 
 #include "z80.h"
@@ -74,15 +74,16 @@ void error(string)
     exit(1);
 }
 
-static void write_output()
+static void write_output(which)
+     char* which;
 {
     int address = 0;
     int i;
     
     highest_address++;
 
-    printf("int trs_rom_size = %d;\n", highest_address);
-    printf("unsigned char trs_rom[%d] = \n{\n", highest_address);
+    printf("int trs_rom%s_size = %d;\n", which, highest_address);
+    printf("unsigned char trs_rom%s[%d] = \n{\n", which, highest_address);
     
     while(address < highest_address) 
     {
@@ -99,30 +100,31 @@ static void write_output()
     printf("};\n");
 }
 
-static void write_norom_output()
+static void write_norom_output(which)
+     char* which;
 {
-    printf("int trs_rom_size = -1;\n");
-    printf("unsigned char trs_rom[1];\n");
+    printf("int trs_rom%s_size = -1;\n", which);
+    printf("unsigned char trs_rom%s[1];\n", which);
 }
 
 main(argc, argv)
     int argc;
     char *argv[];
 {
-    if(argc == 1)
+    if(argc == 2)
     {
 	fprintf(stderr,
-		"No specified ROM file, ROM will not be built into program.\n");
-	write_norom_output();
+		"No specified ROM file, ROM %s will not be built into program.\n", argv[1]);
+	write_norom_output(argv[1]);
     }
-    else if(argc != 2)
+    else if(argc != 3)
     {
-	error("usage: compile_rom hexfile");
+	error("usage: compile_rom model hexfile");
     }
     else
     {
-	load_rom(argv[1]);
-	write_output();
+	load_rom(argv[2]);
+	write_output(argv[1]);
     }
     exit(0);
 }
