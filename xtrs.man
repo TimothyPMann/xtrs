@@ -337,6 +337,19 @@ On reading in single density with an emulated WD1771 (Model I mode
 only), F8 is returned as FA.  If you need more accurate behavior, the
 -truedam flag will turn on error messages on attempts to write F9 or
 FA DAMs and will turn off translation of F8 to FA on reading.
+
+Hint: Be sure to set the drive type correctly in your PC's BIOS.
+Linux and xtrs rely on this information to know how fast your drives
+are spinning and hence what data rate to use when reading and writing.
+All 3.5-inch drives spin at 300 RPM.  Newer 5.25-inch high-density
+capable drives ("1.2MB" drives) normally always spin at 360 RPM.  (Some
+can be jumpered to slow down to 300 RPM when in double-density mode,
+but you should not do that when plugging one into a PC.)  Older
+5.25-inch drives that cannot do high density ("180KB", "360KB" or
+"720KB" 5.25-inch drives) always spin at 300 RPM.  All 8-inch drives
+spin at 360 RPM.  If you plug an 8-inch drive into a PC (this requires
+a 50-pin to 34-pin adaptor cable), tell your BIOS that it is a
+5.25-inch 1.2MB drive.
 .SH Emulated hard disks
 \fBxtrs\fP can emulate a hard disk in a file in one of two ways: it
 can use a special, xtrs-specific LDOS driver called XTRSHARD/DCT,
