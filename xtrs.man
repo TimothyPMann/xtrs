@@ -29,7 +29,7 @@ of TRSDOS, LDOS/LS-DOS, NEWDOS, DOSPLUS, MultiDOS, and TRS-80 CP/M.
 However, the emulator also includes some extensions to the standard
 hardware, and the special drivers, utilities, and instructions needed
 for these are not always provided for all systems. In particular, the
-hard disk emulation currently works only with LDOS/LS-DOS. 
+hard disk emulation currently works only with LDOS/LS-DOS.
 
 The Z-80 emulator has a debugger called zbx.  It works sort of
 like dbx.  If you run with debugging turned on (see the options section for
@@ -63,12 +63,12 @@ signals a disk change in the emulated floppy drives (see below).  F8
 exits the program.  F9 requests entry to the debugger if it is active.
 F10 is the reset button.
 
-In Model III, 4, and 4P modes, the left and right shift keys are distinct; in
-Model I mode, they are the same.  The Home key activates the
-position in the TRS-80 keyboard matrix that corresponds to the Model
-III/4/4P right shift key (address bit 7, data bit 1) even in Model I mode.
-The End key activates an unused position in the keyboard matrix
-(address bit 7, data bit 7).  
+In Model III, 4, and 4P modes, the left and right shift keys are
+distinct; in Model I mode, they are the same.  The PageUp and PageDown
+keys always activate the positions that correspond to the Model
+III/4/4P left and right shift keys (address bit 7, data bits 0 and 1
+respectively), even in Model I mode.  The End key activates an unused
+position in the keyboard matrix (address bit 7, data bit 7).
 
 The keys [, \\, ], ^, _, {, |, },
 and ~ also activate unused positions in the keyboard matrix (address
@@ -80,7 +80,7 @@ to ASCII code 0x7f under some TRS-80 keyboard drivers.  Note: Common Model 4
 keyboard drivers seem to reverse the shift state of these keys, so you may
 need to press Shift+Insert to get an underscore, etc.
 
-On a German keyboard, the umlaut and "ess-tzet" keys should activate
+On a German keyboard, the umlaut and "ess-tsett" keys should activate
 the corresponding characters used in the GENIE, a German Model I clone.
 This feature is most useful together with the "-charset genie" command
 line argument.
@@ -205,7 +205,7 @@ TRS-80 programs that attempt to measure the rotational
 speed of their floppy disk drives using timing loops will get the
 answers they expect, even though \fBxtrs\fP does not
 emulate instructions at the same speed as the original
-machines. This works because \fBxtrs\fP keeps a virtual clock 
+machines. This works because \fBxtrs\fP keeps a virtual clock
 (technically, a T-state counter),
 which measures how much time it should have taken to execute the
 instruction stream on a real machine, and it ties the emulation of
@@ -434,7 +434,7 @@ versions on utility.dsk.  The one whose name ends in "6" runs
 on Model 4 TRSDOS/LS-DOS 6.x; the other runs on LDOS 5.x and most
 other Model I/III operating systems.
 
-CD/CMD (or CD6/CMD) changes xtrs's Unix working directory.  
+CD/CMD (or CD6/CMD) changes xtrs's Unix working directory.
 Usage: \fICD [-l] unixdir\fP.  The -l flag converts the Unix directory
 name to lower case.  When using the -l flag, you can put a [ or
 up-arrow in front of a character to keep it in upper case.  Running
@@ -445,7 +445,7 @@ pathname for xtrs's -diskdir parameter.
 
 PWD/CMD (or PWD6/CMD) prints xtrs's Unix working directory.
 
-UNIX/CMD (or UNIX6/CMD) runs a Unix shell command.  
+UNIX/CMD (or UNIX6/CMD) runs a Unix shell command.
 Usage: \fIUNIX [-l] unix command line\fP.
 The -l flag converts the Unix command line
 to lower case.  When using the -l flag, you can put a [ or
@@ -574,12 +574,11 @@ all. If you use mouse-aware programs that don't have this bug, or if
 you edit the first line of MDRAW to remove the test, you can install
 XTRSMOUS in low memory using the syntax "XTRSMOUS (LOW)".
 .SH Running games
-Some games run rather well under \fBxtrs\fP now, 
+Some games run rather well under \fBxtrs\fP now,
 provided that your
 machine is fast enough to run the emulation in real time and that you
-choose the right command line options.  
-"Galaxy Invaders Plus" by Big 5 Software is particularly good.  (It's
-even better in xtrs 3.7 with the improved sound support!)
+choose the right command line options.
+"Galaxy Invaders Plus" by Big 5 Software is particularly good.
 You will usually want to turn on autodelay, and
 you'll often need to tweak the keystretch setting.  
 Running your X server in 8-bit/pixel mode 
@@ -631,7 +630,7 @@ Put a border of \fIwidth\fP pixels
 around the TRS-80 display.  The default is 2.
 .TP
 .B \-title \fItitletext\fP
-Use \fItitletext\fP in the window title bar instead of the 
+Use \fItitletext\fP in the window title bar instead of the
 program name.
 .TP
 .B \-resize
@@ -727,7 +726,7 @@ instructions on compiling in default romfiles or default romfile names.
 .B \-model \fIm\fP
 Specifies which TRS-80 model to emulate.  Values accepted are 1 or I (Model
 I), 3 or III (Model III), 4 or IV (Model 4), and 4P or IVP (Model 4P).
-Model I is the default. 
+Model I is the default.
 .TP
 .B \-delay \fId\fP
 A crude speed control.  After each Z-80 instruction, xtrs busy-waits
@@ -772,7 +771,7 @@ Make all real floppy drives double-step, allowing access to 35-track or
 section for limitations.
 .TP
 .B \-nodoublestep
-Turn off double-step mode for all real floppy drives.  Linux only.  
+Turn off double-step mode for all real floppy drives.  Linux only.
 This is the default.
 .TP
 .B \-stepmap s0,s1,s2,s3,s4,s5,s6,s7
@@ -803,9 +802,9 @@ sections above.  With this
 option given, the distinction between F8 and FA data address marks
 is strictly observed on both writing and reading.  This option is
 probably not useful unless you need to deal with Model I disks that use
-the distinction as part of a copy-protection scheme.  See also 
+the distinction as part of a copy-protection scheme.  See also
 "Common File Formats for Emulated TRS-80 Floppy Disks", available
-at http://www.research.digital.com/SRC/personal/Tim_Mann/trs80/dskspec.html.
+at http://www.research.compaq.com/SRC/personal/Tim_Mann/trs80/dskspec.html.
 .TP
 .B \-notruedam
 The opposite of -truedam.  This setting is the default.
@@ -822,7 +821,7 @@ shareware and freeware emulators that run under MSDOS and other
 operating systems, software for converting TRS-80 physical media to
 the emulator's disk file format, ROM images, and TRS-80 software that
 has already been converted.  For pointers, see
-http://www.research.digital.com/SRC/personal/Tim_Mann/trs80.html.
+http://www.research.compaq.com/SRC/personal/Tim_Mann/trs80.html.
 .SH Bugs and limitations
 Some of the more bizarre undocumented Z-80 instructions
 are not implemented.
@@ -882,11 +881,12 @@ to occur, as ROMs typically begin with 0xF3, the DI instruction.
 If you discover other bugs, or write fixes for any of these, please let
 us know.  We expect to incorporate fixes into future releases.
 .SH Authors and acknowledgements
-\fBxtrs\fP was written by David Gingold <gingold@think.com> of
-Thinking Machines Corporation, Alec Wolman <wolman@crl.dec.com> of
-Digital Equipment Corporation, and Timothy Mann <mann@pa.dec.com> of
-Digital Equipment Corporation.  See README and README.tpm for
-additional notes from the authors.
+\fBxtrs\fP 1.0 was written by David Gingold, then at
+Thinking Machines Corporation, and Alec Wolman, then at
+Digital Equipment Corporation.
+The current version was revised and much extended by Timothy Mann
+<tim.mann@compaq.com> of Compaq Computer Corporation.  See README and
+README.tpm for additional notes from the authors.
 
 We also thank the following people for their help.  The JV1 and JV3
 floppy disk file formats were designed by Jeff Vavasour, originally
