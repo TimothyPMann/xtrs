@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Sep 30 13:45:02 PDT 1997 by mann
+   Last modified on Mon Dec  1 15:24:07 PST 1997 by mann
 */
 
 /*
@@ -48,6 +48,9 @@ extern void trs_kb_reset();
 extern int trs_kb_mem_read(/* int address */);
 extern int trs_next_key(/*int wait*/);
 extern void trs_kb_heartbeat();
+extern void trs_xlate_keycode(/*int keycode*/);
+extern void queue_key(/*int key*/);
+extern int dequeue_key();
 
 extern void trs_get_event(/*int wait*/);
 extern int x_poll_count;
