@@ -23,6 +23,10 @@
 #include "trs.h"
 #include "trs_uart.h"
 
+#ifndef FNONBLOCK
+#define FNONBLOCK O_NONBLOCK
+#endif
+
 #define BUFSIZE 256
 /*#define UARTDEBUG 1*/
 /*#define UARTDEBUG2 1*/
