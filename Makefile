@@ -168,8 +168,8 @@ tar:		$(SOURCES) $(HEADERS)
 
 clean:
 		rm -f $(OBJECTS) $(MD_OBJECTS) $(CR_OBJECTS) $(HC_OBJECTS) \
-	                $(CD_OBJECTS) \
-			*~ xtrs mkdisk compile_rom hex2cmd trs_rom*.c
+	                $(CD_OBJECTS) trs_rom*.c \
+			*~ xtrs mkdisk compile_rom hex2cmd cmddump
 
 link:	
 		rm -f xtrs
