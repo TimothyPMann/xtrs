@@ -19,9 +19,9 @@
 #include "trs_hard.h"
 #include "reed.h"
 
-#define HARDDEBUG1 1  /* show detail on all port i/o */
-#define HARDDEBUG2 1  /* show all commands */
-#define HARDDEBUG3 1  /* show failure to open a drive */
+/*#define HARDDEBUG1 1*/  /* show detail on all port i/o */
+/*#define HARDDEBUG2 1*/  /* show all commands */
+/*#define HARDDEBUG3 1*/  /* show failure to open a drive */
 
 /* Private types and data */
 
