@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Thu Sep 24 19:16:50 PDT 1998 by mann */
+/* Last modified on Sat Dec 12 11:46:26 PST 1998 by mann */
 
 /*
  * Emulate interrupts
@@ -15,6 +15,7 @@
 #include "trs.h"
 #include <stdio.h>
 #include <sys/time.h>
+#include <time.h>
 #include <signal.h>
 
 /* IRQs */
