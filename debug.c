@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Wed Aug 27 21:29:04 PDT 1997 by mann
+   Last modified on Wed Sep  3 01:27:47 PDT 1997 by mann
 */
 
 #include "z80.h"
@@ -320,7 +320,6 @@ void debug_shell()
 
     while(!done)
     {
-        int sig_mask;
 	printf("\n");
 	disassemble(REG_PC);
 
@@ -484,7 +483,65 @@ void debug_shell()
 	    }
 	    else if(!strcmp(command, "set") || !strcmp(command, "assign"))
 	    {
-		printf("Set not implemented.\n");
+		char regname[MAXLINE];
+		int addr, value;
+
+		if(sscanf(input, "%*s $%[a-zA-Z] = %x", regname, &value) == 2)
+		{
+		    if(!strcasecmp(regname, "a")) {
+			REG_A = value;
+		    } else if(!strcasecmp(regname, "f")) {
+			REG_F = value;
+		    } else if(!strcasecmp(regname, "b")) {
+			REG_B = value;
+		    } else if(!strcasecmp(regname, "c")) {
+			REG_C = value;
+		    } else if(!strcasecmp(regname, "d")) {
+			REG_D = value;
+		    } else if(!strcasecmp(regname, "e")) {
+			REG_E = value;
+		    } else if(!strcasecmp(regname, "h")) {
+			REG_H = value;
+		    } else if(!strcasecmp(regname, "l")) {
+			REG_L = value;
+		    } else if(!strcasecmp(regname, "sp")) {
+			REG_SP = value;
+		    } else if(!strcasecmp(regname, "pc")) {
+			REG_PC = value;
+		    } else if(!strcasecmp(regname, "af")) {
+			REG_AF = value;
+		    } else if(!strcasecmp(regname, "bc")) {
+			REG_BC = value;
+		    } else if(!strcasecmp(regname, "de")) {
+			REG_DE = value;
+		    } else if(!strcasecmp(regname, "hl")) {
+			REG_HL = value;
+		    } else if(!strcasecmp(regname, "af'")) {
+			REG_AF_PRIME = value;
+		    } else if(!strcasecmp(regname, "bc'")) {
+			REG_BC_PRIME = value;
+		    } else if(!strcasecmp(regname, "de'")) {
+			REG_DE_PRIME = value;
+		    } else if(!strcasecmp(regname, "hl'")) {
+			REG_HL_PRIME = value;
+		    } else if(!strcasecmp(regname, "ix")) {
+			REG_IX = value;
+		    } else if(!strcasecmp(regname, "iy")) {
+			REG_IY = value;
+		    } else if(!strcasecmp(regname, "i")) {
+			REG_I = value;
+		    } else {
+			printf("Unrecognized register name %s.\n", regname);
+		    }
+		}
+		else if(sscanf(input, "%*s %x = %x", &addr, &value) == 2)
+		{
+		    mem_write(addr, value);
+		}
+		else 
+		{
+		    printf("Syntax error.  (Type \"help\" for commands.)\n");
+		}
 	    }
 	    else if(!strcmp(command, "step"))
 	    {
@@ -592,7 +649,7 @@ static char help_message[] =
 \n\
 Running:\n\
     run\n\
-        Reset the Z-80 and commence execution.\n\
+        Reset the Z-80 and commence execution at address 0000.\n\
     cont\n\
         Continue execution.\n\
     step\n\
@@ -642,6 +699,9 @@ Traps:\n\
     traceoff at <address>\n\
         Set a trap to disable tracing at the specified hex address.\n\
 Miscellaneous:\n\
+    assign $<reg> = <value>\n\
+    assign <addr> = <value>\n\
+        Change the value of a register, register pair, or memory byte.\n\
     help\n\
     ?\n\
         Print this message.\n\
