@@ -1,9 +1,9 @@
 ;; export.z
 ;; Timothy Mann, 8/24/97
-;; Last modified on Mon Aug 25 15:58:14 PDT 1997 by mann
+;; Last modified on Mon Sep  1 21:19:25 PDT 1997 by mann
 ;;
 ;; Use xtrs 1.4 emulator traps to copy a file from TRS-80 to Unix
-;; Usage: EXPORT fromfile unixfile (NL)
+;; Usage: EXPORT [-n] fromfile unixfile
 ;; If the (NL) parameter is given, each carriage return ('\r')
 ;;  in the TRS-80 file is converted to a newline ('\n') in the Unix file.
 
@@ -11,17 +11,13 @@
 @init   equ 4420h
 @open   equ 4424h
 @close  equ 4428h
-@param  equ 4476h
-@param3 equ 4454h
-@logot  equ 447bh
-@logot3 equ 428ah
 @read   equ 4436h
 @write  equ 4439h
 @error  equ 4409h
 @exit   equ 402dh
 @abort  equ 4030h       
-
-model   equ 0125h ;'I' here => M3
+@put	equ 001bh
+dodcb$	equ 401dh
 
 ; Emulator trap instructions, byte-reversed for use in defw:
 open	equ 30edh
@@ -32,48 +28,45 @@ lseek	equ 34edh
 strerror equ 35edh
 
 	org 5200h
-export: ld a, (model)           ; model 1 or 3?
-        cp 'I'
-        jr nz, model1           ; go if 1
-        push hl
-        ld hl, param+1
-        ld de, @param3
-        ld (hl), e
-        inc hl
-        ld (hl), d
-        ld hl, logot+1
-        ld de, @logot3
-        ld (hl), e
-        inc hl
-        ld (hl), d
-        pop hl
-model1: 
-	ld de, dcb              ; ready to get LDOS filename from (HL)
-        call @fspec
-        jr nz, usage
+export:
+flag0:	ld a, (hl)		; look for -n flag
+	cp ' '
+	jp c, usage		; error if line ends here
+	jr nz, flag1
+	inc hl
+	jr flag0
+flag1:	cp '-'
+	jr nz, fromf
+	inc hl
+	ld a, (hl)
+	or 20h
+	cp 'n'
+	jp nz, usage		; only -n or -N is accepted
+	ld a, 1
+	ld (nflag), a
+flag2:	inc hl			; skip spaces
+	ld a, (hl)
+	cp ' '
+	jr z, flag2
+	jp c, usage
 
-skipsp:	ld a, (hl)              ; scan over Unix filename
+fromf:	ld de, dcb              ; ready to get LDOS filename from (HL)
+        call @fspec
+        jp nz, usage
+
+unix0:	ld a, (hl)              ; scan over Unix filename
         cp ' '		        ; first skip spaces
-	jr c, usage             ; error if line ends here
+	jp c, usage             ; error if line ends here
         jr nz, unix1
         inc hl
-	jr skipsp
+	jr unix0
 unix1:  ld (uname+1), hl        ; save pointer
 unix2:	inc hl                  ; now scan for end of Unix name
         ld a, (hl)
 	cp ' '+1
 	jr nc, unix2
-
-	push hl			; save end of Unix name
-	ld de, prmtbl           ; ready to parse params
-        call param
-	pop hl
 	ld (hl), 0		; NUL terminate Unix name
-        jr z, prmok             ; go if OK
-usage:  ld hl, usager           ; error message and exit
-        call logot
-        jp @abort
-prmok:  
+  
         ld hl, iobuf
         ld de, dcb
         ld b, 0
@@ -108,7 +101,7 @@ rdok:	inc bc
 
 ;; Translate
 	push bc			; save record count
-        ld a, (nlparam)		; check for NL feature
+        ld a, (nflag)		; check for NL feature
 	and a
 	jr z, nlfals
 	ld hl, iobuf
@@ -155,28 +148,39 @@ closok:	ld de, dcb
         jp @abort
 cls2ok: jp @exit                ; all is well
 
+;; Usage message
+usage:  ld hl, usager           ; error message and exit
+        call dsply
+        jp @abort
+
 ;; Unix error, msg in hl, errno in a
 uerror: push af
-	call logot
+	call dsply
 	pop af
 	ld hl, iobuf
 	ld bc, 256
 	defw strerror
-	call logot
+	call dsply
         jp @abort
 
-logot:  jp @logot               ; jump vectors, modified for M3
-param:  jp @param
+;; Display message in HL.  03h terminate, 0dh newline and terminate.
+dsply:	ld de, dodcb$
+	push hl
+dsply0:	ld a, (hl)
+	cp 03h
+	jr z, dsply1
+	push af
+	call @put
+	pop af
+	inc hl
+	cp 0dh
+	jr nz, dsply0
+dsply1:	pop hl
+	ret
 
-prmtbl: 
-        defb 'NL    '
-        defw nlparam
-        defb 0    
+nflag:	defb 0
 
-nlparam:
-	defw 0
-
-usager: defb 'Usage: EXPORT fromfile unixfile (NL=y/n)', 0dh
+usager: defb 'Usage: EXPORT [-n] fromfile unixfile', 0dh
 uopner:	defb 'Error in Unix open: ', 03h
 uwrer:	defb 'Error in Unix write: ', 03h
 uclser:	defb 'Error in Unix close: ', 03h

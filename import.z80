@@ -1,26 +1,26 @@
 ;; import.z
 ;; Timothy Mann, 8/24/97
-;; Last modified on Mon Aug 25 15:56:53 PDT 1997 by mann
+;; Last modified on Sat Aug 30 23:22:08 PDT 1997 by mann
 ;;
 ;; Use xtrs 1.4 emulator traps to copy a file from Unix to TRS-80
-;; Usage: IMPORT unixfile tofile (NL)
-;; If the (NL) parameter is given, each newline ('\n') in the Unix
+;; Usage: IMPORT [-n] unixfile tofile
+;; If the -n parameter is given, each newline ('\n') in the Unix
 ;;  file is converted to a carriage return ('\r'), the TRS-80 end of
 ;;  line character.
 
+;; Still doesn't work on NEWDOS/80.  They insist on uppercasing the
+;;  command line (tough on Unix filenames), and setting the EOF offset
+;;  works differently.
+
 @fspec  equ 441ch
 @init   equ 4420h
-@param  equ 4476h
-@param3 equ 4454h
-@logot  equ 447bh
-@logot3 equ 428ah
 @write  equ 4439h
 @close  equ 4428h
 @error  equ 4409h
 @exit   equ 402dh
 @abort  equ 4030h       
-
-model   equ 0125h ;'I' here => M3
+@put	equ 001bh
+dodcb$	equ 401dh
 
 ; Emulator trap instructions, byte-reversed for use in defw:
 open	equ 30edh
@@ -33,37 +33,36 @@ strerror equ 35edh
 iobsize	equ 8192		; must be divisible by 256
 
 	org 5200h
-import: ld a, (model)           ; model 1 or 3?
-        cp 'I'
-        jr nz, model1           ; go if 1
-        push hl
-        ld hl, param+1
-        ld de, @param3
-        ld (hl), e
-        inc hl
-        ld (hl), d
-        ld hl, logot+1
-        ld de, @logot3
-        ld (hl), e
-        inc hl
-        ld (hl), d
-        pop hl
-model1: 
-skipsp:	ld a, (hl)              ; scan over Unix filename
+import: 
+flag0:	ld a, (hl)		; look for -n flag
+	cp ' '
+	jr c, usage		; error if line ends here
+	jr nz, flag1
+	inc hl
+	jr flag0
+flag1:	cp '-'
+	jr nz, unix1
+	inc hl
+	ld a, (hl)
+	or 20h
+	cp 'n'
+	jr nz, usage		; only -n or -N is accepted
+	ld a, 1
+	ld (nflag), a
+unix0:	inc hl
+	ld a, (hl)
         cp ' '		        ; first skip spaces
 	jr c, usage             ; error if line ends here
-        jr nz, unix1
-        inc hl
-	jr skipsp
-unix1:  ld (uname+1), hl        ; save pointer
-unix2:	inc hl                  ; now scan for end of Unix name
+        jr z, unix0
+unix1:	ld (uname+1), hl        ; save pointer to Unix filename
+unix2:	inc hl                  ; scan for its end
         ld a, (hl)
 	cp ' '
 	jr c, usage
         jr nz, unix2
 	ld (hl), 0              ; NUL terminate
         inc hl
-	ld de, dcb              ; ready to get LDOS filename from (HL)
+	ld de, dcb              ; ready to get TRS-80 filename from (HL)
         call @fspec
         jr nz, usage
         push hl                 ; save position in command line
@@ -75,13 +74,10 @@ unix2:	inc hl                  ; now scan for end of Unix name
         jr z, openok
         call @error
         jp @abort
-openok: ld de, prmtbl           ; ready to parse command line
-        call param
-        jr z, prmok             ; go if OK
 usage:  ld hl, usager           ; error message and exit
-        call logot
+        call dsply
         jp @abort
-prmok:  
+openok:  
 uname:	ld hl, $-$              ; path
         ld bc, 0                ; oflag (O_RDONLY)
         ld de, 0                ; mode (ignored)
@@ -101,7 +97,7 @@ opn2ok:	ld hl, iobuf            ; read a buffer
 readok:	push de			; save fd
 
 ;; Translate
-        ld a, (nlparam)		; check for NL feature
+        ld a, (nflag)		; check for NL feature
 	and a
 	jr z, nlfals
 	ld hl, iobuf
@@ -162,31 +158,37 @@ cls2ok: jp @exit                ; all is well
 
 ;; Unix error, msg in hl, errno in a
 uerror: push af
-	call logot
+	call dsply
 	pop af
 	ld hl, iobuf
 	ld bc, 256
 	defw strerror
-	call logot
+	call dsply
         jp @abort
 
-logot:  jp @logot               ; jump vectors, modified for M3
-param:  jp @param
+;; Display message in HL.  03h terminate, 0dh newline and terminate.
+dsply:	ld de, dodcb$
+	push hl
+dsply0:	ld a, (hl)
+	cp 03h
+	jr z, dsply1
+	push af
+	call @put
+	pop af
+	inc hl
+	cp 0dh
+	jr nz, dsply0
+dsply1:	pop hl
+	ret
 
-prmtbl: 
-        defb 'NL    '
-        defw nlparam
-        defb 0    
+nflag:	defb 0
 
-nlparam:
-	defw 0
-
-usager: defb 'Usage: IMPORT unixfile tofile (NL=y/n)', 0dh
+usager: defb 'Usage: IMPORT [-n] unixfile tofile', 0dh
 uopner:	defb 'Error in Unix open: ', 03h
 urder:	defb 'Error in Unix read: ', 03h
 uclser:	defb 'Error in Unix close: ', 03h
 
-dcb:   defs 32   
-iobuf: defs iobsize
+dcb:	defs 32   
+iobuf:	defs iobsize
         
         end import
