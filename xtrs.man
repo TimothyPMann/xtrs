@@ -11,7 +11,8 @@ The hardware emulation can operate as a TRS-80 Model I, Model III, or Model 4.
 
 \fIxtrs\fP supports 48K of RAM in Model I or Model III mode,
 128K in Model 4 mode. 
-Floppy disks are emulated using files to store the data.
+Floppy disks are emulated using files to store the data; or, under
+Linux only, real floppy drives can be used.
 A printer is emulated by
 sending its output to standard output.  
 There is also a rudimentary emulation of cassette I/O
@@ -77,7 +78,7 @@ For printer support, any text sent to the TRS-80's printer (using LPRINT
 or LLIST, for example) is sent to the standard output.
 
 .SH Floppy disks
-In Model I mode, xtrs emulates a Radio Shack Expansion Interface with
+In Model I mode, \fIxtrs\fP emulates a Radio Shack Expansion Interface with
 the Percom Doubler or Radio Shack Doubler installed.  The Doubler
 provided double-density disk access by allowing either the stock
 WD1771 FDC chip or a WD1791 chip to be selected under program control.
@@ -88,7 +89,7 @@ commands of both -- so a driver for either should work.  Under LDOS,
 use the command "FDUBL" (newer versions of LDOS), or "PDUBL" or
 "RDUBL" (older versions) to install the driver.
 
-In Model III or 4 mode, xtrs emulates the stock Model III/4 floppy
+In Model III or 4 mode, \fIxtrs\fP emulates the stock Model III/4 floppy
 controller, which used a WD1793 chip (software-compatible with the
 WD1791) to provide both single and double density.
 
@@ -101,25 +102,25 @@ tab is emulated.  To change floppies in an emulated drive, rename the
 existing file for the drive (if any), rename the new floppy file to
 the proper name, and hit function key F7 in the emulator.
 
-If you try to boot with no disk in drive 0, xtrs emulates having no
-disk controller.  The behavior of a real machine with a disk
-controller in this case didn't seem useful to emulate faithfully: A
-real Model I hangs with a screen full of garbage; a real Model III or
-4 goes into a retry loop printing "Diskette?" on the screen and
-rechecking whether you've inserted one.
+If you try to boot with no file named diskX-0 (that is, no disk in
+drive 0), \fIxtrs\fP emulates having no disk controller.  The behavior of a
+real machine with a disk controller in this case didn't seem useful to
+emulate faithfully: A real Model I hangs with a screen full of
+garbage; a real Model III or 4 goes into a retry loop printing
+"Diskette?" on the screen and rechecking whether you've inserted one.
 
 Due to a limitation of the original Model I hardware, drive :3 cannot
 be double-sided in Model I mode.  In the original Model I, you could
 not have a drive :3 at all if any drive in the system was
 double-sided, but the emulator is able to be more forgiving.
 
-The floppy image files can be of either of two types: JV1, compatible
-with Jeff Vavasour's popular freeware Model I emulator for the PC; or
-JV3, a compatible extension of a format first used in Vavasour's
-commercial Model III/4 emulator.  Both types work in xtrs regardless
-of what model it is emulating.  A heuristic is used to decide which
-type of image is in a drive, as neither type has a "magic number" or
-signature.
+Emulated floppy image files can be of either of two types: JV1,
+compatible with Jeff Vavasour's popular freeware Model I emulator for
+the PC; or JV3, a compatible extension of a format first used in
+Vavasour's commercial Model III/4 emulator.  Both types work in \fIxtrs\fP
+regardless of what model it is emulating.  A heuristic is used to
+decide which type of image is in a drive, as neither type has a "magic
+number" or signature.
 
 JV1 supports only single density, single sided, with directory on
 track 17.  Sectors must be 256 bytes long.  Use FORMAT (DIR=17) to
@@ -134,7 +135,7 @@ either FB (normal) or F8 (deleted) data address mark on any sector.
 You cannot format a sector with an incorrect track number or head
 number, or with length other than 256 bytes.  You can format a sector
 with an intentional CRC error in the data field.  The original JV3
-format had a limit of 2901 total sectors, but xtrs allows up to 5802.
+format had a limit of 2901 total sectors, but \fIxtrs\fP allows up to 5802.
 If you format more than 2901 sectors on a disk image, however, other
 emulators may be unable to read the additional sectors.  An 80 track,
 double-sided, double-density (18 sector) 5-inch floppy will fit within
@@ -148,7 +149,7 @@ existing one.  By default, mkfloppy makes a JV3 floppy, but with the
 Early Model I operating systems used an FA data address mark for the
 directory (a nonstandard value supported only by the WD1771, but not
 the WD1791/3), while later ones wrote F8 (for Model III/4 compatibility)
-but could read either.  To deal nicely with this problem, xtrs
+but could read either.  To deal nicely with this problem, \fIxtrs\fP
 implements the following kludge.  On writing, any data address mark
 other than FB is recorded as F8.  On reading in single density with
 the emulated WD1771 (available in Model I mode only), F8 is returned
@@ -156,6 +157,23 @@ as FA.  In all other modes, F8 is returned as F8.  This trick makes
 the different operating systems perfectly compatible with each other,
 which is better than on a real Model I!
  
+Under Linux only, any diskX-N file can be a symbolic link to a real
+floppy disk drive, typically /dev/fd0 or /dev/fd1.  Most PCs should be
+able to read and write TRS-80 compatible floppies in this way.  Many
+PC floppy controllers cannot handle single density, however, and some
+may have problems even with double density disks written on a real
+TRS-80, especially disks formatted by older TRS-80 operating systems.
+Use the -doublestep flag if you need to read 35-track or 40-track
+media in an 80-track drive.  If you need to write 35-track or 40-track
+media in an 80-track drive, bulk-erase the media first and format it
+in the 80-track drive.  Don't write to a disk with -doublestep if it
+has ever been written to in a real 40-track drive.
+
+If you try to access a real floppy drive with no disk in it,
+\fIxtrs\fP will print an error message, and the Z-80 program will get
+a somewhat different error than it should.  After inserting a disk,
+you must press F7 to clear the error condition.
+
 .SH Data import and export
 The emulated floppy \fIutility.dsk\fP contains some programs for
 transferring data between the emulator and ordinary Unix files.  All
@@ -299,6 +317,20 @@ normally emulates the index holes in real time, but can emulate Z-80
 instructions faster than a real TRS-80, so sometimes the loop will
 time out too soon and the operating system will report that there is
 no disk in the drive.
+.TP
+.B \-nospinfast
+.IP
+Turn off -spinfast mode.  This is the default.
+.TP
+.B \-doublestep
+.IP
+Make real floppy drives double-step, allowing access to 35-track or
+40-track media in an 80-track drive.  Linux only.  See the Floppy Disks
+section for limitations.
+.TP
+.B \-nodoublestep
+.IP
+Turn off double-step mode.  Linux only.  This is the default.
 
 .SH Additional resources
 There are many other TRS-80 resources available on the Web, including
@@ -306,10 +338,10 @@ shareware and freeware emulators that run under MSDOS and other
 operating systems, software for converting TRS-80 physical media to
 the emulator's disk file format, ROM images, and TRS-80 software that
 has already been converted.  For pointers, see
-http://www.research.digital.com/SRC/personal/Tim_Mann/trs80.html.
+http://www.research. digital.com/SRC/personal/Tim_Mann/trs80.html.
 
 See README and README.tpm in this package for technical (and
-historical) data on xtrs not included in this man page.
+historical) data on \fIxtrs\fP not included in this man page.
 
 .SH Bugs
 There may be bugs in the Z-80 emulator which we haven't found yet.
@@ -325,16 +357,20 @@ Serial ports are not emulated.
 
 The Model III/4 alternate character set is not emulated.
 
-Some features of the disk controller are not currently emulated.  
-(1) Force Interrupt with condition bits 0x01, 0x02, or 0x04 is not
+Some features of the disk controller are not currently emulated.  (1)
+Force Interrupt with condition bits 0x01, 0x02, or 0x04 is not
 implemented.  (2) Read Track is not implemented.  (3) The
 multiple-sector flags in Read and Write are not implemented.
 
-There is no support for real physical floppy disks.  It seems too
-non-portable to try to put this directly into the emulator.  Also,
-today's controllers often cannot handle the formats that were
-generated by the old 1771s and 1791/3s.  Still, partial support that
-works only under Linux may appear some day.
+Real physical floppy disks are supported only under Linux, because
+Unix does not provide a portable interface to the low-level floppy
+controller functionality that \fIxtrs\fP needs.  There are some
+limitations even under Linux: Sectors must be 256 bytes long.
+(Supporting multiple lengths would be difficult due to an interface
+difference between the PC and TRS-80 floppy controllers.)  Index holes
+are faked, not detected on the real disk.  Attempts to access a real
+drive with no disk in it are dealt with awkwardly (as documented
+above).  The code is new and not thoroughly tested.
 
 The emulator arbitrarily limits both JV1 and JV3 disk images to 96
 tracks.  The limit could easily be increased to 255 or maybe 256, but
