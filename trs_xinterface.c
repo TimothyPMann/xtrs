@@ -71,6 +71,7 @@ static int col_chars = 16;
 static int resize = 0;
 static int top_margin = 0;
 static int left_margin = 0;
+static int border_width = 0;
 static Pixmap trs_char[2][MAXCHARS];
 static Display *display;
 static int screen;
@@ -90,6 +91,7 @@ static XrmOptionDescRec opts[] = {
 {"-bg",		"*background",	XrmoptionSepArg,	(caddr_t)NULL},
 {"-foreground",	"*foreground",	XrmoptionSepArg,	(caddr_t)NULL},
 {"-fg",		"*foreground",	XrmoptionSepArg,	(caddr_t)NULL},
+{"-borderwidth","*borderwidth",	XrmoptionSepArg,	(caddr_t)NULL},
 {"-usefont",	"*usefont",	XrmoptionNoArg,		(caddr_t)"on"},
 {"-nofont",	"*usefont",	XrmoptionNoArg,		(caddr_t)"off"},
 {"-font",	"*font",	XrmoptionSepArg,	(caddr_t)NULL},
@@ -308,6 +310,15 @@ void trs_screen_init()
 	back_pixel = BlackPixel(display, screen);
     }
 
+    (void) sprintf(option, "%s%s", program_name, ".borderwidth");
+    if (XrmGetResource(x_db, option, "Xtrs.Borderwidth", &type, &value))
+    {
+	if ((border_width = atoi(value.addr)) < 0)
+	    border_width = 0;
+    } else {
+	border_width = 0;
+    }
+
     (void) sprintf(option, "%s%s", program_name, ".usefont");
     if (XrmGetResource(x_db, option, "Xtrs.Usefont", &type, &value))
     {
@@ -433,13 +444,13 @@ void trs_screen_init()
     }
 
     if (trs_model == 4 && !resize) {
-      OrigWidth = cur_char_width * 80;
+      OrigWidth = cur_char_width * 80 + 2 * border_width;
       left_margin = cur_char_width * (80 - row_chars)/2;
-      OrigHeight = cur_char_height * 24;
+      OrigHeight = cur_char_height * 24 + 2 * border_width;
       top_margin = cur_char_height * (24 - col_chars)/2;
     } else {
-      OrigWidth = cur_char_width * row_chars;
-      OrigHeight = cur_char_height * col_chars;
+      OrigWidth = cur_char_width * row_chars + 2 * border_width;
+      OrigHeight = cur_char_height * col_chars + 2 * border_width;
     }
     window = XCreateSimpleWindow(display, root_window, 400, 400,
 				 OrigWidth, OrigHeight, 1, foreground,
@@ -672,8 +683,8 @@ void trs_screen_80x24(flag)
     }
     screen_chars = row_chars * col_chars;
     if (resize) {
-      OrigWidth = cur_char_width * row_chars;
-      OrigHeight = cur_char_height * col_chars;;
+      OrigWidth = cur_char_width * row_chars + 2 * border_width;
+      OrigHeight = cur_char_height * col_chars + 2 * border_width;
       XSelectInput(display, window, EVENT_MASK);
       XResizeWindow(display, window, OrigWidth, OrigHeight);
       XFlush(display);
@@ -803,8 +814,8 @@ Bool doflush;
     }
     row = position / row_chars;
     col = position - (row * row_chars);
-    destx = col * cur_char_width + left_margin;
-    desty = row * cur_char_height + top_margin;
+    destx = col * cur_char_width + left_margin + border_width;
+    desty = row * cur_char_height + top_margin + border_width;
     if (usefont) {
 	if (trs_model == 1 && !trsfont) {
 #ifndef UPPERCASE
@@ -893,8 +904,10 @@ void trs_screen_scroll()
 {
     int i = 0;
 
-    XCopyArea(display,window,window,gc,0,cur_char_height,
-	      (cur_char_width*row_chars),(cur_char_height*col_chars),0,0);
+    XCopyArea(display,window,window,gc,
+	      border_width,cur_char_height+border_width,
+	      (cur_char_width*row_chars),(cur_char_height*col_chars),
+	      border_width,border_width);
     for (i = row_chars; i < screen_chars; i++)
 	trs_screen[i-row_chars] = trs_screen[i];
 }
