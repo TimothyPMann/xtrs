@@ -18,6 +18,7 @@
 /*#define DISKDEBUG4 1*/  /* REAL sector size detection */
 /*#define DISKDEBUG5 1*/  /* Read Address timing */
 /*#define DISKDEBUG6 1*/  /* DMK support */
+/*#define DISKDEBUG7 1*/  /* ioctl errors accessing real disks */
 #define TSTATEREV 1       /* Index holes timed by T-states, not real time */
 #define SIZERETRY 1       /* Retry in different sizes on real_read */
 #define REALRADLY 0       /* Read Address timing for real disks; nonworking */
@@ -3037,7 +3038,9 @@ real_error(DiskState *d, unsigned int flags, char *msg, unsigned char status)
     d->u.real.empty = 1;
   }
   state.status |= status;
-  /*debug("error on real_%s\n", msg);*/
+#if DISKDEBUG7
+  debug("error on real_%s\n", msg);
+#endif
 }
 
 void
