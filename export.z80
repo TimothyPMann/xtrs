@@ -1,13 +1,15 @@
 ;; export.z
 ;; Timothy Mann, 8/24/97
-;; Last modified on Sat Jan 24 23:13:29 PST 1998 by mann
+;; Last modified on Tue Dec 15 16:32:38 PST 1998 by mann
 ;;
 ;; Use xtrs 1.9 emulator traps to copy a file from TRS-80 to Unix
-;; Usage: EXPORT [-ln] fromfile unixfile
+;; Usage: EXPORT [-ln] fromfile [unixfile]
 ;; Parameter -l will convert the Unix file to lower case.
 ;;  (Needed for NEWDOS/80.  They insist on uppercasing the command line.)
 ;; If the -n parameter is given, each carriage return ('\r')
 ;;  in the TRS-80 file is converted to a newline ('\n') in the Unix file.
+;; If the unixfile parameter is omitted, the fromfile parameter is used,
+;;  with '/' changed to '.'.
 
 ;; Model I/III addresses
 @fspec  equ 441ch
@@ -152,12 +154,13 @@ flag2:	inc hl
 	jr flag0
 
 fromf:	ld de, dcb              ; ready to get LDOS filename from (HL)
+	ld (lfname), hl		; save if needed to default Unix name
         call fspec
         jp nz, usage
 
 unix0:	ld a, (hl)              ; scan over Unix filename
         cp ' '		        ; first skip spaces
-	jp c, usage             ; error if line ends here
+	jr c, usetrs            ; if no Unix name, use translated TRS name
         jr nz, unix1
         inc hl
 	jr unix0
@@ -169,8 +172,26 @@ unix2:	cp (hl)
 	dec de
 	sub a
 	ld (de), a              ; NUL terminate Unix name
-  
-        ld hl, iobuf
+        jr gotu
+
+usetrs: ld hl, (lfname)		; translate TRS-80 name to Unix
+	ld de, iobuf
+ut1:	ld a, (hl)
+	cp ':'			; drivespec?
+	jr z, utdone		; done if so
+	cp ' '+1		; end of line?
+	jr c, utdone		; done if so
+	cp '/'			; change '/' to '.' for extension
+	jr nz, notsl
+	ld a, '.'
+notsl:	ld (de), a
+	inc hl
+	inc de
+	jr ut1
+utdone: sub a			; NUL-terminate Unix name
+	ld (de), a
+
+gotu:   ld hl, iobuf
         ld de, dcb
         ld b, 0
         call open               ; open the TRS-80 file
@@ -321,13 +342,14 @@ lconv2:	ld (de), a
 
 lflag:	defb 0
 nflag:	defb 0
+lfname:	defw 0
 
-usager: defb 'Usage: EXPORT [-ln] fromfile unixfile', 0dh
+usager: defb 'Usage: EXPORT [-ln] fromfile [unixfile]', 0dh
 uopner:	defb 'Error in Unix open: ', 03h
 uwrer:	defb 'Error in Unix write: ', 03h
 uclser:	defb 'Error in Unix close: ', 03h
 
-dcb:   defs 32   
-iobuf: defs 256
+dcb:	defs 32   
+iobuf:	defs 256
         
         end export

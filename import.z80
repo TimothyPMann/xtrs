@@ -1,15 +1,18 @@
 ;; import.z
 ;; Timothy Mann, 8/24/97
-;; Last modified on Sat Jan 24 23:13:29 PST 1998 by mann
+;; Last modified on Tue Dec 15 16:12:49 PST 1998 by mann
 ;;
 ;; Use xtrs 1.9 emulator traps to copy a file from Unix to TRS-80
-;; Usage: IMPORT [-ln] unixfile tofile
+;; Usage: IMPORT [-ln] unixfile [tofile]
 ;; Parameter -l will convert the Unix file to lower case.
 ;;  (Needed for NEWDOS/80.  They insist on uppercasing the
 ;;  command line.)
 ;; If the -n parameter is given, each newline ('\n') in the Unix
 ;;  file is converted to a carriage return ('\r'), the TRS-80 end of
 ;;  line character.
+;; If the tofile parameter is omitted, the last component of the
+;;  Unix pathname is used, with '.' changed to '/'.  If this is
+;;  not a legal TRS-80 filename, you get an error message.
 
 ;; EOF handling is different for NEWDOS/80:
 ;;  For TRSDOS and LDOS, word (dcb+12) contains the number of
@@ -140,7 +143,7 @@ not4:
 
 flag0:	ld a, (hl)		; look for flags
 	cp ' '
-	jr c, usage		; error if line ends here
+	jp c, usage		; error if line ends here
 	jr nz, flag1
 	inc hl
 	jr flag0
@@ -170,11 +173,25 @@ unix1:	ld de, iobuf		; copy Unix filename
 unix2:	cp (hl)
 	ldi
 	jr c, unix2
-	jr nz, usage
-	dec de
-	sub a
-	ld (de), a              ; NUL terminate Unix name
-	ld de, dcb              ; ready to get TRS-80 filename from (HL)
+	dec de			; NUL terminate Unix name
+	ld a, 0
+	ld (de), a              
+	jr z, trs80		; go if two names given
+
+;; Translate last component of Unix name to TRS-80 name			
+	dec hl			; back up to terminator
+unix3:	dec hl			; back up to last byte of name
+	ld a, (hl)
+	cp '.'			; change '.' to '/'
+	jr nz, notdot
+	ld (hl), '/'
+notdot:	cp '/'
+	jr z, unix4
+	cp ' '
+	jr nz, unix3
+unix4:	inc hl			; point to start of modified last component 
+
+trs80:	ld de, dcb              ; ready to get TRS-80 filename from (HL)
         call fspec
         jr nz, usage
 	ld hl, iobuf		; Unix path
@@ -332,7 +349,7 @@ lconv2:	ld (de), a
 lflag:	defb 0
 nflag:	defb 0
 
-usager: defb 'Usage: IMPORT [-ln] unixfile tofile', 0dh
+usager: defb 'Usage: IMPORT [-ln] unixfile [tofile]', 0dh
 uopner:	defb 'Error in Unix open: ', 03h
 urder:	defb 'Error in Unix read: ', 03h
 uclser:	defb 'Error in Unix close: ', 03h
