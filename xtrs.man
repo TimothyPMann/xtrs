@@ -571,7 +571,7 @@ Some games run rather well under \fBxtrs\fP now,
 provided that your
 machine is fast enough to run the emulation in real time and that you
 choose the right command line options.  
-Galaxy Invaders Plus by Big 5 Software is particularly good.  (It's
+"Galaxy Invaders Plus" by Big 5 Software is particularly good.  (It's
 even better in xtrs 3.7 with the improved sound support!)
 You will usually want to turn on autodelay, and
 you'll often need to tweak the keystretch setting.  
@@ -590,6 +590,13 @@ is finished show up on the next screen, try reducing the first number,
 and set the last number equal to the first number.
 See -keystretch below for more information.  This aspect of the
 emulator seems to need a bit more work.
+
+Games with audio output may sound better if you increase the sample
+rate from the default 11,025 Hz.  Try "-samplerate 44100".  The title
+screen to "Talking Adventure 1: Forbidden Planet" by Fantastic
+Software seems to work a lot better at the higher sample rate.  On the
+other hand, raising the sample rate will make the sound break up if your
+machine isn't fast enough to generate samples at that rate.
 .SH Options
 Defaults for all options can be specified using the standard X resource
 mechanism, and the class name for \fBxtrs\fP is "Xtrs".
@@ -815,15 +822,12 @@ Some features of the disk controller are not currently emulated: Force
 Interrupt with condition bits 0x01, 0x02, or 0x04 is not
 implemented. Read Track is implemented only for DMK emulated
 floppies. The multiple-sector flags in Read and Write are not
-implemented.  A Lost Data error will not occur until the emulated
-drive times out and stops, which may cause problems in code that
-generates this error deliberately.  The timing of returned sectors is
-emulated only for the Read Address command, and not very accurately
-for JV1 or JV3.  Partially reformatting a track (which TRS-80 programs
-like HyperZap and Model I Super Utility do to achieve mixed density)
-is supported for DMK but not JV3; however, switching densities while
-formatting (which Model III and 4 Super Utility do) works on both DMK
-and JV3.
+implemented.  The timing of returned sectors is emulated only for the
+Read Address command, and not very accurately for JV1 or JV3.
+Partially reformatting a track (which TRS-80 programs like HyperZap
+and Model I Super Utility do to achieve mixed density) is supported
+for DMK but not JV3; however, switching densities while formatting
+(which Model III and 4 Super Utility do) works on both DMK and JV3.
 
 Real physical floppy disks are supported only under Linux, because
 Unix does not provide a portable interface to the low-level floppy
@@ -882,6 +886,3 @@ and settime utilities to Newdos/80.  Branden Robinson supplied the
 first version of the cassette man page and fixed Makefile bugs.  Mark
 McDougall provided documentation for the Micro Labs Grafyx Solution
 card.
-
-
-

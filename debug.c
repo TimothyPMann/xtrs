@@ -233,8 +233,8 @@ static void clear_trap_address(int address, int flag)
 
 void debug_print_registers()
 {
-    printf("\n       S Z - H - PV N C    IFF1 IFF2 IM\n");
-    printf("Flags: %d %d %d %d %d  %d %d %d      %d    %d   %d\n\n",
+    printf("\n       S Z - H - PV N C   IFF1 IFF2 IM\n");
+    printf("Flags: %d %d %d %d %d  %d %d %d     %d    %d   %d\n\n",
 	   (SIGN_FLAG != 0),
 	   (ZERO_FLAG != 0),
 	   (REG_F & UNDOC5_MASK) != 0,
@@ -253,6 +253,10 @@ void debug_print_registers()
 	   REG_D, REG_E, REG_PC, REG_DE_PRIME);
     printf("H L: %.2x %.2x    SP: %.4x    HL': %.4x\n",
 	   REG_H, REG_L, REG_SP, REG_HL_PRIME);
+
+    printf("\nT-state counter: %" TSTATE_T_LEN "    ", z80_state.t_count);
+    printf("Delay setting: %d (%s)\n",
+	   z80_state.delay, trs_autodelay ? "auto" : "fixed");
 }
 
 

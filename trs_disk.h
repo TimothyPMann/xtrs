@@ -86,7 +86,7 @@ extern int trs_disk_truedam;
 
 /* Type I commands: cccchvrr, where
    cccc = command number
-   h = head load (delay?)
+   h = head load
    v = verify (i.e., read next address to check we're on the right track)
    rr = step rate:  00=6ms, 01=12ms, 10=20ms, 11=40ms
 */
@@ -99,6 +99,7 @@ extern int trs_disk_truedam;
 #define TRSDISK_STEPOUT  0x60
 #define TRSDISK_STEPOUTU 0x70
 #define TRSDISK_UBIT     0x10
+#define TRSDISK_HBIT     0x08
 #define TRSDISK_VBIT     0x04
 
 /* Type II commands: ccccbecd, where

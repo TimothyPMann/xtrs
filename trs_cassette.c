@@ -113,6 +113,7 @@ int cassette_default_sample_rate = DEFAULT_SAMPLE_RATE;
 
 /* For bit-level emulation */
 static tstate_t cassette_transition;
+static tstate_t last_sound;
 static int cassette_value, cassette_next, cassette_flipflop;
 static int cassette_lastnonzero;
 static unsigned long cassette_delta;
@@ -562,7 +563,8 @@ static int assert_state(int state)
       setbuf(cassette_file, NULL);
 #if OSS_SOUND && HAVE_OSS
       if (state == SOUND) {
-	int arg = 0x7fff0008; /* unlimited fragments of size (1 << 8) */
+	/*int arg = 0x7fff0008;*/ /* unlimited fragments of size (1 << 8) */
+	int arg = 0x00200008; /* 32 fragments of size (1 << 8) */
 	if (ioctl(fileno(cassette_file), SNDCTL_DSP_SETFRAGMENT, &arg) < 0) {
 	  error("warning: couldn't set sound fragment size: %s",
 		strerror(errno));
@@ -673,6 +675,7 @@ transition_out(int value)
 	ddelta_us = 20000.0;
 	cassette_roundoff_error = 0.0;
       }
+#if OLDWAY
       if (trs_event_scheduled() == transition_out ||
 	  trs_event_scheduled() == (trs_event_func) assert_state) {
 	trs_cancel_event();
@@ -681,8 +684,19 @@ transition_out(int value)
 	trs_schedule_event((trs_event_func)assert_state, CLOSE, 5000000);
       } else {
 	trs_schedule_event(transition_out, FLUSH,
-			   (int)(20000 * z80_state.clockMHz));
+			   (int)(25000 * z80_state.clockMHz));
       }
+#else
+      if (trs_event_scheduled() == transition_out) {
+	trs_cancel_event();
+      }
+      if ((long)(z80_state.t_count - last_sound) > 5000000) {
+	trs_schedule_event((trs_event_func)assert_state, CLOSE, 5000000);
+      } else {
+	trs_schedule_event(transition_out, FLUSH,
+			   (int)(25000 * z80_state.clockMHz));
+      }
+#endif
     }
 #endif
     sample = value_to_sample[cassette_value];
@@ -776,8 +790,9 @@ transition_out(int value)
   }
 
   sigprocmask(SIG_SETMASK, &oldset, NULL);
-  cassette_value = value;
+  if (cassette_value != value) last_sound = z80_state.t_count;
   cassette_transition = z80_state.t_count;
+  cassette_value = value;
 }
 
 /* Read a new transition, updating cassette_next and cassette_delta.
@@ -1003,7 +1018,6 @@ void trs_cassette_out(int value)
     }
     if (cassette_state != READ && value != cassette_value) {
       if (assert_state(WRITE) < 0) return;
-      trs_paused = 1;  /* disable speed measurement for this round */
       transition_out(value);
     }
   }
@@ -1074,7 +1088,6 @@ trs_cassette_update(int dummy)
 
 	/* Read the next transition */
 	newtrans = transition_in();
-	trs_paused = 1;  /* disable speed measurement for this round */
 
 	/* Allow reset button */
 	trs_get_event(0);

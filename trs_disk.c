@@ -310,8 +310,9 @@ trs_disk_debug()
   printf("  curdrive %d, curside %d, density %d, controller %s\n",
 	 state.curdrive, state.curside, state.density,
 	 state.controller == TRSDISK_P1771 ? "WD1771" : "WD1791/93");
-  printf("  crc state 0x%04x, last_readadr %d, motor timeout %" TSTATE_T_LEN
-	 "\n", state.crc, state.last_readadr, state.motor_timeout);
+  printf("  crc state 0x%04x, last_readadr %d, motor timeout %ld\n",
+	 state.crc, state.last_readadr,
+	 (long) (state.motor_timeout - z80_state.t_count));
   printf("  last (non-DMK) format gaps %d %d %d %d %d\n",
 	 state.format_gap[0], state.format_gap[1], state.format_gap[2],
 	 state.format_gap[3], state.format_gap[4]);
@@ -428,16 +429,6 @@ trs_disk_change_all()
 
 
 static void
-trs_disk_firstdrq(int restoredelay)
-{
-  if (restoredelay > 0) {
-    z80_state.delay = restoredelay;
-  }
-  state.status |= TRSDISK_DRQ;
-  trs_disk_drq_interrupt(1);
-}
-
-static void
 trs_disk_done(int bits)
 {
   state.status &= ~TRSDISK_BUSY;
@@ -445,6 +436,29 @@ trs_disk_done(int bits)
   trs_disk_intrq_interrupt(1);
 }
 
+
+static void
+trs_disk_lostdata(int cmd)
+{
+  if (state.currcommand == cmd) {
+    state.status &= ~TRSDISK_BUSY;
+    state.status |= TRSDISK_LOSTDATA;
+    state.bytecount = 0;
+    trs_disk_intrq_interrupt(1);
+  }
+}
+
+static void
+trs_disk_firstdrq(int restoredelay)
+{
+  if (restoredelay > 0) {
+    z80_state.delay = restoredelay;
+  }
+  state.status |= TRSDISK_DRQ;
+  trs_disk_drq_interrupt(1);
+  trs_schedule_event(trs_disk_lostdata, state.currcommand,
+		     500000 * z80_state.clockMHz);
+}
 
 static void
 trs_disk_unimpl(unsigned char cmd, char* more)
@@ -902,11 +916,11 @@ dmk_get_track(DiskState* d)
 
 /* Search for a sector on the current physical track.  For JV1 or JV3,
    return its index within the emulated disk's array of sectors.  For
-   DMK, get the track into the buffer, return the index of the
-   sector's DAM, and set state.bytecount to its size code.  Set status
-   and return -1 if there is no such sector.  If sector == -1, return
-   the first sector found if any.  If side == 0 or 1, perform side
-   compare against sector ID; if -1, don't. */
+   DMK, get the track into the buffer, return the index of the next
+   byte after the header CRC, and set state.bytecount to its size
+   code.  Set status and return -1 if there is no such sector.  If
+   sector == -1, return the first sector found if any.  If side == 0
+   or 1, perform side compare against sector ID; if -1, don't. */
 static int
 search(int sector, int side)
 {
@@ -966,9 +980,6 @@ search(int sector, int side)
       /* fetch index of next IDAM */
       int idamp = d->u.dmk.buf[i] + (d->u.dmk.buf[i+1] << 8);
 
-      /* max distance past ID CRC to search for DAM */
-      int damlimit = state.density ? 43 : 30; /* ref 1791 datasheet */
-
       /* fail if no more IDAMs */
       if (idamp == 0) break;
 
@@ -997,7 +1008,7 @@ search(int sector, int side)
       p += incr;
 
       /* compare side field of ID if desired */
-      if (*p != side && side != -1) continue;
+      if ((*p & 1) != side && side != -1) continue;
       state.crc = calc_crc1(state.crc, *p);
       p += incr;
 
@@ -1026,18 +1037,9 @@ search(int sector, int side)
 	state.status &= ~TRSDISK_CRCERR;
       }
 
-      /* search for valid DAM */
-      while (damlimit-- > 0) {
-	if (0xf8 <= *p && *p <= 0xfb) {
-	  /* got one! */
-	  d->u.dmk.nextidam = i + 2;
-	  return p - d->u.dmk.buf;
-	}
-	p += incr;
-      }
-
-      /* found ID with good CRC but no following DAM; fail */
-      break;
+      /* Found an ID that matches */
+      d->u.dmk.nextidam = i + 2; /* remember where the next one is */
+      return p - d->u.dmk.buf;
     }
     state.status |= TRSDISK_NOTFOUND;
     return -1;
@@ -1153,6 +1155,12 @@ type1_status()
   } else {
     state.status &= ~TRSDISK_TRKZERO;
   }
+  /* RDY and HLT inputs are wired together on TRS-80 I/III/4/4P */
+  if (state.status & TRSDISK_NOTRDY) {
+    state.status &= ~TRSDISK_HEADENGD;
+  } else {
+    state.status |= TRSDISK_HEADENGD;
+  }
 }
 
 void
@@ -1178,8 +1186,10 @@ trs_disk_select_write(unsigned char data)
     state.curside = (data & TRSDISK3_SIDE) != 0;
     state.density = (data & TRSDISK3_MFM) != 0;
     if (data & TRSDISK3_WAIT) {
-	/* If there was an event pending, deliver it right now */
+      /* If there was an event pending, deliver it right now */
+      if (trs_event_scheduled() != trs_disk_lostdata) {
 	trs_do_event();
+      }
     }
   }
   switch (data & (TRSDISK_0|TRSDISK_1|TRSDISK_2|TRSDISK_3)) {
@@ -1352,7 +1362,10 @@ trs_disk_data_read(void)
 	state.bytecount = 0;
 	state.status &= ~TRSDISK_DRQ;
         trs_disk_drq_interrupt(0);
-	trs_schedule_event(trs_disk_done, 0, 32);
+	if (trs_event_scheduled() == trs_disk_lostdata) {
+	  trs_cancel_event();
+	}
+	trs_schedule_event(trs_disk_done, 0, 64);
       }
     }
     break;
@@ -1423,7 +1436,10 @@ trs_disk_data_read(void)
       state.bytecount = 0;
       state.status &= ~TRSDISK_DRQ;
       trs_disk_drq_interrupt(0);
-      trs_schedule_event(trs_disk_done, 0, 32);
+      if (trs_event_scheduled() == trs_disk_lostdata) {
+	trs_cancel_event();
+      }
+      trs_schedule_event(trs_disk_done, 0, 64);
     }
     break;
   case TRSDISK_READTRK:
@@ -1437,7 +1453,10 @@ trs_disk_data_read(void)
       state.bytecount = 0;
       state.status &= ~TRSDISK_DRQ;
       trs_disk_drq_interrupt(0);
-      trs_schedule_event(trs_disk_done, 0, 32);
+      if (trs_event_scheduled() == trs_disk_lostdata) {
+	trs_cancel_event();
+      }
+      trs_schedule_event(trs_disk_done, 0, 64);
     }
     break;
   default:
@@ -1539,7 +1558,10 @@ trs_disk_data_write(unsigned char data)
 	state.bytecount = 0;
 	state.status &= ~TRSDISK_DRQ;
         trs_disk_drq_interrupt(0);
-	trs_schedule_event(trs_disk_done, 0, 32);
+	if (trs_event_scheduled() == trs_disk_lostdata) {
+	  trs_cancel_event();
+	}
+	trs_schedule_event(trs_disk_done, 0, 64);
 	c = fflush(d->file);
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
       }
@@ -1570,7 +1592,10 @@ trs_disk_data_write(unsigned char data)
 	  c = fflush(d->file);
 	  if (c == EOF) state.status |= TRSDISK_WRITEFLT;
 	  trs_disk_drq_interrupt(0);
-	  trs_schedule_event(trs_disk_done, 0, 32);
+	  if (trs_event_scheduled() == trs_disk_lostdata) {
+	    trs_cancel_event();
+	  }
+	  trs_schedule_event(trs_disk_done, 0, 64);
 	}
       } else {
 	switch (data) {
@@ -1684,7 +1709,10 @@ trs_disk_data_write(unsigned char data)
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
       }
       trs_disk_drq_interrupt(0);
-      trs_schedule_event(trs_disk_done, 0, 32);
+      if (trs_event_scheduled() == trs_disk_lostdata) {
+	trs_cancel_event();
+      }
+      trs_schedule_event(trs_disk_done, 0, 64);
       break;
     }
     switch (state.format) {
@@ -2112,6 +2140,9 @@ trs_disk_command_write(unsigned char cmd)
   }
 
   /* Cancel any ongoing command */
+  if (trs_event_scheduled() == trs_disk_lostdata) {
+    trs_cancel_event();
+  }
   trs_schedule_event(trs_disk_intrq_interrupt, 0, 0);
   state.bytecount = 0;
   state.currcommand = cmd;
@@ -2124,7 +2155,7 @@ trs_disk_command_write(unsigned char cmd)
     if (d->emutype == REAL) real_restore(state.curdrive);
     /* Should this set lastdirection? */
     if (cmd & TRSDISK_VBIT) verify();
-    trs_schedule_event(trs_disk_done, 0, 512);
+    trs_schedule_event(trs_disk_done, 0, 2000);
     break;
   case TRSDISK_SEEK:
     state.last_readadr = -1;
@@ -2139,7 +2170,7 @@ trs_disk_command_write(unsigned char cmd)
     if (d->emutype == REAL) real_seek();
     /* Should this set lastdirection? */
     if (cmd & TRSDISK_VBIT) verify();
-    trs_schedule_event(trs_disk_done, 0, 256);
+    trs_schedule_event(trs_disk_done, 0, 2000);
     break;
   case TRSDISK_STEP:
   case TRSDISK_STEPU:
@@ -2157,7 +2188,7 @@ trs_disk_command_write(unsigned char cmd)
     }
     if (d->emutype == REAL) real_seek();
     if (cmd & TRSDISK_VBIT) verify();
-    trs_schedule_event(trs_disk_done, 0, 64);
+    trs_schedule_event(trs_disk_done, 0, 2000);
     break;
   case TRSDISK_STEPIN:
   case TRSDISK_STEPINU:
@@ -2279,6 +2310,10 @@ trs_disk_command_write(unsigned char cmd)
 
       } else /* d->emutype == DMK */ {
 
+	/* max distance past ID CRC to search for DAM */
+	int damlimit = state.density ? 43 : 30; /* ref 1791 datasheet */
+	unsigned char dam;
+
 	/* DMK search dumps the size code into state.bytecount; adjust
            to real bytecount here */
 	if (non_ibm) {
@@ -2286,10 +2321,27 @@ trs_disk_command_write(unsigned char cmd)
 	} else {
 	  state.bytecount = 128 << (state.bytecount & 3);
 	}
+
+	/* search for valid DAM */
+	while (--damlimit >= 0) {
+	  dam = d->u.dmk.buf[id_index];
+	  id_index += dmk_incr(d);
+	  if (0xf8 <= dam && dam <= 0xfb) {
+	    /* got one! */
+	    break;
+	  }
+	}
+	if (damlimit < 0) {
+	  /* found ID with good CRC but no following DAM; fail */
+	  state.status |= TRSDISK_BUSY;
+	  trs_schedule_event(trs_disk_done, TRSDISK_NOTFOUND, 512);
+	  break;
+	}
+
 	/* Set flags for DAM */
 	if (state.controller == TRSDISK_P1771) {
 	  /* 1771 */
-	  switch (d->u.dmk.buf[id_index]) {
+	  switch (dam) {
 	  case 0xfb:
 	    state.status |= TRSDISK_1771_FB;
 	    break;
@@ -2304,7 +2356,7 @@ trs_disk_command_write(unsigned char cmd)
 	    break;
 	  }
 	} else /* state.controller == TRSDISK_P1791 */ {
-	  switch (d->u.dmk.buf[id_index]) {
+	  switch (dam) {
 	  case 0xfb:
 	    state.status |= TRSDISK_1791_FB;
 	    break;
@@ -2329,15 +2381,16 @@ trs_disk_command_write(unsigned char cmd)
 	}
 	state.crc = calc_crc1((state.density
 			       ? 0xcdb4 /* CRC of a1 a1 a1 */
-			       : 0xffff),
-			      d->u.dmk.buf[id_index]);
+			       : 0xffff), dam);
 
-	d->u.dmk.curbyte = id_index + dmk_incr(d);
+	d->u.dmk.curbyte = id_index;
 
       } /* end if (d->emutype == ...) */
 
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
+      trs_schedule_event(trs_disk_lostdata, state.currcommand,
+			 500000 * z80_state.clockMHz);
     }
     break;
   case TRSDISK_READM:
@@ -2377,6 +2430,8 @@ trs_disk_command_write(unsigned char cmd)
     if (d->emutype == REAL) {
       state.status = TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
+      trs_schedule_event(trs_disk_lostdata, state.currcommand,
+			 500000 * z80_state.clockMHz);
       state.bytecount = size_code_to_size(d->u.real.size_code);
       break;
     }
@@ -2502,7 +2557,7 @@ trs_disk_command_write(unsigned char cmd)
 	fseek(d->file, offset(d, id_index), 0);
 
       } else /* d->emutype == DMK */ {
-	int c;
+	int c, nzeros, i;
 	
 	/* DMK search dumps the size code into state.bytecount; adjust
            to real bytecount here */
@@ -2512,13 +2567,29 @@ trs_disk_command_write(unsigned char cmd)
 	  state.bytecount = 128 << (state.bytecount & 3);
 	}
 
-	/* Write DAM */
+	/* Skip initial part of gap, per 1771 and 179x data sheets */
+	id_index += 11 * (state.density ? 2 : 1) * dmk_incr(d);
 	fseek(d->file, (DMK_HDR_SIZE +
 			(d->u.dmk.curtrack*d->u.dmk.nsides + d->u.dmk.curside)
 			* d->u.dmk.tracklen + id_index), 0);
+
+	/* Write remaining gap (per data sheets) and DAM */
+	nzeros = 6 * (state.density ? 2 : 1) * dmk_incr(d);
+	for (i=0; i<nzeros; i++) {
+	  c = putc(0, d->file);
+	  if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+	  d->u.dmk.buf[id_index++] = 0;
+	}
+	if (state.density) {
+	  for (i=0; i<3; i++) {
+	    c = putc(0xa1, d->file);
+	    if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+	    d->u.dmk.buf[id_index++] = 0xa1;
+	  }	    
+	}
 	c = putc(dam, d->file);
-	d->u.dmk.buf[id_index++] = dam;
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+	d->u.dmk.buf[id_index++] = dam;
 	if (dmk_incr(d) == 2) {
 	  c = putc(dam, d->file);
 	  if (c == EOF) state.status |= TRSDISK_WRITEFLT;
@@ -2536,6 +2607,8 @@ trs_disk_command_write(unsigned char cmd)
 
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
+      trs_schedule_event(trs_disk_lostdata, state.currcommand,
+			 500000 * z80_state.clockMHz);
     }
     break;
   case TRSDISK_WRITEM:
@@ -2733,6 +2806,8 @@ trs_disk_command_write(unsigned char cmd)
     }
     state.status = TRSDISK_BUSY|TRSDISK_DRQ;
     trs_disk_drq_interrupt(1);
+    trs_schedule_event(trs_disk_lostdata, state.currcommand,
+		       500000 * z80_state.clockMHz);
     break;
   case TRSDISK_WRITETRK:
     state.last_readadr = -1;
@@ -2787,6 +2862,8 @@ trs_disk_command_write(unsigned char cmd)
       }
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
+      trs_schedule_event(trs_disk_lostdata, state.currcommand,
+			 500000 * z80_state.clockMHz);
       state.format = FMT_GAP0;
       state.format_gapcnt = 0;
       if (disk[state.curdrive].inches == 5) {
@@ -2797,8 +2874,9 @@ trs_disk_command_write(unsigned char cmd)
     }
     break;
   case TRSDISK_FORCEINT:
-    trs_do_event(); /* finish whatever is going on */
-    state.status = 0;  /* and forget it */
+    /* Stop whatever is going on and forget it */
+    trs_cancel_event();
+    state.status = 0;
     type1_status();
     if ((cmd & 0x07) != 0) {
       /* Conditional interrupt features not implemented. */
@@ -3054,6 +3132,8 @@ real_read()
 	/* Start read */
 	state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
 	trs_disk_drq_interrupt(1);
+	trs_schedule_event(trs_disk_lostdata, state.currcommand,
+			   500000 * z80_state.clockMHz);
 	state.bytecount = size_code_to_size(d->u.real.size_code);
 	return;
       }
@@ -3153,6 +3233,9 @@ real_write()
   state.bytecount = 0;
   trs_disk_drq_interrupt(0);
   state.status |= TRSDISK_BUSY;
+  if (trs_event_scheduled() == trs_disk_lostdata) {
+    trs_cancel_event();
+  }
   trs_schedule_event(trs_disk_done, 0, 512);
 #else
   trs_disk_unimpl(state.currcommand, "write real floppy");
@@ -3274,6 +3357,8 @@ real_readadr()
       /* No delay */
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
+      trs_schedule_event(trs_disk_lostdata, state.currcommand,
+			 500000 * z80_state.clockMHz);
 #endif
       memcpy(d->u.real.buf, &raw_cmd.reply[3], 4);
       d->u.real.buf[4] = d->u.real.buf[5] = 0; /* CRC not emulated */
@@ -3392,6 +3477,9 @@ real_writetrk()
   state.bytecount = 0;
   trs_disk_drq_interrupt(0);
   state.status |= TRSDISK_BUSY;
+  if (trs_event_scheduled() == trs_disk_lostdata) {
+    trs_cancel_event();
+  }
   trs_schedule_event(trs_disk_done, 0, 512);
 #else
   trs_disk_unimpl(state.currcommand, "write track on real floppy");
