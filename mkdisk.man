@@ -232,7 +232,7 @@ typedef struct {
 
 http://www.tim-mann.org/trs80/dskspec.html
 .SH Authors
-\fBmkdisk\fP was written by Timothy Mann <tim.mann@compaq.com>.
+\fBmkdisk\fP was written by Timothy Mann <tim@tim-mann.org>.
 
 The floppy file formats here called JV1 and JV3 were developed by Jeff
 Vavasour for his MSDOS-based Model I and Model III/4 emulators
