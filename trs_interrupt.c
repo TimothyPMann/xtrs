@@ -106,10 +106,10 @@ trs_timer_interrupt(int state)
       if (interrupt_latch & M1_TIMER_BIT) lost_timer_interrupts++;
 #endif
       interrupt_latch |= M1_TIMER_BIT;
+      z80_state.irq = 1;
     } else {
       interrupt_latch &= ~M1_TIMER_BIT;
     }
-    z80_state.irq = (interrupt_latch != 0);
   } else {
     if (state) {
 #ifdef IDEBUG
@@ -129,10 +129,10 @@ trs_disk_intrq_interrupt(int state)
   if (trs_model == 1) {
     if (state) {
       interrupt_latch |= M1_DISK_BIT;
+      z80_state.irq = 1;
     } else {
       interrupt_latch &= ~M1_DISK_BIT;
     }
-    z80_state.irq = (interrupt_latch != 0);
   } else {
     if (state) {
       nmi_latch |= M3_INTRQ_BIT;
@@ -189,6 +189,7 @@ trs_interrupt_latch_read()
   unsigned char tmp = interrupt_latch;
   if (trs_model == 1) {
     trs_timer_interrupt(0); /* acknowledge this one (only) */
+    z80_state.irq = (interrupt_latch != 0);
     return tmp;
   } else {
     return ~tmp;

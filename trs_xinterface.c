@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <malloc.h>
@@ -127,6 +128,7 @@ static XrmOptionDescRec opts[] = {
 {"-truedam",    "*truedam",     XrmoptionNoArg,         (caddr_t)"on"},
 {"-notruedam",  "*truedam",     XrmoptionNoArg,         (caddr_t)"off"},
 {"-samplerate", "*samplerate",  XrmoptionSepArg,        (caddr_t)11025},
+{"-title",      "*title",       XrmoptionSepArg,        (caddr_t)NULL},
 #if __linux
 {"-sb",         "*sb",          XrmoptionSepArg,        (caddr_t)NULL},
 #endif /* linux */
@@ -184,6 +186,9 @@ XImage xim = {
 static int key_queue[KEY_QUEUE_SIZE];
 static int key_queue_head;
 static int key_queue_entries;
+
+/* dummy buffer for stat() call */
+struct stat statbuf;
 
 static void clear_key_queue()
 {
@@ -255,7 +260,8 @@ void trs_event();
 
 static XrmDatabase x_db = NULL;
 static XrmDatabase command_db = NULL;
-static char *program_name;
+extern char *program_name;
+char *title;
 
 int trs_parse_command_line(int argc, char **argv, int *debug)
 {
@@ -265,13 +271,8 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
   char *xrms;
   int stepdefault, i, s[8];
 
-  program_name = strrchr(argv[0], '/');
-  if (program_name == NULL) {
-    program_name = argv[0];
-  } else {
-    program_name++;
-  }
-    
+  title = program_name; /* default */
+
   XrmInitialize();
   /* parse command line options */
   XrmParseCommand(&command_db,opts,num_opts,program_name,&argc,argv);
@@ -365,6 +366,9 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
 	cur_char_width = 6;
       } else if (charset_name[0] == 'w'/*wider*/) {
 	trs_charset = 3;
+	cur_char_width = 8;
+      } else if (charset_name[0] == 'g'/*genie or german*/) {
+	trs_charset = 10;
 	cur_char_width = 8;
       } else {
 	fatal("unknown charset name %s", value.addr);
@@ -509,6 +513,12 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
   if (XrmGetResource(x_db, option, "Xtrs.Samplerate", &type, &value)) {
     cassette_default_sample_rate = strtol(value.addr, NULL, 0);
   }
+
+  (void) sprintf(option, "%s%s", program_name, ".title");
+  if (XrmGetResource(x_db, option, "Xtrs.title", &type, &value)) {
+      title = strdup(value.addr);
+  }
+
   return argc;
 }
 
@@ -544,6 +554,7 @@ void trs_screen_init()
   char *fontname = NULL;
   char *widefontname = NULL;
   int len;
+  char *romfile = NULL;
 
   screen = DefaultScreen(display);
   color_map = DefaultColormap(display,screen);
@@ -619,46 +630,64 @@ void trs_screen_init()
     }
   }
 
-  if (trs_model == 1) {
-    /* try resources first */
+  switch (trs_model) {
+  case 1:
     (void) sprintf(option, "%s%s", program_name, ".romfile");
     if (XrmGetResource(x_db, option, "Xtrs.Romfile", &type, &value)) {
-      trs_load_rom(value.addr);
+      if ((stat(value.addr, &statbuf)) == 0) { /* romfile exists */
+        romfile = value.addr;
+      }
+#ifdef DEFAULT_ROM
+    } else if ((stat(DEFAULT_ROM, &statbuf)) == 0) {
+      romfile = DEFAULT_ROM;
+#endif
+    }
+    if (romfile != NULL) {
+      trs_load_rom(romfile);
     } else if (trs_rom1_size > 0) {
       trs_load_compiled_rom(trs_rom1_size, trs_rom1);
     } else {
-#if DEFAULT_ROM
-      trs_load_rom(DEFAULT_ROM);
-#else
-      fatal("rom file not specified!");
-#endif
+      fatal("ROM file not specified!");
     }
-  } else if (trs_model == 3 || trs_model == 4) {
+    break;
+  case 3: case 4:
     (void) sprintf(option, "%s%s", program_name, ".romfile3");
     if (XrmGetResource(x_db, option, "Xtrs.Romfile3", &type, &value)) {
-      trs_load_rom(value.addr);
+      if ((stat(value.addr, &statbuf)) == 0) { /* romfile exists */
+        romfile = value.addr;
+      }
+#ifdef DEFAULT_ROM3
+    } else if ((stat(DEFAULT_ROM3, &statbuf)) == 0) {
+      romfile = DEFAULT_ROM3;
+#endif
+    }
+    if (romfile != NULL) {
+      trs_load_rom(romfile);
     } else if (trs_rom3_size > 0) {
       trs_load_compiled_rom(trs_rom3_size, trs_rom3);
     } else {
-#if DEFAULT_ROM3
-      trs_load_rom(DEFAULT_ROM3);
-#else
-      fatal("rom file not specified!");
-#endif
+      fatal("ROM file not specified!");
     }
-  } else {
+    break;
+  default: /* 4P */
     (void) sprintf(option, "%s%s", program_name, ".romfile4p");
     if (XrmGetResource(x_db, option, "Xtrs.Romfile4p", &type, &value)) {
-      trs_load_rom(value.addr);
+      if ((stat(value.addr, &statbuf)) == 0) { /* romfile exists */
+        romfile = value.addr;
+      }
+#ifdef DEFAULT_ROM4P
+    } else if ((stat(DEFAULT_ROM4P, &statbuf)) == 0) {
+      romfile = DEFAULT_ROM4P;
+#endif
+    }
+    if (romfile != NULL) {
+      trs_load_rom(romfile);
     } else if (trs_rom4p_size > 0) {
       trs_load_compiled_rom(trs_rom4p_size, trs_rom4p);
     } else {
-#if DEFAULT_ROM4P
-      trs_load_rom(DEFAULT_ROM4P);
-#else
-      fatal("rom file not specified!");
-#endif
+      fatal("ROM file not specified!");
     }
+    break;
   }
 
   clear_key_queue();		/* init the key queue */
@@ -716,7 +745,7 @@ void trs_screen_init()
   window = XCreateSimpleWindow(display, root_window, 400, 400,
 			       OrigWidth, OrigHeight, 1, foreground,
 			       background);
-  XStoreName(display,window,program_name);
+  XStoreName(display,window,title);
   XSelectInput(display, window, EVENT_MASK | ResizeRedirectMask);
   XMapWindow(display, window);
 

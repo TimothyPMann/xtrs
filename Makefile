@@ -124,7 +124,7 @@ Z80CODE = export.cmd import.cmd settime.cmd xtrsmous.cmd \
 
 MANPAGES = xtrs.txt mkdisk.txt cassette.txt
 
-PROGS = xtrs mkdisk hex2cmd cmddump 
+PROGS = xtrs mkdisk hex2cmd cmddump
 
 default: xtrs mkdisk hex2cmd cmddump $(MANPAGES)
 
@@ -188,21 +188,21 @@ tar:		$(SOURCES) $(HEADERS)
 
 clean:
 		rm -f $(OBJECTS) $(MD_OBJECTS) $(CR_OBJECTS) $(HC_OBJECTS) \
-	                $(CD_OBJECTS) trs_rom*.c *~ \
-			$(PROGS) $(MANPAGES)
+			$(CD_OBJECTS) trs_rom*.c *~ \
+			$(PROGS) compile_rom
 
 veryclean: clean
-		rm -f $(Z80CODE)
+		rm -f $(Z80CODE) $(MANPAGES)
 
 link:	
 		rm -f xtrs
 		make xtrs
 
 install:
-		install -c -m 555 xtrs $(BINDIR)
-		install -c -m 444 xtrs.man $(MANDIR)/man1/xtrs.1
-		install -c -m 444 cassette.man $(MANDIR)/man1/cassette.1
-		install -c -m 444 mkdisk.man $(MANDIR)/man1/mkdisk.1
+		install -c -m 755 $(PROGS) $(BINDIR)
+		install -c -m 644 xtrs.man $(MANDIR)/man1/xtrs.1
+		install -c -m 644 cassette.man $(MANDIR)/man1/cassette.1
+		install -c -m 644 mkdisk.man $(MANDIR)/man1/mkdisk.1
 
 depend:
 	makedepend -- $(CFLAGS) -- $(SOURCES)

@@ -79,6 +79,11 @@ data bit 7), so that a shifted underscore can be obtained; this maps
 to ASCII code 0x7f under some TRS-80 keyboard drivers.  Note: Common Model 4
 keyboard drivers seem to reverse the shift state of these keys, so you may
 need to press Shift+Insert to get an underscore, etc.
+
+On a German keyboard, the umlaut and "ess-tzet" keys should activate
+the corresponding characters used in the GENIE, a German Model I clone.
+This feature is most useful together with the "-charset genie" command
+line argument.
 .SH Emulated cassette
 To control the emulated cassette, a file called ".cassette.ctl" in the
 current directory keeps track of what file is currently loaded as
@@ -473,7 +478,9 @@ formatted as a "Montezuma Micro Standard DATA disk (40T, SS, DD,
 the proper disk format and drive parameters (40 track, not 80), or you
 will have confusing problems reading this disk.  Source code is
 included on the floppy; please pass any improvements you make back to
-the author.
+the author.  See http://www.rkga.com.au/~roland/trs-80/cpm-xtrs/,
+where you will sometimes find a newer version of the utilities
+than is included with xtrs.
 
 IMPORT.COM imports a Unix file and writes it to an emulated CP/M disk.
 Usage: \fIIMPORT [-n] [unixfile [cpmfile]]\fP.  The -n flag converts
@@ -623,6 +630,10 @@ Specifies the foreground color of the \fBxtrs\fP window.
 Put a border of \fIwidth\fP pixels
 around the TRS-80 display.  The default is 2.
 .TP
+.B \-title \fItitletext\fP
+Use \fItitletext\fP in the window title bar instead of the 
+program name.
+.TP
 .B \-resize
 In Model 4/4P mode, resize the X window whenever the emulated display
 mode changes between 64x16 and 80x24.
@@ -635,7 +646,7 @@ display mode is 64x16.  This is the default.
 .B \-charset \fIname\fP
 Select among several sets of built-in character bitmaps.
 
-In Model I mode, four sets are available. The default, \fIwider\fP, is
+In Model I mode, five sets are available. The default, \fIwider\fP, is
 a modified Model III set with characters 8 pixels wide; it looks
 better on a modern computer screen with square pixels than the real
 Model I fonts, which were 6 pixels wide. \fIlcmod\fP is the character
@@ -650,11 +661,15 @@ Model I users saw when they tried to do homebrew lower case
 modifications without replacing the character generator: lower case
 letters appear at an inconsistent height, and if you are using the
 Level II BASIC ROM display driver, upper case letters are replaced by
-meaningless symbols.  Finally, \fIearly\fP is the same as stock, but
-with the standard ASCII characters [, \\, ], and ^ in the positions
-where most Model I's had directional arrows.  This was the default
-programming in the Motorola character generator ROM that Radio Shack
-used, and a few early machines were actually shipped with this ROM.
+meaningless symbols.  \fIearly\fP is the same as stock, but with the
+standard ASCII characters [, \\, ], and ^ in the positions where most
+Model I's had directional arrows.  This was the default programming in
+the Motorola character generator ROM that Radio Shack used, and a few
+early machines were actually shipped with this ROM.  Finally,
+\fIgerman\fP or \fIgenie\fP gives an approximate emulation of the
+GENIE, a German Model I clone.  Characters are 8 pixels wide, and
+double width is supported even though later GENIE models did not
+include it.
 
 In Model III, 4, and 4P modes, three sets are available:
 \fIkatakana\fP (the default for Model III) is the original Model III set with
@@ -885,4 +900,5 @@ Mueller added the -borderwidth option and ported the import, export,
 and settime utilities to Newdos/80.  Branden Robinson supplied the
 first version of the cassette man page and fixed Makefile bugs.  Mark
 McDougall provided documentation for the Micro Labs Grafyx Solution
-card.
+card.  Jenz Guenther added the -title option and contributed code to
+emulate the GENIE (German Model I clone).

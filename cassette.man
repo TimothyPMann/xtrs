@@ -14,6 +14,14 @@ works very much like an actual tape recorder.
 
 This manual page also describes the image formats that the emulator
 supports and their limitations.
+
+In this release, two cassette programs are supplied.  The original
+\fBcassette\fP is a C-shell script; it should work with most versions
+of /bin/csh.  If you do not have /bin/csh installed, you can use
+\fBcassette.sh\fP, which is a Bourne shell script.  It requires a 
+modern version of the Bourne shell that supports user-defined functions,
+so it may not work on older Unix systems.
+
 .SH Commands
 .B pos
 generates a status message including the filename being used as the
@@ -127,5 +135,7 @@ that way.  This is not implemented yet.
 \fBxtrs\fP was written by David Gingold <gingold@think.com> of
 Thinking Machines Corporation, Alec Wolman <wolman@crl.dec.com> of
 Digital Equipment Corporation, and Timothy Mann <mann@pa.dec.com> of
-Digital Equipment Corporation. An early version of this manual page
-was written by Branden Robinson for Debian GNU/Linux.
+Digital Equipment Corporation. 
+An initial version of this man page, and
+the translation from C-shell (cassette) to Bourne shell (cassette.sh),
+are due to Branden Robinson of the Debian GNU/Linux project.

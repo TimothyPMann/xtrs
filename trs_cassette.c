@@ -630,6 +630,8 @@ transition_out(int value)
   double ddelta_us;
   sigset_t set, oldset;
 
+  if (value != FLUSH && value == cassette_value) return;
+
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);
   sigaddset(&set, SIGIO);
@@ -675,7 +677,6 @@ transition_out(int value)
 	ddelta_us = 20000.0;
 	cassette_roundoff_error = 0.0;
       }
-#if OLDWAY
       if (trs_event_scheduled() == transition_out ||
 	  trs_event_scheduled() == (trs_event_func) assert_state) {
 	trs_cancel_event();
@@ -686,22 +687,12 @@ transition_out(int value)
 	trs_schedule_event(transition_out, FLUSH,
 			   (int)(25000 * z80_state.clockMHz));
       }
-#else
-      if (trs_event_scheduled() == transition_out) {
-	trs_cancel_event();
-      }
-      if ((long)(z80_state.t_count - last_sound) > 5000000) {
-	trs_schedule_event((trs_event_func)assert_state, CLOSE, 5000000);
-      } else {
-	trs_schedule_event(transition_out, FLUSH,
-			   (int)(25000 * z80_state.clockMHz));
-      }
-#endif
     }
 #endif
     sample = value_to_sample[cassette_value];
     nsamples = (unsigned long)
       (ddelta_us / (1000000.0/cassette_sample_rate) + 0.5);
+    if (nsamples == 0) nsamples = 1; /* always at least one sample */
     cassette_roundoff_error =
       nsamples * (1000000.0/cassette_sample_rate) - ddelta_us;
 #if CASSDEBUG
@@ -709,9 +700,9 @@ transition_out(int value)
 	   cassette_value, z80_state.t_count - cassette_transition,
 	   value, nsamples);
 #endif
-    do {
+    while (nsamples-- > 0) {
       putc(sample, cassette_file);
-    } while (--nsamples > 0);
+    }
     if (value == FLUSH) {
       value = cassette_value;
 #if OSS_SOUND && HAVE_OSS

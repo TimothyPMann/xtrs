@@ -36,9 +36,9 @@ BUILT_IN_ROM4P = xtrsrom4p.hex
 # time, use these lines (with the appropriate file names).  The default file
 # name is ignored and can be omitted if the ROM for that model is built in.
 
-# DEFAULT_ROM = -DDEFAULT_ROM='"/usr/local/lib/level2rom.hex"' \
-#               -DDEFAULT_ROM3='"/usr/local/lib/romimage.m3"' \
-#               -DDEFAULT_ROM4P='"/usr/local/lib/romimage.m4p"'
+DEFAULT_ROM = -DDEFAULT_ROM='"/usr/local/lib/xtrs/level2rom.hex"' \
+              -DDEFAULT_ROM3='"/usr/local/lib/xtrs/romimage.m3"' \
+              -DDEFAULT_ROM4P='"/usr/local/lib/xtrs/romimage.m4p"'
 
 # If you would like to change where xtrs looks for disk?-? files, edit
 # this line.  "." of course means the current working directory.
@@ -49,12 +49,12 @@ DISKDIR = -DDISKDIR='"."'
 # get it) and would like to use it with the built-in Z-80 debugger, use
 # these lines.  As of xtrs 2.7, it is now OK to use this feature again.
 
-# READLINE = -DREADLINE
-# READLINELIBS = -lreadline -ltermcap
+READLINE = -DREADLINE
+READLINELIBS = -lreadline -lncurses
 
 # If you want to debug the emulator, use the -g flag instead:
 
-DEBUG = -O
+DEBUG = -O2 -g
 #DEBUG = -g -DKBDEBUG -DXDEBUG
 #DEBUG = -g
 #DEBUG = -Wall
@@ -65,12 +65,12 @@ DEBUG = -O
 
 # If you need a different path for libraries:
 
-LDFLAGS = -L/usr/X11/lib
+LDFLAGS = -L/usr/X11R6/lib
 #LDFLAGS = -non_shared -L/usr/X11/lib
 
 # If you need a different path for include files:
 
-IFLAGS = -I/usr/X11/include
+IFLAGS = -I/usr/include/X11
 
 # Re-define this if your X library is strangely named:
 
@@ -82,10 +82,16 @@ XLIB = -lX11
 #EXTRALIBS = -lots
 #EXTRALIBS = -ldnet_stub
 
+# prefix directory
+
+PREFIX=/usr/local
+#If included in distribution: PREFIX=/usr
+
 # Set these to where you want installed stuff to go, if you install them.
 
-BINDIR = /usr/local/bin
-MANDIR = /usr/local/man
+BINDIR = $(PREFIX)/bin
+MANDIR = $(PREFIX)/man
+#Debian: MANDIR = $(PREFIX)/share/man
 
 # If you are building in a subdirectory:
 #VPATH = ..

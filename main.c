@@ -18,6 +18,8 @@
    Last modified on Thu Sep 24 19:16:48 PDT 1998 by mann
 */
 
+#include <string.h>
+
 #include "z80.h"
 #include "trs.h"
 #include "trs_disk.h"
@@ -43,7 +45,7 @@ void trs_load_rom(char *filename)
 {
     FILE *program;
     int c;
-    
+
     if((program = fopen(filename, "r")) == NULL)
     {
 	char message[100];
@@ -104,7 +106,13 @@ int main(int argc, char *argv[])
 
     check_endian();
 
-    program_name = argv[0];
+    program_name = strrchr(argv[0], '/');
+    if (program_name == NULL) {
+      program_name = argv[0];
+    } else {
+      program_name++;
+    }
+
     argc = trs_parse_command_line(argc, argv, &debug);
     if (argc > 1) {
       fprintf(stderr, "%s: erroneous argument %s\n", program_name, argv[1]);

@@ -1,4 +1,5 @@
 #!/bin/csh -f
+# Try cassette.sh instead if you do not have /bin/csh.
 
 set done = 0
 set control_file = '.cassette.ctl'
