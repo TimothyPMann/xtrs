@@ -661,7 +661,7 @@ trs_disk_emutype(DiskState *d)
     if (fmt[0] == 0 && fmt[1] == 0 && fmt[2] == 0 && fmt[3] == 0) {
       fseek(d->file, DMK_TRACKLEN, 0);
       count = (unsigned char) getc(d->file);
-      count += (unsigned char) getc(d->file) >> 8;
+      count += (unsigned char) getc(d->file) << 8;
       if (count < 16 || count > DMK_TRACKLEN_MAX) {
 	d->emutype = JV1;
       } else {
@@ -1366,6 +1366,9 @@ trs_disk_data_read(void)
 
     } else if (d->emutype == DMK) {
       state.data = d->u.dmk.buf[d->u.dmk.curbyte];
+      if (state.bytecount == 6) {
+	state.sector = state.data; /*sic*/
+      }
       d->u.dmk.curbyte += dmk_incr(d);
 
     } else if (state.last_readadr >= 0) {
@@ -2546,6 +2549,7 @@ trs_disk_command_write(unsigned char cmd)
     trs_disk_unimpl(cmd, "write multiple");
     break;
   case TRSDISK_READADR:
+    state.data = 0; /* workaround for apparent SU1 bug */
     if (state.density) {
       state.crc = 0xb230;  /* CRC of a1 a1 a1 fe */
     } else {
@@ -2560,8 +2564,9 @@ trs_disk_command_write(unsigned char cmd)
       id_index = search_adr();
       if (id_index == -1) {
 	state.status = TRSDISK_BUSY;
+	state.bytecount = 0;
 	trs_schedule_event(trs_disk_done, TRSDISK_NOTFOUND,
-			   200000*z80_state.clockMHz);
+			   1000000*z80_state.clockMHz);
 	break;
       }
       /* Compute how long it should have taken for this sector to come
@@ -2608,6 +2613,7 @@ trs_disk_command_write(unsigned char cmd)
 	if (!denok) {
 	  /* No sectors of the correct density */
 	  state.status = TRSDISK_BUSY;
+	  state.bytecount = 0;
 	  trs_schedule_event(trs_disk_done, TRSDISK_NOTFOUND,
 			     1000000*z80_state.clockMHz);
 	  break;
@@ -2680,6 +2686,7 @@ trs_disk_command_write(unsigned char cmd)
       }
       /* no suitable ID found */
       state.status = TRSDISK_BUSY;
+      state.bytecount = 0;
       trs_schedule_event(trs_disk_done, TRSDISK_NOTFOUND,
 			 1000000*z80_state.clockMHz);
       break;
@@ -3181,6 +3188,7 @@ real_readadr()
   gettimeofday(&tv, NULL);
 #endif
   sigprocmask(SIG_SETMASK, &oldset, NULL);
+  state.bytecount = 0;
   if (res < 0) {
     real_error(d, raw_cmd.flags, "readadr", TRSDISK_NOTFOUND);
   } else {
