@@ -375,8 +375,8 @@ void debug_shell()
 	    else if(!strcmp(command, "delete"))
 	    {
 		int i;
-
-		if(!strcmp(input, "delete *"))
+                
+		if(!strncmp(input, "delete *", 8))
 		{
 		    clear_all_traps();
 		}
