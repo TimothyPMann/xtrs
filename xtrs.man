@@ -150,10 +150,11 @@ images you create, unless you need to exchange images with someone who
 is using the Vavasour Model I emulator.  A JV3 disk can be formatted
 with 128, 256, 512, or 1024-byte sectors, 1 or 2 sides, single or
 double density, with either FB (normal) or F8 (deleted) data address
-mark on any sector.  You cannot format a sector with an incorrect
-track number or head number.  You can format a sector with an
-intentional CRC error in the data field.  \fBxtrs\fP supports at most
-96 cylinders and at most 5802 total sectors on a JV3 image.
+mark on any sector.  In single density the nonstandard data address
+marks FA and F9 are also available.  You cannot format a sector with
+an incorrect track number or head number.  You can format a sector
+with an intentional CRC error in the data field.  \fBxtrs\fP supports
+at most 96 cylinders and at most 5802 total sectors on a JV3 image.
 
 The original Vavasour JV3 format supported only 256-byte sectors, and
 had a limit of 2901 total sectors.  If you use sector sizes other
@@ -288,7 +289,7 @@ using one to emulate an 8-inch drive.  In both cases we also waste the
 top three tracks, since an 8-inch drive has only 77 tracks, not 80.
 
 The nonstandard FA and F9 data address marks available in single
-density on a real Model I the with WD1771 controller also need special
+density on a real Model I with the WD1771 controller also need special
 handling.  A PC-style floppy disk controller can neither read nor
 write sectors with such DAMs at all.  This raises three issues: (1) It
 will be impossible for you to read some Model I disks on your PC even
@@ -424,7 +425,7 @@ runs on LDOS 5.x, UNIX6/CMD on LS-DOS 6.x.  They have not been tested
 on other TRS-80 operating systems.
 
 MOUNT/CMD (or MOUNT6/CMD) is a convenience program that switches
-emulated floppy disks in the drives.  Usage: \fMOUNT filename U\fP.
+emulated floppy disks in the drives.  Usage: \fIMOUNT filename U\fP.
 The filename is any Unix filename; U is a single digit, 0 through 7.
 The command deletes the file diskM-U (where M is the TRS-80 model)
 from the disk directory (see -diskdir option), replaces it with a
@@ -434,7 +435,7 @@ LS-DOS 6.x.  They have not been tested on other TRS-80 operating
 systems.
 
 UMOUNT/CMD (or UMOUNT6/CMD) is a convenience program that removes an
-emulated floppy disk from a drive.  Usage: \fUMOUNT U\fP.  U is a
+emulated floppy disk from a drive.  Usage: \fIUMOUNT U\fP.  U is a
 single digit, 0 through 7.  The command deletes the file diskM-U
 (where M is the TRS-80 model) from the disk directory (see -diskdir
 option) and signals a disk change (as if F7 had been pressed).

@@ -74,55 +74,11 @@ floppies.  The directory is assumed to be track 17.
 
 The original JV3 format is documented in the printed manual for Jeff
 Vavasour's commercial Model III/4 emulator.  The xtrs implementation
-includes some extensions.
+includes some extensions.  
 
-A JV3 file is an array of 3-byte sector descriptors followed by an
-array of 256-byte sectors, in the same order as the descriptors.  The
-first 34*256 bytes of the file are reserved for descriptors, leaving
-room for 2901 of them with one byte left over at the end.  The extra
-byte should be 0xff.  A newer feature, not implemented in all
-emulators, emulates a write protect tab on the disk if the extra byte
-is 0x00.  Currently xtrs respects this flag, but provides no way to
-turn it on or off.  The preferred way to write-protect a floppy image
-under xtrs is to turn off write permission on the corresponding file.
-
-The original format thus could handle only 2901 sectors.  This is
-enough for a DSDD 80-track 5" floppy, but not enough for 8" floppies,
-so xtrs extends the format by adding an optional second block of 2901
-more headers after the last possible sector described by the first
-block.  That is, the second block starts at byte (34 + 2901)*256 in
-the file.  This extension is also implemented in Matthew Reed's newer
-TRS-80 emulators.
-
-The headers themselves look like this (from trs_disk.c):
-
-.nf
-/* Values for flags below */
-#define JV3_DENSITY     0x80  /* 1=dden, 0=sden */
-#define JV3_LOCKED      0x40  /* always zero */
-#define JV3_DIRECTORY   0x20  /* dden: 1=deleted DAM (0xF8)
-                                 sden: 1=0xFA or 0xF8 */
-#define JV3_SIDE        0x10  /* 0=side 0, 1=side 1 */
-#define JV3_ERROR       0x08  /* 0=ok, 1=CRC error */
-#define JV3_MBZ         0x07  /* must be zero if sector in use */
-#define JV3_UNUSED      0xFF
-
-typedef struct {
-  unsigned char track;
-  unsigned char sector;
-  unsigned char flags;
-} SectorId;
-.fi
-
-An unused sector is denoted by a header filled with 0xFF.  Sometimes
-headers in the middle of a block can be unused; this happens, for
-example, if you reformat a track from double density to single
-density.  In general, when you format a track with N sectors, the
-first N unused headers are assigned to it; they need not be contiguous
-in the file or ordered with respect to other tracks.  The order of the
-sectors within a track does matter, though; they show up in that order
-if you do a series of Read Address commands or a Read Track command
-(however, xtrs doesn't currently implement Read Track).
+Full documentation for both JV1 and JV3 can be found at
+http://www.research.digital.com/SRC/personal/Tim_Mann/trs80/dskspec.html.
+A copy of this html file is also included in the \fBxtrs\fP distribution.
 
 An HDV (hard disk) image has the following format.  This information
 is based on email from Matthew Reed.  There is an initial 256-byte
@@ -181,6 +137,8 @@ typedef struct {
 
 .SH See also
 .BR xtrs (1)
+
+http://www.research.digital.com/SRC/personal/Tim_Mann/trs80/dskspec.html
 .SH Authors
 \fBmkdisk\fP was written by Timothy Mann <mann@pa.dec.com>, Digital
 Equipment Corporation.
