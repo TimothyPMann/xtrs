@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Wed Oct  1 17:18:42 PDT 1997 by mann
+   Last modified on Wed Nov 26 17:01:49 PST 1997 by mann
 */
 
 /*
@@ -143,11 +143,11 @@ void mem_bank(command)
 	bank_offset[1] = 2 << 15;
 	break;
       case 6:
-	bank_offset[0] = 1 << 15;
+	bank_offset[0] = 2 << 15;
 	bank_offset[1] = 0 << 15;
 	break;
       case 7:
-	bank_offset[0] = 2 << 15;
+	bank_offset[0] = 3 << 15;
 	bank_offset[1] = 0 << 15;
 	break;
       default:
