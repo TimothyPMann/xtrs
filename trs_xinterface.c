@@ -37,6 +37,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
@@ -49,6 +50,7 @@
 #include "trs.h"
 #include "z80.h"
 #include "trs_disk.h"
+#include "trs_uart.h"
 
 #define DEF_FONT1	"-misc-fixed-medium-r-normal--20-200-75-75-*-100-iso8859-1"
 #define DEF_WIDEFONT1	"-misc-fixed-medium-r-normal--20-200-75-75-*-200-iso8859-1"
@@ -139,6 +141,8 @@ static XrmOptionDescRec opts[] = {
 {"-scale2",     "*scale",       XrmoptionNoArg,         (caddr_t)"2"},
 {"-scale3",     "*scale",       XrmoptionNoArg,         (caddr_t)"3"},
 {"-scale4",     "*scale",       XrmoptionNoArg,         (caddr_t)"4"},
+{"-serial",     "*serial",      XrmoptionSepArg,        (caddr_t)NULL},
+{"-switches",   "*switches",    XrmoptionSepArg,        (caddr_t)NULL},
 #if __linux
 {"-sb",         "*sb",          XrmoptionSepArg,        (caddr_t)NULL},
 #endif /* linux */
@@ -154,13 +158,13 @@ static int num_opts = (sizeof opts / sizeof opts[0]);
 char grafyx[(2*G_YSIZE*MAX_SCALE) * (G_XSIZE*MAX_SCALE)];
 unsigned char grafyx_unscaled[G_YSIZE][G_XSIZE];
 
-unsigned char grafyx_microlabs = 1;
+unsigned char grafyx_microlabs = 0;
 unsigned char grafyx_x = 0, grafyx_y = 0, grafyx_mode = 0;
 unsigned char grafyx_enable = 0;
 unsigned char grafyx_overlay = 0;
 unsigned char grafyx_xoffset = 0, grafyx_yoffset = 0;
 
-/* Port 0x83 bits */
+/* Port 0x83 (grafyx_mode) bits */
 #define G_ENABLE    1
 #define G_UL_NOTEXT 2   /* Micro Labs only */
 #define G_RS_WAIT   2   /* Radio Shack only */
@@ -170,6 +174,12 @@ unsigned char grafyx_xoffset = 0, grafyx_yoffset = 0;
 #define G_YNOCLKR   32
 #define G_XNOCLKW   64
 #define G_YNOCLKW   128
+
+/* Port 0xFF (grafyx_m3_mode) bits */
+#define G3_COORD    0x80
+#define G3_ENABLE   0x40
+#define G3_COMMAND  0x20
+#define G3_YLOW(v)  (((v)&0x1e)>>1)     
 
 XImage image = {
   /*width, height*/    8*G_XSIZE, 2*G_YSIZE,  /* if scale_x=1, scale_y=2 */
@@ -191,7 +201,7 @@ XImage image = {
 };
 
 #ifdef HRG1B
-#define HRG_MEMSIZE (1024 * 12)        /* 12k * 8 bit graphics memory */
+#define HRG_MEMSIZE (1024 * 12)	/* 12k * 8 bit graphics memory */
 static unsigned char hrg_screen[HRG_MEMSIZE];
 static int hrg_pixel_x[2][6+1];
 static int hrg_pixel_y[12+1];
@@ -224,14 +234,14 @@ void queue_key(int state)
 {
   key_queue[(key_queue_head + key_queue_entries) % KEY_QUEUE_SIZE] = state;
 #if KBDEBUG
-  fprintf(stderr, "queue_key 0x%x", state);
+  debug("queue_key 0x%x", state);
 #endif
   if (key_queue_entries < KEY_QUEUE_SIZE) {
     key_queue_entries++;
 #if KBDEBUG
-    fprintf(stderr, "\n");
+    debug("\n");
   } else {
-    fprintf(stderr, " (overflow)\n");
+    debug(" (overflow)\n");
 #endif
   }
 }
@@ -246,7 +256,7 @@ int dequeue_key()
       key_queue_head = (key_queue_head + 1) % KEY_QUEUE_SIZE;
       key_queue_entries--;
 #if KBDEBUG
-      fprintf(stderr, "dequeue_key 0x%x\n", rval);
+      debug("dequeue_key 0x%x\n", rval);
 #endif
     }
   return rval;
@@ -305,7 +315,7 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
   (void) XrmGetResource(command_db, option, "Xtrs.Display", &type, &value);
   /* open display */
   if ( (display = XOpenDisplay (value.addr)) == NULL) {
-    printf("Unable to open display.");
+    fprintf(stderr, "Unable to open display.");
     exit(-1);
   }
 
@@ -440,8 +450,7 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
       }
     }
     cur_char_width = TRS_CHAR_WIDTH * scale_x;
-    cur_char_height = ((trs_model >= 4) ? TRS_CHAR_HEIGHT4 : TRS_CHAR_HEIGHT)
-      * scale_y;
+    cur_char_height = TRS_CHAR_HEIGHT * scale_y;
   }
 
   (void) sprintf(option, "%s%s", program_name, ".diskdir");
@@ -562,6 +571,16 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
       title = strdup(value.addr);
   }
 
+  (void) sprintf(option, "%s%s", program_name, ".serial");
+  if (XrmGetResource(x_db, option, "Xtrs.serial", &type, &value)) {
+      trs_uart_name = strdup(value.addr);
+  }
+
+  (void) sprintf(option, "%s%s", program_name, ".switches");
+  if (XrmGetResource(x_db, option, "Xtrs.serial", &type, &value)) {
+      trs_uart_switches = strtol(value.addr, NULL, 0);
+  }
+
   return argc;
 }
 
@@ -619,7 +638,7 @@ void trs_screen_init()
 
   (void) sprintf(option, "%s%s", program_name, ".foreground");
   if (XrmGetResource(x_db, option, "Xtrs.Foreground", &type, &value)) {
-    /* printf("foreground is %s\n",value.addr); */
+    /* debug("foreground is %s\n",value.addr); */
     XParseColor(display, color_map, value.addr, &cdef);
     XAllocColor(display, color_map, &cdef);
     fore_pixel = cdef.pixel;
@@ -676,15 +695,6 @@ void trs_screen_init()
       len = strlen(def_widefont);
       widefontname = malloc(len+1);
       strcpy(widefontname, def_widefont);
-    }
-  }
-
-  (void) sprintf(option, "%s%s", program_name, ".resize");
-  if (XrmGetResource(x_db, option, "Xtrs.Resize", &type, &value)) {
-    if (strcmp(value.addr,"on") == 0) {
-      resize = 1;
-    } else if (strcmp(value.addr,"off") == 0) {
-      resize = 0;
     }
   }
 
@@ -748,6 +758,17 @@ void trs_screen_init()
     break;
   }
 
+  (void) sprintf(option, "%s%s", program_name, ".resize");
+  if (XrmGetResource(x_db, option, "Xtrs.Resize", &type, &value)) {
+    if (strcmp(value.addr,"on") == 0) {
+      resize = 1;
+    } else if (strcmp(value.addr,"off") == 0) {
+      resize = 0;
+    }
+  } else {
+    resize = (trs_model == 3);
+  }
+
   clear_key_queue();		/* init the key queue */
 
   /* setup root window, and gc */
@@ -788,7 +809,7 @@ void trs_screen_init()
     cur_char_height = myfont->ascent + myfont->descent;
   }
 
-  if (trs_model >= 4 && !resize) {
+  if (trs_model >= 3 && !resize) {
     OrigWidth = cur_char_width * 80 + 2 * border_width;
     left_margin = cur_char_width * (80 - row_chars)/2 + border_width;
     if (usefont) {
@@ -809,7 +830,7 @@ void trs_screen_init()
 			       OrigWidth, OrigHeight, 1, foreground,
 			       background);
 #if XDEBUG
-    fprintf(stderr, "XCreateSimpleWindow(%d, %d)\n", OrigWidth, OrigHeight);
+    debug("XCreateSimpleWindow(%d, %d)\n", OrigWidth, OrigHeight);
 #endif XDEBUG
   trs_fix_size(window, OrigWidth, OrigHeight);
   XStoreName(display,window,title);
@@ -829,7 +850,7 @@ void trs_screen_init()
 #if HAVE_SIGIO
 void trs_event_init()
 {
-  int fd, rc;
+  int fd;
   struct sigaction sa;
 
   /* set up event handler */
@@ -840,11 +861,12 @@ void trs_event_init()
   sigaction(SIGIO, &sa, NULL);
 
   fd = ConnectionNumber(display);
-  if (fcntl(fd,F_SETOWN,getpid()) < 0)
-    perror("fcntl F_SETOWN");
-  rc = fcntl(fd,F_SETFL,FASYNC);
-  if (rc != 0)
-    perror("fcntl F_SETFL async error");
+  if (fcntl(fd, F_SETOWN, getpid()) < 0) {
+    error("fcntl F_SETOWN: %s", strerror(errno));
+  }
+  if (fcntl(fd, F_SETFL, FASYNC) != 0) {
+    error("fcntl F_SETFL async error: %s", strerror(errno));
+  }
 }
 
 /* ARGSUSED */
@@ -861,6 +883,7 @@ KeySym last_key[256];
  *   If wait is true, process one event, blocking until one is available.
  *   If wait is false, process as many events as are available, returning
  *     when none are left.
+ * Handle interrupt-driven uart input here too.
  */ 
 void trs_get_event(int wait)
 {
@@ -868,6 +891,10 @@ void trs_get_event(int wait)
   KeySym key;
   char buf[10];
   XComposeStatus status;
+
+  if (trs_model > 1) {
+    (void)trs_uart_check_avail();
+  }
 
   key_immediate = 0;
   do {
@@ -880,7 +907,7 @@ void trs_get_event(int wait)
     switch(event.type) {
     case Expose:
 #if XDEBUG
-      fprintf(stderr,"Expose\n");
+      debug("Expose\n");
 #endif
       if (event.xexpose.count == 0) {
 	while (XCheckMaskEvent(display, ExposureMask, &event)) /*skip*/;
@@ -890,14 +917,14 @@ void trs_get_event(int wait)
 
     case MapNotify:
 #if XDEBUG
-      fprintf(stderr,"MapNotify\n");
+      debug("MapNotify\n");
 #endif
       trs_screen_refresh();
       break;
 
     case EnterNotify:
 #if XDEBUG
-      fprintf(stderr,"EnterNotify\n");
+      debug("EnterNotify\n");
 #endif
       save_repeat();
       trs_xlate_keycode(0x10000); /* all keys up */
@@ -905,7 +932,7 @@ void trs_get_event(int wait)
 
     case LeaveNotify:
 #if XDEBUG
-      fprintf(stderr,"LeaveNotify\n");
+      debug("LeaveNotify\n");
 #endif
       restore_repeat();
       trs_xlate_keycode(0x10000); /* all keys up */
@@ -914,7 +941,7 @@ void trs_get_event(int wait)
     case KeyPress:
       (void) XLookupString((XKeyEvent *)&event,buf,10,&key,&status);
 #if XDEBUG
-      fprintf(stderr,"KeyPress: state 0x%x, keycode 0x%x, key 0x%x\n",
+      debug("KeyPress: state 0x%x, keycode 0x%x, key 0x%x\n",
 	      event.xkey.state, event.xkey.keycode, (unsigned int) key);
 #endif
       switch (key) {
@@ -967,14 +994,14 @@ void trs_get_event(int wait)
 	trs_xlate_keycode(0x10000 | key);
       }
 #if XDEBUG
-      fprintf(stderr,"KeyRelease: state 0x%x, keycode 0x%x, last_key 0x%x\n",
-	      event.xkey.state, event.xkey.keycode, (unsigned int) key);
+      debug("KeyRelease: state 0x%x, keycode 0x%x, last_key 0x%x\n",
+	    event.xkey.state, event.xkey.keycode, (unsigned int) key);
 #endif
       break;
 
     default:
 #if XDEBUG	    
-      fprintf(stderr,"Unhandled event: type %d\n", event.type);
+      debug("Unhandled event: type %d\n", event.type);
 #endif
       break;
     }
@@ -1046,7 +1073,7 @@ void trs_screen_640x240(int flag)
     XClearWindow(display,window);
     XFlush(display);
 #if XDEBUG
-    fprintf(stderr, "XResizeWindow(%d, %d)\n", OrigWidth, OrigHeight);
+    debug("XResizeWindow(%d, %d)\n", OrigWidth, OrigHeight);
 #endif XDEBUG
   } else {
     left_margin = cur_char_width * (80 - row_chars)/2 + border_width;
@@ -1214,7 +1241,7 @@ void bitmap_init(unsigned long foreground, unsigned long background)
 				   scale_x,scale_y);
       trs_char[1][i] =
 	XCreateBitmapFromDataScale(display,window,
-				   (char*)trs_char_data[trs_charset][i],
+				   trs_char_data[trs_charset][i],
 				   TRS_CHAR_WIDTH,TRS_CHAR_HEIGHT,
 				   scale_x*2,scale_y);
     }
@@ -1230,7 +1257,7 @@ void trs_screen_refresh()
   int i, srcx, srcy, dunx, duny;
 
 #if XDEBUG
-  fprintf(stderr, "trs_screen_refresh\n");
+  debug("trs_screen_refresh\n");
 #endif
   if (grafyx_enable && !grafyx_overlay) {
     srcx = cur_char_width * grafyx_xoffset;
@@ -1418,9 +1445,9 @@ void trs_screen_scroll()
 #endif
   else {
     XCopyArea(display,window,window,gc,
-	      border_width,cur_char_height+border_width,
+	      left_margin,cur_char_height+top_margin,
 	      (cur_char_width*row_chars),(cur_char_height*col_chars),
-	      border_width,border_width);
+	      left_margin,top_margin);
   }
 }
 
@@ -1442,6 +1469,7 @@ void grafyx_write_byte(int x, int y, char byte)
   int screen_y = ((y - grafyx_yoffset + G_YSIZE) % G_YSIZE);
   int on_screen = screen_x < row_chars &&
     screen_y < col_chars*cur_char_height/scale_y;
+
   if (grafyx_enable && grafyx_overlay && on_screen) {
     /* Erase old byte, preserving text */
     XPutImage(display, window, gc_xor, &image,
@@ -1609,6 +1637,51 @@ void grafyx_set_microlabs(int on_off)
   grafyx_microlabs = on_off;
 }
 
+/* Model III MicroLabs support */
+void grafyx_m3_reset()
+{
+  if (grafyx_microlabs) grafyx_m3_write_mode(0);
+}
+
+void grafyx_m3_write_mode(int value)
+{
+  int enable = (value & G3_ENABLE) != 0;
+  int changed = (enable != grafyx_enable);
+  grafyx_enable = enable;
+  grafyx_overlay = enable;
+  grafyx_mode = value;
+  grafyx_y = G3_YLOW(value);
+  if (changed) trs_screen_refresh();
+}
+
+int grafyx_m3_write_byte(int position, int byte)
+{
+  if (grafyx_microlabs && (grafyx_mode & G3_COORD)) {
+    int x = (position % 64);
+    int y = (position / 64) * 12 + grafyx_y;
+    grafyx_write_byte(x, y, byte);
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+unsigned char grafyx_m3_read_byte(int position)
+{
+  if (grafyx_microlabs && (grafyx_mode & G3_COORD)) {
+    int x = (position % 64);
+    int y = (position / 64) * 12 + grafyx_y;
+    return grafyx_unscaled[y][x];
+  } else {
+    return trs_screen[position];
+  }
+}
+
+int grafyx_m3_active()
+{
+  return (trs_model == 3 && grafyx_microlabs && (grafyx_mode & G3_COORD));
+}
+
 #ifdef HRG1B
 /* Support for Model I HRG1B hi-res graphics card. */
 /* See file trs_io.c for documentation. */
@@ -1635,7 +1708,7 @@ hrg_init()
   }
   if (cur_char_width % 6 != 0 || cur_char_height % 12 != 0)
     error("character size %d*%d not a multiple of 6*12 HRG raster",
-         cur_char_width, cur_char_height);
+	  cur_char_width, cur_char_height);
 }
 
 /* Switch HRG on (1) or off (0). */
@@ -1677,10 +1750,10 @@ hrg_write_data(int data)
   if ((currentmode & EXPANDED) && (hrg_addr & 1)) return;
   if ((data &= 0x3f) == (old_data &= 0x3f)) return;
 
-  position = hrg_addr & 0x3ff; /* bits 0-9: "PRINT @" screen position */
-  line = hrg_addr >> 10;       /* vertical offset inside character cell */
-  bits0 = ~data & old_data;    /* pattern to clear */
-  bits1 = data & ~old_data;    /* pattern to set */
+  position = hrg_addr & 0x3ff;	/* bits 0-9: "PRINT @" screen position */
+  line = hrg_addr >> 10;	/* vertical offset inside character cell */
+  bits0 = ~data & old_data;	/* pattern to clear */
+  bits1 = data & ~old_data;	/* pattern to set */
 
   if (bits0 == 0
       || trs_screen[position] == 0x20
@@ -1705,33 +1778,33 @@ hrg_write_data(int data)
     /* Compute arrays of rectangles to clear and to set. */
     for (j = 0, b = 1; j < 6; j++, b <<= 1) {
       if (bits0 & b) {
-       if (flag >= 0) {        /* Start new rectangle. */
-         rect0[n0].x = destx + x[j];
-         rect0[n0].y = desty;
-         rect0[n0].width = w[j];
-         rect0[n0].height = h;
-         n0++;
-         flag = -1;
-       }
-       else {                  /* Increase width of rectangle. */
-         rect0[n0-1].width += w[j];
-       }
+	if (flag >= 0) {	/* Start new rectangle. */
+	  rect0[n0].x = destx + x[j];
+	  rect0[n0].y = desty;
+	  rect0[n0].width = w[j];
+	  rect0[n0].height = h;
+	  n0++;
+	  flag = -1;
+	}
+	else {			/* Increase width of rectangle. */
+	  rect0[n0-1].width += w[j];
+	}
       }
       else if (bits1 & b) {
-       if (flag <= 0) {
-         rect1[n1].x = destx + x[j];
-         rect1[n1].y = desty;
-         rect1[n1].width = w[j];
-         rect1[n1].height = h;
-         n1++;
-         flag = 1;
-       }
-       else {
-         rect1[n1-1].width += w[j];
-       }
+	if (flag <= 0) {
+	  rect1[n1].x = destx + x[j];
+	  rect1[n1].y = desty;
+	  rect1[n1].width = w[j];
+	  rect1[n1].height = h;
+	  n1++;
+	  flag = 1;
+	}
+	else {
+	  rect1[n1-1].width += w[j];
+	}
       }
       else {
-       flag = 0;
+	flag = 0;
       }
     }
     if (n0 != 0) XFillRectangles(display, window, gc_inv, rect0, n0);
@@ -1783,25 +1856,25 @@ hrg_update_char(int position)
       np = n;
       flag = 0;
       for (j = 0; j < 6; j++) {
-       if (!(byte & 1<<j)) {
-         flag = 0;
-       }
-       else if (!flag) {       /* New rectangle. */
-         rect[n].x = destx + x[j];
-         rect[n].y = desty + hrg_pixel_y[i];
-         rect[n].width = w[j];
-         rect[n].height = hrg_pixel_height[i];
-         n++;
-         flag = 1;
-       }
-       else {                  /* Increase width. */
-         rect[n-1].width += w[j];
-       }
+	if (!(byte & 1<<j)) {
+	  flag = 0;
+	}
+	else if (!flag) {	/* New rectangle. */
+	  rect[n].x = destx + x[j];
+	  rect[n].y = desty + hrg_pixel_y[i];
+	  rect[n].width = w[j];
+	  rect[n].height = hrg_pixel_height[i];
+	  n++;
+	  flag = 1;
+	}
+	else {			/* Increase width. */
+	  rect[n-1].width += w[j];
+	}
       }
     }
-    else {                     /* Increase heights. */
+    else {			/* Increase heights. */
       for (j = np; j < n; j++)
-       rect[j].height += hrg_pixel_height[i];
+	rect[j].height += hrg_pixel_height[i];
     }
     prev_byte = byte;
   }
@@ -1826,7 +1899,7 @@ void trs_get_mouse_pos(int *x, int *y, unsigned int *buttons)
   XQueryPointer(display, window, &root, &child,
 		&root_x, &root_y, &win_x, &win_y, &mask);
 #if MOUSEDEBUG
-  fprintf(stderr, "get_mouse %d %d 0x%x ->", win_x, win_y, mask);
+  debug("get_mouse %d %d 0x%x ->", win_x, win_y, mask);
 #endif
   if (win_x >= 0 && win_x < OrigWidth &&
       win_y >= 0 && win_y < OrigHeight) {
@@ -1851,7 +1924,7 @@ void trs_get_mouse_pos(int *x, int *y, unsigned int *buttons)
   *y = mouse_last_y;
   *buttons = mouse_last_buttons;
 #if MOUSEDEBUG
-  fprintf(stderr, "%d %d 0x%x\n",
+  debug("%d %d 0x%x\n",
 	  mouse_last_x, mouse_last_y, mouse_last_buttons);
 #endif
 }
@@ -1870,7 +1943,7 @@ void trs_set_mouse_pos(int x, int y)
   dest_y = top_margin  + y * (OrigHeight - 2*top_margin) / mouse_y_size;
 
 #if MOUSEDEBUG
-  fprintf(stderr, "set_mouse %d %d -> %d %d\n", x, y, dest_x, dest_y);
+  debug("set_mouse %d %d -> %d %d\n", x, y, dest_x, dest_y);
 #endif
   XWarpPointer(display, window, window, 0, 0, OrigWidth, OrigHeight,
 	       dest_x, dest_y);
