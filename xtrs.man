@@ -734,6 +734,9 @@ mechanism, and the class name for \fBxtrs\fP is "Xtrs".
 Set your X display to \fIdisplay\fP. The default is to
 use the DISPLAY environment variable.
 .TP
+.B \-iconic
+Start with the \fBxtrs\fP window iconified.
+.TP
 .B \-background \fIcolor\fP
 .PD 0
 .TP

@@ -129,11 +129,9 @@ void trs_reset(int hard)
     if (trs_model == 3) {
         grafyx_m3_reset();
     }
-#ifdef HRG1B
     if (trs_model == 1) {
 	hrg_onoff(0);		/* Switch off HRG1B hi-res graphics. */
     }
-#endif
     trs_kb_reset();  /* Part of keyboard stretch kludge */
 
     trs_cancel_event();

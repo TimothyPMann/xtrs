@@ -153,13 +153,10 @@ int grafyx_m3_active(); /* true if currently intercepting video i/o */
 void grafyx_m3_write_mode(int value);
 unsigned char grafyx_m3_read_byte(int position);
 int grafyx_m3_write_byte(int position, int value);
-
-#ifdef HRG1B
 void hrg_onoff(int enable);
 void hrg_write_addr(int addr, int mask);
 void hrg_write_data(int data);
 int hrg_read_data(void);
-#endif /* HRG1B */
 
 void trs_get_mouse_pos(int *x, int *y, unsigned int *buttons);
 void trs_set_mouse_pos(int x, int y);

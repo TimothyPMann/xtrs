@@ -99,6 +99,7 @@ static int scale_y = 2;
 
 static XrmOptionDescRec opts[] = {
 /* Option */    /* Resource */  /* Value from arg? */   /* Value if no arg */
+{"-iconic",     "*iconic",      XrmoptionNoArg,         (caddr_t)""},
 {"-background",	"*background",	XrmoptionSepArg,	(caddr_t)NULL},
 {"-bg",		"*background",	XrmoptionSepArg,	(caddr_t)NULL},
 {"-foreground",	"*foreground",	XrmoptionSepArg,	(caddr_t)NULL},
@@ -204,7 +205,6 @@ XImage image = {
   /*f*/                { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
-#ifdef HRG1B
 #define HRG_MEMSIZE (1024 * 12)	/* 12k * 8 bit graphics memory */
 static unsigned char hrg_screen[HRG_MEMSIZE];
 static int hrg_pixel_x[2][6+1];
@@ -214,7 +214,6 @@ static int hrg_pixel_height[12];
 static int hrg_enable = 0;
 static int hrg_addr = 0;
 static void hrg_update_char(int position);
-#endif /* HRG1B */
 
 /*
  * Key event queueing routines
@@ -904,10 +903,18 @@ void trs_screen_init()
   trs_fix_size(window, OrigWidth, OrigHeight);
   XStoreName(display,window,title);
   XSelectInput(display, window, EVENT_MASK);
+
+  (void) sprintf(option, "%s%s", program_name, ".iconic"); 
+  if (XrmGetResource(x_db, option, "Xtrs.Iconic", &type, &value)) { 
+    XWMHints * hints = XAllocWMHints(); 
+    hints->flags = StateHint; 
+    hints->initial_state = IconicState; 
+    XSetWMHints(display, window, hints); 
+    XFree(hints); 
+  }
+
   XMapWindow(display, window);
-
   bitmap_init(foreground, background);
-
   screen_init();
   XClearWindow(display,window);
 
@@ -1495,10 +1502,9 @@ void trs_screen_write_char(int position, int char_index)
 		cur_char_width, cur_char_height - duny);
     }
   }
-#ifdef HRG1B
-  if (hrg_enable)
+  if (hrg_enable) {
     hrg_update_char(position);
-#endif
+  }
 }
 
  /* Copy lines 1 through col_chars-1 to lines 0 through col_chars-2.
@@ -1518,13 +1524,9 @@ void trs_screen_scroll()
     if (grafyx_overlay) {
       trs_screen_refresh();
     }
-  }
-#ifdef HRG1B
-  else if (hrg_enable) {
+  } else if (hrg_enable) {
     trs_screen_refresh();
-  }
-#endif
-  else {
+  } else {
     XCopyArea(display,window,window,gc,
 	      left_margin,cur_char_height+top_margin,
 	      (cur_char_width*row_chars),(cur_char_height*col_chars),
@@ -1761,9 +1763,43 @@ int grafyx_m3_active()
   return (trs_model == 3 && grafyx_microlabs && (grafyx_mode & G3_COORD));
 }
 
-#ifdef HRG1B
-/* Support for Model I HRG1B hi-res graphics card. */
-/* See file trs_io.c for documentation. */
+/*
+ * Support for Model I HRG1B 384*192 graphics card
+ * (sold in Germany for Model I and Video Genie by RB-Elektronik).
+ *
+ * Assignment of ports is as follows:
+ *    Port 0x00 (out): switch graphics screen off (value ignored).
+ *    Port 0x01 (out): switch graphics screen on (value ignored).
+ *    Port 0x02 (out): select screen memory address (LSB).
+ *    Port 0x03 (out): select screen memory address (MSB).
+ *    Port 0x04 (in):  read byte from screen memory.
+ *    Port 0x05 (out): write byte to screen memory.
+ * (The real hardware decodes only address lines A0-A2 and A7, so
+ * that there are several "shadow" ports in the region 0x08-0x7d.
+ * However, these undocumented ports are not implemented here.)
+ *
+ * The 16-bit memory address (port 2 and 3) is used for subsequent
+ * read or write operations. It corresponds to a position on the
+ * graphics screen, in the following way:
+ *    Bits 0-5:   character column address (0-63)
+ *    Bits 6-9:   character row address (0-15)
+ *                (i.e. bits 0-9 are the "PRINT @" position.)
+ *    Bits 10-13: address of line within character cell (0-11)
+ *    Bits 14-15: not used
+ *
+ *      <----port 2 (LSB)---->  <-------port 3 (MSB)------->
+ * Bit: 0  1  2  3  4  5  6  7  8  9  10  11  12  13  14  15
+ *      <-column addr.->  <row addr>  <-line addr.->  <n.u.>
+ *
+ * Reading from port 4 or writing to port 5 will access six
+ * neighbouring pixels corresponding (from left to right) to bits
+ * 0-5 of the data byte. Bits 6 and 7 are present in memory, but
+ * are ignored.
+ *
+ * In expanded mode (32 chars per line), the graphics screen has
+ * only 192*192 pixels. Pixels with an odd column address (i.e.
+ * every second group of 6 pixels) are suppressed.
+ */
 
 /* Initialize HRG. */
 static void
@@ -1962,7 +1998,7 @@ hrg_update_char(int position)
   if (n != 0)
     XFillRectangles(display, window, gc, rect, n);
 }
-#endif /* HRG1B */
+
 
 /*---------- X mouse support --------------*/
 

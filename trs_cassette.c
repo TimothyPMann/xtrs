@@ -19,9 +19,10 @@
 */
 
 /*
- * This module implements both cassette I/O and game sound.  "Game sound"
- *  is defined as output to the cassette port when the cassette motor is
- *  off, or output to the Model III/4 sound option card (a 1-bit DAC).
+ * This module implements cassette I/O, game sound, and Orchestra
+ *  85/90 sound.  "Game sound" is defined as output to the cassette
+ *  port when the cassette motor is off, or output to the Model III/4
+ *  sound option card (a 1-bit DAC).
  * 
  * Compile time options:
  *
@@ -46,7 +47,7 @@
  *   Enable sound support using direct I/O to a SoundBlaster with I/O
  *   port base at portbase, playing sounds at vol percent of
  *   maximum volume.  A typical setting would be -sb 0x220,30.
- *   Fabio Ferrari contributed the SB_SOUND implementation.
+ *   Fabio Ferrari contributed the SB_SOUND implementation.  
  */
 
 #if __linux
@@ -113,6 +114,10 @@ static float cassette_env;
 static int cassette_noisefloor;
 static int cassette_sample_rate;
 int cassette_default_sample_rate = DEFAULT_SAMPLE_RATE;
+static int cassette_stereo = 0;
+#if HAVE_OSS
+static int cassette_afmt = AFMT_U8;
+#endif
 
 /* For bit-level emulation */
 static tstate_t cassette_transition;
@@ -120,6 +125,7 @@ static tstate_t last_sound;
 static tstate_t cassette_firstoutread;
 static int cassette_value, cassette_next, cassette_flipflop;
 static int cassette_lastnonzero;
+static int cassette_transitionsout;
 static unsigned long cassette_delta;
 static float cassette_roundoff_error;
 
@@ -309,6 +315,58 @@ get_fourbyte(Uint *pp, FILE* f)
   return 0;
 }
 
+/* Output an 8-byte unsigned sample, if necessary converting to a
+ * different sample format.  */
+static void
+put_sample(Uchar sample, int convert, FILE* f)
+{
+  if (convert) {
+#if HAVE_OSS
+    switch (cassette_afmt) {
+    case AFMT_U8:
+      putc(sample, f);
+      break;
+    case AFMT_S16_LE:
+      put_twobyte((sample << 8) - 0x8000, f);
+      break;
+    default:
+      error("sample format 0x%x not supported", cassette_afmt);
+      break;
+    }
+    return;
+#endif
+  }
+  putc(sample, f);
+}    
+
+/* Get an 8-byte unsigned sample, if necessary converting from a
+ * different sample format and/or reducing stereo to mono.  */
+static int
+get_sample(int convert, FILE* f)
+{
+#if HAVE_OSS
+  if (convert) {
+    int ret = 0;
+    short s = 0;
+    switch (cassette_afmt) {
+    case AFMT_U8:
+      ret = getc(f);
+      break;
+    case AFMT_S16_LE:
+      ret = get_twobyte(&s, cassette_file);      
+      if (ret == EOF) break;
+      ret = ((s + 0x8000) >> 8) & 0xff;
+      break;
+    default:
+      error("sample format 0x%x not supported", cassette_afmt);
+      break;
+    }
+    return ret;
+  }
+#endif
+  return getc(f);
+}
+
 /* Write a new .wav file header to a file.  Return -1 on error. */
 static int
 create_wav_header(FILE *f)
@@ -422,13 +480,28 @@ set_audio_format(FILE *f, int state)
   int format, stereo, speed, req;
   req = format = AFMT_U8;  /* unsigned 8-bit */
   if (ioctl(audio_fd, SNDCTL_DSP_SETFMT, &format)==-1) return -1;
-  if (format != req) { errno = EINVAL; return -1; }
+  if (format != req) {
+    req = format = AFMT_S16_LE; /* signed 16-bit little-endian */
+    if (ioctl(audio_fd, SNDCTL_DSP_SETFMT, &format)==-1) return -1;
+    if (format != req) {
+      error("requested audio format 0x%x, got 0x%x", req, format);
+      errno = EINVAL;
+      return -1;
+    }
+  }
+  cassette_afmt = format;
   req = stereo = (state == ORCH90);
   if (ioctl(audio_fd, SNDCTL_DSP_STEREO, &stereo)==-1) return -1;
-  if (stereo != req) { errno = EINVAL; return -1; }
+  if (req && !stereo) {
+    error("requested stereo, got mono");
+    errno = EINVAL;
+    return -1;
+  }
+  cassette_stereo = stereo;
   req = speed = cassette_sample_rate;
   if (ioctl(audio_fd, SNDCTL_DSP_SPEED, &speed)==-1) return -1;
   if (abs(speed - req) > req/20) {
+    error("requested sample rate %d Hz, got %d Hz", req, speed);
     errno = EINVAL;
     return -1;
   }
@@ -519,6 +592,10 @@ static int assert_state(int state)
     if (cassette_state != SOUND && cassette_state != ORCH90) {
       put_control();
     }
+#if HAVE_OSS
+    cassette_stereo = 0;
+    cassette_afmt = AFMT_U8;
+#endif
   }
 
   switch (state) {
@@ -663,6 +740,7 @@ transition_out(int value)
   float ddelta_us;
   sigset_t set, oldset;
 
+  cassette_transitionsout++;
   if (value != FLUSH && value == cassette_value) return;
 
   sigemptyset(&set);
@@ -732,13 +810,16 @@ transition_out(int value)
     debug("%d %4lu %d -> %3lu\n", cassette_value,
 	  z80_state.t_count - cassette_transition, value, nsamples);
 #endif
+    if (cassette_format == DIRECT_FORMAT && cassette_stereo) nsamples *= 2;
     while (nsamples-- > 0) {
-      putc(sample, cassette_file);
+      put_sample(sample, cassette_format == DIRECT_FORMAT, cassette_file);
     }
     if (value == FLUSH) {
       value = cassette_value;
 #if OSS_SOUND && HAVE_OSS
-      ioctl(fileno(cassette_file), SNDCTL_DSP_POST, 0);
+      if (cassette_format == DIRECT_FORMAT) {
+	ioctl(fileno(cassette_file), SNDCTL_DSP_POST, 0);
+      }
       trs_restore_delay();
 #endif
     }
@@ -915,7 +996,12 @@ transition_in()
     nsamples = 0;
     maxsamples = cassette_sample_rate / 100;
     do {
-      c = getc(cassette_file);
+      int direct = (cassette_format == DIRECT_FORMAT);
+      c = get_sample(direct, cassette_file);
+      if (direct && cassette_stereo) {
+	/* Discard right channel */
+	(void) get_sample(direct, cassette_file);
+      }
       if (c == EOF) goto fail;
       if (c > 127 + cassette_noisefloor) {
 	next = 1;
@@ -1057,6 +1143,7 @@ void trs_cassette_motor(int value)
       cassette_env = 127;
       cassette_noisefloor = NOISE_FLOOR;
       cassette_firstoutread = 0;
+      cassette_transitionsout = 0;
       if (trs_model > 1) {
 	/* Get 1500bps reading started after 1 second */
 	trs_schedule_event(trs_cassette_kickoff, 0,
@@ -1194,8 +1281,8 @@ trs_orch90_out(int channels, int value)
     nsamples * (1000000.0/cassette_sample_rate) - ddelta_us;
 
   while (nsamples-- > 0) {
-    putc(orch90_left, cassette_file);
-    putc(orch90_right, cassette_file);
+    put_sample(orch90_left, TRUE, cassette_file);
+    put_sample(orch90_right, TRUE, cassette_file);
   }
 
   if (trs_event_scheduled() == orch90_flush ||
@@ -1270,7 +1357,9 @@ trs_cassette_in()
 #if CASSDEBUG3
   debug("in  %ld\n", z80_state.t_count);
 #endif
-  if (cassette_motor) assert_state(READ);
+  if (cassette_motor && cassette_transitionsout <= 1) {
+    assert_state(READ);
+  }
   /* Heuristic to detect reading with Level 1 routines.  If the
      routine paused too long after resetting the flipflop before
      reading it again, assume it must be Level 1 code.  */

@@ -1264,6 +1264,7 @@ trs_disk_select_write(unsigned char data)
     /* If a SIGUSR1 disk change is pending, accept it here */
     if (trs_disk_needchange) {
       trs_disk_change_all();
+      trs_disk_needchange = 0;
     }
 
     /* Update our knowledge of whether there is a real disk present */

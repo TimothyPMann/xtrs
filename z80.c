@@ -3441,12 +3441,19 @@ int z80_run(int continuous)
 	    break;
 	    
 	  case 0x76:	/* halt */
-	    REG_PC--;	/* don't increment PC past this instruction */
 	    if (trs_model == 1) {
 		/* Z-80 HALT output is tied to reset button circuit */
 		trs_reset(0);
 	    } else {
 		/* Really halt (i.e., wait for interrupt) */
+	        /* Slight kludge: we back up the PC and keep going
+		   around the main loop reexecuting the halt.  A real
+		   Z-80 does not back up and re-fetch the halt
+		   instruction repeatedly; it just executes NOPs
+		   internally.  When an interrupt or NMI is delivered,
+		   (see below) we undo this decrement to get out of
+		   the halt state. */
+	        REG_PC--;
 		if (continuous > 0 &&
 		    !(z80_state.nmi && !z80_state.nmi_seen) &&
 		    !(z80_state.irq && z80_state.iff1) &&
@@ -4315,8 +4322,12 @@ int z80_run(int continuous)
 	if (trs_continuous >= 0)
         {
 	    /* Handle NMI first */
-	    if(z80_state.nmi && !z80_state.nmi_seen)
+	    if (z80_state.nmi && !z80_state.nmi_seen)
 	    {
+	        if (instruction == 0x76) {
+		    /* Taking a NMI gets us out of a halt */
+		    REG_PC++;
+		}
 	        do_nmi();
 	        z80_state.nmi_seen = TRUE;
                 if (trs_model == 1) {
@@ -4325,8 +4336,13 @@ int z80_run(int continuous)
 		}
 	    }
 	    /* Allow IRQ if enabled and instruction was not EI */
-	    if(z80_state.irq && z80_state.iff1 == 1 && instruction != 0xFB)
+	    else if (z80_state.irq && z80_state.iff1 == 1
+		     && instruction != 0xFB)
             {
+	        if (instruction == 0x76) {
+		    /* Taking an interrupt gets us out of a halt */
+		    REG_PC++;
+		}
 	        do_int();
 	    }
 	}
