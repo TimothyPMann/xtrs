@@ -153,7 +153,7 @@ Vavasour's commercial Model III/4 emulator.  The xtrs implementation
 includes some extensions.  
 
 Full documentation for both JV1 and JV3 can be found at
-http://www.research.digital.com/SRC/personal/Tim_Mann/trs80/dskspec.html.
+http://www.tim-mann.org/trs80/dskspec.html.
 A copy of this html file is also included in the \fBxtrs\fP distribution.
 
 The DMK format is documented in a file on David Keil's web site,
@@ -230,10 +230,9 @@ typedef struct {
 .SH See also
 .BR xtrs (1)
 
-http://www.research.digital.com/SRC/personal/Tim_Mann/trs80/dskspec.html
+http://www.tim-mann.org/trs80/dskspec.html
 .SH Authors
-\fBmkdisk\fP was written by Timothy Mann <mann@pa.dec.com>, Digital
-Equipment Corporation.
+\fBmkdisk\fP was written by Timothy Mann <tim.mann@compaq.com>.
 
 The floppy file formats here called JV1 and JV3 were developed by Jeff
 Vavasour for his MSDOS-based Model I and Model III/4 emulators
