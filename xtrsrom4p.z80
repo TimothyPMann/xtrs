@@ -25,7 +25,7 @@
 ; TODO:
 ;   possibly write code for the RST handlers as in the real 4P rom
 ;
-; Last modified on Fri Mar 19 14:02:53 PST 1999 by mann 
+; Last modified on Fri Mar 19 14:30:10 PST 1999 by mann 
 ;      modified on Mon Mar 15 17:25:49 CST 1999 by petec
 ;
 ;------------------------------------------------------------------
@@ -277,6 +277,6 @@ elost:
 ecant:	db	'Emulator or ROM bug',0
 ecrc:	db	'Boot sector CRC error',0
 ernf:	db	'Boot sector not found on disk',0
-dskmsg:	db	'You do not have a disk loaded',0
+dskmsg:	db	'You do not have a disk image loaded',0
 ;
 	end	start
