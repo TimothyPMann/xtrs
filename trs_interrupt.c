@@ -347,8 +347,10 @@ trs_timer_event(int signo)
     trs_disk_motoroff_interrupt(trs_disk_motoroff());
     trs_kb_heartbeat(); /* part of keyboard stretch kludge */
   }
-#if !HAVE_SIGIO
-  x_poll_count = 0; /* be sure to flush X events */
+#if HAVE_SIGIO
+  x_flush_needed = 1; /* be sure to flush X output */
+#else
+  x_poll_count = 0; /* be sure to flush and check for X events */
 #endif
 
   /* Schedule next tick.  We do it this way because the host system

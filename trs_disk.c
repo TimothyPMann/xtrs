@@ -35,6 +35,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <signal.h>
 
 #include "crc.c"
 
@@ -44,7 +45,6 @@
 #include <linux/fd.h>
 #include <linux/fdreg.h>
 #include <sys/ioctl.h>
-#include <signal.h>
 #endif
 
 #define NDRIVES 8

@@ -2979,6 +2979,7 @@ static int do_ED_instruction()
 }
 
 volatile int x_poll_count = 0;
+volatile int x_flush_needed = 0;
 #define X_POLL_INTERVAL 10000
 
 /* Hack, hack, see if we can speed this up. */
@@ -3000,15 +3001,26 @@ int z80_run(int continuous)
 
     /* loop to do a z80 instruction */
     do {
+#if HAVE_SIGIO
+        /* If we are using SIGIO, the SIGIO handler tells us when to
+	   poll for X events by setting x_poll_count to 0, and when to
+	   flush output to the X server by setting x_flush_needed to 1. */
 	if (x_poll_count <= 0) {
 	    x_poll_count = X_POLL_INTERVAL;
 	    trs_get_event(0);
+	} else if (x_flush_needed) {
+	    x_flush_needed = 0;
+	    trs_x_flush();
 	}
-#if !HAVE_SIGIO
-	/* If we aren't using SIGIO, we need to poll periodically.
-	   If we are using it, the SIGIO handler tells us when to poll
-	   by setting x_poll_count to 0 */
-	x_poll_count--;
+#else
+        /* If we aren't using SIGIO, we need to poll for X events 
+	   periodically, and that also flushes output to the X server. */
+	if (x_poll_count <= 0) {
+	    x_poll_count = X_POLL_INTERVAL;
+	    trs_get_event(0);
+	} else {
+	    x_poll_count--;
+	}
 #endif
         /* Speed control */
         if ((i = z80_state.delay)) {

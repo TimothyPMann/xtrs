@@ -945,6 +945,14 @@ void trs_event(int signo)
 
 KeySym last_key[256];
 
+/*
+ * Flush output to X server
+ */
+inline void trs_x_flush()
+{
+  XFlush(display);
+}
+
 /* 
  * Get and process X event(s).
  *   If wait is true, process one event, blocking until one is available.

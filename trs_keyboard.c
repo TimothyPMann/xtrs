@@ -712,9 +712,11 @@ void trs_kb_reset()
   key_stretch_timeout = z80_state.t_count;
 }
 
+int key_heartbeat = 0;
 void trs_kb_heartbeat()
 {
-  /* Don't hold keys in queue too long (how?) */
+  /* Don't hold keys in queue too long */
+  key_heartbeat++;
 }
 
 void trs_kb_bracket(int shifted)
@@ -874,6 +876,17 @@ int trs_kb_mem_read(int address)
        below) if REG_SP happens to point to keyboard memory. */
     if (recursion) return 0;
 
+    /* Avoid delaying key state changes in queue for too long */
+    if (key_heartbeat > 2) {
+      do {
+	key = trs_next_key(0);
+	if (key >= 0) {
+	  change_keystate(key);
+	  timesseen = 1;
+	}
+      } while (key >= 0);
+    }
+
     /* After each key state change, impose a timeout before the next one
        so that the Z-80 program doesn't miss any by polling too rarely,
        and so that we don't tickle the bugs in some common TRS-80 keyboard
@@ -913,6 +926,7 @@ int trs_kb_mem_read(int address)
       change_keystate(key);
       timesseen = 1;
     }
+    key_heartbeat = 0;
     return kb_mem_value(address);
 }
 
