@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Wed Jan  3 11:58:05 PST 2001 by mann
+   Last modified on Tue May  1 17:52:20 PDT 2001 by mann
 */
 
 #include "z80.h"
@@ -70,8 +70,8 @@ Running:\n\
     reset\n\
         Hard reset the Z-80 and devices.\n\
     softreset\n\
-        Press the system reset button.  On Model I/III, softreset resets the
-        devices and posts a nonmaskable interrupt to the CPU; on Model 4/4P,
+        Press the system reset button.  On Model I/III, softreset resets the\n\
+        devices and posts a nonmaskable interrupt to the CPU; on Model 4/4P,\n\
         softreset is the same as hard reset.\n\
     timeroff\n\
     timeron\n\
@@ -393,7 +393,7 @@ void debug_shell()
     if (!home) home = ".";
     sprintf (history_file, "%s/.zbx-history", home);
     read_history(history_file);
-#endif READLINE
+#endif
 
     while(!done)
     {
