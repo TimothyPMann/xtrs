@@ -5,11 +5,13 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Mon Sep  1 18:56:44 PDT 1997 by mann */
+/* Last modified on Wed Sep 24 18:26:57 PDT 1997 by mann */
 
 /*
  * Emulate Model I or III disk controller
  */
+
+/*#define DISKDEBUG 1*/
 
 #include "z80.h"
 #include "trs.h"
@@ -18,7 +20,6 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 
-#define TRSDISK_NONE TRSDISK_FORCEINT
 #define NDRIVES 8
 
 int trs_disk_spinfast = 0;
@@ -38,8 +39,9 @@ typedef struct {
   int format_bytecount;         /* bytes left in this part of write track */
   unsigned curdrive;
   unsigned curside;
-  unsigned density;		/*sden=0, dden=1*/
+  unsigned density;		/* sden=0, dden=1 */
   unsigned char controller;	/* TRSDISK_P1771 or TRSDISK_P1791 */
+  int last_readadr;             /* id index found by last readadr */
 } FDCState;
 
 FDCState state;
@@ -166,6 +168,7 @@ trs_disk_init(int reset_button)
   state.curdrive = state.curside = 0;
   state.density = 0;
   state.controller = (trs_model == 1) ? TRSDISK_P1771 : TRSDISK_P1791;
+  state.last_readadr = -1;
   for (i=0; i<NDRIVES; i++) {
     disk[i].phytrack = 0;
   }
@@ -398,9 +401,9 @@ idoffset(int id_index)
 
 
 /* Search for a sector on the current physical track and return its
-   index within the emulated-disk file.  Set status and return -1 if
-   there is no such sector.  If sector == -1, just return the first
-   sector found if any. */
+   index within the emulated disk's array of sectors.  Set status and
+   return -1 if there is no such sector.  If sector == -1, just return
+   the first sector found if any. */
 static int
 search(int sector)
 {
@@ -409,13 +412,13 @@ search(int sector)
   if (d->emutype == JV1) { 
     if (d->phytrack < 0 || d->phytrack >= MAXTRACKS ||
 	state.curside > 0 || sector >= 10 || d->file == NULL ||
-	d->phytrack != state.track) {
+	d->phytrack != state.track || state.density == 1) {
       state.status |= TRSDISK_NOTFOUND;
       return -1;
     }
     return JV1_SECPERTRK * d->phytrack + (sector < 0 ? 0 : sector);
   } else {
-    int i, physec;
+    int i;
     SectorId *sid;
     if (d->phytrack < 0 || d->phytrack >= MAXTRACKS ||
 	state.curside >= JV3_SIDES ||
@@ -443,14 +446,56 @@ search(int sector)
 }
 
 
+/* Search for the first sector on the current physical track and
+   return its index within the sorted index array (JV3 only).  Return
+   -1 if there is no such sector. */
+static int
+search_adr()
+{
+  DiskState *d = &disk[state.curdrive];
+  /* Get true address within file of current sector data */
+  if (d->emutype == JV1) { 
+    trs_disk_unimpl(state.currcommand, "!! JV1 read address");    
+    return -1;
+  } else {
+    int i;
+    SectorId *sid;
+    if (d->phytrack < 0 || d->phytrack >= MAXTRACKS ||
+	state.curside >= JV3_SIDES ||
+	d->phytrack != state.track || d->file == NULL) {
+      /*!!state.status |= TRSDISK_NOTFOUND;*/
+      return -1;
+    }
+    if (!d->sorted_valid) sort_ids(state.curdrive);
+    i = d->track_start[d->phytrack][state.curside];
+    if (i != -1) {
+      for (;;) {
+	sid = &d->id[d->sorted_id[i]];
+	if (sid->track != d->phytrack ||
+	    (sid->flags & JV3_SIDE ? 1 : 0) != state.curside) break;
+	if (((sid->flags & JV3_DENSITY) ? 1 : 0) == state.density) {
+	  return i;
+	}
+	i++;
+      }
+    }
+    /*!!state.status |= TRSDISK_NOTFOUND;*/
+    return -1;
+  }
+}
+
+
 void
 verify()
 {
   int ok;
   DiskState *d = &disk[state.curdrive];
   if (d->emutype == JV1) {
-    if (state.track != d->phytrack)
+    if (state.density == 1) {
+      state.status |= TRSDISK_NOTFOUND;
+    } else if (state.track != d->phytrack) {
       state.status |= TRSDISK_SEEKERR;
+    }
   } else {
     search(-1);			/* TRSDISK_SEEKERR == TRSDISK_NOTFOUND */
   }
@@ -493,18 +538,21 @@ type1_status()
 void
 trs_disk_select_write(unsigned char data)
 {
-  /*printf("select_write(0x%02x)\n", data);*/
+#ifdef DISKDEBUG
+  fprintf(stderr, "select_write(0x%02x)\n", data);
+#endif
   state.status &= ~TRSDISK_NOTRDY;
-  if (trs_model == 3) {
-    state.curside = (data & TRSDISK3_SIDE) != 0;
-    state.density = (data & TRSDISK3_MFM) != 0;
-  } else {
+  if (trs_model == 1) {
     /* Disk 3 and side select share a bit.  You can't have a drive :3
        on a real Model I if any drive is two-sided.  Here we are more
        generous and just forbid drive :3 from being 2-sided. */
     state.curside = ( (data & (TRSDISK_0|TRSDISK_1|TRSDISK_2)) != 0 &&
 		      (data & TRSDISK_SIDE) != 0 );
     if (state.curside) data &= ~TRSDISK_SIDE;
+
+  } else {
+    state.curside = (data & TRSDISK3_SIDE) != 0;
+    state.density = (data & TRSDISK3_MFM) != 0;
   }
   switch (data & (TRSDISK_0|TRSDISK_1|TRSDISK_2|TRSDISK_3)) {
   case 0:
@@ -547,55 +595,65 @@ trs_disk_select_write(unsigned char data)
 unsigned char
 trs_disk_track_read(void)
 {
-  /*printf("track_read() => 0x%02x\n", state.track);*/
+#ifdef DISKDEBUG
+  fprintf(stderr, "track_read() => 0x%02x\n", state.track);
+#endif
   return state.track;
 }
 
 void
 trs_disk_track_write(unsigned char data)
 {
-  /*printf("track_write(0x%02x)\n", data);*/
+#ifdef DISKDEBUG
+  fprintf(stderr, "track_write(0x%02x)\n", data);
+#endif
   state.track = data;
 }
 
 unsigned char
 trs_disk_sector_read(void)
 {
-  /*printf("sector_read() => 0x%02x\n", state.sector);*/
+#ifdef DISKDEBUG
+  fprintf(stderr, "sector_read() => 0x%02x\n", state.sector);
+#endif
   return state.sector;
 }
 
 void
 trs_disk_sector_write(unsigned char data)
 {
-  /*printf("sector_write(0x%02x)\n", data);*/
-  if (trs_model == 3) {
+#ifdef DISKDEBUG
+  fprintf(stderr, "sector_write(0x%02x)\n", data);
+#endif
+  if (trs_model == 1) {
+    switch (data) {
+      /* Emulate Radio Shack doubler */
+    case TRSDISK_R1791:
+      state.controller = TRSDISK_P1791;
+      state.density = 1;
+      break;
+    case TRSDISK_R1771:
+      state.controller = TRSDISK_P1771;
+      state.density = 0;
+      break;
+    case TRSDISK_NOPRECMP:
+    case TRSDISK_PRECMP:
+      /* Nothing for emulator to do */
+      break;
+    default:
+      state.sector = data;
+      break;
+    }
+  } else {
     state.sector = data;
-    return;
-  }
-  switch (data) {
-    /* Emulate Radio Shack doubler */
-  case TRSDISK_R1791:
-    state.controller = TRSDISK_P1791;
-    state.density = 1;
-    break;
-  case TRSDISK_R1771:
-    state.controller = TRSDISK_P1771;
-    state.density = 0;
-    break;
-  case TRSDISK_NOPRECMP:
-  case TRSDISK_PRECMP:
-    /* Nothing for emulator to do */
-    break;
-  default:
-    state.sector = data;
-    break;
   }
 }
 
 unsigned char
 trs_disk_data_read(void)
 {
+  DiskState *d;
+  SectorId *sid;
   switch (state.currcommand & TRSDISK_CMDMASK) {
   case TRSDISK_READ:
     if (state.bytecount > 0) {
@@ -614,10 +672,49 @@ trs_disk_data_read(void)
       }
     }
     break;
+  case TRSDISK_READADR:
+    if (state.last_readadr == -1 || state.bytecount <= 0) break;
+    d = &disk[state.curdrive];
+    if (d->emutype == JV1) {
+      trs_disk_unimpl(state.currcommand, "!! JV1 read address");
+    } else {
+      sid = &d->id[d->sorted_id[state.last_readadr]];
+      switch (state.bytecount) {
+      case 6:
+        state.data = sid->track;
+        state.sector = sid->track;  //sic
+        break;
+      case 5:
+        state.data = (sid->flags & JV3_SIDE) != 0;
+        break;
+      case 4:
+        state.data = sid->sector;
+        break;
+      case 3:
+        state.data = 0x01;  // 256 bytes always
+        break;
+      case 2:
+        state.data = 0;     // CRC not emulated
+        break;
+      case 1:
+        state.data = 0;     // CRC not emulated
+	break;
+      }
+    }
+    state.bytecount--;
+    if (state.bytecount <= 0) {
+      state.bytecount = 0;
+      state.status &= ~(TRSDISK_BUSY|TRSDISK_DRQ);
+      trs_disk_drq_interrupt(0);
+      trs_disk_intrq_interrupt(1);
+    }
+    break;
   default:
     break;
   }
-  /*printf("data_read() => 0x%02x\n", state.data);*/
+#ifdef DISKDEBUG
+  fprintf(stderr, "data_read() => 0x%02x\n", state.data);
+#endif
   return state.data;
 }
 
@@ -627,7 +724,9 @@ trs_disk_data_write(unsigned char data)
   DiskState *d = &disk[state.curdrive];
   int c;
 
-  /*printf("data_write(0x%02x)\n", data);*/
+#ifdef DISKDEBUG
+  fprintf(stderr, "data_write(0x%02x)\n", data);
+#endif
   switch (state.currcommand & TRSDISK_CMDMASK) {
   case TRSDISK_WRITE:
     if (state.bytecount > 0) {
@@ -797,9 +896,17 @@ trs_disk_data_write(unsigned char data)
 unsigned char
 trs_disk_status_read(void)
 {
+#ifdef DISKDEBUG
+  static int last_status = -1;
+#endif
   if (trs_disk_nocontroller) return 0xff;
   type1_status();
-  /*printf("status_read() => 0x%02x\n", state.status);*/
+#ifdef DISKDEBUG
+  if (state.status != last_status) {
+    fprintf(stderr, "status_read() => 0x%02x\n", state.status);
+    last_status = state.status;
+  }
+#endif
   trs_disk_intrq_interrupt(0);
   return state.status;
 }
@@ -810,7 +917,9 @@ trs_disk_command_write(unsigned char cmd)
   int id_index;
   DiskState *d = &disk[state.curdrive];
 
-  /*printf("command_write(0x%02x)\n", cmd);*/
+#ifdef DISKDEBUG
+  fprintf(stderr, "command_write(0x%02x)\n", cmd);
+#endif
   trs_disk_intrq_interrupt(0);
   state.bytecount = 0;		/* just forget any ongoing command */
   state.currcommand = cmd;
@@ -948,7 +1057,37 @@ trs_disk_command_write(unsigned char cmd)
     trs_disk_unimpl(cmd, "write multiple");
     break;
   case TRSDISK_READADR:
-    trs_disk_unimpl(cmd, "read address");
+    state.status = 0;
+    if (d->emutype == JV1) {
+      trs_disk_unimpl(state.currcommand, "!! JV1 read address");
+    } else {
+      /* !!Not synchronized with emulated index hole */
+      if (state.last_readadr == -1) {
+	/* Start new track */
+	id_index = search_adr();
+      } else {
+	SectorId *sid = &d->id[d->sorted_id[state.last_readadr]];
+	SectorId *sid2 = &d->id[d->sorted_id[state.last_readadr + 1]];
+	if (sid->track != d->phytrack ||
+  	    ((sid->flags & JV3_SIDE) != 0) != state.curside ||
+	    sid2->track != d->phytrack ||
+  	    ((sid2->flags & JV3_SIDE) != 0) != state.curside) {
+	  /* Start new track */
+	  id_index = search_adr();
+        } else {
+	  /* Give next sector on this track */
+	  id_index = state.last_readadr + 1;
+        }
+      }
+      state.last_readadr = id_index;
+      if (id_index == -1) {
+	trs_disk_intrq_interrupt(1);
+      } else {
+        state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
+        trs_disk_drq_interrupt(1);
+        state.bytecount = 6;
+      }
+    }
     break;
   case TRSDISK_READTRK:
     trs_disk_unimpl(cmd, "read track");
@@ -974,8 +1113,13 @@ trs_disk_command_write(unsigned char cmd)
 	for (i=0, sid=d->id; i<=d->last_used_id; i++, sid++) {
 	  if (sid->track == d->phytrack &&
 	      ((sid->flags & JV3_SIDE) != 0) == state.curside) {
+            int c;
 	    sid->track = sid->sector = sid->flags = JV3_UNUSED;
+	    fseek(d->file, idoffset(i), 0);
+	    c = fwrite(sid, sizeof(SectorId), 1, d->file);
+	    if (c == EOF) state.status |= TRSDISK_WRITEFLT;
 	    if (d->unused_id > i) d->unused_id = i;
+	    d->sorted_valid = 0;
 	  }
 	}
 	while (d->id[d->last_used_id].track == JV3_UNUSED) {
@@ -1001,9 +1145,9 @@ trs_disk_command_write(unsigned char cmd)
     }
     break;
   case TRSDISK_FORCEINT:
-    if ((cmd & 0x0f) != 0) {
+    if ((cmd & 0x07) != 0) {
       /* Interrupt features not implemented. */
-      trs_disk_unimpl(cmd, "force interrupt with nonzero condition");
+      trs_disk_unimpl(cmd, "force interrupt with condition");
     } else {
       if (state.status & TRSDISK_BUSY) {
 	state.status &= ~TRSDISK_BUSY;
@@ -1015,7 +1159,12 @@ trs_disk_command_write(unsigned char cmd)
 	  state.status = 0;
 	}
       }
+      if ((cmd & 0x08) != 0) {
+	trs_disk_intrq_interrupt(1);
+      }
     }
     break;
   }
 }
+
+
