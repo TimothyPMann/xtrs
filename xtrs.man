@@ -177,28 +177,29 @@ you must press F7 to clear the error condition.
 .SH Data import and export
 The emulated floppy \fIutility.dsk\fP contains some programs for
 transferring data between the emulator and ordinary Unix files.  All
-the programs run on the emulator under Model I/III LDOS; some also
-work under other TRS-80 operating systems.
+the programs run on the emulator under Model I/III LDOS and Model 4
+TRSDOS/LS-DOS 6; some also work under other TRS-80 operating systems.
 
 IMPORT/CMD imports a Unix file and writes it to an emulated disk.
 Usage: \fIIMPORT [-n] unixfile trsfile\fP.  The -n flag converts Unix
 newlines (\\n) to TRS-80 newlines (\\r).  IMPORT/CMD may not work
-correctly under operating systems other than Model I/III LDOS.
-IMPORT/BAS is a much slower program that performs the same function
-but should work under more operating systems.  Simply run it under
-Disk Basic and answer the prompts.
+correctly under operating systems other than Model I/III LDOS and
+Model 4 TRSDOS/LS-DOS 6.  IMPORT/BAS is a much slower program that
+performs the same function but should work under more operating
+systems.  Simply run it under Disk Basic and answer the prompts.
 
 EXPORT/CMD reads a file from an emulated disk and exports it to a Unix
 file. Usage: \fIEXPORT [-n] trsfile unixfile\fP.  The -n flag converts
 TRS-80 newlines (\\r) to Unix newlines (\\n).  EXPORT/CMD may not work
-correctly under operating systems other than Model I/III LDOS.
-EXPORT/BAS is a much slower program that performs the same function
-but should work under more operating systems.  Simply run it under
-Disk Basic and answer the prompts.
+correctly under operating systems other than Model I/III LDOS and
+Model 4 TRSDOS/LS-DOS 6.  EXPORT/BAS is a much slower program that
+performs the same function but should work under more operating
+systems.  Simply run it under Disk Basic and answer the prompts.
 
 SETTIME/CMD reads the date and time from Unix and sets the TRS-80
 DOS's date and time accordingly.  It has been tested only under LDOS
 but probably runs on other Model I/III operating systems.
+SETTIME6/CMD is the same program compiled for Model 4 TRSDOS/LS-DOS 6.
 
 The emulator implements a set of pseudo-instructions (emulator traps)
 that give TRS-80 programs access to Unix files.  The programs listed
@@ -393,8 +394,7 @@ The emulator guesses a romfile is in .hex format if its first byte is
 a colon (':'), so a raw binary ROM image can't start with that byte
 value.  In the future it would be nice to accept MODELA/III files too.
 
-Versions of import/cmd and export/cmd for Model 4 LDOS (and non-LDOS
-systems on any model) are not currently provided.
+The import/cmd and export/cmd programs do not work on NEWDOS/80.
 
 If you discover other bugs, or write fixes for any of these, please let
 us know.  We expect to incorporate fixes into future releases.
