@@ -66,7 +66,7 @@ while($done != 1)
 			    set format = 5
 			    breaksw
 			default:
-			    set format = 1
+			    set format = $default_format
 			    breaksw
 		    endsw
 		    echo $command[2] 0 $format > $control_file
