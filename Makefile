@@ -118,7 +118,9 @@ MISC = \
 
 default: xtrs mkdisk hex2cmd cmddump xtrs.txt mkdisk.txt cassette.txt
 
-cmds: export.cmd import.cmd settime.cmd xtrsmous.cmd xtrs8.dct xtrshard.dct
+z80code: export.cmd import.cmd settime.cmd xtrsmous.cmd \
+	xtrs8.dct xtrshard.dct \
+	fakerom.hex
 
 # Local customizations for make variables are done in Makefile.local:
 include Makefile.local
