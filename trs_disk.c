@@ -22,10 +22,20 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if __linux
+#include <sys/types.h>
+#include <fcntl.h>
+#include <linux/fd.h>
+#include <linux/fdreg.h>
+#include <sys/ioctl.h>
+#include <signal.h>
+#endif
+
 #define NDRIVES 8
 
 int trs_disk_spinfast = 0;
 int trs_disk_nocontroller = 0;
+int trs_disk_doublestep = 0;
 char *trs_disk_dir = DISKDIR;
 
 typedef struct {
@@ -133,6 +143,7 @@ typedef struct {
 /* Values for emulated disk image type (emutype) below */
 #define JV1 1 /* compatible with Vavasour Model I emulator */
 #define JV3 3 /* compatible with Vavasour Model III/4 emulator */
+#define REAL 0
 
 typedef struct {
   int writeprot;		  /* emulated write protect tab */
@@ -140,19 +151,30 @@ typedef struct {
   int emutype;
   int inches;                     /* 5 or 8 */
   FILE* file;
-  SectorId id[JV3_SECSMAX + 1];   /* extra one is a loop sentinel */
   int unused_id;		  /* first unused index in id array */
   int last_used_id;		  /* last used index */
   int nblocks;                    /* number of blocks of ids, 1 or 2 */
+  int sorted_valid;               /* sorted_id array valid */
+  SectorId id[JV3_SECSMAX + 1];   /* extra one is a loop sentinel */
   short sorted_id[JV3_SECSMAX + 1];
-  int sorted_valid;
-  int track_start[MAXTRACKS][JV3_SIDES];
+  short track_start[MAXTRACKS][JV3_SIDES];
+  unsigned char buf[SECSIZE];
 } DiskState;
 
 DiskState disk[NDRIVES];
 
 /* Emulate interleave in JV1 mode */
 unsigned char jv1_interleave[10] = {0, 5, 1, 6, 2, 7, 3, 8, 4, 9};
+
+/* Forward */
+void real_verify();
+void real_restore();
+void real_seek();
+void real_read();
+void real_write();
+void real_readadr();
+void real_readtrk();
+void real_writetrk();
 
 void
 trs_disk_init(int reset_button)
@@ -175,6 +197,7 @@ trs_disk_init(int reset_button)
   state.delayed_intrq_kludge = 0;
   for (i=0; i<NDRIVES; i++) {
     disk[i].phytrack = 0;
+    disk[i].emutype = JV3;
   }
   disk[0].inches = 5;
   disk[1].inches = 5;
@@ -255,36 +278,58 @@ trs_disk_change(int drive)
   char diskname[1024];
   DiskState *d = &disk[drive];  
   struct stat st;
-  int c;
+  int c, res;
 
   if (d->file != NULL) {
     c = fclose(d->file);
     if (c == EOF) state.status |= TRSDISK_WRITEFLT;
   }
   sprintf(diskname, "%s/disk%d-%d", trs_disk_dir, trs_model, drive);
-  d->file = fopen(diskname, "r+");
-  if (d->file == NULL) {
-    d->file = fopen(diskname, "r");
-    if (d->file == NULL) return;
-    d->writeprot = 1;
-  } else {
-    d->writeprot = 0;
+  res = stat(diskname, &st);
+  if (res == -1) {
+    d->file = NULL;
+    return;
   }
-
-  /* Heuristic to decide what file format we have */
-  fstat(fileno(d->file), &st);
-  if (st.st_size < JV3_SECSTART) {
-    d->emutype = JV1;
-  } else {
-    fseek(d->file, 0, 0);
-    if (getc(d->file) == 0 && getc(d->file) == 0xfe) {
+#if __linux
+  if (S_ISBLK(st.st_mode)) {
+    /* Real floppy drive */
+    int fd;
+    int reset_now = 0;
+    d->emutype = REAL;
+    d->inches = 5; /* i.e., not 8" */
+    fd = open(diskname, O_ACCMODE|O_NDELAY);
+    if (fd == -1) {
+      d->file = NULL;
+      return;
+    }
+    d->file = fdopen(fd, "r+");
+    if (d->file == NULL) return;
+    d->writeprot = 0;
+    ioctl(fileno(d->file), FDRESET, &reset_now);
+  } else
+#endif
+  {
+    d->file = fopen(diskname, "r+");
+    if (d->file == NULL) {
+      d->file = fopen(diskname, "r");
+      if (d->file == NULL) return;
+      d->writeprot = 1;
+    } else {
+      d->writeprot = 0;
+    }
+    /* Heuristic to decide what file format we have */
+    if (st.st_size < JV3_SECSTART) {
       d->emutype = JV1;
     } else {
-      int c;
-      d->emutype = JV3;
-      fseek(d->file, JV3_SECSPERBLK*sizeof(SectorId), 0);
-      c = getc(d->file);
-      switch (c) {
+      fseek(d->file, 0, 0);
+      if (getc(d->file) == 0 && getc(d->file) == 0xfe) {
+	d->emutype = JV1;
+      } else {
+	int c;
+	d->emutype = JV3;
+	fseek(d->file, JV3_SECSPERBLK*sizeof(SectorId), 0);
+	c = getc(d->file);
+	switch (c) {
 	case 0xff:
 	  /* Normal */
 	  break;
@@ -295,6 +340,7 @@ trs_disk_change(int drive)
 	default:
 	  d->emutype = JV1;
 	  break;
+	}
       }
     }
   }
@@ -327,6 +373,8 @@ trs_disk_unimpl(unsigned char cmd, char* more)
   state.status = TRSDISK_WRITEFLT|TRSDISK_NOTFOUND;
   state.bytecount = state.format_bytecount = 0;
   state.format = FMT_DONE;
+  trs_disk_drq_interrupt(0);
+  trs_disk_intrq_interrupt(1);
   fprintf(stderr, "trs_disk_command(0x%02x) not implemented - %s\n",
 	  cmd, more);
 }
@@ -495,8 +543,11 @@ search_adr()
 void
 verify()
 {
+  /* Verify that head is on the expected track */
   DiskState *d = &disk[state.curdrive];
-  if (d->emutype == JV1) {
+  if (d->emutype == REAL) {
+    real_verify();
+  } else if (d->emutype == JV1) {
     if (state.density == 1) {
       state.status |= TRSDISK_NOTFOUND;
     } else if (state.track != d->phytrack) {
@@ -511,7 +562,6 @@ verify()
 static void
 type1_status()
 {
-
   struct timeval tv;
   DiskState *d = &disk[state.curdrive];
 
@@ -520,6 +570,7 @@ type1_status()
     state.status |= TRSDISK_INDEX;
   } else {
     /* Simulate sector hole going by at 300 RPM */
+    /* !! if (d->emutype == REAL) { check if disk in drive } */
     gettimeofday(&tv, NULL);
     if (trs_disk_spinfast ? 
 	(tv.tv_usec % 20000) < 500 :
@@ -658,15 +709,25 @@ trs_disk_sector_write(unsigned char data)
 unsigned char
 trs_disk_data_read(void)
 {
-  DiskState *d;
+  DiskState *d = &disk[state.curdrive];
   SectorId *sid;
   switch (state.currcommand & TRSDISK_CMDMASK) {
   case TRSDISK_READ:
     if (state.bytecount > 0) {
-      int c = getc(disk[state.curdrive].file);
-      if (c == EOF) {
-	/*state.status |= TRSDISK_NOTFOUND;*/
-	c = 0x42;		/* or maybe 0xe5 or 0x6db6...? */
+      int c;
+      if (d->emutype == REAL) { 
+	c = d->buf[SECSIZE - state.bytecount];
+      } else {
+	c = getc(disk[state.curdrive].file);
+	if (c == EOF) {
+	  /*state.status |= TRSDISK_NOTFOUND;*/
+	  c = 0xe5;
+	  if (d->emutype == JV1) {
+	    state.status &= ~TRSDISK_RECTYPE;
+	    state.status |= (state.controller == TRSDISK_P1771) ?
+	      TRSDISK_1771_FB : TRSDISK_1791_FB;
+	  }
+	}
       }
       state.data = c;
       state.bytecount--;
@@ -681,8 +742,22 @@ trs_disk_data_read(void)
   case TRSDISK_READADR:
     if (state.bytecount <= 0) break;
     if (state.last_readadr >= 0) {
-      d = &disk[state.curdrive];
-      if (d->emutype == JV1) {
+      if (d->emutype == REAL) {
+	switch (state.bytecount) {
+	case 6:
+	  state.sector = d->phytrack; /*sic*/
+	  /* fall through */
+	case 5:
+	case 4:
+	case 3:
+	  state.data = d->buf[6 - state.bytecount];
+	  break;
+	case 2:
+	case 1:
+	  state.data = 0;     /* CRC not emulated */
+	  break;
+	}
+      } else if (d->emutype == JV1) {
 	switch (state.bytecount) {
 	case 6:
 	  state.data = d->phytrack;
@@ -698,8 +773,6 @@ trs_disk_data_read(void)
 	  state.data = 0x01;  /* 256 bytes always */
 	  break;
 	case 2:
-	  state.data = 0;     /* CRC not emulated */
-	  break;
 	case 1:
 	  state.data = 0;     /* CRC not emulated */
 	  break;
@@ -721,8 +794,6 @@ trs_disk_data_read(void)
 	  state.data = 0x01;  /* 256 bytes always */
 	  break;
 	case 2:
-	  state.data = 0;     /* CRC not emulated */
-	  break;
 	case 1:
 	  state.data = 0;     /* CRC not emulated */
 	  break;
@@ -758,6 +829,14 @@ trs_disk_data_write(unsigned char data)
   switch (state.currcommand & TRSDISK_CMDMASK) {
   case TRSDISK_WRITE:
     if (state.bytecount > 0) {
+      if (d->emutype == REAL) {
+	d->buf[SECSIZE - state.bytecount] = data;
+	state.bytecount--;
+	if (state.bytecount <= 0) {
+	  real_write();
+	}
+	break;
+      }
       c = putc(data, d->file);
       if (c == EOF) state.status |= TRSDISK_WRITEFLT;
       state.bytecount--;
@@ -775,6 +854,9 @@ trs_disk_data_write(unsigned char data)
     if (state.bytecount-- <= 0) state.format = FMT_GAP4;
     switch (state.format) {
     case FMT_GAP0:
+      if (d->emutype == REAL) {
+	d->nblocks = 0; /* (mis)use field to count sector header bytes */
+      }
       if (data == 0xfc) {
 	state.format = FMT_GAP1;
       } else if (data == 0xfe) {
@@ -803,16 +885,31 @@ trs_disk_data_write(unsigned char data)
       }
       break;
     case FMT_TRACKID:
-      if (data != d->phytrack) {
-	trs_disk_unimpl(state.currcommand, "false track number");
+      if (d->emutype == REAL) {
+	if (d->nblocks >= sizeof(d->buf)) {
+	  /* Data structure full */
+	  state.status |= TRSDISK_WRITEFLT;
+	  state.bytecount = 0;
+	  state.format_bytecount = 0;
+	  state.format = FMT_DONE;
+	} else {
+	  d->buf[d->nblocks++] = data;
+	  state.format = FMT_HEADID;
+	}
+      } else {
+	if (data != d->phytrack) {
+	  trs_disk_unimpl(state.currcommand, "false track number");
+	}
+	if (d->emutype == JV3) {
+	  d->id[d->unused_id].track = data;
+	}
+	state.format = FMT_HEADID;
       }
-      if (d->emutype == JV3) {
-	d->id[d->unused_id].track = data;
-      }
-      state.format = FMT_HEADID;
       break;
     case FMT_HEADID:
-      if (d->emutype == JV1) {
+      if (d->emutype == REAL) {
+	d->buf[d->nblocks++] = data;
+      } else if (d->emutype == JV1) {
 	if (data != 0) {
 	  trs_disk_unimpl(state.currcommand, "JV1 double sided");
 	}
@@ -830,11 +927,11 @@ trs_disk_data_write(unsigned char data)
       state.format = FMT_SECID;
       break;
     case FMT_SECID:
-      if (d->emutype == JV1) {
+      if (d->emutype == REAL) {
+	d->buf[d->nblocks++] = data;
+      } else if (d->emutype == JV1) {
 	if (data >= JV1_SECPERTRK) {
 	  trs_disk_unimpl(state.currcommand, "JV1 sector number >= 10");
-	} else {
-	  fseek(d->file, offset(JV1, data + JV1_SECPERTRK*d->phytrack), 0);
 	}
       } else {
 	d->id[d->unused_id].sector = data;
@@ -845,23 +942,32 @@ trs_disk_data_write(unsigned char data)
       if (data != 0x01) {
 	trs_disk_unimpl(state.currcommand, "sector size != 256");
       }
+      if (d->emutype == REAL) {
+	d->buf[d->nblocks++] = data;
+      }
       state.format = FMT_GAP2;
       break;
     case FMT_GAP2:
       if ((data & 0xfc) == 0xf8) {
 	/* Found a DAM */
 	if ((data & 3) != 3) {
-	  /* Treat any non-FB DAM as a directory DAM */
-	  if (d->emutype == JV1) {
-	    if (d->phytrack != 17) 
-	      trs_disk_unimpl(state.currcommand,
-			      "JV1 directory track must be 17");
+          if (d->emutype == REAL) {
+	    /* !!Could implement this by issuing a Write Deleted later */
+	    trs_disk_unimpl(state.currcommand,
+			    "format DAM != FB on real floppy");
 	  } else {
-	    d->id[d->unused_id].flags |= JV3_DIRECTORY;
+	    /* Treat any non-FB DAM as a directory DAM */
+	    if (d->emutype == JV1) {
+	      if (d->phytrack != 17) 
+		trs_disk_unimpl(state.currcommand,
+				"JV1 directory track must be 17");
+	    } else {
+	      d->id[d->unused_id].flags |= JV3_DIRECTORY;
+	    }
 	  }
 	}
-	/* Prepare to write the data */
 	if (d->emutype == JV3) {
+	  /* Prepare to write the data */
 	  fseek(d->file, offset(JV3, d->unused_id), 0);
 	}
 	state.format = FMT_DATA;
@@ -869,8 +975,10 @@ trs_disk_data_write(unsigned char data)
       }
       break;
     case FMT_DATA:
-      c = putc(data, d->file);
-      if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+      if (d->emutype == JV3) {
+	c = putc(data, d->file);
+	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+      }
       if (--state.format_bytecount <= 0) {
 	state.format = FMT_DCRC;
       }
@@ -880,8 +988,8 @@ trs_disk_data_write(unsigned char data)
 	state.bytecount--;  /* two bytes are written */
       } else {
 	/* Intentional CRC error (?!) */
-	if (d->emutype == JV1) {
-	  trs_disk_unimpl(state.currcommand, "JV1 intentional CRC error");
+	if (d->emutype != JV3) {
+	  trs_disk_unimpl(state.currcommand, "intentional CRC error");
 	} else {
 	  d->id[d->unused_id].flags |= JV3_ERROR;
 	}
@@ -901,10 +1009,14 @@ trs_disk_data_write(unsigned char data)
     case FMT_GAP4:
       state.format = FMT_DONE;
       state.status = 0;
+      if (d->emutype == REAL) {
+	real_writetrk();
+      } else {
+	c = fflush(d->file);
+	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+      }
       trs_disk_drq_interrupt(0);
       trs_disk_intrq_interrupt(1);
-      c = fflush(d->file);
-      if (c == EOF) state.status |= TRSDISK_WRITEFLT;
       break;
     case FMT_DONE:
       break;
@@ -964,6 +1076,7 @@ trs_disk_command_write(unsigned char cmd)
     state.track = 0;
     state.sector = 0;		/* ? */
     state.status = TRSDISK_TRKZERO;
+    if (d->emutype == REAL) real_restore();
     /* Should this set lastdirection? */
     if (cmd & TRSDISK_VBIT) verify();
     trs_disk_intrq_interrupt(1);
@@ -977,6 +1090,7 @@ trs_disk_command_write(unsigned char cmd)
     } else {
       state.status = 0;
     }
+    if (d->emutype == REAL) real_seek();
     /* Should this set lastdirection? */
     if (cmd & TRSDISK_VBIT) verify();
     trs_disk_intrq_interrupt(1);
@@ -994,6 +1108,7 @@ trs_disk_command_write(unsigned char cmd)
     } else {
       state.status = 0;
     }
+    if (d->emutype == REAL) real_seek();
     if (cmd & TRSDISK_VBIT) verify();
     trs_disk_intrq_interrupt(1);
     break;
@@ -1006,10 +1121,14 @@ trs_disk_command_write(unsigned char cmd)
     state.lastdirection = -1;
     goto step;
   case TRSDISK_READ:
+    if (d->emutype == REAL) {
+      real_read();
+      break;
+    }
     state.status = 0;
     id_index = search(state.sector);
     if (id_index == -1) {
-	trs_disk_intrq_interrupt(1);
+      trs_disk_intrq_interrupt(1);
     } else {
       if (d->emutype == JV1) {
 	if (d->phytrack == 17) {
@@ -1041,6 +1160,12 @@ trs_disk_command_write(unsigned char cmd)
     trs_disk_unimpl(cmd, "read multiple");
     break;
   case TRSDISK_WRITE:
+    if (d->emutype == REAL) {
+      state.status = TRSDISK_BUSY|TRSDISK_DRQ;
+      trs_disk_drq_interrupt(1);
+      state.bytecount = SECSIZE;
+      break;
+    }
     if (d->writeprot) {
       state.status = TRSDISK_WRITEPRT;
       break;
@@ -1092,6 +1217,10 @@ trs_disk_command_write(unsigned char cmd)
     trs_disk_unimpl(cmd, "write multiple");
     break;
   case TRSDISK_READADR:
+    if (d->emutype == REAL) {
+      real_readadr();
+      break;
+    }
     state.status = 0;
     /* Note: not synchronized with emulated index hole */
     if (d->emutype == JV1) {
@@ -1145,6 +1274,10 @@ trs_disk_command_write(unsigned char cmd)
     }
     break;
   case TRSDISK_READTRK:
+    if (d->emutype == REAL) {
+      real_readtrk();
+      break;
+    }
     trs_disk_unimpl(cmd, "read track");
     break;
   case TRSDISK_WRITETRK:
@@ -1157,7 +1290,7 @@ trs_disk_command_write(unsigned char cmd)
       state.density = (state.controller == TRSDISK_P1791);
     } else {
       /* Yes; a real write track */
-      if (d->writeprot) {
+      if (d->emutype != REAL && d->writeprot) {
 	state.status = TRSDISK_WRITEPRT;
 	break;
       }
@@ -1222,4 +1355,312 @@ trs_disk_command_write(unsigned char cmd)
   }
 }
 
+/* Interface to real floppy drive */
+void
+real_verify()
+{
+  /* Verify that head is on the expected track */
+  /*!! ignore for now*/
+}
 
+void
+real_restore()
+{
+#if __linux
+  DiskState *d = &disk[state.curdrive];
+  struct floppy_raw_cmd raw_cmd;
+  int res, i = 0;
+  sigset_t set, oldset;
+
+  raw_cmd.flags = FD_RAW_INTR;
+  raw_cmd.cmd[i++] = FD_RECALIBRATE;
+  raw_cmd.cmd[i++] = 0;
+  raw_cmd.cmd_count = i;
+  sigemptyset(&set);
+  sigaddset(&set, SIGALRM);
+  sigaddset(&set, SIGIO);
+  sigprocmask(SIG_BLOCK, &set, &oldset);
+  res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
+  sigprocmask(SIG_SETMASK, &oldset, NULL);
+  if (res < 0) {
+    /*int reset_now = 0;*/
+    perror("real_restore");
+    /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
+    state.status |= TRSDISK_SEEKERR;
+    return;
+  }
+#else
+  trs_disk_unimpl(state.currcommand, "restore real floppy");
+#endif
+}
+
+void
+real_seek()
+{
+#if __linux
+  DiskState *d = &disk[state.curdrive];
+  struct floppy_raw_cmd raw_cmd;
+  int res, i = 0;
+  sigset_t set, oldset;
+
+  memset(&raw_cmd, 0, sizeof(raw_cmd));
+  raw_cmd.length = 256;
+  raw_cmd.data = NULL;
+  raw_cmd.rate = 0;
+  raw_cmd.flags = FD_RAW_INTR;
+  raw_cmd.cmd[i++] = FD_SEEK;
+  raw_cmd.cmd[i++] = 0;
+  raw_cmd.cmd[i++] = d->phytrack * (trs_disk_doublestep ? 2 : 1);
+  raw_cmd.cmd_count = i;
+  sigemptyset(&set);
+  sigaddset(&set, SIGALRM);
+  sigaddset(&set, SIGIO);
+  sigprocmask(SIG_BLOCK, &set, &oldset);
+  res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
+  sigprocmask(SIG_SETMASK, &oldset, NULL);
+  if (res < 0) {
+    /*int reset_now = 0;*/
+    perror("real_seek");
+    /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
+    state.status |= TRSDISK_SEEKERR;
+    return;
+  }
+#else
+  trs_disk_unimpl(state.currcommand, "seek real floppy");
+#endif
+}
+
+void
+real_read()
+{
+#if __linux
+  DiskState *d = &disk[state.curdrive];
+  struct floppy_raw_cmd raw_cmd;
+  int res, i = 0;
+  sigset_t set, oldset;
+
+  state.status = 0;
+  memset(&raw_cmd, 0, sizeof(raw_cmd));
+  raw_cmd.rate = 1;
+  raw_cmd.flags = FD_RAW_READ | FD_RAW_INTR;
+  raw_cmd.cmd[i++] = state.density ? 0x46 : 0x06;
+  raw_cmd.cmd[i++] = state.curside ? 4 : 0;
+  raw_cmd.cmd[i++] = state.track;
+  raw_cmd.cmd[i++] = state.curside;
+  raw_cmd.cmd[i++] = state.sector;
+  raw_cmd.cmd[i++] = 1; /* 256 */
+  raw_cmd.cmd[i++] = 255;
+  raw_cmd.cmd[i++] = 0x0a;
+  raw_cmd.cmd[i++] = 0xff; /* 256 */
+  raw_cmd.cmd_count = i;
+  raw_cmd.data = (void*) d->buf;
+  raw_cmd.length = raw_cmd.buffer_length = raw_cmd.phys_length = 256;
+  sigemptyset(&set);
+  sigaddset(&set, SIGALRM);
+  sigaddset(&set, SIGIO);
+  sigprocmask(SIG_BLOCK, &set, &oldset);
+  res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
+  sigprocmask(SIG_SETMASK, &oldset, NULL);
+  if (res < 0) {
+    /*int reset_now = 0;*/
+    perror("real_read");
+    /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
+    state.status |= TRSDISK_NOTFOUND;
+    return;
+  }
+  if (raw_cmd.reply[1] & 0x85) state.status |= TRSDISK_NOTFOUND;
+  if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
+  if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
+  /*if (raw_cmd.reply[1] & 0x02) state.status |= TRSDISK_WRITEPRT;*/
+  if (raw_cmd.reply[2] & 0x40) {
+    if (state.controller == TRSDISK_P1771) {
+      state.status |= TRSDISK_1771_FA;
+    } else {
+      state.status |= TRSDISK_1791_F8;
+    }
+  }
+  if (raw_cmd.reply[2] & 0x20) state.status |= TRSDISK_CRCERR;
+  if (raw_cmd.reply[2] & 0x13) state.status |= TRSDISK_NOTFOUND;
+  if ((raw_cmd.reply[0] & 0xc0) == 0) {
+    state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
+    trs_disk_drq_interrupt(1);
+    state.bytecount = SECSIZE;
+  }
+#else
+  trs_disk_unimpl(state.currcommand, "read real floppy");
+#endif
+}
+
+void
+real_write()
+{
+#if __linux
+  DiskState *d = &disk[state.curdrive];
+  struct floppy_raw_cmd raw_cmd;
+  int res, i = 0;
+  sigset_t set, oldset;
+
+  state.status = 0;
+  memset(&raw_cmd, 0, sizeof(raw_cmd));
+  raw_cmd.rate = 1;
+  raw_cmd.flags = FD_RAW_WRITE | FD_RAW_INTR;
+  raw_cmd.cmd[i++] = ((state.currcommand & 
+		       (state.controller == TRSDISK_P1771 ? 0x03 : 0x01))
+		      ? 0x09 : 0x05) | (state.density ? 0x40 : 0x00);
+  raw_cmd.cmd[i++] = state.curside ? 4 : 0;
+  raw_cmd.cmd[i++] = state.track;
+  raw_cmd.cmd[i++] = state.curside;
+  raw_cmd.cmd[i++] = state.sector;
+  raw_cmd.cmd[i++] = 1; /* 256 */
+  raw_cmd.cmd[i++] = 255;
+  raw_cmd.cmd[i++] = 0x0a;
+  raw_cmd.cmd[i++] = 0xff; /* 256 */
+  raw_cmd.cmd_count = i;
+  raw_cmd.data = (void*) d->buf;
+  raw_cmd.length = raw_cmd.buffer_length = raw_cmd.phys_length = 256;
+  sigemptyset(&set);
+  sigaddset(&set, SIGALRM);
+  sigaddset(&set, SIGIO);
+  sigprocmask(SIG_BLOCK, &set, &oldset);
+  res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
+  sigprocmask(SIG_SETMASK, &oldset, NULL);
+  if (res < 0) {
+    /*int reset_now = 0;*/
+    perror("real_write");
+    /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
+    state.status |= TRSDISK_WRITEFLT;
+    return;
+  }
+  if (raw_cmd.reply[1] & 0x85) state.status |= TRSDISK_NOTFOUND;
+  if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
+  if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
+  if (raw_cmd.reply[1] & 0x02) {
+    state.status |= TRSDISK_WRITEPRT;
+    d->writeprot = 1;
+  } else {
+    d->writeprot = 0;
+  }
+  if (raw_cmd.reply[2] & 0x20) state.status |= TRSDISK_CRCERR;
+  if (raw_cmd.reply[2] & 0x13) state.status |= TRSDISK_NOTFOUND;
+  state.bytecount = 0;
+  trs_disk_drq_interrupt(0);
+  trs_disk_intrq_interrupt(1);
+#else
+  trs_disk_unimpl(state.currcommand, "write real floppy");
+#endif
+}
+
+void
+real_readadr()
+{
+#if __linux
+  DiskState *d = &disk[state.curdrive];
+  struct floppy_raw_cmd raw_cmd;
+  int res, i = 0;
+  sigset_t set, oldset;
+
+  state.status = 0;
+  memset(&raw_cmd, 0, sizeof(raw_cmd));
+  raw_cmd.rate = 1;
+  raw_cmd.flags = FD_RAW_INTR;
+  raw_cmd.cmd[i++] = state.density ? 0x4a : 0x0a;
+  raw_cmd.cmd[i++] = state.curside ? 4 : 0;
+  raw_cmd.cmd_count = i;
+  raw_cmd.data = NULL;
+  raw_cmd.length = raw_cmd.buffer_length = raw_cmd.phys_length = 0;
+  sigemptyset(&set);
+  sigaddset(&set, SIGALRM);
+  sigaddset(&set, SIGIO);
+  sigprocmask(SIG_BLOCK, &set, &oldset);
+  res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
+  sigprocmask(SIG_SETMASK, &oldset, NULL);
+  if (res < 0) {
+    /*int reset_now = 0;*/
+    perror("real_readadr");
+    /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
+    state.status |= TRSDISK_NOTFOUND;
+    return;
+  }
+  if (raw_cmd.reply[1] & 0x85) state.status |= TRSDISK_NOTFOUND;
+  if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
+  if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
+  /*if (raw_cmd.reply[1] & 0x02) state.status |= TRSDISK_WRITEPRT;*/
+  if (raw_cmd.reply[2] & 0x40) {
+    if (state.controller == TRSDISK_P1771) {
+      state.status |= TRSDISK_1771_FA;
+    } else {
+      state.status |= TRSDISK_1791_F8;
+    }
+  }
+  if (raw_cmd.reply[2] & 0x20) state.status |= TRSDISK_CRCERR;
+  if (raw_cmd.reply[2] & 0x13) state.status |= TRSDISK_NOTFOUND;
+  if ((raw_cmd.reply[0] & 0xc0) == 0) {
+    state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
+    trs_disk_drq_interrupt(1);
+    memcpy(d->buf, &raw_cmd.reply[3], 4);
+    state.bytecount = 4;
+  }
+#else
+  trs_disk_unimpl(state.currcommand, "read address on real floppy");
+#endif
+}
+
+void
+real_readtrk()
+{
+  trs_disk_unimpl(state.currcommand, "read track on real floppy");
+}
+
+void
+real_writetrk()
+{
+#if __linux
+  DiskState *d = &disk[state.curdrive];
+  struct floppy_raw_cmd raw_cmd;
+  int res, i = 0;
+  sigset_t set, oldset;
+
+  state.status = 0;
+  memset(&raw_cmd, 0, sizeof(raw_cmd));
+  raw_cmd.rate = 1;
+  raw_cmd.flags = FD_RAW_WRITE | FD_RAW_INTR;
+  raw_cmd.cmd[i++] = 0x0d | (state.density ? 0x40 : 0x00);
+  raw_cmd.cmd[i++] = state.curside ? 4 : 0;
+  raw_cmd.cmd[i++] = 1; /* 256 */
+  raw_cmd.cmd[i++] = d->nblocks / 4;
+  raw_cmd.cmd[i++] = 0x0c;
+  raw_cmd.cmd[i++] = state.density ? 0x6d : 0xe5;
+  raw_cmd.cmd_count = i;
+  raw_cmd.data = (void*) d->buf;
+  raw_cmd.length = raw_cmd.buffer_length = raw_cmd.phys_length = d->nblocks;
+  sigemptyset(&set);
+  sigaddset(&set, SIGALRM);
+  sigaddset(&set, SIGIO);
+  sigprocmask(SIG_BLOCK, &set, &oldset);
+  res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
+  sigprocmask(SIG_SETMASK, &oldset, NULL);
+  if (res < 0) {
+    /*int reset_now = 0;*/
+    perror("real_writetrk");
+    /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
+    state.status |= TRSDISK_WRITEFLT;
+    return;
+  }
+  if (raw_cmd.reply[1] & 0x85) state.status |= TRSDISK_NOTFOUND;
+  if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
+  if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
+  if (raw_cmd.reply[1] & 0x02) {
+    state.status |= TRSDISK_WRITEPRT;
+    d->writeprot = 1;
+  } else {
+    d->writeprot = 0;
+  }
+  if (raw_cmd.reply[2] & 0x20) state.status |= TRSDISK_CRCERR;
+  if (raw_cmd.reply[2] & 0x13) state.status |= TRSDISK_NOTFOUND;
+  state.bytecount = 0;
+  trs_disk_drq_interrupt(0);
+  trs_disk_intrq_interrupt(1);
+#else
+  trs_disk_unimpl(state.currcommand, "write track on real floppy");
+#endif
+}
