@@ -105,6 +105,8 @@ static XrmOptionDescRec opts[] = {
 {"-noresize",	"*resize",	XrmoptionNoArg,		(caddr_t)"off"},
 {"-spinfast",   "*spinfast",    XrmoptionNoArg,         (caddr_t)"on"},
 {"-nospinfast", "*spinfast",    XrmoptionNoArg,         (caddr_t)"off"},
+{"-doublestep", "*doublestep",  XrmoptionNoArg,         (caddr_t)"on"},
+{"-nodoublestep","*doublestep", XrmoptionNoArg,         (caddr_t)"off"},
 {"-model",      "*model",       XrmoptionSepArg,	(caddr_t)NULL},
 {"-model1",     "*model",       XrmoptionNoArg,		(caddr_t)"1"},
 {"-model3",     "*model",       XrmoptionNoArg,		(caddr_t)"3"},
@@ -226,6 +228,16 @@ int trs_parse_command_line(argc, argv, debug)
 	    trs_disk_spinfast = True;
 	} else if (strcmp(value.addr,"off") == 0) {
 	    trs_disk_spinfast = False;
+	}
+    }
+
+    (void) sprintf(option, "%s%s", program_name, ".doublestep");
+    if (XrmGetResource(x_db, option, "Xtrs.doublestep", &type, &value))
+    {
+	if (strcmp(value.addr,"on") == 0) {
+	    trs_disk_doublestep = True;
+	} else if (strcmp(value.addr,"off") == 0) {
+	    trs_disk_doublestep = False;
 	}
     }
 
@@ -740,7 +752,7 @@ void bitmap_init(foreground, background)
 				      TRS_CHAR_WIDTH,TRS_CHAR_HEIGHT);
 	    trs_char[1][i] =
 		XCreateBitmapFromData(display,window,
-				      trs_widechar_data[trs_model != 1][i],
+				     (char*)trs_widechar_data[trs_model!=1][i],
 				      TRS_CHAR_WIDTH*2,TRS_CHAR_HEIGHT);
 	}
     } else if (!trsfont) {
