@@ -178,6 +178,11 @@ void trs_reset()
 	trs_interrupt_mask_write(0);
 	trs_nmi_mask_write(0);
     }
+#ifdef HRG1B
+    if (trs_model == 1) {
+       hrg_onoff(0);           /* Switch off HRG1B hi-res graphics. */
+    }
+#endif
     trs_kb_reset();  /* Part of keyboard stretch kludge */
 
     if (trs_model >= 4) {

@@ -21,7 +21,8 @@ OSS-compatible sound drivers), or via .wav files.  Game sound and
 music output are also supported if you have an OSS-compatible sound
 driver; sound output though the cassette port, through the Model 4
 sound option, and through the optional Orchestra-85/90 music synthesizer
-card are all emulated.  In Model 4/4P mode, a hi-res graphics card is
+card are all emulated.  In Model I mode, the HRG1B 384x192 graphics card
+is emulated.  In Model 4/4P mode, a 640x240 graphics card is
 emulated; you can select either the Radio Shack card or the Micro Labs
 Grafyx Solution card.  There is also a mouse driver for Model 4/4P
 mode.
@@ -401,10 +402,11 @@ Beginning in version 4.1, \fBxtrs\fP also emulates the Radio Shack
 hard disk controller (based on the Western Digital WD1010) and will
 work with the native drivers for this hardware.  This emulation uses
 the same hard drive (.hdv) file format that XTRSHARD/DCT does.  With
-LDOS/LS-DOS, the RSHARDx/DCT driver will work; other drivers may also
-work. The hard disk drivers for NEWDOS/80 and for CP/M should work,
-but they have not yet been tested at this writing.  Any bugs should be
-reported.
+LDOS/LS-DOS, the RSHARDx/DCT and TRSHD/DCT drivers are known to work.
+With Montezuma CP/M 2.2, the optional Montezuma hard disk drivers are
+known to work.  The hard disk drivers for NEWDOS/80 and for Radio
+Shack CP/M 3.0 should work, but they have not yet been tested at this
+writing.  Any bugs should be reported.
 
 To get started, run the \fBmkdisk\fP program under Unix to create a
 blank hard drive (.hdv) file.  Typical usage would be: \fImkdisk -h
@@ -420,10 +422,12 @@ the WD1010 emulation.
 Note that if hard drive unit 0 is present on a Model 4P (file
 hard4p-0), the Radio Shack boot ROM will always try to boot from it,
 even if the operating system does not support booting from a hard
-drive.  (In particular, stock TRSDOS/LS-DOS 6 systems do not support
-this, though Montezuma CP/M does.)  If you have this problem, either
-hold down F2 while booting to force the ROM to boot from floppy, or
-simply avoid using unit number 0.
+drive.  If you have this problem, either hold down F2 while booting to
+force the ROM to boot from floppy, or simply avoid using unit number
+0.  Stock TRSDOS/LS-DOS 6 systems do not support booting from a hard
+drive; M.A.D. Software's HBUILD6 add-on to LS-DOS for hard drive
+booting should work, but is untested.  Montezuma CP/M 2.2 does boot
+from the emulated hard drive.
 
 Finally, obtain the correct driver for the operating system you will be
 using, read its documentation, configure the driver, and format the drive.  
@@ -727,9 +731,11 @@ program name.
 Put a border of \fIwidth\fP pixels
 around the TRS-80 display.  The default is 2.
 .TP
-.B \-scale \fIfac\fP
-Multiply the window size by \fIfac\fP.
-Possible values: 1 (default), 2, 3, or 4.
+.B \-scale \fIxfac[,yfac]\fP
+Multiply the horizontal and vertical window size by \fIxfac\fP and
+\fIyfac\fP, respectively.  Possible values are integers in the range
+[1,4] for \fIxfac\fP and [1,8] for \fIyfac\fP.  Defaults are
+\fIxfac\fP=1 and \fIyfac\fP=2*\fIxfac\fP.
 .TP
 .B \-resize
 In Model 4/4P mode, resize the X window whenever the emulated display
@@ -993,12 +999,13 @@ format was designed by Matthew Reed for his MSDOS-based TRS-80
 emulators.  Al Petrofsky and Todd P. Cromwell III supplied font data.
 Roland Gerlach contributed the CP/M import and export programs as well
 as several bug reports and fixes for the emulator itself.  Ulrich
-Mueller added the -borderwidth option and ported the import, export,
-and settime utilities to Newdos/80.  Branden Robinson supplied the
-first version of the cassette man page, fixed Makefile bugs, and
-translated cassette to the Bourne shell.  Mark McDougall provided
-documentation for the Micro Labs Grafyx Solution card.  Jenz Guenther
-added the -title option and contributed code to emulate the GENIE
-(German Model I clone).  Joe Peterson contributed code to emulate the
-TimeDate80.  Denis Leconte contributed part of the -scale
-implementation.
+Mueller added the -borderwidth option, improved the -scale option and
+the bitmap font scaling, ported the import, export, and settime
+utilities to Newdos/80, and contributed the HRG1B emulation.  Branden
+Robinson supplied the first version of the cassette man page, fixed
+Makefile bugs, and translated cassette to the Bourne shell.  Mark
+McDougall provided documentation for the Micro Labs Grafyx Solution
+card.  Jenz Guenther added the -title option and contributed code to
+emulate the GENIE (German Model I clone).  Joe Peterson contributed
+code to emulate the TimeDate80.  Denis Leconte contributed part of the
+-scale implementation.

@@ -760,6 +760,11 @@ int trs_kb_mem_read(int address)
 {
     int key = -1;
     int i, wait;
+    static int recursion = 0;
+
+    /* Prevent endless recursive calls to this routine (by mem_read_word
+       below) if REG_SP happens to point to keyboard memory. */
+    if (recursion) return 0;
 
     stretch -= stretch_poll;
     if (stretch < 0) {
@@ -773,12 +778,14 @@ int trs_kb_mem_read(int address)
            NEWDOS80, which pushes 2 extra bytes on the stack.
 	*/
 	wait = 0;
+       recursion = 1;
 	for (i=0; i<=4; i+=2) {
 	    if (mem_read_word(REG_SP + 2 + i) == 0x4015) {
 		wait = mem_read_word(REG_SP + 10 + i) == 0x004c;
 		break;
 	    }
 	}
+       recursion = 0;
 	key = trs_next_key(wait);
 	stretch = stretch_amount;
     }

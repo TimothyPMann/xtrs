@@ -17,7 +17,6 @@ OBJECTS = \
 	trs_cassette.o \
 	trs_xinterface.o \
 	trs_chars.o \
-	trs_wide_chars.o \
 	trs_printer.o \
 	trs_rom1.o \
 	trs_rom3.o \
@@ -60,7 +59,6 @@ SOURCES = \
 	mkdisk.c \
 	trs_cassette.c \
 	trs_chars.c \
-	trs_wide_chars.c \
 	trs_disk.c \
 	trs_hard.c \
 	trs_imp_exp.c \
@@ -140,7 +138,7 @@ z80code: $(Z80CODE)
 include Makefile.local
 
 CFLAGS = $(DEBUG) $(ENDIAN) $(DEFAULT_ROM) $(READLINE) $(DISKDIR) $(IFLAGS) \
-	-DKBWAIT -DHAVE_SIGIO
+       -DKBWAIT -DHAVE_SIGIO -DHRG1B
 LIBS = $(XLIB) $(READLINELIBS) $(EXTRALIBS)
 
 ZMACFLAGS = -h

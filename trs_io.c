@@ -59,6 +59,58 @@ void z80_out(int port, int value)
   if (trs_model == 1) {
     /* Next, Model I only */
     switch (port) {
+#ifdef HRG1B
+    /*
+     * Support for Model I HRG1B 384*192 graphics card
+     * (sold in Germany for Model I and Video Genie by RB-Elektronik).
+     *
+     * Assignment of ports is as follows:
+     *    Port 0x00 (out): switch graphics screen off (value ignored).
+     *    Port 0x01 (out): switch graphics screen on (value ignored).
+     *    Port 0x02 (out): select screen memory address (LSB).
+     *    Port 0x03 (out): select screen memory address (MSB).
+     *    Port 0x04 (in):  read byte from screen memory.
+     *    Port 0x05 (out): write byte to screen memory.
+     * (The real hardware decodes only address lines A0-A2 and A7, so
+     * that there are several "shadow" ports in the region 0x08-0x7d.
+     * However, these undocumented ports are not implemented here.)
+     *
+     * The 16-bit memory address (port 2 and 3) is used for subsequent
+     * read or write operations. It corresponds to a position on the
+     * graphics screen, in the following way:
+     *    Bits 0-5:   character column address (0-63)
+     *    Bits 6-9:   character row address (0-15)
+     *                (i.e. bits 0-9 are the "PRINT @" position.)
+     *    Bits 10-13: address of line within character cell (0-11)
+     *    Bits 14-15: not used
+     *
+     *      <----port 2 (LSB)---->  <-------port 3 (MSB)------->
+     * Bit: 0  1  2  3  4  5  6  7  8  9  10  11  12  13  14  15
+     *      <-column addr.->  <row addr>  <-line addr.->  <n.u.>
+     *
+     * Reading from port 4 or writing to port 5 will access six
+     * neighbouring pixels corresponding (from left to right) to bits
+     * 0-5 of the data byte. Bits 6 and 7 are present in memory, but
+     * are ignored.
+     *
+     * In expanded mode (32 chars per line), the graphics screen has
+     * only 192*192 pixels. Pixels with an odd column address (i.e.
+     * every second group of 6 pixels) are suppressed.
+     */
+    case 0x00: /* HRG off */
+    case 0x01: /* HRG on */
+      hrg_onoff(port);
+      break;
+    case 0x02: /* HRG write address low byte */
+      hrg_write_addr(value, 0xff);
+      break;
+    case 0x03: /* HRG write address high byte */
+      hrg_write_addr(value << 8, 0x3f00);
+      break;
+    case 0x05: /* HRG write data byte */
+      hrg_write_data(value);
+      break;
+#endif /* HRG1B */
     case 0xB9: /* Orchestra-85 left channel */
       trs_orch90_out(1, value);
       break;
@@ -310,6 +362,15 @@ int z80_in(int port)
   if (trs_model == 1) {
     /* Model I only */
     switch (port) {
+#ifdef HRG1B
+    /* HRG1B hi-res graphics card. */
+    case 0x00: /* HRG off (undocumented) */
+    case 0x01: /* HRG on (undocumented) */
+      hrg_onoff(port);
+      break;
+    case 0x04: /* HRG read data byte */
+      return hrg_read_data();
+#endif /* HRG1B */
     case 0xFD:
       /* GENIE location of printer port */
       return trs_printer_read();

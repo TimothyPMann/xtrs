@@ -137,6 +137,13 @@ void grafyx_write_overlay(int value);
 void grafyx_set_microlabs(int on_off);
 int grafyx_get_microlabs(void);
 
+#ifdef HRG1B
+void hrg_onoff(int enable);
+void hrg_write_addr(int addr, int mask);
+void hrg_write_data(int data);
+int hrg_read_data(void);
+#endif /* HRG1B */
+
 void trs_get_mouse_pos(int *x, int *y, unsigned int *buttons);
 void trs_set_mouse_pos(int x, int y);
 void trs_get_mouse_max(int *x, int *y, unsigned int *sens);

@@ -114,7 +114,7 @@ int trs_hard_in(int port)
       for (i=0; i<TRS_HARD_MAXDRIVES; i++) {
 	open_drive(i);
 	if (state.d[i].writeprot) {
-	  v |= TRS_HARD_WPBIT(i);
+	  v |= TRS_HARD_WPBIT(i) | TRS_HARD_WPSOME;
 	}
       }
       break; }
@@ -265,8 +265,8 @@ static void hard_read(int cmd)
   fprintf(stderr, "hard_read drive %d cyl %d hd %d sec %d\n",
 	  state.drive, state.cyl, state.head, state.secnum);
 #endif
-  if (cmd & TRS_HARD_DMA) {
-    error("trs_hard: dma read not supported (0x%02x)", cmd);
+  if (cmd & TRS_HARD_MULTI) {
+    error("trs_hard: multi-sector read not supported (0x%02x)", cmd);
     state.status = TRS_HARD_READY | TRS_HARD_SEEKDONE | TRS_HARD_ERR;
     state.error = TRS_HARD_ABRTERR;
     return;
@@ -280,8 +280,8 @@ static void hard_write(int cmd)
   fprintf(stderr, "hard_write drive %d cyl %d hd %d sec %d\n",
 	  state.drive, state.cyl, state.head, state.secnum);
 #endif
-  if (cmd & TRS_HARD_DMA) {
-    error("trs_hard: dma write not supported (0x%02x)", cmd);
+  if (cmd & TRS_HARD_MULTI) {
+    error("trs_hard: multi-sector write not supported (0x%02x)", cmd);
     state.status = TRS_HARD_READY | TRS_HARD_SEEKDONE | TRS_HARD_ERR;
     state.error = TRS_HARD_ABRTERR;
     return;

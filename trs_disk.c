@@ -464,6 +464,15 @@ trs_disk_firstdrq(int restoredelay)
 }
 
 static void
+trs_disk_firstreaddrq(int bits)
+{
+  state.status |= TRSDISK_DRQ | bits;
+  trs_disk_drq_interrupt(1);
+  trs_schedule_event(trs_disk_lostdata, state.currcommand,
+		     500000 * z80_state.clockMHz);
+}
+
+static void
 trs_disk_unimpl(unsigned char cmd, char* more)
 {
   state.status = TRSDISK_NOTRDY|TRSDISK_WRITEFLT|TRSDISK_NOTFOUND;
@@ -677,13 +686,11 @@ trs_disk_emutype(DiskState *d)
       fseek(d->file, DMK_TRACKLEN, 0);
       count = (unsigned char) getc(d->file);
       count += (unsigned char) getc(d->file) << 8;
-      if (count < 16 || count > DMK_TRACKLEN_MAX) {
-	d->emutype = JV1;
-      } else {
+      if (count >= 16 && count <= DMK_TRACKLEN_MAX) {
 	d->emutype = DMK;
 	d->writeprot = d->writeprot || (c == 0xff);
+	return;
       }
-      return;
     }
     if (fmt[0] == 0x78 && fmt[1] == 0x56 && fmt[2] == 0x34 && fmt[3] == 0x12) {
       error("Real disk specifier file from DMK emulator not supported");
@@ -692,7 +699,6 @@ trs_disk_emutype(DiskState *d)
       d->file = NULL;
       return;
     }
-
   }
   if (c == 0) {
     fseek(d->file, 1, 0);
@@ -1232,12 +1238,15 @@ trs_disk_select_write(unsigned char data)
     state.status |= TRSDISK_NOTRDY;
     break;
   }
+
   if (!(state.status & TRSDISK_NOTRDY)) {
     DiskState *d = &disk[state.curdrive];
+
     /* A drive was selected; retrigger emulated motor timeout */
     state.motor_timeout = z80_state.t_count +
       MOTOR_USEC * z80_state.clockMHz;
     trs_disk_motoroff_interrupt(0);
+
     /* Also update our knowledge of whether there is a disk present */
     if (d->emutype == REAL) real_check_empty(d);
   }
@@ -1316,12 +1325,10 @@ trs_disk_sector_write(unsigned char data)
       /* Nothing for emulator to do */
       break;
     default:
-      state.sector = data;
       break;
     }
-  } else {
-    state.sector = data;
   }
+  state.sector = data;
 }
 
 unsigned char
@@ -1378,14 +1385,27 @@ trs_disk_data_read(void)
   case TRSDISK_READADR:
     if (state.bytecount <= 0) break;
     if (d->emutype == REAL) {
-      state.sector = d->phytrack; /*sic*/
+#if 0
+      state.sector = d->u.real.buf[0]; /*179x data sheet says this*/
+#else
+      state.track = d->u.real.buf[0]; /*let's guess it meant this*/
+      state.sector = d->u.real.buf[2]; /*1771 data sheet says this*/
+#endif
       state.data = d->u.real.buf[6 - state.bytecount];
 
     } else if (d->emutype == DMK) {
       state.data = d->u.dmk.buf[d->u.dmk.curbyte];
+#if 0
       if (state.bytecount == 6) {
-	state.sector = state.data; /*sic*/
+	state.sector = state.data; /*179x data sheet says this*/
       }
+#else
+      if (state.bytecount == 6) {
+	state.track = state.data; /*let's guess it meant this!!*/
+      } else if (state.bytecount == 4) {
+	state.sector = state.data;  /*1771 data sheet says this*/
+      }
+#endif
       d->u.dmk.curbyte += dmk_incr(d);
 
     } else if (state.last_readadr >= 0) {
@@ -1393,7 +1413,8 @@ trs_disk_data_read(void)
 	switch (state.bytecount) {
 	case 6:
 	  state.data = d->phytrack;
-	  state.sector = d->phytrack; /*sic*/
+	  state.sector = d->phytrack; /*data sheet says this*/
+	  state.track = d->phytrack; /*let's guess it meant this!!*/
 	  break;
 	case 5:
 	  state.data = 0;
@@ -2076,7 +2097,7 @@ trs_disk_status_read(void)
 void
 trs_disk_command_write(unsigned char cmd)
 {
-  int id_index, non_ibm, goal_side;
+  int id_index, non_ibm, goal_side, new_status;
   DiskState *d = &disk[state.curdrive];
   trs_event_func event;
 
@@ -2238,6 +2259,7 @@ trs_disk_command_write(unsigned char cmd)
     state.status = 0;
     non_ibm = 0;
     goal_side = -1;
+    new_status = 0;
     if (state.controller == TRSDISK_P1771) {
       if (!(cmd & TRSDISK_BBIT)) {
 #if DISKDEBUG2
@@ -2276,9 +2298,9 @@ trs_disk_command_write(unsigned char cmd)
 
 	if (d->phytrack == 17) {
 	  if (state.controller == TRSDISK_P1771) {
-	    state.status |= TRSDISK_1771_FA;
+	    new_status = TRSDISK_1771_FA;
 	  } else {
-	    state.status |= TRSDISK_1791_F8;
+	    new_status = TRSDISK_1791_F8;
 	  }
 	}
 	state.bytecount = JV1_SECSIZE;
@@ -2289,36 +2311,36 @@ trs_disk_command_write(unsigned char cmd)
 	if (state.controller == TRSDISK_P1771) {
 	  switch (d->u.jv3.id[id_index].flags & JV3_DAM) {
 	  case JV3_DAMSDFB:
-	    state.status |= TRSDISK_1771_FB;
+	    new_status = TRSDISK_1771_FB;
 	    break;
 	  case JV3_DAMSDFA:
-	    state.status |= TRSDISK_1771_FA;
+	    new_status = TRSDISK_1771_FA;
 	    break;
 	  case JV3_DAMSDF9:
-	    state.status |= TRSDISK_1771_F9;
+	    new_status = TRSDISK_1771_F9;
 	    break;
 	  case JV3_DAMSDF8:
-	    state.status |= TRSDISK_1771_F8;
+	    new_status = TRSDISK_1771_F8;
 	    break;
 	  }
 	} else if (state.density == 0) {
 	  /* single density 179x */
 	  switch (d->u.jv3.id[id_index].flags & JV3_DAM) {
 	  case JV3_DAMSDFB:
-	    state.status |= TRSDISK_1791_FB;
+	    new_status = TRSDISK_1791_FB;
 	    break;
 	  case JV3_DAMSDFA:
 	    if (trs_disk_truedam) {
-	      state.status |= TRSDISK_1791_FB;
+	      new_status = TRSDISK_1791_FB;
 	    } else {
-	      state.status |= TRSDISK_1791_F8;
+	      new_status = TRSDISK_1791_F8;
 	    }
 	    break;
 	  case JV3_DAMSDF9:
-	    state.status |= TRSDISK_1791_F8;
+	    new_status = TRSDISK_1791_F8;
 	    break;
 	  case JV3_DAMSDF8:
-	    state.status |= TRSDISK_1791_F8;
+	    new_status = TRSDISK_1791_F8;
 	    break;
 	  }
 	} else {
@@ -2326,15 +2348,15 @@ trs_disk_command_write(unsigned char cmd)
 	  switch (d->u.jv3.id[id_index].flags & JV3_DAM) {
 	  default: /*impossible*/
 	  case JV3_DAMDDFB:
-	    state.status |= TRSDISK_1791_FB;
+	    new_status = TRSDISK_1791_FB;
 	    break;
 	  case JV3_DAMDDF8:
-	    state.status |= TRSDISK_1791_F8;
+	    new_status = TRSDISK_1791_F8;
 	    break;
 	  }
 	}
 	if (d->u.jv3.id[id_index].flags & JV3_ERROR) {
-	  state.status |= TRSDISK_CRCERR;
+	  new_status |= TRSDISK_CRCERR;
 	}
 	if (non_ibm) {
 	  state.bytecount = 16;
@@ -2378,39 +2400,39 @@ trs_disk_command_write(unsigned char cmd)
 	  /* 1771 */
 	  switch (dam) {
 	  case 0xfb:
-	    state.status |= TRSDISK_1771_FB;
+	    new_status = TRSDISK_1771_FB;
 	    break;
 	  case 0xfa:
-	    state.status |= TRSDISK_1771_FA;
+	    new_status = TRSDISK_1771_FA;
 	    break;
 	  case 0xf9:
-	    state.status |= TRSDISK_1771_F9;
+	    new_status = TRSDISK_1771_F9;
 	    break;
 	  case 0xf8:
-	    state.status |= TRSDISK_1771_F8;
+	    new_status = TRSDISK_1771_F8;
 	    break;
 	  }
 	} else /* state.controller == TRSDISK_P1791 */ {
 	  switch (dam) {
 	  case 0xfb:
-	    state.status |= TRSDISK_1791_FB;
+	    new_status = TRSDISK_1791_FB;
 	    break;
 	  case 0xfa:
 	    /* Note: Illegal in DDEN but Write Track can still
 	       generate it, and of course 1771 can generate in SDEN */
 	    if (trs_disk_truedam) {
-	      state.status |= TRSDISK_1791_FB;
+	      new_status = TRSDISK_1791_FB;
 	    } else {
-	      state.status |= TRSDISK_1791_F8;
+	      new_status = TRSDISK_1791_F8;
 	    }
 	    break;
 	  case 0xf9:
 	    /* Note: Illegal in DDEN but Write Track can still
 	       generate it, and of course 1771 can generate in SDEN */
-	    state.status |= TRSDISK_1791_F8;
+	    new_status = TRSDISK_1791_F8;
 	    break;
 	  case 0xf8:
-	    state.status |= TRSDISK_1791_F8;
+	    new_status = TRSDISK_1791_F8;
 	    break;
 	  }
 	}
@@ -2422,10 +2444,8 @@ trs_disk_command_write(unsigned char cmd)
 
       } /* end if (d->emutype == ...) */
 
-      state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
-      trs_disk_drq_interrupt(1);
-      trs_schedule_event(trs_disk_lostdata, state.currcommand,
-			 500000 * z80_state.clockMHz);
+      state.status |= TRSDISK_BUSY;
+      trs_schedule_event(trs_disk_firstreaddrq, new_status, 64);
     }
     break;
 

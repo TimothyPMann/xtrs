@@ -57,7 +57,6 @@
 #define DEF_USEFONT 0
 
 extern char trs_char_data[][MAXCHARS][TRS_CHAR_HEIGHT];
-extern char trs_widechar_data[][MAXCHARS][TRS_CHAR_HEIGHT][2];
 
 #define EVENT_MASK \
   ExposureMask | KeyPressMask | MapRequest | KeyReleaseMask | \
@@ -86,12 +85,13 @@ static int currentmode = NORMAL;
 static int OrigHeight,OrigWidth;
 static int usefont = DEF_USEFONT;
 static int cur_char_width = TRS_CHAR_WIDTH;
-static int cur_char_height = TRS_CHAR_HEIGHT;
+static int cur_char_height = TRS_CHAR_HEIGHT * 2;
 static int text80x24 = 0, screen640x240 = 0;
 static XFontStruct *myfont, *mywidefont, *curfont;
 static XKeyboardState repeat_state;
 static int trs_charset;
-static int scale = 1;
+static int scale_x = 1;
+static int scale_y = 2;
 
 static XrmOptionDescRec opts[] = {
 /* Option */    /* Resource */  /* Value from arg? */   /* Value if no arg */
@@ -172,7 +172,7 @@ unsigned char grafyx_xoffset = 0, grafyx_yoffset = 0;
 #define G_YNOCLKW   128
 
 XImage image = {
-  /*width, height*/    8*G_XSIZE, 2*G_YSIZE,  /* if scale = 1 */
+  /*width, height*/    8*G_XSIZE, 2*G_YSIZE,  /* if scale_x=1, scale_y=2 */
   /*xoffset*/          0,
   /*format*/           XYBitmap,
   /*data*/             (char*)grafyx,
@@ -189,6 +189,18 @@ XImage image = {
   /*obdata*/           NULL,
   /*f*/                { NULL, NULL, NULL, NULL, NULL, NULL }
 };
+
+#ifdef HRG1B
+#define HRG_MEMSIZE (1024 * 12)        /* 12k * 8 bit graphics memory */
+static unsigned char hrg_screen[HRG_MEMSIZE];
+static int hrg_pixel_x[2][6+1];
+static int hrg_pixel_y[12+1];
+static int hrg_pixel_width[2][6];
+static int hrg_pixel_height[12];
+static int hrg_enable = 0;
+static int hrg_addr = 0;
+static void hrg_update_char(int position);
+#endif /* HRG1B */
 
 /*
  * Key event queueing routines
@@ -309,13 +321,16 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
   (void) sprintf(option, "%s%s", program_name, ".scale");
   if (XrmGetResource(x_db, option, "Xtrs.Scale", &type, &value)) 
   {
-    sscanf(value.addr, "%d", &scale);
-    if (scale <= 0) scale = 1;
-    if (scale > MAX_SCALE) scale = MAX_SCALE;
+    if (sscanf(value.addr, "%d,%d", &scale_x, &scale_y) < 2)
+      scale_y = scale_x * 2;
+    if (scale_x <= 0) scale_x = 1;
+    if (scale_x > MAX_SCALE) scale_x = MAX_SCALE;
+    if (scale_y <= 0) scale_y = 1;
+    if (scale_y > MAX_SCALE * 2) scale_y = MAX_SCALE * 2;
   }
-  image.width *= scale;
-  image.height *= scale;
-  image.bytes_per_line *= scale;
+  image.width *= scale_x;
+  image.height = image.height * scale_y / 2;
+  image.bytes_per_line *= scale_x;
 
 #if __linux
   (void) sprintf(option, "%s%s", program_name, ".sb");
@@ -377,28 +392,28 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
     }
     if (isdigit(*charset_name)) {
       trs_charset = atoi(charset_name);
-      cur_char_width = 8 * scale;
+      cur_char_width = 8 * scale_x;
     } else {
       if (charset_name[0] == 'e'/*early*/) {
 	trs_charset = 0;
-	cur_char_width = 6 * scale;
+	cur_char_width = 6 * scale_x;
       } else if (charset_name[0] == 's'/*stock*/) {
 	trs_charset = 1;
-	cur_char_width = 6 * scale;
+	cur_char_width = 6 * scale_x;
       } else if (charset_name[0] == 'l'/*lcmod*/) {
 	trs_charset = 2;
-	cur_char_width = 6 * scale;
+	cur_char_width = 6 * scale_x;
       } else if (charset_name[0] == 'w'/*wider*/) {
 	trs_charset = 3;
-	cur_char_width = 8 * scale;
+	cur_char_width = 8 * scale_x;
       } else if (charset_name[0] == 'g'/*genie or german*/) {
 	trs_charset = 10;
-	cur_char_width = 8 * scale;
+	cur_char_width = 8 * scale_x;
       } else {
 	fatal("unknown charset name %s", value.addr);
       }
     }
-    cur_char_height = TRS_CHAR_HEIGHT * scale;
+    cur_char_height = TRS_CHAR_HEIGHT * scale_y;
   } else /* trs_model > 1 */ {
     char *charset_name;
     /* Set default */
@@ -424,9 +439,9 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
 	fatal("unknown charset name %s", value.addr);
       }
     }
-    cur_char_width = TRS_CHAR_WIDTH * scale;
+    cur_char_width = TRS_CHAR_WIDTH * scale_x;
     cur_char_height = ((trs_model >= 4) ? TRS_CHAR_HEIGHT4 : TRS_CHAR_HEIGHT)
-      * scale;
+      * scale_y;
   }
 
   (void) sprintf(option, "%s%s", program_name, ".diskdir");
@@ -780,8 +795,8 @@ void trs_screen_init()
       OrigHeight = cur_char_height * 24 + 2 * border_width;
       top_margin = cur_char_height * (24 - col_chars)/2 + border_width;
     } else {
-      OrigHeight = TRS_CHAR_HEIGHT4 * scale * 24 + 2 * border_width;
-      top_margin = (TRS_CHAR_HEIGHT4 * scale * 24 -
+      OrigHeight = TRS_CHAR_HEIGHT4 * scale_y * 24 + 2 * border_width;
+      top_margin = (TRS_CHAR_HEIGHT4 * scale_y * 24 -
 		    cur_char_height * col_chars)/2 + border_width;
     }
   } else {
@@ -1014,11 +1029,11 @@ void trs_screen_640x240(int flag)
   if (flag) {
     row_chars = 80;
     col_chars = 24;
-    if (!usefont) cur_char_height = TRS_CHAR_HEIGHT4 * scale;
+    if (!usefont) cur_char_height = TRS_CHAR_HEIGHT4 * scale_y;
   } else {
     row_chars = 64;
     col_chars = 16;
-    if (!usefont) cur_char_height = TRS_CHAR_HEIGHT * scale;
+    if (!usefont) cur_char_height = TRS_CHAR_HEIGHT * scale_y;
   }
   screen_chars = row_chars * col_chars;
   if (resize) {
@@ -1038,7 +1053,7 @@ void trs_screen_640x240(int flag)
     if (usefont) {
       top_margin = cur_char_height * (24 - col_chars)/2 + border_width;
     } else {
-      top_margin = (TRS_CHAR_HEIGHT4 * scale * 24 -
+      top_margin = (TRS_CHAR_HEIGHT4 * scale_y * 24 -
 		    cur_char_height * col_chars)/2 + border_width;
     }
     if (left_margin > border_width || top_margin > border_width) {
@@ -1117,7 +1132,9 @@ boxes_init(int foreground, int background, int width, int height, int expanded)
  */
 Pixmap XCreateBitmapFromDataScale(Display *display, Drawable window,
 			             char *data, unsigned int width, 
-                                     unsigned int height, unsigned int scale)
+				     unsigned int height,
+				     unsigned int scale_x,
+				     unsigned int scale_y)
 {
   static unsigned char *mydata;
   static unsigned char *mypixels;
@@ -1131,7 +1148,8 @@ Pixmap XCreateBitmapFromDataScale(Display *display, Drawable window,
      * These arrays never get released, but they are really not     
      * too big, so we should be OK.
      */
-    mydata= (unsigned char *)malloc(width * height * scale * scale * 4);
+    mydata = (unsigned char *)malloc(width * height *
+				     scale_x * scale_y * 4);
     mypixels= (unsigned char *)malloc(width * height * 4);
   }
   
@@ -1145,27 +1163,27 @@ Pixmap XCreateBitmapFromDataScale(Display *display, Drawable window,
   }
 
   /* Clear out the rescaled character array */
-  for (i= 0; i< width / 8 * height * scale * scale * 4; i++)
+  for (i= 0; i< width / 8 * height * scale_x * scale_y * 4; i++)
   {
     *(mydata + i)= 0;
   }
   
   /* And prepare our rescaled character. */
   k= 0;
-  for (j= 0; j< height * scale; j++)
+  for (j= 0; j< height * scale_y; j++)
   {
-    for (i= 0; i< width * scale; i++)
+    for (i= 0; i< width * scale_x; i++)
     {
        *(mydata + (k >> 3)) = *(mydata + (k >> 3)) |
-	 (*(mypixels + ((int)(j / scale) * width) +
-	    (int)(i / scale)) << (k & 7));
+	 (*(mypixels + ((int)(j / scale_y) * width) +
+	    (int)(i / scale_x)) << (k & 7));
        k++;
     }
   }
 
   return XCreateBitmapFromData(display,window,
 			      (char*)mydata,
-			      width * scale, height * scale);
+			      width * scale_x, height * scale_y);
 }
 
 void bitmap_init(unsigned long foreground, unsigned long background)
@@ -1192,16 +1210,18 @@ void bitmap_init(unsigned long foreground, unsigned long background)
       trs_char[0][i] =
 	XCreateBitmapFromDataScale(display,window,
 				   trs_char_data[trs_charset][i],
-				   TRS_CHAR_WIDTH,TRS_CHAR_HEIGHT,scale);
+				   TRS_CHAR_WIDTH,TRS_CHAR_HEIGHT,
+				   scale_x,scale_y);
       trs_char[1][i] =
 	XCreateBitmapFromDataScale(display,window,
-				   (char*)trs_widechar_data[trs_charset][i],
-				   TRS_CHAR_WIDTH*2,TRS_CHAR_HEIGHT,scale);
+				   (char*)trs_char_data[trs_charset][i],
+				   TRS_CHAR_WIDTH,TRS_CHAR_HEIGHT,
+				   scale_x*2,scale_y);
     }
     boxes_init(foreground, background,
-	       cur_char_width, TRS_CHAR_HEIGHT * scale, 0);
+	       cur_char_width, TRS_CHAR_HEIGHT * scale_y, 0);
     boxes_init(foreground, background,
-	       cur_char_width*2, TRS_CHAR_HEIGHT * scale, 1);
+	       cur_char_width*2, TRS_CHAR_HEIGHT * scale_y, 1);
   }
 }
 
@@ -1214,7 +1234,7 @@ void trs_screen_refresh()
 #endif
   if (grafyx_enable && !grafyx_overlay) {
     srcx = cur_char_width * grafyx_xoffset;
-    srcy = 2 * scale * grafyx_yoffset;
+    srcy = scale_y * grafyx_yoffset;
     XPutImage(display, window, gc, &image,
 	      srcx, srcy,
 	      left_margin, top_margin,
@@ -1354,7 +1374,8 @@ void trs_screen_write_char(int position, int char_index, Bool doflush)
     /* assert(grafyx_overlay); */
     int srcx, srcy, duny;
     srcx = ((col+grafyx_xoffset) % G_XSIZE)*cur_char_width;
-    srcy = (row*cur_char_height + grafyx_yoffset*2*scale) % (G_YSIZE*2*scale); 
+    srcy = (row*cur_char_height + grafyx_yoffset*scale_y)
+	   % (G_YSIZE*scale_y); 
     XPutImage(display, window, gc_xor, &image, srcx, srcy,
 	      destx, desty, cur_char_width, cur_char_height);
     /* Draw wrapped portion if any */
@@ -1366,6 +1387,10 @@ void trs_screen_write_char(int position, int char_index, Bool doflush)
 		cur_char_width, cur_char_height - duny);
     }
   }
+#ifdef HRG1B
+  if (hrg_enable)
+    hrg_update_char(position);
+#endif
 #if DO_XFLUSH
   if (doflush)
     XFlush(display);
@@ -1385,7 +1410,13 @@ void trs_screen_scroll()
     if (grafyx_overlay) {
       trs_screen_refresh();
     }
-  } else {
+  }
+#ifdef HRG1B
+  else if (hrg_enable) {
+    trs_screen_refresh();
+  }
+#endif
+  else {
     XCopyArea(display,window,window,gc,
 	      border_width,cur_char_height+border_width,
 	      (cur_char_width*row_chars),(cur_char_height*col_chars),
@@ -1410,19 +1441,19 @@ void grafyx_write_byte(int x, int y, char byte)
   int screen_x = ((x - grafyx_xoffset + G_XSIZE) % G_XSIZE);
   int screen_y = ((y - grafyx_yoffset + G_YSIZE) % G_YSIZE);
   int on_screen = screen_x < row_chars &&
-    screen_y < col_chars*cur_char_height/(scale*2);
+    screen_y < col_chars*cur_char_height/scale_y;
   if (grafyx_enable && grafyx_overlay && on_screen) {
     /* Erase old byte, preserving text */
     XPutImage(display, window, gc_xor, &image,
-	      x*cur_char_width, y*2*scale,
+	      x*cur_char_width, y*scale_y,
 	      left_margin + screen_x*cur_char_width,
-	      top_margin + screen_y*2*scale,
-	      cur_char_width, 2*scale);
+	      top_margin + screen_y*scale_y,
+	      cur_char_width, scale_y);
   }
 
   /* Save new byte in local memory */
   grafyx_unscaled[y][x] = byte;
-  switch (scale) {
+  switch (scale_x) {
   case 1:
     exp[0] = byte;
     break;
@@ -1447,11 +1478,11 @@ void grafyx_write_byte(int x, int y, char byte)
     exp[0] = (((byte & 0x40) >> 6) + ((byte & 0x80) >> 3)) * 15;
     break;
   default:
-    fatal("scaling graphics by %dx not implemented\n", scale);
+    fatal("scaling graphics by %dx not implemented\n", scale_x);
   }
-  for (j=0; j<2*scale; j++) {
-    for (i=0; i<scale; i++) {
-      grafyx[(y*2*scale + j)*image.bytes_per_line + x*scale + i] = exp[i];
+  for (j=0; j<scale_y; j++) {
+    for (i=0; i<scale_x; i++) {
+      grafyx[(y*scale_y + j)*image.bytes_per_line + x*scale_x + i] = exp[i];
     }
   }
 
@@ -1459,16 +1490,16 @@ void grafyx_write_byte(int x, int y, char byte)
     /* Draw new byte */
     if (grafyx_overlay) {
       XPutImage(display, window, gc_xor, &image,
-		x*cur_char_width, y*2*scale,
+		x*cur_char_width, y*scale_y,
 		left_margin + screen_x*cur_char_width,
-		top_margin + screen_y*2*scale,
-		cur_char_width, 2*scale);
+		top_margin + screen_y*scale_y,
+		cur_char_width, scale_y);
     } else {
       XPutImage(display, window, gc, &image,
-		x*cur_char_width, y*2*scale,
+		x*cur_char_width, y*scale_y,
 		left_margin + screen_x*cur_char_width,
-		top_margin + screen_y*2*scale,
-		cur_char_width, 2*scale);
+		top_margin + screen_y*scale_y,
+		cur_char_width, scale_y);
     }
   }
 }
@@ -1577,6 +1608,207 @@ void grafyx_set_microlabs(int on_off)
 {
   grafyx_microlabs = on_off;
 }
+
+#ifdef HRG1B
+/* Support for Model I HRG1B hi-res graphics card. */
+/* See file trs_io.c for documentation. */
+
+/* Initialize HRG. */
+static void
+hrg_init()
+{
+  int i;
+
+  /* Precompute arrays of pixel sizes and offsets. */
+  for (i = 0; i <= 6; i++) {
+    hrg_pixel_x[0][i] = cur_char_width * i / 6;
+    hrg_pixel_x[1][i] = cur_char_width*2 * i / 6;
+    if (i != 0) {
+      hrg_pixel_width[0][i-1] = hrg_pixel_x[0][i] - hrg_pixel_x[0][i-1];
+      hrg_pixel_width[1][i-1] = hrg_pixel_x[1][i] - hrg_pixel_x[1][i-1];
+    }
+  }
+  for (i = 0; i <= 12; i++) {
+    hrg_pixel_y[i] = cur_char_height * i / 12;
+    if (i != 0)
+      hrg_pixel_height[i-1] = hrg_pixel_y[i] - hrg_pixel_y[i-1];
+  }
+  if (cur_char_width % 6 != 0 || cur_char_height % 12 != 0)
+    error("character size %d*%d not a multiple of 6*12 HRG raster",
+         cur_char_width, cur_char_height);
+}
+
+/* Switch HRG on (1) or off (0). */
+void
+hrg_onoff(int enable)
+{
+  static int init = 0;
+
+  if ((hrg_enable!=0) == (enable!=0)) return; /* State does not change. */
+
+  if (!init) {
+    hrg_init();
+    init = 1;
+  }
+  hrg_enable = enable;
+  trs_screen_refresh();
+}
+
+/* Write address to latch. */
+void
+hrg_write_addr(int addr, int mask)
+{
+  hrg_addr = (hrg_addr & ~mask) | (addr & mask);
+}
+
+/* Write byte to HRG memory. */
+void
+hrg_write_data(int data)
+{
+  int old_data;
+  int position, line;
+  int bits0, bits1;
+
+  if (hrg_addr >= HRG_MEMSIZE) return; /* nonexistent address */
+  old_data = hrg_screen[hrg_addr];
+  hrg_screen[hrg_addr] = data;
+
+  if (!hrg_enable) return;
+  if ((currentmode & EXPANDED) && (hrg_addr & 1)) return;
+  if ((data &= 0x3f) == (old_data &= 0x3f)) return;
+
+  position = hrg_addr & 0x3ff; /* bits 0-9: "PRINT @" screen position */
+  line = hrg_addr >> 10;       /* vertical offset inside character cell */
+  bits0 = ~data & old_data;    /* pattern to clear */
+  bits1 = data & ~old_data;    /* pattern to set */
+
+  if (bits0 == 0
+      || trs_screen[position] == 0x20
+      || trs_screen[position] == 0x80
+      /*|| (trs_screen[position] < 0x80 && line >= 8 && !usefont)*/
+      ) {
+    /* Only additional bits set, or blank text character.
+       No need for update of text. */
+    int destx = (position % row_chars) * cur_char_width + left_margin;
+    int desty = (position / row_chars) * cur_char_height + top_margin
+      + hrg_pixel_y[line];
+    int *x = hrg_pixel_x[(currentmode&EXPANDED)!=0];
+    int *w = hrg_pixel_width[(currentmode&EXPANDED)!=0];
+    int h = hrg_pixel_height[line];
+    XRectangle rect0[3];    /* 6 bits => max. 3 groups of adjacent "0" bits */
+    XRectangle rect1[3];
+    int n0 = 0;
+    int n1 = 0;
+    int flag = 0;
+    int j, b;
+
+    /* Compute arrays of rectangles to clear and to set. */
+    for (j = 0, b = 1; j < 6; j++, b <<= 1) {
+      if (bits0 & b) {
+       if (flag >= 0) {        /* Start new rectangle. */
+         rect0[n0].x = destx + x[j];
+         rect0[n0].y = desty;
+         rect0[n0].width = w[j];
+         rect0[n0].height = h;
+         n0++;
+         flag = -1;
+       }
+       else {                  /* Increase width of rectangle. */
+         rect0[n0-1].width += w[j];
+       }
+      }
+      else if (bits1 & b) {
+       if (flag <= 0) {
+         rect1[n1].x = destx + x[j];
+         rect1[n1].y = desty;
+         rect1[n1].width = w[j];
+         rect1[n1].height = h;
+         n1++;
+         flag = 1;
+       }
+       else {
+         rect1[n1-1].width += w[j];
+       }
+      }
+      else {
+       flag = 0;
+      }
+    }
+    if (n0 != 0) XFillRectangles(display, window, gc_inv, rect0, n0);
+    if (n1 != 0) XFillRectangles(display, window, gc,     rect1, n1);
+  }
+  else {
+    /* Unfortunately, HRG1B combines text and graphics with an
+       (inclusive) OR. Thus, in the general case, we cannot erase
+       the old graphics byte without losing the text information.
+       Call trs_screen_write_char to restore the text character
+       (erasing the graphics). This function will in turn call
+       hrg_update_char and restore 6*12 graphics pixels. Sigh. */
+    trs_screen_write_char(position, trs_screen[position], False);
+  }
+#if DO_XFLUSH
+  XFlush(display);
+#endif
+}
+
+/* Read byte from HRG memory. */
+int
+hrg_read_data()
+{
+  if (hrg_addr >= HRG_MEMSIZE) return 0xff; /* nonexistent address */
+  return hrg_screen[hrg_addr];
+}
+
+/* Update graphics at given screen position.
+   Called by trs_screen_write_char. */
+static void
+hrg_update_char(int position)
+{
+  int destx = (position % row_chars) * cur_char_width + left_margin;
+  int desty = (position / row_chars) * cur_char_height + top_margin;
+  int *x = hrg_pixel_x[(currentmode&EXPANDED)!=0];
+  int *w = hrg_pixel_width[(currentmode&EXPANDED)!=0];
+  XRectangle rect[3*12];
+  int byte;
+  int prev_byte = 0;
+  int n = 0;
+  int np = 0;
+  int i, j, flag;
+
+  /* Compute array of rectangles. */
+  for (i = 0; i < 12; i++) {
+    if ((byte = hrg_screen[position+(i<<10)] & 0x3f) == 0) {
+    }
+    else if (byte != prev_byte) {
+      np = n;
+      flag = 0;
+      for (j = 0; j < 6; j++) {
+       if (!(byte & 1<<j)) {
+         flag = 0;
+       }
+       else if (!flag) {       /* New rectangle. */
+         rect[n].x = destx + x[j];
+         rect[n].y = desty + hrg_pixel_y[i];
+         rect[n].width = w[j];
+         rect[n].height = hrg_pixel_height[i];
+         n++;
+         flag = 1;
+       }
+       else {                  /* Increase width. */
+         rect[n-1].width += w[j];
+       }
+      }
+    }
+    else {                     /* Increase heights. */
+      for (j = np; j < n; j++)
+       rect[j].height += hrg_pixel_height[i];
+    }
+    prev_byte = byte;
+  }
+  if (n != 0)
+    XFillRectangles(display, window, gc, rect, n);
+}
+#endif /* HRG1B */
 
 /*---------- X mouse support --------------*/
 

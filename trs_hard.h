@@ -39,14 +39,18 @@ extern char* trs_disk_dir;
  */
 
 /* Write protect switch register (read only): 
- *  abcd----
+ *  abcd--pi
  *  a = drive 0 write protected
  *  b = drive 1 write protected
  *  c = drive 2 write protected
  *  d = drive 3 write protected
+ *  p = at least one drive write protected
+ *  i = interrupt request
  */
 #define TRS_HARD_WP 0xc0
 #define TRS_HARD_WPBIT(d) (0x80 >> (d))
+#define TRS_HARD_WPSOME 0x02
+#define TRS_HARD_INTRQ  0x01 /* not emulated */
 
 /* Control register (read(?)/write): 
  *  ---sdw--
@@ -59,6 +63,18 @@ extern char* trs_disk_dir;
 #define TRS_HARD_DEVICE_ENABLE  0x08
 #define TRS_HARD_WAIT_ENABLE    0x04
 
+/* ID register (Model II only!)
+ */
+#define TRS_HARD_ID0 0xc2
+#define TRS_HARD_ID1 0xc3
+
+/* CTC channels (Model II only!)
+ */
+#define TRS_HARD_CTC0 0xc4
+#define TRS_HARD_CTC1 0xc5
+#define TRS_HARD_CTC2 0xc6
+#define TRS_HARD_CTC3 0xc7
+
 /*
  * WD1010 registers
  */
@@ -70,7 +86,7 @@ extern char* trs_disk_dir;
  *  bdin-atm
  *  b = block marked bad
  *  e = uncorrectable error in data 
- *  i = uncorrectable error in id
+ *  i = uncorrectable error in id (unused?)
  *  n = id not found
  *  - = unused
  *  a = command aborted
@@ -80,17 +96,20 @@ extern char* trs_disk_dir;
 #define TRS_HARD_ERROR (TRS_HARD_DATA+1)
 #define	TRS_HARD_BBDERR   0x80
 #define TRS_HARD_DATAERR  0x40
-#define TRS_HARD_IDERR    0x20
+#define TRS_HARD_IDERR    0x20 /* unused? */
 #define TRS_HARD_NFERR    0x10
-#define TRS_HARD_MCRERR   0x08
+#define TRS_HARD_MCRERR   0x08 /* unused */
 #define TRS_HARD_ABRTERR  0x04
 #define TRS_HARD_TRK0ERR  0x02
 #define TRS_HARD_MARKERR  0x01
 
 /* Write precompensation register (write only) */
+/* Value *4 is the starting cylinder for write precomp */
 #define TRS_HARD_PRECOMP (TRS_HARD_DATA+1)
 
 /* Sector count register (read/write) */
+/* Used only for multiple sector accesses; otherwise ignored. */
+/* Autodecrements when used. */
 #define TRS_HARD_SECCNT (TRS_HARD_DATA+2)
 
 /* Sector number register (read/write) */
@@ -102,14 +121,17 @@ extern char* trs_disk_dir;
 /* Cylinder high byte register (read/write) */
 #define TRS_HARD_CYLHI (TRS_HARD_DATA+5)
 
-/* Size/drive/head register (read??/write):
- *  sssddhhh
- *  sss = LS-DOS uses 000; Linux IDE uses 101
+/* Size/drive/head register (read/write):
+ *  essddhhh
+ *  e = 0 if CRCs used; 1 if ECC used
+ *  ss = sector size; 00=256, 01=512, 10=1024, 11=128
  *  dd = drive
  *  hhh = head
  */
 #define TRS_HARD_SDH (TRS_HARD_DATA+6)
-#define TRS_HARD_SIZEMASK   0xe0
+#define TRS_HARD_ECCMASK    0x80
+#define TRS_HARD_ECCSHIFT   7
+#define TRS_HARD_SIZEMASK   0x60
 #define TRS_HARD_SIZESHIFT  5
 #define TRS_HARD_DRIVEMASK  0x18
 #define TRS_HARD_DRIVESHIFT 3
@@ -121,12 +143,12 @@ extern char* trs_disk_dir;
 /* Status register (read only): 
  *  brwsdcie
  *  b = busy
- *  r = ready (?)
- *  w = write error (?)
- *  s = seek (?)
+ *  r = drive ready
+ *  w = write error
+ *  s = seek complete
  *  d = data request
- *  c = corrected ecc (??)
- *  i = CIP (=software reset required)
+ *  c = corrected ecc (reserved)
+ *  i = command in progress (=software reset required)
  *  e = error
  */
 #define TRS_HARD_STATUS (TRS_HARD_DATA+7)
@@ -150,23 +172,27 @@ extern char* trs_disk_dir;
 
 /* Restore: 
  *  0001rrrr
- *  rrrr = step rate
+ *  rrrr = step rate; 0000=35us, else rrrr*0.5ms
  */
 #define TRS_HARD_RESTORE 0x10
 
 /* Read sector:
- *  0010d000
- *  d = 0 for programmed I/O, 1 for DMA
+ *  0010dm00
+ *  d = 0 for interrupt on DRQ, 1 for interrupt at end (DMA style)
+ *      TRS-80 always uses programmed I/O, INTRQ not connected, I believe.
+ *  m = multiple sector flag (not emulated!)
  */
-#define TRS_HARD_READ 0x20
-#define TRS_HARD_DMA  0x08 /* not emulated! */
+#define TRS_HARD_READ  0x20
+#define TRS_HARD_DMA   0x08
+#define TRS_HARD_MULTI 0x04
 
 /* Write sector:
- *  00110000 (no DMA allowed??)
+ *  00110m00
+ *  m = multiple sector flag (not emulated!) 
  */
 #define TRS_HARD_WRITE 0x30
 
-/* Verify sector: (?)
+/* Verify sector (or "Scan ID"):
  *  01000000
  */
 #define TRS_HARD_VERIFY 0x40
@@ -183,6 +209,6 @@ extern char* trs_disk_dir;
 
 /* Seek to specified sector/head/cylinder:
  *  0111rrrr
- *  rrrr = step rate
+ *  rrrr = step rate; 0000=35us, else rrrr*0.5ms
  */
 #define TRS_HARD_SEEK 0x70
