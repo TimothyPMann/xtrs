@@ -15,8 +15,7 @@ arraycount () {
 DONE=no
 CONTROL_FILE=.cassette.ctl
 DEFAULT_FORMAT=1
-AUTODETECT_FORMAT=6
-FORMAT_NAME='cas cpt wav direct debug autodetect'
+FORMAT_NAME='cas cpt wav direct debug'
 
 if [ ! -e "$CONTROL_FILE" ]; then
   echo Creating $CONTROL_FILE
@@ -71,7 +70,7 @@ while [ "$DONE" != "yes" ]; do
           *.debug)
             FORMAT=5 ;;
           *)
-            FORMAT=6 ;;
+            FORMAT=1 ;;
         esac
         echo "$(arrayitem 2 $COMMAND) $FORMAT" > $CONTROL_FILE
       fi ;;
@@ -94,8 +93,6 @@ while [ "$DONE" != "yes" ]; do
             POSITION=0 ;;
           debug)
             FORMAT=5 ;;
-          autodetect)
-            FORMAT=6 ;;
           *)
             echo Types are:
             echo '  '$FORMAT_NAME ;;

@@ -106,14 +106,17 @@ You can play wav files written by \fBxtrs\fP through your sound card
 and hear roughly what a real TRS-80 cassette sounds like.  A real
 TRS-80 should be able to read wav files written by \fBxtrs\fP if you
 copy them to a cassette or connect the TRS-80 directly to the sound
-card's output, but that is untested at this writing.
+card's output.  This feature has not been tested extensively, but it
+does seem to work, at least for short programs.
 
 \fBxtrs\fP can also read wav files.  It can read back the wav files
-that it writes without error (since no noise has been introduced), but
-reading wav files sampled from real cassettes is more difficult.  At
-this writing it seems to work fairly well for 500bps cassettes but
-poorly for 1500bps.  Perhaps better signal preprocessing inside xtrs
-would help.
+that it writes without error.  Reading wav files sampled from real
+cassettes is more difficult because of the noise introduced, but in
+brief testing it does seem to work.  The signal processing algorithms
+used are very crude, and better ones could probably do a better job
+of reading old, noisy cassettes, but I don't have any such cassettes
+to test with (and I don't know much about signal processing!).  Help
+in this area would be welcome.
 
 The wav file parsing code has several limitations.  Samples must be
 8-bit mono, and the wav file must contain only one data chunk and no
@@ -135,12 +138,6 @@ human-readable ASCII.  The cassette output is assumed to be 0
 initially.  Each line of output gives a new value (0, 1, or 2), and
 the amount of time (in microseconds) to wait before changing the
 output to this value.
-
-.I autodetect
-is not a real format.  Rather, setting the type to autodetect is
-supposed to tell \fBxtrs\fP to look inside the file and guess the type
-that way.  This is not implemented yet.
-
 
 .SH Authors
 \fBxtrs\fP 1.0 was written by David Gingold, then at

@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Fri Mar 31 18:07:46 PST 2000 by mann
+   Last modified on Sat May  6 14:53:21 PDT 2000 by mann
 */
 
 /*
@@ -89,9 +89,8 @@
 #define WAV_FORMAT         3  /* wave file */
 #define DIRECT_FORMAT      4  /* direct to sound card */
 #define DEBUG_FORMAT       5  /* like cpt but in ASCII */
-#define AUTODETECT_FORMAT  6  /*!! autodetect not implemented yet */
 static char *format_name[] = {
-  NULL, "cas", "cpt", "wav", "direct", "debug", "autodetect" };
+  NULL, "cas", "cpt", "wav", "direct", "debug" };
 #define DEFAULT_SAMPLE_RATE 44100  /* samples/sec to use for .wav files */
 #define NOISE_FLOOR 64
 
@@ -578,11 +577,7 @@ static int assert_state(int state)
     } else {
       get_control(state);
     }
-    if (cassette_format == AUTODETECT_FORMAT) {
-      error("can't autodetect format on output");
-      /* !! this should work for *existing* files, though */
-      cassette_file = NULL;
-    } else if (cassette_format == DIRECT_FORMAT) {
+    if (cassette_format == DIRECT_FORMAT) {
 #if USESOX
       char command[256];
       cassette_sample_rate = cassette_default_sample_rate;
@@ -846,7 +841,6 @@ transition_out(int value)
     break;
 
 
-  case AUTODETECT_FORMAT: /* !!missing */
   default:
     error("output format %s not implemented",
 	  cassette_format < (sizeof(format_name)/sizeof(char *)) ?
@@ -1011,7 +1005,6 @@ transition_in()
     ret = 1;
     break;
 
-  case AUTODETECT_FORMAT: /* !!missing */
   default:
     error("input format %s not implemented",
 	  cassette_format < (sizeof(format_name)/sizeof(char *)) ?

@@ -544,7 +544,7 @@ to port 0xFE would double the speed to 3.54816 MHz, while writing a 0
 would set the speed back to normal.  The heartbeat clock runs at 40 Hz
 in either case.  xtrs emulates this feature as well.
 .SH Sound
-Sound support was completely rewritten in xtrs 3.7 and now uses
+Sound support uses
 the Open Sound System /dev/dsp device, standard on Linux and available
 on many other Unix versions as well.  This support is compiled in
 automatically on Linux; if you have OSS on another version of Unix,
@@ -858,9 +858,8 @@ http://www.research.compaq.com/SRC/personal/Tim_Mann/trs80.html.
 Some of the more bizarre undocumented Z-80 instructions
 are not implemented.
 
-Cassette emulation is much improved in this version of xtrs, but
-a better signal processing algorithm is still needed to read real cassettes
-reliably, especially at 1500bps.
+A better signal processing algorithm might help read real cassettes
+more reliably, especially at 1500bps.
 
 Serial ports are not emulated.
 

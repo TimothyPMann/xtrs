@@ -92,7 +92,6 @@ static XFontStruct *myfont, *mywidefont, *curfont;
 static XKeyboardState repeat_state;
 static int trs_charset;
 static int scale = 1;
-static int just_resized = False;
 
 static XrmOptionDescRec opts[] = {
 /* Option */    /* Resource */  /* Value from arg? */   /* Value if no arg */
@@ -568,6 +567,21 @@ restore_repeat()
   }
 }
 
+void trs_fix_size (Window window, int width, int height)
+{
+  XSizeHints sizehints;
+
+  sizehints.flags = PMinSize | PMaxSize | PBaseSize;
+  sizehints.min_width = width;
+  sizehints.max_width = width;
+  sizehints.base_width = width;
+
+  sizehints.min_height = height;
+  sizehints.max_height = height;
+  sizehints.base_height = height;
+
+  XSetWMNormalHints(display, window, &sizehints);
+}
 
 /* exits if something really bad happens */
 void trs_screen_init()
@@ -782,8 +796,9 @@ void trs_screen_init()
 #if XDEBUG
     fprintf(stderr, "XCreateSimpleWindow(%d, %d)\n", OrigWidth, OrigHeight);
 #endif XDEBUG
+  trs_fix_size(window, OrigWidth, OrigHeight);
   XStoreName(display,window,title);
-  XSelectInput(display, window, EVENT_MASK | ResizeRedirectMask);
+  XSelectInput(display, window, EVENT_MASK);
   XMapWindow(display, window);
 
   bitmap_init(foreground, background);
@@ -856,34 +871,6 @@ void trs_get_event(int wait)
       if (event.xexpose.count == 0) {
 	while (XCheckMaskEvent(display, ExposureMask, &event)) /*skip*/;
 	trs_screen_refresh();
-      }
-      break;
-
-    case ResizeRequest:
-#if XDEBUG
-      fprintf(stderr,"ResizeRequest w %d-->%d, h %d-->%d\n",
-	      OrigWidth, event.xresizerequest.width,
-	      OrigHeight, event.xresizerequest.height);
-#endif
-      if (event.xresizerequest.width != OrigWidth ||
-	  event.xresizerequest.height != OrigHeight) {
-	xwc.width = OrigWidth;
-	xwc.height = OrigHeight;
-	XConfigureWindow(display,event.xresizerequest.window,
-			 (CWWidth | CWHeight),&xwc);
-      }
-#if DO_XFLUSH
-      XFlush(display);
-#endif
-      break;
-
-    case ConfigureNotify:
-#if XDEBUG
-      fprintf(stderr,"ConfigureNotify\n");
-#endif
-      if (just_resized) {
-	XSelectInput(display, window, EVENT_MASK | ResizeRedirectMask);
-	just_resized = False;
       }
       break;
 
@@ -1040,11 +1027,10 @@ void trs_screen_640x240(int flag)
     OrigHeight = cur_char_height * col_chars + 2 * border_width;
     left_margin = border_width;
     top_margin = border_width;
-    XSelectInput(display, window, EVENT_MASK);
+    trs_fix_size(window, OrigWidth, OrigHeight);
     XResizeWindow(display, window, OrigWidth, OrigHeight);
     XClearWindow(display,window);
     XFlush(display);
-    just_resized = True;  /* remember to select ResizeNotify events again */
 #if XDEBUG
     fprintf(stderr, "XResizeWindow(%d, %d)\n", OrigWidth, OrigHeight);
 #endif XDEBUG
