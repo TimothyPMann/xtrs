@@ -3,7 +3,9 @@
 ;; Last modified on Sat Jan 24 23:13:29 PST 1998 by mann
 ;;
 ;; Use xtrs 1.9 emulator traps to copy a file from TRS-80 to Unix
-;; Usage: EXPORT [-n] fromfile unixfile
+;; Usage: EXPORT [-ln] fromfile unixfile
+;; Parameter -l will convert the Unix file to lower case.
+;;  (Needed for NEWDOS/80.  They insist on uppercasing the command line.)
 ;; If the -n parameter is given, each carriage return ('\r')
 ;;  in the TRS-80 file is converted to a newline ('\n') in the Unix file.
 
@@ -122,7 +124,7 @@ export:
 	pop hl
 not4:
 
-flag0:	ld a, (hl)		; look for -n flag
+flag0:	ld a, (hl)		; look for flags
 	cp ' '
 	jp c, usage		; error if line ends here
 	jr nz, flag1
@@ -132,16 +134,22 @@ flag1:	cp '-'
 	jr nz, fromf
 	inc hl
 	ld a, (hl)
-	or 20h
-	cp 'n'
+flag3:	or 20h
+	cp 'l'
+	jr nz, flagn		; check for next flag
+	ld a, 1
+	ld (lflag), a
+	jr flag2
+flagn:	cp 'n'
 	jp nz, usage		; only -n or -N is accepted
 	ld a, 1
 	ld (nflag), a
-flag2:	inc hl			; skip spaces
+flag2:	inc hl
 	ld a, (hl)
 	cp ' '
-	jr z, flag2
-	jp c, usage
+	jr nz, flag3		; another flag follows
+	inc hl
+	jr flag0
 
 fromf:	ld de, dcb              ; ready to get LDOS filename from (HL)
         call fspec
@@ -153,12 +161,14 @@ unix0:	ld a, (hl)              ; scan over Unix filename
         jr nz, unix1
         inc hl
 	jr unix0
-unix1:  ld (uname+1), hl        ; save pointer
-unix2:	inc hl                  ; now scan for end of Unix name
-        ld a, (hl)
-	cp ' '+1
-	jr nc, unix2
-	ld (hl), 0		; NUL terminate Unix name
+unix1:	ld de, iobuf		; copy Unix filename
+	ld a, ' '
+unix2:	cp (hl)
+	ldi
+	jr c, unix2
+	dec de
+	sub a
+	ld (de), a              ; NUL terminate Unix name
   
         ld hl, iobuf
         ld de, dcb
@@ -170,17 +180,28 @@ unix2:	inc hl                  ; now scan for end of Unix name
         call error
         jp abort
 
-uname:	ld hl, $-$              ; path
+uname:	ld hl, iobuf		; path
+	ld a, (lflag)
+	or a
+	call nz, lcconv		; convert filename to lower case
         ld bc, EO_WRONLY|EO_CREAT|EO_TRUNC
         ld de, 0666q            ; mode
         defw emt_open		; open the Unix file
         jr z, opn2ok            ; go if OK
         ld hl, uopner           ; error message and exit
-        jr uerror
+	jp uerror
 
 ;; Read
 opn2ok:	
-	ld bc, 0		; count records in bc
+	ld bc, (dcb+12)		; count down records in bc
+	ld a, (4427h)		; system id for Newdos/80...
+	cp 82h			; ...should be 82h (v2.0)
+	jr nz, notnwd
+	ld a, (dcb+8)
+	or a			; length multiple of 256 bytes?
+	jr z, notnwd
+	inc bc			; no, # of records + 1
+notnwd:
 
 loop:	push de			; save fd
 	ld de, dcb
@@ -192,7 +213,7 @@ loop:	push de			; save fd
 	ld c, a
         call error              ; oops, i/o error
         jp abort
-rdok:	inc bc
+rdok:	dec bc
 
 ;; Translate
 	push bc			; save record count
@@ -210,25 +231,25 @@ notlf:	inc hl
 nlfals:	pop bc			; restore record count
 
 ;; Write
-	ld hl, (dcb+12)		; check if last record
-	sub a
-	sbc hl, bc
+	ld a, c
+	or b			; last record?
 	push bc			; save record count
 	ld bc, 0100h		; byte count
 	jr nz, notlst
-	ld b, 0
+	ld b, a
 	ld a, (dcb+8)
 	ld c, a
+	dec c			; EOF offset 0: write 256 bytes
+	inc bc
 notlst:
 	ld hl, iobuf
 	defw emt_write
-	ld h, b
 	pop bc
 	jr z, wrok
 	ld hl, uwrer            ; write error
         jr uerror
-wrok:	ld a, h
-	and a
+wrok:	ld a, c
+	or b
 	jr nz, loop
 
 ;; Close
@@ -275,9 +296,33 @@ dsply0:	ld a, (hl)
 dsply1:	pop hl
 	ret
 
+;; Convert (NUL terminated) string in HL to lower case.
+lcconv:	push hl
+	ld d, h
+	ld e, l
+lcloop:	ld a, (hl)
+	cp 5bh			; use '[' or uparrow as escape
+	jr nz, lconv1
+	inc hl
+	ld a, (hl)
+	jr lconv2		; char after esc: don't convert
+lconv1:	sub 'A'
+	cp 26
+	ld a, (hl)
+	jr nc, lconv2
+	or 20h			; convert to lower case
+lconv2:	ld (de), a
+	inc hl
+	inc de
+	or a			; NUL terminator?
+	jr nz, lcloop
+	pop hl
+	ret
+
+lflag:	defb 0
 nflag:	defb 0
 
-usager: defb 'Usage: EXPORT [-n] fromfile unixfile', 0dh
+usager: defb 'Usage: EXPORT [-ln] fromfile unixfile', 0dh
 uopner:	defb 'Error in Unix open: ', 03h
 uwrer:	defb 'Error in Unix write: ', 03h
 uclser:	defb 'Error in Unix close: ', 03h

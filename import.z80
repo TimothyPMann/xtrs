@@ -3,14 +3,22 @@
 ;; Last modified on Sat Jan 24 23:13:29 PST 1998 by mann
 ;;
 ;; Use xtrs 1.9 emulator traps to copy a file from Unix to TRS-80
-;; Usage: IMPORT [-n] unixfile tofile
+;; Usage: IMPORT [-ln] unixfile tofile
+;; Parameter -l will convert the Unix file to lower case.
+;;  (Needed for NEWDOS/80.  They insist on uppercasing the
+;;  command line.)
 ;; If the -n parameter is given, each newline ('\n') in the Unix
 ;;  file is converted to a carriage return ('\r'), the TRS-80 end of
 ;;  line character.
 
-;; Still doesn't work on NEWDOS/80.  They insist on uppercasing the
-;;  command line (tough on Unix filenames), and setting the EOF offset
-;;  works differently.
+;; EOF handling is different for NEWDOS/80:
+;;  For TRSDOS and LDOS, word (dcb+12) contains the number of
+;;  256 byte records in the file, byte (dcb+8) contains the EOF
+;;  offset in the last record (0=256).
+;;  For NEWDOS/80, byte (dcb+8) and word (dcb+12) form a 24 bit
+;;  number containing the relative byte address of EOF.
+;;  Thus (dcb+12) differs by one if the file length is not a
+;;  multiple of 256 bytes.
 
 ;; Model I/III addresses
 @fspec  equ 441ch
@@ -130,7 +138,7 @@ import:
 	pop hl
 not4:
 
-flag0:	ld a, (hl)		; look for -n flag
+flag0:	ld a, (hl)		; look for flags
 	cp ' '
 	jr c, usage		; error if line ends here
 	jr nz, flag1
@@ -140,48 +148,59 @@ flag1:	cp '-'
 	jr nz, unix1
 	inc hl
 	ld a, (hl)
-	or 20h
-	cp 'n'
+flag3:	or 20h
+	cp 'l'
+	jr nz, flagn		; check for next flag
+	ld a, 1
+	ld (lflag), a
+	jr flag2
+flagn:	cp 'n'
 	jr nz, usage		; only -n or -N is accepted
 	ld a, 1
 	ld (nflag), a
-unix0:	inc hl
+flag2:	inc hl
 	ld a, (hl)
-        cp ' '		        ; first skip spaces
-	jr c, usage             ; error if line ends here
-        jr z, unix0
-unix1:	ld (uname+1), hl        ; save pointer to Unix filename
-unix2:	inc hl                  ; scan for its end
-        ld a, (hl)
 	cp ' '
-	jr c, usage
-        jr nz, unix2
-	ld (hl), 0              ; NUL terminate
-        inc hl
+	jr nz, flag3		; another flag follows
+	inc hl
+	jr flag0
+
+unix1:	ld de, iobuf		; copy Unix filename
+	ld a, ' '
+unix2:	cp (hl)
+	ldi
+	jr c, unix2
+	jr nz, usage
+	dec de
+	sub a
+	ld (de), a              ; NUL terminate Unix name
 	ld de, dcb              ; ready to get TRS-80 filename from (HL)
         call fspec
         jr nz, usage
-        push hl                 ; save position in command line
+	ld hl, iobuf		; Unix path
+	ld a, (lflag)
+	or a
+	call nz, lcconv		; convert path to lower case
+	ld bc, EO_RDONLY
+	ld de, 0		; mode (ignored)
+	defw emt_open
+	jr z, openok		; go if OK
+	ld hl, uopner		; error message and exit
+	jp uerror
+
+openok:	push de			; save fd
         ld hl, iobuf
         ld de, dcb
         ld b, 0
         call init               ; open the file
-        pop hl
-        jr z, openok
+	pop de
+	jr z, opn2ok
 	ld c, a
         call error
         jp abort
 usage:  ld hl, usager           ; error message and exit
         call dsply
         jp abort
-openok:  
-uname:	ld hl, $-$              ; path
-        ld bc, EO_RDONLY
-        ld de, 0                ; mode (ignored)
-        defw emt_open
-        jr z, opn2ok            ; go if OK
-        ld hl, uopner           ; error message and exit
-	jr uerror
 
 ;; Read
 rloop:
@@ -246,7 +265,13 @@ closit:	defw emt_close		; close Unix file
 closok:	ld a, c
 	ld (dcb+8), a		; EOF offset
 	ld hl, (dcb+10)		; record number (in case shortening file)
-	ld (dcb+12), hl
+	ld a, (4427h)		; system id for Newdos/80...
+	sub 82h			; ...should be 82h (v2.0)
+	jr nz, notnwd
+	or c			; length multiple of 256 bytes?
+	jr z, notnwd
+	dec hl			; no, # of records - 1
+notnwd:	ld (dcb+12), hl
 	ld de, dcb
         call close              ; close the TRS-80 file
         jr z, cls2ok
@@ -281,9 +306,33 @@ dsply0:	ld a, (hl)
 dsply1:	pop hl
 	ret
 
+;; Convert (NUL terminated) string in HL to lower case.
+lcconv:	push hl
+	ld d, h
+	ld e, l
+lcloop:	ld a, (hl)
+	cp 5bh			; use '[' or uparrow as escape
+	jr nz, lconv1
+	inc hl
+	ld a, (hl)
+	jr lconv2		; char after esc: don't convert
+lconv1:	sub 'A'
+	cp 26
+	ld a, (hl)
+	jr nc, lconv2
+	or 20h			; convert to lower case
+lconv2:	ld (de), a
+	inc hl
+	inc de
+	or a			; NUL terminator?
+	jr nz, lcloop
+	pop hl
+	ret
+
+lflag:	defb 0
 nflag:	defb 0
 
-usager: defb 'Usage: IMPORT [-n] unixfile tofile', 0dh
+usager: defb 'Usage: IMPORT [-ln] unixfile tofile', 0dh
 uopner:	defb 'Error in Unix open: ', 03h
 urder:	defb 'Error in Unix read: ', 03h
 uclser:	defb 'Error in Unix close: ', 03h
@@ -292,8 +341,3 @@ dcb:	defs 32
 iobuf:	defs iobsize
         
         end import
-
-
-
-
-
