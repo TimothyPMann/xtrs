@@ -22,6 +22,8 @@
 #include "trs.h"
 #include "trs_disk.h"
 
+int trs_model = 1;
+
 static void check_endian()
 {
     wordregister x;
@@ -37,6 +39,7 @@ void trs_load_rom(filename)
     char *filename;
 {
     FILE *program;
+    int c;
     
     if((program = fopen(filename, "r")) == NULL)
     {
@@ -44,7 +47,17 @@ void trs_load_rom(filename)
 	sprintf(message, "could not read %s", filename);
 	error(message);
     }
-    load_hex(program);
+    c = getc(program);
+    if (c == ':') {
+        rewind(program);
+        trs_rom_size = load_hex(program);
+    } else {
+        trs_rom_size = 0;
+        while (c != EOF) {
+	    mem_write_rom(trs_rom_size++, c);
+	    c = getc(program);
+	}
+    }
     fclose(program);
 }
 
@@ -73,11 +86,25 @@ main(argc, argv)
 	    debug = TRUE;
 	} else if (!strcmp(argv[i],"-instrument")) {
 	    instrument = TRUE;
+	} else if (!strcmp(argv[i],"-spinfast")) {
+	    /* Kludge -- make index hole go by at 10x normal frequency.
+               This makes NEWDOS 80 somewhat happier.  NEWDOS 80
+               apparently looks to see if a drive contains a disk by
+               polling for some fixed number of iterations, looking
+               for an index hole to go by.  But it seems we emulate
+               the instructions in the loop too fast, so that sometimes
+               no hole has gone by yet when NEWDOS 80 gives up.
+	    */
+	    trs_disk_spinfast = TRUE;
+        } else if (!strcmp(argv[i],"-model1")) {
+	    trs_model = 1;
+        } else if (!strcmp(argv[i],"-model3")) {
+	    trs_model = 3;  /* !!not fully implemented yet */
 	}
     }
 	
     mem_init();
-    trs_disk_init();
+    trs_disk_init(0);
 #ifdef XTRASH
     argc = trs_screen_init(argc,argv,&debug);
 #endif
@@ -109,3 +136,4 @@ main(argc, argv)
 	exit(0);
     }
 }
+

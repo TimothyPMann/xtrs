@@ -25,8 +25,8 @@
 #define READ		1
 #define WRITE		2
 
-#define CONTROL_FILENAME	"TRS-CASSETTE-CONTROL"
-#define DEFAULT_FILENAME	"cassette"
+#define CONTROL_FILENAME	".cassette.ctl"
+#define DEFAULT_FILENAME	"cassette.bin"
 
 static char cassette_filename[256];
 static int cassette_position;
@@ -96,7 +96,11 @@ static int assert_state(state)
 	break;
       case WRITE:
 	get_control();
-	cassette_file = fopen(cassette_filename, "w");
+	cassette_file = fopen(cassette_filename, "r+");
+        if(cassette_file == NULL)
+	{
+	    cassette_file = fopen(cassette_filename, "w");
+	}
 	if(cassette_file == NULL)
 	{
 	    fprintf(stderr, "Couldn't write %s\n", cassette_filename);
@@ -172,6 +176,7 @@ int trs_cassette_in(modesel)
 		
 		do
 		{
+		    if (z80_state.nmi) return 0; /* allow reboot */
 		    nextbyte = fgetc(cassette_file);
 		}
 		while(nextbyte != 0xa5);

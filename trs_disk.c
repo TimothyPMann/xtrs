@@ -5,10 +5,10 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Tue Dec 17 13:06:18 PST 1996 by mann */
+/* Last modified on Tue Aug  5 20:08:32 PDT 1997 by mann */
 
 /*
- * Emulate Model-I disk controller
+ * Emulate Model I or III disk controller
  */
 
 #include "z80.h"
@@ -19,6 +19,8 @@
 #include <sys/stat.h>
 
 #define TRSDISK_NONE TRSDISK_FORCEINT
+
+int trs_disk_spinfast = 0;
 
 typedef struct {
   /* Registers */
@@ -124,7 +126,7 @@ typedef struct {
 DiskState disk[4];
 
 void
-trs_disk_init(void)
+trs_disk_init(int reset_button)
 {
   int i;
   state.status = TRSDISK_NOTRDY|TRSDISK_TRKZERO;
@@ -138,7 +140,7 @@ trs_disk_init(void)
   state.format_bytecount = 0;
   state.curdrive = state.curside = 0;
   state.density = 0;
-  state.controller = TRSDISK_P1771;
+  state.controller = (trs_model == 1) ? TRSDISK_P1771 : TRSDISK_P1791;
   for (i=0; i<4; i++) {
     disk[i].phytrack = 0;
   }
@@ -153,6 +155,7 @@ trs_disk_change_all()
     trs_disk_change(i);
   }
 }
+
 
 /* Sort first by track, second by side, third by position in emulated-disk
    sector array (i.e., physical sector order on track).
@@ -216,7 +219,7 @@ trs_disk_change(int drive)
     c = fclose(d->file);
     if (c == EOF) state.status |= TRSDISK_WRITEFLT;
   }
-  sprintf(diskname, "disk%d", drive);
+  sprintf(diskname, "disk%d-%d", trs_model, drive);
   d->file = fopen(diskname, "r+");
   if (d->file == NULL) {
     d->file = fopen(diskname, "r");
@@ -331,7 +334,8 @@ search(int sector)
   } else {
     int i, physec;
     SectorId *sid;
-    if (d->phytrack < 0 || state.curside >= JV3_SIDES ||
+    if (d->phytrack < 0 || d->phytrack >= MAXTRACKS ||
+	state.curside >= JV3_SIDES ||
 	d->phytrack != state.track || d->file == NULL) {
       state.status |= TRSDISK_NOTFOUND;
       return -1;
@@ -383,7 +387,9 @@ type1_status()
   } else {
     /* Simulate sector hole going by at 300 RPM */
     gettimeofday(&tv, NULL);
-    if ((tv.tv_usec % 200000) < 50000) {
+    if (trs_disk_spinfast ? 
+	(tv.tv_usec % 20000) < 500 :
+        (tv.tv_usec % 200000) < 5000) {
       state.status |= TRSDISK_INDEX;
     } else {
       state.status &= ~TRSDISK_INDEX;
@@ -406,36 +412,33 @@ trs_disk_select_write(unsigned char data)
 {
   /*printf("select_write(0x%02x)\n", data);*/
   state.status &= ~TRSDISK_NOTRDY;
-  switch (data & 0x0f) {
+  if (trs_model == 3) {
+    state.curside = (data & TRSDISK3_SIDE) != 0;
+    state.density = (data & TRSDISK3_MFM) != 0;
+  } else {
+    /* Disk 3 and side select share a bit.  You can't have a drive :3
+       on a real Model I if any drive is two-sided.  Here we are more
+       generous and just forbid drive :3 from being 2-sided. */
+    state.curside = ( (data & (TRSDISK_0|TRSDISK_1|TRSDISK_2)) != 0 &&
+		      (data & TRSDISK_SIDE) != 0 );
+    if (state.curside) data &= ~TRSDISK_SIDE;
+  }
+  switch (data & (TRSDISK_0|TRSDISK_1|TRSDISK_2|TRSDISK_3)) {
   case 0:
     state.status |= TRSDISK_NOTRDY;
     break;
   case TRSDISK_0:
-    state.curdrive = 0; state.curside = 0;
+    state.curdrive = 0;
     break;
   case TRSDISK_1:
-    state.curdrive = 1; state.curside = 0;
+    state.curdrive = 1;
     break;
   case TRSDISK_2:
-    state.curdrive = 2; state.curside = 0;
+    state.curdrive = 2;
     break;
   case TRSDISK_3:
-    state.curdrive = 3; state.curside = 0;
+    state.curdrive = 3;
     break;
-  case TRSDISK_0|TRSDISK_SIDE:
-    state.curdrive = 0; state.curside = 1;
-    break;
-  case TRSDISK_1|TRSDISK_SIDE:
-    state.curdrive = 1; state.curside = 1;
-    break;
-  case TRSDISK_2|TRSDISK_SIDE:
-    state.curdrive = 2; state.curside = 1;
-    break;
-    /*case TRSDISK_3|TRSDISK_SIDE:*/
-    /* Impossible on Model I; disk 3 and side select share a bit.
-       You can't have a drive :3 on a real TRS-80 if any drive is two-sided.
-       Here we are more generous and just forbid drive :3 from being 2-sided.
-       */
   default:
     fprintf(stderr, "trs_disk: bogus drive select 0x%02x\n", data);
     break;
@@ -467,6 +470,10 @@ void
 trs_disk_sector_write(unsigned char data)
 {
   /*printf("sector_write(0x%02x)\n", data);*/
+  if (trs_model == 3) {
+    state.sector = data;
+    return;
+  }
   switch (data) {
     /* Emulate Radio Shack doubler */
   case TRSDISK_R1791:
@@ -503,6 +510,8 @@ trs_disk_data_read(void)
       if (state.bytecount <= 0) {
 	state.bytecount = 0;
 	state.status &= ~(TRSDISK_BUSY|TRSDISK_DRQ);
+        trs_disk_drq_interrupt(0);
+	trs_disk_intrq_interrupt(1);
       }
     }
     break;
@@ -529,6 +538,8 @@ trs_disk_data_write(unsigned char data)
       if (state.bytecount <= 0) {
 	state.bytecount = 0;
 	state.status = 0;
+        trs_disk_drq_interrupt(0);
+	trs_disk_intrq_interrupt(1);
 	c = fflush(d->file);
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
       }
@@ -621,10 +632,10 @@ trs_disk_data_write(unsigned char data)
 			      "JV1 directory track must be 17");
 	  } else {
 	    d->id[d->unused_id].flags |= JV3_DIRECTORY;
-	    /* Prepare to write the data */
-	    fseek(d->file, offset(JV3, d->unused_id), 0);
 	  }
 	}
+	/* Prepare to write the data */
+	fseek(d->file, offset(JV3, d->unused_id), 0);
 	state.format = FMT_DATA;
 	state.format_bytecount = SECSIZE;
       }
@@ -662,6 +673,8 @@ trs_disk_data_write(unsigned char data)
     case FMT_GAP4:
       state.format = FMT_DONE;
       state.status = 0;
+      trs_disk_drq_interrupt(0);
+      trs_disk_intrq_interrupt(1);
       c = fflush(d->file);
       if (c == EOF) state.status |= TRSDISK_WRITEFLT;
       break;
@@ -687,6 +700,7 @@ trs_disk_status_read(void)
 {
   type1_status();
   /*printf("status_read() => 0x%02x\n", state.status);*/
+  trs_disk_intrq_interrupt(0);
   return state.status;
 }
 
@@ -697,6 +711,7 @@ trs_disk_command_write(unsigned char cmd)
   DiskState *d = &disk[state.curdrive];
 
   /*printf("command_write(0x%02x)\n", cmd);*/
+  trs_disk_intrq_interrupt(0);
   state.bytecount = 0;		/* just forget any ongoing command */
   state.currcommand = cmd;
   switch (cmd & TRSDISK_CMDMASK) {
@@ -707,6 +722,7 @@ trs_disk_command_write(unsigned char cmd)
     state.status = TRSDISK_TRKZERO;
     /* Should this set lastdirection? */
     if (cmd & TRSDISK_VBIT) verify();
+    trs_disk_intrq_interrupt(1);
     break;
   case TRSDISK_SEEK:
     d->phytrack += (state.data - state.track);
@@ -719,6 +735,7 @@ trs_disk_command_write(unsigned char cmd)
     }
     /* Should this set lastdirection? */
     if (cmd & TRSDISK_VBIT) verify();
+    trs_disk_intrq_interrupt(1);
     break;
   case TRSDISK_STEP:
   case TRSDISK_STEPU:
@@ -734,6 +751,7 @@ trs_disk_command_write(unsigned char cmd)
       state.status = 0;
     }
     if (cmd & TRSDISK_VBIT) verify();
+    trs_disk_intrq_interrupt(1);
     break;
   case TRSDISK_STEPIN:
   case TRSDISK_STEPINU:
@@ -746,7 +764,9 @@ trs_disk_command_write(unsigned char cmd)
   case TRSDISK_READ:
     state.status = 0;
     id_index = search(state.sector);
-    if (id_index != -1) {
+    if (id_index == -1) {
+	trs_disk_intrq_interrupt(1);
+    } else {
       if (d->emutype == JV1) {
 	if (d->phytrack == 17) {
 	  if (state.controller == TRSDISK_P1771) {
@@ -768,6 +788,7 @@ trs_disk_command_write(unsigned char cmd)
 	}
       }
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
+      trs_disk_drq_interrupt(1);
       state.bytecount = SECSIZE;
       fseek(d->file, offset(d->emutype, id_index), 0);
     }
@@ -782,7 +803,9 @@ trs_disk_command_write(unsigned char cmd)
     }
     state.status = 0;
     id_index = search(state.sector);
-    if (id_index != -1) {
+    if (id_index == -1) {
+      trs_disk_intrq_interrupt(1);
+    } else {
       int dirdam = (state.controller == TRSDISK_P1771 ?
 		    (cmd & (TRSDISK_CBIT|TRSDISK_DBIT)) != 0 :
 		    (cmd & TRSDISK_DBIT) != 0);
@@ -811,6 +834,7 @@ trs_disk_command_write(unsigned char cmd)
 	}
       }
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
+      trs_disk_drq_interrupt(1);
       state.bytecount = SECSIZE;
       fseek(d->file, offset(d->emutype, id_index), 0);
     }
@@ -830,16 +854,13 @@ trs_disk_command_write(unsigned char cmd)
     break;
   case TRSDISK_WRITETRK:
     /* Really a write track? */
-    switch (cmd) {
-    case TRSDISK_P1771:
-    case TRSDISK_P1791:
+    if (trs_model == 1 && (cmd == TRSDISK_P1771 || cmd == TRSDISK_P1791)) {
       /* No; emulate Percom Doubler.  Shortcut: we don't really maintain
 	 separate state for the two controllers. */
       state.controller = cmd;
       /* The Doubler's 1791 is hardwired to double density */
       state.density = (state.controller == TRSDISK_P1791);
-      break;
-    default:
+    } else {
       /* Yes; a real write track */
       if (d->writeprot) {
 	state.status = TRSDISK_WRITEPRT;
@@ -861,13 +882,13 @@ trs_disk_command_write(unsigned char cmd)
 	}
       }
       state.status = TRSDISK_BUSY|TRSDISK_DRQ;
+      trs_disk_drq_interrupt(1);
       state.format = FMT_GAP0;
       if (state.density) {
 	state.bytecount = TRKSIZE_DD;
       } else {
 	state.bytecount = TRKSIZE_SD;
       }
-      break;
     }
     break;
   case TRSDISK_FORCEINT:

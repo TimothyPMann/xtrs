@@ -1,11 +1,11 @@
 #!/bin/csh -f
 
 set done = 0
-set control_file = 'TRS-CASSETTE-CONTROL'
+set control_file = '.cassette.ctl'
 
 if(! -e $control_file) then
 	echo "Creating" $control_file
-	echo "/dev/null 0" > $control_file
+	echo "cassette.bin 0" > $control_file
 endif
 
 while($done != 1)

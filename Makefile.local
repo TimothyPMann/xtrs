@@ -10,14 +10,17 @@
 # ENDIAN = -Dbig_endian
 
 # If you would like the TRS-80 ROM to be built into the application,
-# use this line (with the appropriate file name):
+# use the following line (with the appropriate file name).  Warning: you
+# cannot build both a Model I and Model III ROM into xtrs, and if a
+# ROM is built in, only that ROM can be used.
 
-BUILT_IN_ROM = level2rom.hex
+# BUILT_IN_ROM = level2rom.hex
 
 # If you would like the application to load a default ROM file at startup
 # time, use this line (with the appropriate file name):
 
-# DEFAULT_ROM = -DDEFAULT_ROM='"/usr/local/lib/trs80rom.hex"'
+# DEFAULT_ROM = -DDEFAULT_ROM='"/usr/local/lib/level2rom.hex"'
+DEFAULT_ROM = -DDEFAULT_ROM='"level2rom.hex"' -DDEFAULT_ROM3='"romimage.m3"'
 
 # If you have the GNU readline package (the README file tells you where to
 # get it) and would like to use it with the built-in Z-80 debugger, use
@@ -34,7 +37,7 @@ DEBUG = -g
 
 # If you have gcc, and you want to use it:
 
-CC = gcc
+#CC = gcc
 
 # If you need a different path for libraries:
 
@@ -42,7 +45,7 @@ LDFLAGS = -L/usr/X11/lib
 
 # If you need a different path for include files:
 
-# IFLAGS = -I/usr/local/include
+IFLAGS = -I/usr/X11/include
 
 # Re-define this if your X library is strangely named:
 
@@ -51,6 +54,7 @@ XLIB = -lX11
 # Use this if you need yet more libraries:
 
 # EXTRALIBS = -ldnet
+# EXTRALIBS = -lots
 
 # Set these to where you want installed stuff to go, if you install them.
 

@@ -8,10 +8,10 @@
 /* Last modified on Tue Dec 17 13:06:18 PST 1996 by mann */
 
 /*
- * Emulate Model-I disk controller
+ * Emulate Model-I or Model-III disk controller
  */
 
-extern void trs_disk_init(void);
+extern void trs_disk_init(int reset_button);
 extern void trs_disk_select_write(unsigned char data);
 extern unsigned char trs_disk_track_read(void);
 extern void trs_disk_track_write(unsigned char data);
@@ -21,8 +21,12 @@ extern unsigned char trs_disk_data_read(void);
 extern void trs_disk_data_write(unsigned char data);
 extern unsigned char trs_disk_status_read(void);
 extern void trs_disk_command_write(unsigned char cmd);
+extern unsigned char trs_disk_interrupt_read(void); /* M3 only */
+extern void trs_disk_interrupt_write(unsigned char mask); /* M3 only */
 
-/* Drive select register -- address bits 0,1 not decoded */
+extern int trs_disk_spinfast;  /* see main.c */
+
+/* Model I drive select register -- address bits 0,1 not decoded */
 #define TRSDISK_SELECT(addr) (((addr)&~3) == 0x37e0)
 #define TRSDISK_0       0x1
 #define TRSDISK_1       0x2
@@ -31,13 +35,34 @@ extern void trs_disk_command_write(unsigned char cmd);
 #define TRSDISK_SIDE    0x8     /* shared: can't use drive 3 if system
 				   includes double-sided drives */
 
-#define TRSDISK_FDC     0x37ec  /* base of FDC address space */
+/* FDC address space in Model I */
+#define TRSDISK_FDC     0x37ec
 #define TRSDISK_FDCLEN  4       /* 4 bytes are mapped, offsets as follows: */
 #define TRSDISK_COMMAND 0x37ec  /* writing */
 #define TRSDISK_STATUS  0x37ec  /* reading */
 #define TRSDISK_TRACK   0x37ed
 #define TRSDISK_SECTOR  0x37ee
 #define TRSDISK_DATA    0x37ef
+
+/* FDC port space in Model III */
+#define TRSDISK3_INTERRUPT 0xe4 
+#define TRSDISK3_COMMAND   0xf0  /* writing */
+#define TRSDISK3_STATUS    0xf0  /* reading */
+#define TRSDISK3_TRACK     0xf1
+#define TRSDISK3_SECTOR    0xf2
+#define TRSDISK3_DATA      0xf3
+#define TRSDISK3_SELECT    0xf4  /* write-only */
+
+/* Interrupt register bits (M3 only) */
+#define TRSDISK3_INTRQ     0x80
+#define TRSDISK3_DRQ       0x40
+#define TRSDISK3_RESET     0x20  /* reset button, not really disk related */
+
+/* Select register bits (M3 only). Drives 0-3 same as model 1. */
+#define TRSDISK3_MFM       0x80
+#define TRSDISK3_WAIT      0x40
+#define TRSDISK3_PRECOMP   0x20
+#define TRSDISK3_SIDE      0x10  /* not shared! */
 
 /* Commands */
 #define TRSDISK_CMDMASK  0xf0  /* high nybble selects which command */

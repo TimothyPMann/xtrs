@@ -1,24 +1,48 @@
 ;; import.z
-;; Use xtrs 1.0.tpm2 import feature to copy a file from Unix to TRS-80
 ;; Timothy Mann, 10/30/96
-;; Last modified on Tue Dec 17 13:06:19 PST 1996 by mann
+;; Last modified on Mon Aug  4 17:16:42 PDT 1997 by mann
+;;
+;; Use xtrs 1.0.tpm2 import feature to copy a file from Unix to TRS-80
+;; Usage: IMPORT unixfile tofile (NL)
+;; If the (NL) parameter is given, each newline ('\n') in the Unix
+;;  file is converted to a carriage return ('\r'), the TRS-80 end of
+;;  line character.
 
 @fspec  equ 441ch
 @init   equ 4420h
 @param  equ 4476h
+@param3 equ 4454h
 @logot  equ 447bh
+@logot3 equ 428ah
 @write  equ 4439h
 @close  equ 4428h
 @error  equ 4409h
 @exit   equ 402dh
 @abort  equ 4030h       
 
+model   equ 0125h ;'I' here => M3
+
 impctrl equ 0d0h
 impstat equ 0d0h
 impdata equ 0d1h
 
 	org 5200h
-import: ld a, (hl)              ; scan over Unix filename
+import: ld a, (model)           ; Model 1 or 3?
+        cp 'I'
+        jr nz, model1           ; Go if 1
+        push hl
+        ld hl, param+1
+        ld de, @param3
+        ld (hl), e
+        inc hl
+        ld (hl), d
+        ld hl, logot+1
+        ld de, @logot3
+        ld (hl), e
+        inc hl
+        ld (hl), d
+        pop hl
+model1: ld a, (hl)              ; scan over Unix filename
         cp ' '		        ; first skip spaces
 	jr c, usage             ; error if line ends here
         jr nz, unix1
@@ -45,10 +69,10 @@ unix2:	inc hl                  ; now scan for end of Unix name
         call @error
         jp @abort
 openok: ld de, prmtbl           ; ready to parse command line
-        call @param
+        call param
         jr z, prmok             ; go if OK
 usage:  ld hl, usager           ; error message and exit
-        call @logot
+        call logot
         jp @abort
 prmok:  xor a			; reset import/export state machine
 	out (impctrl), a
@@ -66,7 +90,7 @@ dloop:  in a, (impstat)         ; get status
         and a
         jr z, cmdok             ; go if OK
         ld hl, cmder            ; error message and exit
-        call @logot
+        call logot
         jp @abort
 cmdok:  ld a, (nlparam)		; check for NL feature
 	ld c, 0dh		; init to do nothing
@@ -84,7 +108,7 @@ iilp:   in a, (impdata)         ; inner loop
         and a
         jr z, eof               ; go if really eof
         ld hl, imper            ; really a read error
-        call @logot
+        call logot
         jp @abort
 zero:   xor a
 noteof: cp c			; translate?
@@ -113,6 +137,9 @@ eofok:  xor a                   ; compute EOF offset
         call @error             ; oops, i/o error
         jp @abort
 closok: jp @exit                ; all is well
+
+logot:  jp @logot               ; jump vectors, modified for M3
+param:  jp @param
 
 prmtbl: 
         defb 'NL    '

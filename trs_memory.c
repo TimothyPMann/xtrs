@@ -32,20 +32,19 @@
 #include <stdlib.h>
 #include "trs_disk.h"
 
-uchar *memory;
+Uchar *memory;
 
 #define MEMORY_SIZE	Z80_ADDRESS_LIMIT
 
 #define ROM_START	(0x0000)
 #define IO_START	(0x3000)
 #define KEYBOARD_START	(0x3800)
-/*!!#define MORE_IO_START	(0x3900)*/
 #define MORE_IO_START	(0x3c00)
 #define VIDEO_START	(0x3c00)
 #define RAM_START	(0x4000)
 #define PRINTER_ADDRESS	(0x37E8)
 
-/* Interrupt latch register in EI */
+/* Interrupt latch register in EI (Model 1) */
 #define TRS_INTLATCH(addr) (((addr)&~3) == 0x37e0)
 
 /*
@@ -58,12 +57,12 @@ uchar *memory;
 #define WRITEABLE(address) \
   ((address) >= RAM_START)
 #define READABLE(address) \
-  (((ushort) ((address) - IO_START)) >= (VIDEO_START - IO_START))
+  (((Ushort) ((address) - trs_rom_size)) >= (VIDEO_START - trs_rom_size))
 
 #define WRITEABLE_WORD(address) \
-  (((ushort) ((address) + 1)) >= (RAM_START + 1))
+  (((Ushort) ((address) + 1)) >= (RAM_START + 1))
 #define READABLE_WORD(address) \
-  (((ushort) ((address) + 1 - IO_START)) >= (VIDEO_START + 1 - IO_START))
+  (((Ushort) ((address)+1 - trs_rom_size)) >= (VIDEO_START+1 - trs_rom_size))
 
 /*SUPPRESS 53*/
 /*SUPPRESS 112*/
@@ -182,15 +181,14 @@ void trs_exit()
 void trs_reset()
 {
     /* Reset devices (SYSRES on system bus) as at power-up --TPM */
-    trs_disk_init();
+    trs_disk_init(1);
     /* Signal a nonmaskable interrupt. */
-    z80_state.nmi = TRUE;
-    printf("Nonmaskable interrupt.\n");
+    trs_reset_button_interrupt(1);
 }
 
 void mem_init()
 {
-    memory = (uchar *) malloc(MEMORY_SIZE);
+    memory = (Uchar *) malloc(MEMORY_SIZE);
 
     bzero(memory, MEMORY_SIZE);
 #ifdef XTRASH
@@ -352,7 +350,7 @@ int mem_read_word(address)
     int address;
 {
     int rval;
-    uchar *m;
+    Uchar *m;
 
     address &= 0xffff;
 
@@ -376,7 +374,7 @@ int mem_read_word(address)
 void mem_write_word(address, value)
     int address;
 {
-    uchar *m;
+    Uchar *m;
 
     address &= 0xffff;
 
@@ -406,9 +404,9 @@ void mem_write_word(address, value)
  * video scrolling.
  */
 void mem_block_transfer(dest, source, direction, count)
-    ushort dest, source;
+    Ushort dest, source;
     int direction;
-    ushort count;
+    Ushort count;
 {
     /* special case for screen scroll */
     if((dest == VIDEO_START) && (source == VIDEO_START + 0x40) &&

@@ -40,7 +40,7 @@
 #define DISASSEMBLE_OFF_FLAG	(0x8)
 #define BREAK_ONCE_FLAG		(0x10)
 
-static uchar *traps;
+static Uchar *traps;
 static int num_traps;
 static int print_instructions;
 static int stop_signaled;
@@ -195,14 +195,14 @@ void debug_init()
 {
     int i;
 
-    traps = (uchar *) malloc(ADDRESS_SPACE * sizeof(uchar));
-    bzero(traps, ADDRESS_SPACE * sizeof(uchar));
+    traps = (Uchar *) malloc(ADDRESS_SPACE * sizeof(Uchar));
+    bzero(traps, ADDRESS_SPACE * sizeof(Uchar));
 
     for(i = 0; i < MAX_TRAPS; ++i) trap_table[i].valid = 0;
 }
 
 static void print_memory(address, num_bytes)
-    ushort address;
+    Ushort address;
     int num_bytes;
 {
     int bytes_to_print, i;
@@ -244,7 +244,7 @@ static void print_memory(address, num_bytes)
 static void debug_run()
 {
     void (*old_signal_handler)();
-    uchar t;
+    Uchar t;
 
     /* catch control-c signal */
     old_signal_handler = signal(SIGINT, signal_handler);
@@ -376,7 +376,7 @@ void debug_shell()
 	    else if(!strcmp(command, "list"))
 	    {
 		int x, y;
-		ushort start, end;
+		Ushort start, end;
 		int lines = 0;
 
 		if(sscanf(input, "list %x , %x", &x, &y) == 2)
@@ -622,8 +622,8 @@ overflow(a, b, r)
 test_add(a, b)
     int a, b;
 {
-    uchar result;
-    uchar flags;
+    Uchar result;
+    Uchar flags;
 
     result = a + b;
 
@@ -650,8 +650,8 @@ test_add(a, b)
 test_sub(a, b)
     int a, b;
 {
-    uchar result;
-    uchar flags;
+    Uchar result;
+    Uchar flags;
 
     result = a - b;
     

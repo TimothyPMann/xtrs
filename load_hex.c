@@ -34,7 +34,7 @@ static int hex_byte(string)
     return(strtol(buf, (char **)NULL, 16));
 }
     
-void load_hex(file)
+int load_hex(file)
     FILE *file;
 {
     char buffer[BUFFER_SIZE];
@@ -43,6 +43,7 @@ void load_hex(file)
     int address;
     int check;
     int value;
+    int high = 0;
 
     while(fgets(buffer, BUFFER_SIZE, file))
     {
@@ -75,6 +76,7 @@ void load_hex(file)
 		    hex_data(address++, value);
 		    check += value;
 		}
+		if (address > high) high = address;
 
 		/* the checksum */
 		value = hex_byte(b);
@@ -85,4 +87,5 @@ void load_hex(file)
 	    }
 	}
     }
+    return high;
 }

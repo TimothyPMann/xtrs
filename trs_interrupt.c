@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Tue Dec 17 13:06:18 PST 1996 by mann */
+/* Last modified on Wed Jul  9 09:21:17 PDT 1997 by mann */
 
 /*
  * Emulate Model-I interrupts
@@ -17,11 +17,21 @@
 #include <sys/time.h>
 #include <signal.h>
 
+/* IRQs */
+#define M1_TIMER_BIT 0x80
+#define M1_DISK_BIT  0x40
+#define M3_TIMER_BIT 0x04
 static unsigned char interrupt_latch = 0;
-#define TIMER_BIT 0x80  /* within interrupt latch */
-#define DISK_BIT  0x40  /* not emulated, but could be */
+static unsigned char interrupt_mask = 0xFF;
 
-#define TIMER_HZ  40    /* must be an integer */
+/* NMIs (M3 only) */
+#define M3_INTRQ_BIT 0x80
+#define M3_DRQ_BIT   0x40
+#define M3_RESET_BIT 0x20
+static unsigned char nmi_latch = 0;
+static unsigned char nmi_mask = M3_RESET_BIT;
+
+#define TIMER_HZ  (trs_model == 1 ? 40 : 30)  /* must be an integer */
 
 /* Kludge: LDOS hides the date (not time) here over a reboot */
 #define LDOS_MONTH 0x4306
@@ -31,6 +41,118 @@ static unsigned char interrupt_latch = 0;
 static int timer_on = 1;
 
 void
+trs_timer_interrupt(int state)
+{
+  if (trs_model == 1) {
+    if (state) {
+      interrupt_latch |= M1_TIMER_BIT;
+    } else {
+      interrupt_latch &= ~M1_TIMER_BIT;
+    }
+    z80_state.irq = (interrupt_latch != 0);
+  } else {
+    if (state) {
+      interrupt_latch |= M3_TIMER_BIT;
+    } else {
+      interrupt_latch &= ~M3_TIMER_BIT;
+    }
+    z80_state.irq = (interrupt_latch & interrupt_mask) != 0;
+  }
+}
+
+void
+trs_disk_intrq_interrupt(int state)
+{
+  if (trs_model == 1) {
+    if (state) {
+      interrupt_latch |= M1_DISK_BIT;
+    } else {
+      interrupt_latch &= ~M1_DISK_BIT;
+    }
+    z80_state.irq = (interrupt_latch != 0);
+  } else {
+    if (state) {
+      nmi_latch |= M3_INTRQ_BIT;
+    } else {
+      nmi_latch &= ~M3_INTRQ_BIT;
+    }
+    z80_state.nmi = (nmi_latch & nmi_mask) != 0;
+    if (!z80_state.nmi) z80_state.nmi_seen = 0;
+  }
+}
+
+void
+trs_disk_drq_interrupt(int state)
+{
+  if (trs_model == 1) {
+    /* no effect */
+  } else {
+#if 0
+/*!! seems to kill LDOS?? */
+    if (state) {
+      nmi_latch |= M3_DRQ_BIT;
+    } else {
+      nmi_latch &= ~M3_DRQ_BIT;
+    }
+    z80_state.nmi = (nmi_latch & nmi_mask) != 0;
+    if (!z80_state.nmi) z80_state.nmi_seen = 0;
+#endif
+  }
+}
+
+void
+trs_reset_button_interrupt(int state)
+{
+  if (trs_model == 1) {
+    z80_state.nmi = state;
+  } else {  
+    if (state) {
+      nmi_latch |= M3_RESET_BIT;
+    } else {
+      nmi_latch &= ~M3_RESET_BIT;
+    }
+    z80_state.nmi = (nmi_latch & nmi_mask) != 0;
+  }
+  if (!z80_state.nmi) z80_state.nmi_seen = 0;
+}
+
+unsigned char
+trs_interrupt_latch_read()
+{
+  unsigned char tmp = interrupt_latch;
+  trs_timer_interrupt(0); /* acknowledge this one (only) */
+  if (trs_model == 1) {
+    return tmp;
+  } else {
+    return ~tmp;
+  }
+}
+
+void
+trs_interrupt_mask_write(unsigned char value)
+{
+  interrupt_mask = value;
+  z80_state.irq = (interrupt_latch & interrupt_mask) != 0;
+}
+
+/* M3 only */
+unsigned char
+trs_nmi_latch_read()
+{
+  unsigned char tmp = ~nmi_latch;
+  trs_reset_button_interrupt(0); /* acknowledge this one (only) !!? */
+  return tmp;
+}
+
+void
+trs_nmi_mask_write(unsigned char value)
+{
+  nmi_mask = value | M3_RESET_BIT;
+  z80_state.nmi = (nmi_latch & nmi_mask) != 0;
+  if (!z80_state.nmi) z80_state.nmi_seen = 0;
+}
+
+void
 trs_timer_event(signo)
 {
   struct timeval tv;
@@ -38,8 +160,7 @@ trs_timer_event(signo)
 
   if (!timer_on) return;
 
-  interrupt_latch |= TIMER_BIT;
-  z80_state.irq = 1;
+  trs_timer_interrupt(1); /* generate */
 
   /* Schedule next tick.  We do it this way because the host system
      probably didn't wake us up at exactly the right time.  For
@@ -91,17 +212,6 @@ trs_timer_on()
   if (!timer_on) {
     timer_on = 1;
     trs_timer_event(SIGALRM);
-  } else {
-    timer_on = 1;
   }
 }
 
-unsigned char
-trs_interrupt_latch_read()
-{
-  unsigned char tmp = interrupt_latch;
-  interrupt_latch &= ~TIMER_BIT;  /* only this one is cleared by
-                                     reading latch */
-  z80_state.irq = (interrupt_latch != 0);
-  return tmp;
-}

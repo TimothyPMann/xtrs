@@ -15,28 +15,13 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Dec 17 13:06:21 PST 1996 by mann
+   Last modified on Tue Aug  5 19:44:52 PDT 1997 by mann
 */
 
 #include "z80.h"
 
 static int highest_address = 0;
-static uchar memory[Z80_ADDRESS_LIMIT];
-
-static void load_rom(filename)
-    char *filename;
-{
-    FILE *program;
-    
-    if((program = fopen(filename, "r")) == NULL)
-    {
-	char message[100];
-	sprintf(message, "could not read %s", filename);
-	error(message);
-    }
-    load_hex(program);
-    fclose(program);
-}
+static Uchar memory[Z80_ADDRESS_LIMIT];
 
 /* Called by load_hex */
 void hex_data(address, value)
@@ -54,6 +39,32 @@ void hex_transfer_address(address)
      int address;
 {
     /* Ignore */
+}
+
+static void load_rom(filename)
+    char *filename;
+{
+    FILE *program;
+    int c, trs_rom_size;
+    
+    if((program = fopen(filename, "r")) == NULL)
+    {
+	char message[100];
+	sprintf(message, "could not read %s", filename);
+	error(message);
+    }
+    c = getc(program);
+    if (c == ':') {
+        rewind(program);
+        trs_rom_size = load_hex(program);
+    } else {
+        trs_rom_size = 0;
+        while (c != EOF) {
+	    hex_data(trs_rom_size++, c);
+	    c = getc(program);
+	}
+    }
+    fclose(program);
 }
 
 void error(string)

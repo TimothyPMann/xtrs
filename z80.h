@@ -27,17 +27,15 @@
 #define FALSE	(0)
 #endif
 
-#if 0
-typedef unsigned short ushort;
-typedef unsigned char uchar;
-#endif
+typedef unsigned short Ushort;
+typedef unsigned char Uchar;
 
 struct twobyte
 {
 #ifdef big_endian
-    uchar high, low;
+    Uchar high, low;
 #else
-    uchar low, high;
+    Uchar low, high;
 #endif
 };
 
@@ -45,7 +43,7 @@ struct twobyte
 typedef union
 {
     struct twobyte byte;
-    ushort word;
+    Ushort word;
 } wordregister;
 
 struct z80_state_struct
@@ -64,30 +62,34 @@ struct z80_state_struct
     wordregister de_prime;
     wordregister hl_prime;
 
-    uchar i;	/* interrupt-page address register */
-    /* uchar r; */  /* no memory-refresh register, just fetch random values */
+    Uchar i;	/* interrupt-page address register */
+    /* Uchar r; */  /* no memory-refresh register, just fetch random values */
 
-    uchar iff1, iff2;
-    uchar interrupt_mode;
+    Uchar iff1, iff2;
+    Uchar interrupt_mode;
 
     /* To signal a maskable interrupt, set irq TRUE.  The CPU does not
-     * turn off irq; the external device must do that when
+     * turn off irq; the external device must turn it off when
      * appropriately tickled by some IO port or memory address that it
-     * decodes.  This matches a real Z-80: INT is level triggered.
+     * decodes.  INT is level triggered, so Z-80 code must tickle the
+     * device before reenabling interrupts.
      *
      * There is no support as yet for fetching an interrupt vector or
      * RST instruction from the interrupting device, as this gets
      * rather complex when there can be more than one device with an
      * interrupt pending.  So you'd better use interrupt_mode 1 only
-     * (which is what the TRS-80 does.
+     * (which is what the TRS-80 does).
      */
     int irq;
 
-    /* To signal a nonmaskable interrupt, set nmi to TRUE.
-       In this case the CPU sets it to FALSE when it receives the
-       interrupt.  In a real Z-80, NMI is edge-triggered, so this
-       behavior is correct.  */
-    int nmi;
+    /* To signal a nonmaskable interrupt, set nmi to TRUE.  The CPU
+     * does not turn off nmi; the external device must turn it off
+     * when tickled (or after a timeout).  NMI is edge triggered, so
+     * it has to be turned off and back on again before it can cause
+     * another interrupt.  nmi_seen remembers that an edge has been seen,
+     * so turn off both nmi and nmi2 when the interrupt is acknowledged.
+     */
+    int nmi, nmi_seen;
 };
 
 #define Z80_ADDRESS_LIMIT	(1 << 16)
@@ -190,7 +192,7 @@ extern void mem_write_rom();
 extern int mem_read_word();
 extern void mem_write_word();
 extern void mem_block_transfer();
-extern void load_hex();
+extern int load_hex(); /* returns highest address loaded + 1 */
 extern void error();
 extern void z80_out();
 extern int z80_int();

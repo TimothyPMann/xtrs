@@ -27,6 +27,8 @@ typedef enum {
     EXPANDED = 1
 } ScreenMode;
 
+extern int trs_model; /* 1 or 3 */
+
 extern int trs_screen_init();
 extern void trs_screen_write_char(/*int position, int char_index, Bool doflush*/);
 extern void trs_screen_write_chars(/*int *locations, int *values,int count*/);

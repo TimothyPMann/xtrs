@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Dec 17 13:06:20 PST 1996 by mann
+   Last modified on Tue Aug  5 20:24:13 PDT 1997 by mann
 */
 
 /*
@@ -73,6 +73,7 @@ static XrmOptionDescRec opts[] = {
 {"-display",	"*display",	XrmoptionSepArg,	(caddr_t)NULL},
 {"-debug",	"*debug",	XrmoptionNoArg,		(caddr_t)"on"},
 {"-romfile",	"*romfile",	XrmoptionSepArg,	(caddr_t)NULL},
+{"-romfile3",	"*romfile3",	XrmoptionSepArg,	(caddr_t)NULL},
 };
 
 static int num_opts = (sizeof opts / sizeof opts[0]);
@@ -246,17 +247,31 @@ int *debug;
 	/* use compiled in rom */
 	trs_load_compiled_rom();
     } else {
-	/* try resources */
-	(void) sprintf(option, "%s%s", program_name, ".romfile");
-	if (XrmGetResource(x_db, option, "Xtrs.Romfile", &type, &value)) {
-	    trs_load_rom(value.addr);
-	} else {
+	if (trs_model == 1) {
+	    /* try resources */
+	    (void) sprintf(option, "%s%s", program_name, ".romfile");
+	    if (XrmGetResource(x_db, option, "Xtrs.Romfile", &type, &value)) {
+		trs_load_rom(value.addr);
+	    } else {
 #ifdef DEFAULT_ROM
-	    trs_load_rom(DEFAULT_ROM);
+		trs_load_rom(DEFAULT_ROM);
 #else
-	    fprintf(stderr,"%s: rom file not specified!\n",program_name);
-	    exit(-1);
+		fprintf(stderr,"%s: rom file not specified!\n",program_name);
+		exit(-1);
 #endif
+	    }
+	} else {
+	    (void) sprintf(option, "%s%s", program_name, ".romfile3");
+	    if (XrmGetResource(x_db, option, "Xtrs.Romfile3", &type, &value)) {
+		trs_load_rom(value.addr);
+	    } else {
+#ifdef DEFAULT_ROM3
+		trs_load_rom(DEFAULT_ROM3);
+#else
+		fprintf(stderr,"%s: rom file not specified!\n",program_name);
+		exit(-1);
+#endif
+	    }
 	}
     }
 

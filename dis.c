@@ -30,7 +30,7 @@ struct opcode {
 static struct opcode major[256] = {
 	"nop",			0,		/* 00 */
 	"ld	bc,%02x%02xh",	2,		/* 01 */
-	"ld	bc,a",		0,		/* 02 */
+	"ld	(bc),a",	0,		/* 02 */
 	"inc	bc",		0,		/* 03 */
 	"inc	b",		0,		/* 04 */
 	"dec	b",		0,		/* 05 */
@@ -317,7 +317,7 @@ static struct opcode major[256] = {
 	"rst	38h",		0,		/* ff */
 };
 
-static struct opcode minor[4][256] = {
+static struct opcode minor[6][256] = {
 							/* cb */
 	"rlc	b",		0,		/* cb00 */
 	"rlc	c",		0,		/* cb01 */
@@ -835,7 +835,7 @@ static struct opcode minor[4][256] = {
 	undefined,		0,		/* ddc8 */
 	undefined,		0,		/* ddc9 */
 	undefined,		0,		/* ddca */
-	"dd cb	%02x,%02x",	2,		/* ddcb */  /* cop out */
+	0,	                4,		/* ddcb */
 	undefined,		0,		/* ddcc */
 	undefined,		0,		/* ddcd */
 	undefined,		0,		/* ddce */
@@ -1411,7 +1411,7 @@ static struct opcode minor[4][256] = {
 	undefined,		0,		/* fdc8 */
 	undefined,		0,		/* fdc9 */
 	undefined,		0,		/* fdca */
-	"fd cb	%02x,%02x",	2,		/* fdcb */  /* cop out */  
+	0,	                5,		/* fdcb */
 	undefined,		0,		/* fdcc */
 	undefined,		0,		/* fdcd */
 	undefined,		0,		/* fdce */
@@ -1470,6 +1470,584 @@ static struct opcode minor[4][256] = {
 	undefined,		0,		/* fdfd */
 	undefined,		0,		/* fdfe */
 	undefined,		0,		/* fdff */
+
+							/* dd cb */
+	undefined,		0,		/* ddcb00 */
+	undefined,		0,		/* ddcb01 */
+	undefined,		0,		/* ddcb02 */
+	undefined,		0,		/* ddcb03 */
+	undefined,		0,		/* ddcb04 */
+	undefined,		0,		/* ddcb05 */
+	"rlc	(ix+%02xh)",	3,		/* ddcb06 */
+	undefined,		0,		/* ddcb07 */
+	
+	undefined,		0,		/* ddcb08 */
+	undefined,		0,		/* ddcb09 */
+	undefined,		0,		/* ddcb0a */
+	undefined,		0,		/* ddcb0b */
+	undefined,		0,		/* ddcb0c */
+	undefined,		0,		/* ddcb0d */
+	"rrc	(ix+%02xh)",	3,		/* ddcb0e */
+	undefined,		0,		/* ddcb0f */
+	
+	undefined,		0,		/* ddcb10 */
+	undefined,		0,		/* ddcb11 */
+	undefined,		0,		/* ddcb12 */
+	undefined,		0,		/* ddcb13 */
+	undefined,		0,		/* ddcb14 */
+	undefined,		0,		/* ddcb15 */
+	"rl	(ix+%02xh)",	3,		/* ddcb16 */
+	undefined,		0,		/* ddcb17 */
+	
+	undefined,		0,		/* ddcb18 */
+	undefined,		0,		/* ddcb19 */
+	undefined,		0,		/* ddcb1a */
+	undefined,		0,		/* ddcb1b */
+	undefined,		0,		/* ddcb1c */
+	undefined,		0,		/* ddcb1d */
+	"rr	(ix+%02xh)",	3,		/* ddcb1e */
+	undefined,		0,		/* ddcb1f */
+	
+	undefined,		0,		/* ddcb20 */
+	undefined,		0,		/* ddcb21 */
+	undefined,		0,		/* ddcb22 */
+	undefined,		0,		/* ddcb23 */
+	undefined,		0,		/* ddcb24 */
+	undefined,		0,		/* ddcb25 */
+	"sla	(ix+%02xh)",	3,		/* ddcb26 */
+	undefined,		0,		/* ddcb27 */
+	
+	undefined,		0,		/* ddcb28 */
+	undefined,		0,		/* ddcb29 */
+	undefined,		0,		/* ddcb2a */
+	undefined,		0,		/* ddcb2b */
+	undefined,		0,		/* ddcb2c */
+	undefined,		0,		/* ddcb2d */
+	"sra	(ix+%02xh)",	3,		/* ddcb2e */
+	undefined,		0,		/* ddcb2f */
+	
+	undefined,		0,		/* ddcb30 */
+	undefined,		0,		/* ddcb31 */
+	undefined,		0,		/* ddcb32 */
+	undefined,		0,		/* ddcb33 */
+	undefined,		0,		/* ddcb34 */
+	undefined,		0,		/* ddcb35 */
+	undefined,		0,		/* ddcb36 */
+	undefined,		0,		/* ddcb37 */
+	
+	undefined,		0,		/* ddcb38 */
+	undefined,		0,		/* ddcb39 */
+	undefined,		0,		/* ddcb3a */
+	undefined,		0,		/* ddcb3b */
+	undefined,		0,		/* ddcb3c */
+	undefined,		0,		/* ddcb3d */
+	"srl	(ix+%02xh)",	3,		/* ddcb3e */
+	undefined,		0,		/* ddcb3f */
+	
+	undefined,		0,		/* ddcb40 */
+	undefined,		0,		/* ddcb41 */
+	undefined,		0,		/* ddcb42 */
+	undefined,		0,		/* ddcb43 */
+	undefined,		0,		/* ddcb44 */
+	undefined,		0,		/* ddcb45 */
+	"bit	0,(ix+%02xh)",	3,		/* ddcb46 */
+	undefined,		0,		/* ddcb47 */
+	
+	undefined,		0,		/* ddcb48 */
+	undefined,		0,		/* ddcb49 */
+	undefined,		0,		/* ddcb4a */
+	undefined,		0,		/* ddcb4b */
+	undefined,		0,		/* ddcb4c */
+	undefined,		0,		/* ddcb4d */
+	"bit	1,(ix+%02xh)",	3,		/* ddcb4e */
+	undefined,		0,		/* ddcb4f */
+	
+	undefined,		0,		/* ddcb50 */
+	undefined,		0,		/* ddcb51 */
+	undefined,		0,		/* ddcb52 */
+	undefined,		0,		/* ddcb53 */
+	undefined,		0,		/* ddcb54 */
+	undefined,		0,		/* ddcb55 */
+	"bit	2,(ix+%02xh)",	3,		/* ddcb56 */
+	undefined,		0,		/* ddcb57 */
+	
+	undefined,		0,		/* ddcb58 */
+	undefined,		0,		/* ddcb59 */
+	undefined,		0,		/* ddcb5a */
+	undefined,		0,		/* ddcb5b */
+	undefined,		0,		/* ddcb5c */
+	undefined,		0,		/* ddcb5d */
+	"bit	3,(ix+%02xh)",	3,		/* ddcb5e */
+	undefined,		0,		/* ddcb5f */
+	
+	undefined,		0,		/* ddcb60 */
+	undefined,		0,		/* ddcb61 */
+	undefined,		0,		/* ddcb62 */
+	undefined,		0,		/* ddcb63 */
+	undefined,		0,		/* ddcb64 */
+	undefined,		0,		/* ddcb65 */
+	"bit	4,(ix+%02xh)",	3,		/* ddcb66 */
+	undefined,		0,		/* ddcb67 */
+	
+	undefined,		0,		/* ddcb68 */
+	undefined,		0,		/* ddcb69 */
+	undefined,		0,		/* ddcb6a */
+	undefined,		0,		/* ddcb6b */
+	undefined,		0,		/* ddcb6c */
+	undefined,		0,		/* ddcb6d */
+	"bit	5,(ix+%02xh)",	3,		/* ddcb6e */
+	undefined,		0,		/* ddcb6f */
+	
+	undefined,		0,		/* ddcb70 */
+	undefined,		0,		/* ddcb71 */
+	undefined,		0,		/* ddcb72 */
+	undefined,		0,		/* ddcb73 */
+	undefined,		0,		/* ddcb74 */
+	undefined,		0,		/* ddcb75 */
+	"bit	6,(ix+%02xh)",	3,		/* ddcb76 */
+	undefined,		0,		/* ddcb77 */
+	
+	undefined,		0,		/* ddcb78 */
+	undefined,		0,		/* ddcb79 */
+	undefined,		0,		/* ddcb7a */
+	undefined,		0,		/* ddcb7b */
+	undefined,		0,		/* ddcb7c */
+	undefined,		0,		/* ddcb7d */
+	"bit	7,(ix+%02xh)",	3,		/* ddcb7e */
+	undefined,		0,		/* ddcb7f */
+	
+	undefined,		0,		/* ddcb80 */
+	undefined,		0,		/* ddcb81 */
+	undefined,		0,		/* ddcb82 */
+	undefined,		0,		/* ddcb83 */
+	undefined,		0,		/* ddcb84 */
+	undefined,		0,		/* ddcb85 */
+	"res	0,(ix+%02xh)",	3,		/* ddcb86 */
+	undefined,		0,		/* ddcb87 */
+	
+	undefined,		0,		/* ddcb88 */
+	undefined,		0,		/* ddcb89 */
+	undefined,		0,		/* ddcb8a */
+	undefined,		0,		/* ddcb8b */
+	undefined,		0,		/* ddcb8c */
+	undefined,		0,		/* ddcb8d */
+	"res	1,(ix+%02xh)",	3,		/* ddcb8e */
+	undefined,		0,		/* ddcb8f */
+	
+	undefined,		0,		/* ddcb90 */
+	undefined,		0,		/* ddcb91 */
+	undefined,		0,		/* ddcb92 */
+	undefined,		0,		/* ddcb93 */
+	undefined,		0,		/* ddcb94 */
+	undefined,		0,		/* ddcb95 */
+	"res	2,(ix+%02xh)",	3,		/* ddcb96 */
+	undefined,		0,		/* ddcb97 */
+	
+	undefined,		0,		/* ddcb98 */
+	undefined,		0,		/* ddcb99 */
+	undefined,		0,		/* ddcb9a */
+	undefined,		0,		/* ddcb9b */
+	undefined,		0,		/* ddcb9c */
+	undefined,		0,		/* ddcb9d */
+	"res	3,(ix+%02xh)",	3,		/* ddcb9e */
+	undefined,		0,		/* ddcb9f */
+	
+	undefined,		0,		/* ddcba0 */
+	undefined,		0,		/* ddcba1 */
+	undefined,		0,		/* ddcba2 */
+	undefined,		0,		/* ddcba3 */
+	undefined,		0,		/* ddcba4 */
+	undefined,		0,		/* ddcba5 */
+	"res	4,(ix+%02xh)",	3,		/* ddcba6 */
+	undefined,		0,		/* ddcba7 */
+	
+	undefined,		0,		/* ddcba8 */
+	undefined,		0,		/* ddcba9 */
+	undefined,		0,		/* ddcbaa */
+	undefined,		0,		/* ddcbab */
+	undefined,		0,		/* ddcbac */
+	undefined,		0,		/* ddcbad */
+	"res	5,(ix+%02xh)",	3,		/* ddcbae */
+	undefined,		0,		/* ddcbaf */
+	
+	undefined,		0,		/* ddcbb0 */
+	undefined,		0,		/* ddcbb1 */
+	undefined,		0,		/* ddcbb2 */
+	undefined,		0,		/* ddcbb3 */
+	undefined,		0,		/* ddcbb4 */
+	undefined,		0,		/* ddcbb5 */
+	"res	6,(ix+%02xh)",	3,		/* ddcbb6 */
+	undefined,		0,		/* ddcbb7 */
+	
+	undefined,		0,		/* ddcbb8 */
+	undefined,		0,		/* ddcbb9 */
+	undefined,		0,		/* ddcbba */
+	undefined,		0,		/* ddcbbb */
+	undefined,		0,		/* ddcbbc */
+	undefined,		0,		/* ddcbbd */
+	"res	7,(ix+%02xh)",	3,		/* ddcbbe */
+	undefined,		0,		/* ddcbbf */
+	
+	undefined,		0,		/* ddcbc0 */
+	undefined,		0,		/* ddcbc1 */
+	undefined,		0,		/* ddcbc2 */
+	undefined,		0,		/* ddcbc3 */
+	undefined,		0,		/* ddcbc4 */
+	undefined,		0,		/* ddcbc5 */
+	"set	0,(ix+%02xh)",	3,		/* ddcbc6 */
+	undefined,		0,		/* ddcbc7 */
+	
+	undefined,		0,		/* ddcbc8 */
+	undefined,		0,		/* ddcbc9 */
+	undefined,		0,		/* ddcbca */
+	undefined,		0,		/* ddcbcb */
+	undefined,		0,		/* ddcbcc */
+	undefined,		0,		/* ddcbcd */
+	"set	1,(ix+%02xh)",	3,		/* ddcbce */
+	undefined,		0,		/* ddcbcf */
+	
+	undefined,		0,		/* ddcbd0 */
+	undefined,		0,		/* ddcbd1 */
+	undefined,		0,		/* ddcbd2 */
+	undefined,		0,		/* ddcbd3 */
+	undefined,		0,		/* ddcbd4 */
+	undefined,		0,		/* ddcbd5 */
+	"set	2,(ix+%02xh)",	3,		/* ddcbd6 */
+	undefined,		0,		/* ddcbd7 */
+	
+	undefined,		0,		/* ddcbd8 */
+	undefined,		0,		/* ddcbd9 */
+	undefined,		0,		/* ddcbda */
+	undefined,		0,		/* ddcbdb */
+	undefined,		0,		/* ddcbdc */
+	undefined,		0,		/* ddcbdd */
+	"set	3,(ix+%02xh)",	3,		/* ddcbde */
+	undefined,		0,		/* ddcbdf */
+	
+	undefined,		0,		/* ddcbe0 */
+	undefined,		0,		/* ddcbe1 */
+	undefined,		0,		/* ddcbe2 */
+	undefined,		0,		/* ddcbe3 */
+	undefined,		0,		/* ddcbe4 */
+	undefined,		0,		/* ddcbe5 */
+	"set	4,(ix+%02xh)",	3,		/* ddcbe6 */
+	undefined,		0,		/* ddcbe7 */
+	
+	undefined,		0,		/* ddcbe8 */
+	undefined,		0,		/* ddcbe9 */
+	undefined,		0,		/* ddcbea */
+	undefined,		0,		/* ddcbeb */
+	undefined,		0,		/* ddcbec */
+	undefined,		0,		/* ddcbed */
+	"set	5,(ix+%02xh)",	3,		/* ddcbee */
+	undefined,		0,		/* ddcbef */
+	
+	undefined,		0,		/* ddcbf0 */
+	undefined,		0,		/* ddcbf1 */
+	undefined,		0,		/* ddcbf2 */
+	undefined,		0,		/* ddcbf3 */
+	undefined,		0,		/* ddcbf4 */
+	undefined,		0,		/* ddcbf5 */
+	"set	6,(ix+%02xh)",	3,		/* ddcbf6 */
+	undefined,		0,		/* ddcbf7 */
+	
+	undefined,		0,		/* ddcbf8 */
+	undefined,		0,		/* ddcbf9 */
+	undefined,		0,		/* ddcbfa */
+	undefined,		0,		/* ddcbfb */
+	undefined,		0,		/* ddcbfc */
+	undefined,		0,		/* ddcbfd */
+	"set	7,(ix+%02xh)",	3,		/* ddcbfe */
+	undefined,		0,		/* ddcbff */
+
+							/* fd cb */
+	undefined,		0,		/* fdcb00 */
+	undefined,		0,		/* fdcb01 */
+	undefined,		0,		/* fdcb02 */
+	undefined,		0,		/* fdcb03 */
+	undefined,		0,		/* fdcb04 */
+	undefined,		0,		/* fdcb05 */
+	"rlc	(iy+%02xh)",	3,		/* fdcb06 */
+	undefined,		0,		/* fdcb07 */
+	
+	undefined,		0,		/* fdcb08 */
+	undefined,		0,		/* fdcb09 */
+	undefined,		0,		/* fdcb0a */
+	undefined,		0,		/* fdcb0b */
+	undefined,		0,		/* fdcb0c */
+	undefined,		0,		/* fdcb0d */
+	"rrc	(iy+%02xh)",	3,		/* fdcb0e */
+	undefined,		0,		/* fdcb0f */
+	
+	undefined,		0,		/* fdcb10 */
+	undefined,		0,		/* fdcb11 */
+	undefined,		0,		/* fdcb12 */
+	undefined,		0,		/* fdcb13 */
+	undefined,		0,		/* fdcb14 */
+	undefined,		0,		/* fdcb15 */
+	"rl	(iy+%02xh)",	3,		/* fdcb16 */
+	undefined,		0,		/* fdcb17 */
+	
+	undefined,		0,		/* fdcb18 */
+	undefined,		0,		/* fdcb19 */
+	undefined,		0,		/* fdcb1a */
+	undefined,		0,		/* fdcb1b */
+	undefined,		0,		/* fdcb1c */
+	undefined,		0,		/* fdcb1d */
+	"rr	(iy+%02xh)",	3,		/* fdcb1e */
+	undefined,		0,		/* fdcb1f */
+	
+	undefined,		0,		/* fdcb20 */
+	undefined,		0,		/* fdcb21 */
+	undefined,		0,		/* fdcb22 */
+	undefined,		0,		/* fdcb23 */
+	undefined,		0,		/* fdcb24 */
+	undefined,		0,		/* fdcb25 */
+	"sla	(iy+%02xh)",	3,		/* fdcb26 */
+	undefined,		0,		/* fdcb27 */
+	
+	undefined,		0,		/* fdcb28 */
+	undefined,		0,		/* fdcb29 */
+	undefined,		0,		/* fdcb2a */
+	undefined,		0,		/* fdcb2b */
+	undefined,		0,		/* fdcb2c */
+	undefined,		0,		/* fdcb2d */
+	"sra	(iy+%02xh)",	3,		/* fdcb2e */
+	undefined,		0,		/* fdcb2f */
+	
+	undefined,		0,		/* fdcb30 */
+	undefined,		0,		/* fdcb31 */
+	undefined,		0,		/* fdcb32 */
+	undefined,		0,		/* fdcb33 */
+	undefined,		0,		/* fdcb34 */
+	undefined,		0,		/* fdcb35 */
+	undefined,		0,		/* fdcb36 */
+	undefined,		0,		/* fdcb37 */
+	
+	undefined,		0,		/* fdcb38 */
+	undefined,		0,		/* fdcb39 */
+	undefined,		0,		/* fdcb3a */
+	undefined,		0,		/* fdcb3b */
+	undefined,		0,		/* fdcb3c */
+	undefined,		0,		/* fdcb3d */
+	"srl	(iy+%02xh)",	3,		/* fdcb3e */
+	undefined,		0,		/* fdcb3f */
+	
+	undefined,		0,		/* fdcb40 */
+	undefined,		0,		/* fdcb41 */
+	undefined,		0,		/* fdcb42 */
+	undefined,		0,		/* fdcb43 */
+	undefined,		0,		/* fdcb44 */
+	undefined,		0,		/* fdcb45 */
+	"bit	0,(iy+%02xh)",	3,		/* fdcb46 */
+	undefined,		0,		/* fdcb47 */
+	
+	undefined,		0,		/* fdcb48 */
+	undefined,		0,		/* fdcb49 */
+	undefined,		0,		/* fdcb4a */
+	undefined,		0,		/* fdcb4b */
+	undefined,		0,		/* fdcb4c */
+	undefined,		0,		/* fdcb4d */
+	"bit	1,(iy+%02xh)",	3,		/* fdcb4e */
+	undefined,		0,		/* fdcb4f */
+	
+	undefined,		0,		/* fdcb50 */
+	undefined,		0,		/* fdcb51 */
+	undefined,		0,		/* fdcb52 */
+	undefined,		0,		/* fdcb53 */
+	undefined,		0,		/* fdcb54 */
+	undefined,		0,		/* fdcb55 */
+	"bit	2,(iy+%02xh)",	3,		/* fdcb56 */
+	undefined,		0,		/* fdcb57 */
+	
+	undefined,		0,		/* fdcb58 */
+	undefined,		0,		/* fdcb59 */
+	undefined,		0,		/* fdcb5a */
+	undefined,		0,		/* fdcb5b */
+	undefined,		0,		/* fdcb5c */
+	undefined,		0,		/* fdcb5d */
+	"bit	3,(iy+%02xh)",	3,		/* fdcb5e */
+	undefined,		0,		/* fdcb5f */
+	
+	undefined,		0,		/* fdcb60 */
+	undefined,		0,		/* fdcb61 */
+	undefined,		0,		/* fdcb62 */
+	undefined,		0,		/* fdcb63 */
+	undefined,		0,		/* fdcb64 */
+	undefined,		0,		/* fdcb65 */
+	"bit	4,(iy+%02xh)",	3,		/* fdcb66 */
+	undefined,		0,		/* fdcb67 */
+	
+	undefined,		0,		/* fdcb68 */
+	undefined,		0,		/* fdcb69 */
+	undefined,		0,		/* fdcb6a */
+	undefined,		0,		/* fdcb6b */
+	undefined,		0,		/* fdcb6c */
+	undefined,		0,		/* fdcb6d */
+	"bit	5,(iy+%02xh)",	3,		/* fdcb6e */
+	undefined,		0,		/* fdcb6f */
+	
+	undefined,		0,		/* fdcb70 */
+	undefined,		0,		/* fdcb71 */
+	undefined,		0,		/* fdcb72 */
+	undefined,		0,		/* fdcb73 */
+	undefined,		0,		/* fdcb74 */
+	undefined,		0,		/* fdcb75 */
+	"bit	6,(iy+%02xh)",	3,		/* fdcb76 */
+	undefined,		0,		/* fdcb77 */
+	
+	undefined,		0,		/* fdcb78 */
+	undefined,		0,		/* fdcb79 */
+	undefined,		0,		/* fdcb7a */
+	undefined,		0,		/* fdcb7b */
+	undefined,		0,		/* fdcb7c */
+	undefined,		0,		/* fdcb7d */
+	"bit	7,(iy+%02xh)",	3,		/* fdcb7e */
+	undefined,		0,		/* fdcb7f */
+	
+	undefined,		0,		/* fdcb80 */
+	undefined,		0,		/* fdcb81 */
+	undefined,		0,		/* fdcb82 */
+	undefined,		0,		/* fdcb83 */
+	undefined,		0,		/* fdcb84 */
+	undefined,		0,		/* fdcb85 */
+	"res	0,(iy+%02xh)",	3,		/* fdcb86 */
+	undefined,		0,		/* fdcb87 */
+	
+	undefined,		0,		/* fdcb88 */
+	undefined,		0,		/* fdcb89 */
+	undefined,		0,		/* fdcb8a */
+	undefined,		0,		/* fdcb8b */
+	undefined,		0,		/* fdcb8c */
+	undefined,		0,		/* fdcb8d */
+	"res	1,(iy+%02xh)",	3,		/* fdcb8e */
+	undefined,		0,		/* fdcb8f */
+	
+	undefined,		0,		/* fdcb90 */
+	undefined,		0,		/* fdcb91 */
+	undefined,		0,		/* fdcb92 */
+	undefined,		0,		/* fdcb93 */
+	undefined,		0,		/* fdcb94 */
+	undefined,		0,		/* fdcb95 */
+	"res	2,(iy+%02xh)",	3,		/* fdcb96 */
+	undefined,		0,		/* fdcb97 */
+	
+	undefined,		0,		/* fdcb98 */
+	undefined,		0,		/* fdcb99 */
+	undefined,		0,		/* fdcb9a */
+	undefined,		0,		/* fdcb9b */
+	undefined,		0,		/* fdcb9c */
+	undefined,		0,		/* fdcb9d */
+	"res	3,(iy+%02xh)",	3,		/* fdcb9e */
+	undefined,		0,		/* fdcb9f */
+	
+	undefined,		0,		/* fdcba0 */
+	undefined,		0,		/* fdcba1 */
+	undefined,		0,		/* fdcba2 */
+	undefined,		0,		/* fdcba3 */
+	undefined,		0,		/* fdcba4 */
+	undefined,		0,		/* fdcba5 */
+	"res	4,(iy+%02xh)",	3,		/* fdcba6 */
+	undefined,		0,		/* fdcba7 */
+	
+	undefined,		0,		/* fdcba8 */
+	undefined,		0,		/* fdcba9 */
+	undefined,		0,		/* fdcbaa */
+	undefined,		0,		/* fdcbab */
+	undefined,		0,		/* fdcbac */
+	undefined,		0,		/* fdcbad */
+	"res	5,(iy+%02xh)",	3,		/* fdcbae */
+	undefined,		0,		/* fdcbaf */
+	
+	undefined,		0,		/* fdcbb0 */
+	undefined,		0,		/* fdcbb1 */
+	undefined,		0,		/* fdcbb2 */
+	undefined,		0,		/* fdcbb3 */
+	undefined,		0,		/* fdcbb4 */
+	undefined,		0,		/* fdcbb5 */
+	"res	6,(iy+%02xh)",	3,		/* fdcbb6 */
+	undefined,		0,		/* fdcbb7 */
+	
+	undefined,		0,		/* fdcbb8 */
+	undefined,		0,		/* fdcbb9 */
+	undefined,		0,		/* fdcbba */
+	undefined,		0,		/* fdcbbb */
+	undefined,		0,		/* fdcbbc */
+	undefined,		0,		/* fdcbbd */
+	"res	7,(iy+%02xh)",	3,		/* fdcbbe */
+	undefined,		0,		/* fdcbbf */
+	
+	undefined,		0,		/* fdcbc0 */
+	undefined,		0,		/* fdcbc1 */
+	undefined,		0,		/* fdcbc2 */
+	undefined,		0,		/* fdcbc3 */
+	undefined,		0,		/* fdcbc4 */
+	undefined,		0,		/* fdcbc5 */
+	"set	0,(iy+%02xh)",	3,		/* fdcbc6 */
+	undefined,		0,		/* fdcbc7 */
+	
+	undefined,		0,		/* fdcbc8 */
+	undefined,		0,		/* fdcbc9 */
+	undefined,		0,		/* fdcbca */
+	undefined,		0,		/* fdcbcb */
+	undefined,		0,		/* fdcbcc */
+	undefined,		0,		/* fdcbcd */
+	"set	1,(iy+%02xh)",	3,		/* fdcbce */
+	undefined,		0,		/* fdcbcf */
+	
+	undefined,		0,		/* fdcbd0 */
+	undefined,		0,		/* fdcbd1 */
+	undefined,		0,		/* fdcbd2 */
+	undefined,		0,		/* fdcbd3 */
+	undefined,		0,		/* fdcbd4 */
+	undefined,		0,		/* fdcbd5 */
+	"set	2,(iy+%02xh)",	3,		/* fdcbd6 */
+	undefined,		0,		/* fdcbd7 */
+	
+	undefined,		0,		/* fdcbd8 */
+	undefined,		0,		/* fdcbd9 */
+	undefined,		0,		/* fdcbda */
+	undefined,		0,		/* fdcbdb */
+	undefined,		0,		/* fdcbdc */
+	undefined,		0,		/* fdcbdd */
+	"set	3,(iy+%02xh)",	3,		/* fdcbde */
+	undefined,		0,		/* fdcbdf */
+	
+	undefined,		0,		/* fdcbe0 */
+	undefined,		0,		/* fdcbe1 */
+	undefined,		0,		/* fdcbe2 */
+	undefined,		0,		/* fdcbe3 */
+	undefined,		0,		/* fdcbe4 */
+	undefined,		0,		/* fdcbe5 */
+	"set	4,(iy+%02xh)",	3,		/* fdcbe6 */
+	undefined,		0,		/* fdcbe7 */
+	
+	undefined,		0,		/* fdcbe8 */
+	undefined,		0,		/* fdcbe9 */
+	undefined,		0,		/* fdcbea */
+	undefined,		0,		/* fdcbeb */
+	undefined,		0,		/* fdcbec */
+	undefined,		0,		/* fdcbed */
+	"set	5,(iy+%02xh)",	3,		/* fdcbee */
+	undefined,		0,		/* fdcbef */
+	
+	undefined,		0,		/* fdcbf0 */
+	undefined,		0,		/* fdcbf1 */
+	undefined,		0,		/* fdcbf2 */
+	undefined,		0,		/* fdcbf3 */
+	undefined,		0,		/* fdcbf4 */
+	undefined,		0,		/* fdcbf5 */
+	"set	6,(iy+%02xh)",	3,		/* fdcbf6 */
+	undefined,		0,		/* fdcbf7 */
+	
+	undefined,		0,		/* fdcbf8 */
+	undefined,		0,		/* fdcbf9 */
+	undefined,		0,		/* fdcbfa */
+	undefined,		0,		/* fdcbfb */
+	undefined,		0,		/* fdcbfc */
+	undefined,		0,		/* fdcbfd */
+	"set	7,(iy+%02xh)",	3,		/* fdcbfe */
+	undefined,		0,		/* fdcbff */
 };
 
 int disassemble(pc)
@@ -1485,9 +2063,11 @@ int disassemble(pc)
     {
 	j = major[i].args;
 	i = mem_read(pc++);
-	while (!minor[j][i].name)
+	if (!minor[j][i].name)
 	{
+	    /* dd cb or fd cb; offset comes *before* instruction */
 	    j = minor[j][i].args;
+            pc++; /* skip over offset */
 	    i = mem_read(pc++);
 	}
 	code = &minor[j][i];
@@ -1506,6 +2086,9 @@ int disassemble(pc)
 	printf (code->name, mem_read(pc));
 	pc += 1;
 	break;
+      case 3: /* 1 arg before instruction */
+	printf (code->name, mem_read(pc - 2));
+        break;
       case 0:
 	printf (code->name);
 	break;
