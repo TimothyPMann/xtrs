@@ -19,6 +19,7 @@
 */
 
 #include <string.h>
+#include <stdlib.h>
 
 #include "z80.h"
 #include "trs.h"

@@ -2362,7 +2362,7 @@ trs_disk_command_write(unsigned char cmd)
 
 	/* max distance past ID CRC to search for DAM */
 	int damlimit = state.density ? 43 : 30; /* ref 1791 datasheet */
-	unsigned char dam;
+	unsigned char dam = 0;
 
 	/* DMK search dumps the size code into state.bytecount; adjust
            to real bytecount here */
