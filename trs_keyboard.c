@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Mon Dec  1 15:18:34 PST 1997 by mann
+   Last modified on Mon Dec  1 15:24:24 PST 1997 by mann
 */
 
 #include "z80.h"
@@ -530,7 +530,6 @@ void trs_xlate_keycode(keycode)
 {
     int key_down;
     KeyTable* kt;
-    int i;
     static int shift_action = TK_Neutral;
 
     if (keycode == 0x10000) {
