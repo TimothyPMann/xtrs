@@ -1,0 +1,44 @@
+/* truedam.ccc -- Misosys C program to query/set truedam flag on xtrs */
+/* Copyright (c) 1998, Timothy Mann */
+
+/* This software may be copied, modified, and used for any purpose
+ * without fee, provided that (1) the above copyright notice is
+ * retained, and (2) modified versions are clearly marked as having
+ * been modified, with the modifier's name and the date included.  */
+
+/* Last modified on Tue Dec 15 14:54:58 PST 1998 by mann */
+
+#include "xtrsemt.h"
+#include "xtrsemt.ccc"  /* could use separate compilation instead */
+
+usage(n)
+     int n;
+{
+    fprintf(stderr, "usage: truedam [0|1]\n");
+    exit(1);
+}
+
+int main(argc, argv)
+     int argc;
+     char **argv;
+{
+    int hl, bc, de, ret;
+    char *retp;
+    int func;
+
+    if (argc == 1) {
+	func = EMT_MISC_QUERY_TRUEDAM;
+    } else if ((argc == 2) && isdigit(argv[1][0])) {	
+        func = EMT_MISC_SET_TRUEDAM;
+	if (strlen(argv[1]) != 1) usage();
+	hl = atoi(argv[1]);
+	if (hl > 1) usage();
+    } else {
+        usage();
+    }
+
+    emt_4misc(func, &hl, &bc, &de);
+    printf("truedam = %d\n", hl);
+
+    exit(0);
+}
