@@ -17,13 +17,13 @@ rewrite of the keyboard handling, support for most of the undocumented
 Z-80 instructions, and a bunch of bug fixes and minor improvements.
 
 This project has been a real (48KB?) trip down memory lane for me.  I
-worked as a programmer for Logical Systems, who produced LDOS, during
-1980-81 before I went to grad school.  I no longer own a TRS-80, but I
-recently found a box in my storage closet containing all my Model I
-hardware manuals, schematics, ROM disassemblies, and even the assembly
-listing for a version of the LDOS Percom Doubler driver that I helped
-write, giving me enough information to get my additions to xtrs off
-the ground.
+worked as a programmer for Logical Systems, the company that produced
+LDOS, during 1980-81 before I went to grad school.  I no longer own a
+TRS-80, but I recently found a box in my storage closet containing all
+my Model I hardware manuals, schematics, ROM disassemblies, and even
+the assembly listing for a version of the LDOS Percom Doubler driver
+that I helped write, giving me enough information to get my additions
+to xtrs off the ground.
 
 Since then I've done much more. Check out my TRS-80 Web page at
 http://www.research.digital.com/SRC/personal/Tim_Mann/trs80.html
