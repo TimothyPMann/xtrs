@@ -1,0 +1,453 @@
+;*=*=*
+;	xtrs8/dct
+;	LDOS driver for xtrs emulation of 8" floppy
+;
+;	Copyright (c) 1998, Timothy Mann
+;
+;	This software may be copied, modified, and used for any
+;	purpose without fee, provided that (1) the above copyright
+;	notice is retained, and (2) modified versions are clearly
+;	marked as having been modified, with the modifier's name and
+;	the date included.  
+;
+;	Created 4-9-98
+;       Last modified on Thu Apr  9 17:26:29 PDT 1998 by mann
+;*=*=*
+
+
+; Number of floppy drives xtrs allows
+ndrive	equ	8	
+
+; ASCII chars
+LF      equ     10
+CR	equ	13
+ETX	equ	3
+
+; Model 4 SVC numbers
+@high   equ     100
+@dsply  equ     10
+@flags  equ     101
+@logot  equ     12
+@gtdcb  equ	82 
+@gtmod	equ	83
+@keyin	equ	9
+
+; Model I/III hard addresses
+m3flag$ equ	0125h	; 'I' in ROM on Model III
+@logot1 equ     447bh
+@logot3	equ	428ah
+@dsply1	equ	4467h
+@dsply3	equ	4467h
+high$1  equ     4049h
+high$3  equ     4411h
+cflag$1 equ     4758h
+cflag$3 equ     4758h
+@keyin1	equ	0040h
+@keyin3	equ	0040h
+osver$3 equ	441fh
+
+; Very undocumented! ugh!
+flop31	equ	4585h	;Model III LDOS 5.1.x floppy driver
+flop33	equ	4583h   ;Model III LDOS 5.3.x floppy driver
+
+;*=*=*
+;	Set origin to be safe on both LDOS 5 and 6
+;*=*=*
+	org	6000h
+
+;*=*=*
+; 	Relocator for disk driver
+;*=*=*
+instal:	ld	(dct),de	;Save DCT address
+	ld	a,(000ah)	;Determine TRS-80 model
+	cp	40h
+	jp	nz,lsdos6	;Model 4 (or other LS-DOS, I hope)
+	ld	a,(m3flag$)
+	cp	'I'
+	jp	z,model3	;Go if Model III
+;*=*=*
+; 	LDOS 5 Model I - See LS-DOS 6 version for comments
+;*=*=*
+	ld	a,0cdh		;Insert Model I @LOGOT
+	ld	(logot),a
+	ld	hl,@logot1
+	ld	(logot+1),hl
+	ld	hl,hello_
+	call	@dsply1
+	ld      a,(cflag$1)
+	bit     3,a		;System request?
+	jp      z,viaset
+	ld	de,(dct)
+	ld	a,d		;DRIVE= must be specified
+	or	e
+	jp	z,needdr
+asku1:	ld	hl,unit_	;Ask which unit number
+	call	@dsply1
+	ld	hl,unit
+	ld	bc,100h
+	call	@keyin1
+	jp	c,hitbrk
+	jp	nz,hitbrk
+	ld	a,(unit)
+	cp	'0'
+	jr	c,asku1
+	cp	'0'+ndrive
+	jr	nc,asku1
+	ld	de,modnam	;Module already loaded?
+	ld	hl,(high$1)
+	call	xgtmod
+	jp	z,setdct
+	ld	de,fd1		;Find fdubl driver
+	ld	hl,(high$1)
+	call	xgtmod
+	jp	nz,needfd	;go if missing
+	ld	(flop),hl
+	ld      hl,(high$1)
+	ld      (newend),hl
+	ld	de,length
+	sub	a
+	sbc	hl,de
+	ld      (high$1),hl
+	call	relo
+	jp	move
+;*=*=*
+; 	LDOS 5 Model III
+;*=*=*
+model3:
+	ld	a,0cdh		;Insert Model III @LOGOT
+	ld	(logot),a
+	ld	hl,@logot3
+	ld	(logot+1),hl
+	ld	hl,hello_
+	call	@dsply3
+	ld      a,(cflag$3)
+	bit     3,a		;System request?
+	jp      z,viaset
+	ld	de,(dct)
+	ld	a,d		;DRIVE= must be specified
+	or	e
+	jp	z,needdr
+asku3:	ld	hl,unit_	;Ask which unit number
+	call	@dsply3
+	ld	hl,unit
+	ld	bc,100h
+	call	@keyin3
+	jp	c,hitbrk
+	jp	nz,hitbrk
+	ld	a,(unit)
+	cp	'0'
+	jr	c,asku3
+	cp	'0'+ndrive
+	jr	nc,asku3
+	ld	de,modnam	;Module already loaded?
+	ld	hl,(high$3)
+	call	xgtmod
+	jp	z,setdct
+;
+; Doesn't work on Model III:
+;	ld	de,fd3		;Find floppy driver
+;	ld	hl,(high$3)
+;	call	xgtmod
+;	jp	nz,needfd	;go if missing
+;
+; Cheat instead:
+	ld	a,(osver$3)
+	cp	51h
+	ld	hl,flop31
+	jr	z,gotit
+	ld	hl,flop33
+gotit:
+;
+	ld	(flop),hl
+	ld      hl,(high$3)
+	ld      (newend),hl
+	ld	de,length
+	sub	a
+	sbc	hl,de
+	ld      (high$3),hl
+	call	relo
+	jp	move
+
+;*=*=*
+; 	LS-DOS 6
+;*=*=*
+lsdos6:	ld      hl,hello_
+	ld      a,@dsply        ;Display hello
+	rst     40
+;*=*=*
+;       Check if entry from SYSTEM command.
+;*=*=*
+	ld      a,@flags        ;Get flags pointer into IY
+	rst     40
+	ld      a,(iy+'C'-'A')  ;Get CFLAG$
+	bit     3,a		;System request?
+	jp      z,viaset
+	ld	de,(dct)
+	ld	a,d		;DRIVE= must be specified
+	or	e
+	jp	z,needdr
+;*=*=*
+;	Ask which unit number
+;*=*=*
+asku4:	ld	hl,unit_	;Ask which unit number
+	ld	a,@dsply
+	rst	40
+	ld	hl,unit
+	ld	bc,100h
+	ld	a,@keyin
+	rst	40
+	jp	c,hitbrk
+	jp	nz,hitbrk
+	ld	a,(unit)
+	cp	'0'
+	jr	c,asku4
+	cp	'0'+ndrive
+	jr	nc,asku4
+;*=*=*
+;       Check if driver already loaded
+;*=*=*
+	ld	de,modnam
+	ld	a,@gtmod
+	rst	40
+	jp	z,setdct	;Already loaded, skip loading
+;*=*=*
+;	Find system floppy driver
+;*=*=*
+	ld	de,fd4
+	ld	a,@gtmod
+	rst	40
+	jp	nz,curdl	;Fatal error if not found
+	ld	(flop),hl
+;*=*=*
+;       Obtain low memory driver pointer.  Bizarre API here!
+;*=*=*
+        ld      e,'K'           ;Locate pointer to *KI DCB
+	ld	d,'I'		;  via @GTDCB SVC
+        ld      a,@gtdcb        
+        rst     40
+        jp      nz,curdl        ;No error unless KI clobbered!
+        dec     hl              ;Decrement to driver pointer
+        ld      d,(hl)          ;P/u hi-order of pointer,
+        dec     hl              ;  decrement to and p/u
+        ld      e,(hl)          ;  lo-order of pointer
+;*=*=*
+;       Check if driver will fit into [(LCPTR), X'12FF']
+;*=*=*
+	push	hl		;Save address of pointer
+        ld      hl,length	;New pointer will be
+        add     hl,de		;  pointer + LENGTH
+	ld	d,h		;Save a copy in DE
+	ld	e,l
+        ld      bc,1301h        ;If > 1300H, driver won't fit
+        sub     a               ;Reset carry flag
+        sbc     hl,bc
+	pop	hl		;Get back address of pointer
+        jr      nc,usehi        ;Go if driver won't fit
+	ld	(hl),e		;Store new value of pointer
+	inc	hl
+	ld	(hl),d
+	dec	de		;Last byte of driver goes here
+	ld      (newend),de
+	jr	dorelo
+;*=*=*
+;       Put in high memory instead.
+;*=*=*
+usehi:	ld      hl,0            ;Get current HIGH$
+	ld      b,l
+	ld      a,@high 
+	rst     40
+	jp      nz,nomem
+	ld      (newend),hl	;Last byte of driver goes here
+	ld	de,length
+	sub	a		;Reset carry flag
+	sbc	hl,de		;Compute new HIGH$
+	ld      a,@high         ;Set new HIGH$ into the system
+	rst     40
+;*=*=*
+;       Relocate internal references in driver.
+;	HL = address for last byte of driver.
+;*=*=*
+dorelo:	call	relo
+;*=*=*
+;       Move driver into low or high memory.
+;*=*=*
+move:
+	ld      de,(newend)     ;Destination address
+	ld      hl,dvrend       ;Last byte of module
+	ld      bc,length       ;Length of filter
+	lddr
+	ex      de,hl
+	inc     hl              ;Bump to driver entry
+;*=*=*
+;	Setup DCT
+;*=*=*
+setdct:
+	ld	iy,(dct)
+	ld      (iy+1),l          ;Driver address
+	ld      (iy+2),h
+	ld	(iy+3),00100000b  ;Flags: 8" floppy
+	ld	a,(unit)	  ;Xlate unit number to select code
+	and	07h
+	ld	c,a
+	ld	b,0
+	ld	hl,utab
+	add	hl,bc
+	ld	a,(hl)
+	or	01000000b         ;Flags: dden capable, select code
+	ld	(iy+4),a
+	ld	(iy+5),0	  ;current cylinder number
+	ld	(iy+6),76	  ;high cylinder number
+	ld	(iy+7),0fh        ;init to sden head/sec/gran config
+	ld	(iy+8),27h
+	ld	(iy+9),38	  ;Directory cylinder (guess)
+
+	ld      hl,0            ;Successful completion
+	sub	a
+	ret
+;*=*=*
+needfd:	ld	hl,needfd_
+	defb	0ddh
+curdl:	ld	hl,curdl_	;Other error
+	defb	0ddh
+needdr:	ld	hl,needdr_
+	defb	0ddh
+viaset: ld      hl,viaset_
+	defb    0ddh
+nomem:  ld      hl,nomem_
+	defb    0ddh
+hitbrk:	ld	hl,hitbrk_
+logot:	ld	a,@logot 
+	rst	40
+	ld      hl,-1            ;Unuccessful completion
+	ret
+
+;*=*=*
+;       Relocate internal references in driver.
+;	HL = address for last byte of driver.
+;*=*=*
+relo:	ld	hl,(newend)
+	ld      iy,reltab       ;Point to relocation tbl
+	ld      de,dvrend
+	sub     a               ;Clear carry flag
+	sbc     hl,de
+	ld      b,h             ;Move to BC
+	ld      c,l
+rloop:  ld      l,(iy)          ;Get address to change
+	ld      h,(iy+1)
+	ld      a,h
+	or      l
+	ret	z
+	ld      e,(hl)          ;P/U address
+	inc     hl
+	ld      d,(hl)
+	ex      de,hl           ;Offset it
+	add     hl,bc
+	ex      de,hl
+	ld      (hl),d          ;And put back
+	dec     hl
+	ld      (hl),e
+	inc     iy
+	inc     iy
+	jr      rloop           ;Loop till done
+
+;*=*=*
+;	Search for existing copy of driver.
+;        Rough Model I/III emulation of Model 4 @GTMOD,
+;        hardcoded with driver address.
+;	Entry: HL = (HIGH$)
+;              DE => module name, terminated with a character <= 0x1f
+;	Exit Z: HL = driver address
+;            NZ: driver not found
+;*=*=*
+xgtmod:	inc	hl
+	ld	a,h
+	or	l
+	jr	nz,xgtm1
+	dec	a		;not found
+	ret
+xgtm1:	ld	a,(hl)
+	cp	18h		;unconditional jr?
+	ret	nz		;not a module header
+	push	de		;save desired name ptr
+	push	hl		;save start address
+	inc	hl		;skip jr
+	inc	hl		;skip offset
+	inc	hl		;skip start address
+	inc	hl
+	ld	b,(hl)		;get name length
+	inc	hl
+xgtm2:	ld	a,(de)
+	cp	20h
+	jr	c,nextmd	;desired name shorter - skip
+	cp	(hl)
+	jr	nz,nextmd	;character different - skip
+	inc	de
+	inc	hl
+	djnz	xgtm2
+	ld	a,(de)
+	cp	20h
+	jr	nc,nextmd	;desired name longer - skip
+	pop	hl		;same - found
+	pop	de
+	sub	a
+	ret
+nextmd:	pop	hl		;get back start of module
+	inc	hl
+	inc	hl
+	ld	e,(hl)		;pointer to last byte
+	inc	hl
+	ld	d,(hl)
+	ex	de,hl
+	pop	de
+	jr	xgtmod
+
+;*=*=*
+;	Messages and globals
+;*=*=*
+hello_: defb    'XTRS8 - Emulated 8" floppy driver for xtrs - 4/9/98',CR
+curdl_:	defb	'LS-DOS is curdled!',CR
+nomem_: defb    'High memory is not available!',CR
+viaset_:defb    'Must install via SYSTEM (DRIVE=,DRIVER=)!',CR
+needdr_:defb	'DRIVE= must be specified!',CR
+unit_:	defb	'Enter unit number (4-7): ',ETX
+hitbrk_:defb	'Aborted!',CR
+needfd_:defb	'FDUBL must be loaded first!',CR
+lcptr:	defw	0
+newend:	defw	0
+dct:    defw	0
+unit:   defs	2
+errbuf:	defs	256
+utab:   defb	1,2,4,8,3,5,6,7
+fd1:	defb	'$FDD',ETX
+fd4:	defb	'$FD',ETX
+
+;
+; Driver - just a tiny wrapper around LDOS dden floppy driver
+;
+
+entry:  jr      begin           ;The driver starts with the
+	defw    dvrend          ;  DOS standard header
+rx00	equ	$-2
+	defb    modptr-modnam   ;Length of name
+modnam:	defb    'xtrs8'         ;Name for @GTMOD requests
+modptr: defw    0               ;These pointers are unused, but 1st byte MBZ
+	defw    0
+
+begin:	call	$-$		;call the real driver
+flop	equ	$-2
+	push 	af
+	bit 	5,(iy+3)	;8" drive?
+	jr 	z,done		;go if not
+	ld	bc,1d49h	;init for dden
+	bit	6,(iy+3)	;dden?
+	jr	nz,ldden	;go if so
+	ld	bc,0f27h
+ldden:	ld	(iy+7), b
+	ld	(iy+8), c
+done:   pop	af
+	ret
+
+dvrend  equ     $-1
+length  equ     $-entry
+reltab: defw    rx00,0
+	end     instal

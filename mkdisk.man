@@ -1,0 +1,86 @@
+.TH mkdisk 1
+.SH Name
+mkdisk \- Make a blank emulated floppy or hard disk for xtrs
+.SH Syntax
+.B mkdisk 
+[-1 | -3 | -h] [-c cyl] [-s sec] [-g gran] [-d dir] filename
+.SH Description
+The mkdisk program is part of the \fBxtrs\fP(1) package.  It makes a
+blank (unformatted) emulated floppy or hard drive in a file.  See the
+xtrs man page for background information.
+
+With the -1 flag, \fBmkdisk\fP makes an unformatted emulated floppy of
+type JV1.  With the -3 flag (which is the default and should normally
+be used), \fBmkdisk\fP makes an unformatted emulated floppy of type
+JV3.  The conventional file extension for both types is ".dsk", but
+mkdisk does not enforce this convention; you can give any filename.
+
+With the -h flag, \fBmkdisk\fP makes an unformatted emulated hard
+drive with \fIcyl\fP cylinders, \fIsec\fP sectors, and \fIgran\fP
+granules (LDOS allocation units) per cylinder.  You should format the
+drive with its directory on cylinder \fIdir\fP.  You will usually want
+to use the default values for all these parameters.  The conventional
+file extension for emulated hard drives is ".hdv", but \fBmkdisk\fP
+does not enforce this convention; you can give any filename.
+
+For \fIcyl\fP, the default value is 202, the maximum is 202 (Model
+I/III) or 203 (Model 4), and the minimum is 3.  Note: Model I/III LDOS
+could handle 203 cylinders except for a minor bug in FORMAT/CMD that
+prevents such a large drive from being formatted.  You can use a
+203-cylinder drive with Model I/III LDOS if you format it with Model 4
+LDOS.
+
+For \fIsec\fP, the default value is 256, the maximum is 256, and the
+minimum is 4.  Note: if you are using version 1.1 of Matthew Reed's
+Model I/III emulator and you would like to share emulated hard drives
+with it, then if \fIsec\fP is greater than 32, it must be divisible by
+32.  Later Reed emulators do not have this limitation.
+
+For \fIgran\fP, the default value is 8, the maximum is 8, and the
+minimum is 1.  In addition, it is necessary that \fIsec\fP be evenly
+divisible by \fIgran\fP, and that \fIsec/gran\fP be less than or equal
+to 32.
+
+The maximum size of a hard drive image is controlled by \fIcyl\fP and
+\fIsec\fP: it can be at most \fIcyl*sec\fP 256-byte sectors.  The
+image file starts out small and grows as you write to more cylinders.
+The allocation efficiency is controlled by the granule size: LDOS
+allocates file space in \fIgran\fP-sized units.  Therefore (1)
+\fIgran\fP should always be set as large as possible and (2) reducing
+\fIsec\fP, thereby making the granules smaller, reduces wasted space
+due to fragmentation but limits the maximum size of the drive.
+
+Seeing that the absolute maximum drive size is less than 13 MB and
+that the maximum granule size is only 8 KB, wasted space should not be
+much of a concern for most \fBxtrs\fP users.  Therefore the default
+parameters have been chosen to give you the largest drive possible.
+
+The \fIdir\fP parameter declares which cylinder will contain the LDOS
+directory.  The default value is 1, a good choice so that the emulated
+drive image can start out small, with no data written past cylinder 1
+by the LDOS FORMAT program.  You should invoke the LDOS FORMAT program
+on the new image with the same \fIdir\fP value you used with
+\fBmkdisk\fP; for example, if you omitted the -d option and accepted
+the default value of 1, then type \fIFORMAT (DIR=1)\fP.  Note: setting
+the \fI-d dir\fP and \fIDIR=dir\fP values to agree is not essential
+unless you plan to share hard drive images with Matthew Reed's
+emulators; \fBxtrs\fP itself ignores the \fIdir\fP parameter and
+allows FORMAT to place the directory on any cylinder.
+.SH See also
+.BR xtrs (1)
+.SH Authors
+\fBmkdisk\fP was written by Timothy Mann <mann@pa.dec.com>, Digital
+Equipment Corporation.
+
+The floppy file formats here called JV1 and JV3 were developed by Jeff
+Vavasour for his MSDOS-based Model I and Model III/4 emulators
+(respectively).  They have become a de facto standard in the TRS-80
+emulation community, and much TRS-80 software is available on the
+Internet in .dsk format.  Thanks to Jeff for designing and documenting
+the formats.
+
+The hard drive format was developed by Matthew Reed for his
+MSDOS-based Model I/III and Model 4 emulators.  I have duplicated his
+format to allow users to exchange .hdv hard drive images between
+\fBxtrs\fP and Matthew's emulators.  Thanks to Matthew for designing
+the format and providing documentation.

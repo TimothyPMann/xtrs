@@ -1,0 +1,41 @@
+.TH cassette 1
+.SH Name
+cassette \- data cassette image manipulator for xtrs TRS-80 emulator
+.SH Syntax
+.B cassette
+.SH Description
+To control the emulated cassette used by \fBxtrs\fP, a file called
+".cassette.ctl" in the current directory keeps track of what file is
+currently "loaded" as the cassette tape and the current position within
+that file. The \fBcassette\fP shell script provides a way to manipulate
+this file; typing "help" at its prompt shows its commands. You may use
+this script to load and position cassette tape files. The operation
+works very much like an actual tape recorder. The cassette emulation
+works only in Model I mode.
+.SH Commands
+.B pos
+generates a status message including the filename being used as the
+cassette image and the current position within the image, in bytes.
+
+.B load
+.I [filename]
+changes the cassette image currently being used to the file specified, and
+resets the position counter to zero.
+
+.B rew
+.I [position]
+changes the position counter to the position specified.
+
+.B ff
+.I [position]
+changes the position counter to the position specified.
+
+.B quit
+exits the \fBcassette\fP shell script.
+.SH Authors
+\fBxtrs\fP was written by David Gingold <gingold@think.com> of Thinking
+Machines Corporation, Alec Wolman <wolman@crl.dec.com> of Digital
+Equipment Corporation, and Timothy Mann <mann@pa.dec.com> of Digital
+Equipment Corporation. This manual page was written by Branden Robinson
+for Debian GNU/Linux, though most of it will look familar from the
+"Emulated cassette" section of the \fBxtrs\fP manual page.
