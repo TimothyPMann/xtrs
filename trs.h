@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Fri Sep 25 19:34:17 PDT 1998 by mann
+   Last modified on Tue Sep 29 13:05:39 PDT 1998 by mann
 */
 
 /*
@@ -111,3 +111,13 @@ void grafyx_write_y(int value);
 void grafyx_write_data(int value);
 int grafyx_read_data(void);
 void grafyx_write_mode(int value);
+void grafyx_write_xoffset(int value);
+void grafyx_write_yoffset(int value);
+void grafyx_write_overlay(int value);
+void grafyx_set_microlabs(int on_off);
+
+void trs_get_mouse_pos(int *x, int *y, unsigned int *buttons);
+void trs_set_mouse_pos(int x, int y);
+void trs_get_mouse_max(int *x, int *y, unsigned int *sens);
+void trs_set_mouse_max(int x, int y, unsigned int sens);
+int trs_get_mouse_type();

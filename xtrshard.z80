@@ -11,7 +11,7 @@
 ;	the date included.  
 ;
 ;	Created 1-10-98
-;       Last modified on Thu Apr  9 16:46:09 PDT 1998 by mann
+;       Last modified on Tue Sep 29 13:27:01 PDT 1998 by mann
 ;*=*=*
 
 
@@ -306,6 +306,7 @@ dorelo:	call	dvrini		;Final driver init before move
         ld      a,(iy+28)       ;Copy current @ICNFG into LINK
         ld      l,(iy+29)
         ld      h,(iy+30)
+	ld	(link),a
         ld      (link+1),hl
 	ld	hl,dvrcfg	;Get relocated init address
 rx10	equ	$-2
@@ -442,7 +443,7 @@ nextmd:	pop	hl		;get back start of module
 ;*=*=*
 ;	Messages and globals
 ;*=*=*
-hello_: defb    'XTRSHARD - Emulated hard disk driver for xtrs - 4/9/98',CR
+hello_: defb    'XTRSHARD - Emulated hard disk driver for xtrs - 9/29/98',CR
 curdl_:	defb	'LS-DOS is curdled!',CR
 nomem_: defb    'High memory is not available!',CR
 viaset_:defb    'Must install via SYSTEM (DRIVE=,DRIVER=)!',CR

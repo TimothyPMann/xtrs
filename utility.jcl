@@ -15,3 +15,5 @@ import xtrshard.dct xtrshard/dct:#D#
 import -n xtrshard.z xtrshard/z:#D#
 import xtrs8.dct xtrs8/dct:#D#
 import -n xtrs8.z xtrs8/z:#D#
+import xtrsmous.cmd xtrsmous/cmd:#D#
+import -n xtrsmous.z xtrsmous/z:#D#

@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Fri Sep 25 19:33:40 PDT 1998 by mann
+   Last modified on Sat Oct 10 22:15:30 PDT 1998 by mann
 */
 
 #include "z80.h"
@@ -53,16 +53,16 @@ void z80_out(int port, int value)
     } else {
 	switch (port) {
 	  case 0x80:
-	    if (trs_model >= 3) grafyx_write_x(value);
+	    if (trs_model >= 4) grafyx_write_x(value);
 	    break;
 	  case 0x81:
-	    if (trs_model >= 3) grafyx_write_y(value);
+	    if (trs_model >= 4) grafyx_write_y(value);
 	    break;
 	  case 0x82:
-	    if (trs_model >= 3) grafyx_write_data(value);
+	    if (trs_model >= 4) grafyx_write_data(value);
 	    break;
 	  case 0x83:
-	    if (trs_model >= 3) grafyx_write_mode(value);
+	    if (trs_model >= 4) grafyx_write_mode(value);
 	    break;
 	  case 0x84:
 	  case 0x85:
@@ -87,6 +87,15 @@ void z80_out(int port, int value)
 		}
 		ctrlimage = value;
 	    }
+	    break;
+	  case 0x8c:
+	    if (trs_model >= 4) grafyx_write_xoffset(value);
+	    break;
+	  case 0x8d:
+	    if (trs_model >= 4) grafyx_write_yoffset(value);
+	    break;
+	  case 0x8e:
+	    if (trs_model >= 4) grafyx_write_overlay(value);
 	    break;
 	  case 0x90:
 	  case 0x91:
@@ -186,7 +195,7 @@ int z80_in(int port)
     } else {
 	switch (port) {
 	  case 0x82:
-	    if (trs_model >= 3) {
+	    if (trs_model >= 4) {
 		return grafyx_read_data();
 	    }
 	    break;

@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Sat Apr 25 01:24:35 PDT 1998 by mann */
+/* Last modified on Mon Sep 28 12:27:21 PDT 1998 by mann */
 
 /*
  * trs_imp_exp.c
@@ -52,6 +52,57 @@ void do_emt_system()
     REG_F |= ZERO_MASK;
   }
   REG_BC = res;
+}
+
+void do_emt_mouse()
+{
+  int x, y;
+  unsigned int buttons, sens;
+  switch (REG_B) {
+  case 1:
+    trs_get_mouse_pos(&x, &y, &buttons);
+    REG_HL = x;
+    REG_DE = y;
+    REG_A = buttons;
+    if (REG_A) {
+      REG_F &= ~ZERO_MASK;
+    } else {
+      REG_F |= ZERO_MASK;
+    }
+    break;
+  case 2:
+    trs_set_mouse_pos(REG_HL, REG_DE);
+    REG_A = 0;
+    REG_F |= ZERO_MASK;
+    break;
+  case 3:
+    trs_get_mouse_max(&x, &y, &sens);
+    REG_HL = x;
+    REG_DE = y;
+    REG_A = sens;
+    if (REG_A) {
+      REG_F &= ~ZERO_MASK;
+    } else {
+      REG_F |= ZERO_MASK;
+    }
+    break;
+  case 4:
+    trs_set_mouse_max(REG_HL, REG_DE, REG_C);
+    REG_A = 0;
+    REG_F |= ZERO_MASK;
+    break;
+  case 5:
+    REG_A = trs_get_mouse_type();
+    if (REG_A) {
+      REG_F &= ~ZERO_MASK;
+    } else {
+      REG_F |= ZERO_MASK;
+    }
+    break;
+  default:
+    error("undefined emt_mouse function code");
+    break;
+  }
 }
 
 void do_emt_open()

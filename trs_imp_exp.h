@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Thu Apr  9 12:30:13 PDT 1998 by mann */
+/* Last modified on Sun Oct 11 00:22:11 PDT 1998 by mann */
 
 /*
  * trs_imp_exp.h
@@ -23,7 +23,51 @@
  *         After,  AF =  0 if OK, error number if not (Z flag affected)
  *                 BC =  command exit status, normally 0 if OK
  *
- * ED29-ED2F reserved
+ * ED29 emt_mouse
+ *         Implements Goben/Reed-style mouse driver in one instruction.
+ *         Documentation adapted from original Misosys Quarterly V.iii article.
+ *         (Notes: 1. The emt does not affect registers that do not have
+ *         documented return values. 2. Different versions of the native
+ *         drivers varied in whether coordinate values ranged from 0 to
+ *         XSIZE or 0 to XSIZE-1. This driver will return values up to
+ *         XSIZE if XSIZE is odd, up to XSIZE-1 if XSIZE is even, thus
+ *         finessing the issue. 3. The sensitivity value is ignored. 4. The 
+ *         mouse is assumed to have 3 buttons.  5. The set operations always
+ *         return success.)
+ *  
+ *      GET MOUSE CURSOR POSITION
+ *         Before, B  = 1
+ *         After,  HL = mouse cursor X value (0 to XSIZE-1)
+ *                 DE = mouse cursor Y value (0 to YSIZE-1)
+ *                 A  = button status
+ *                      Bit 0: Reset if right button pressed
+ *                      Bit 1: Reset if middle button pressed (both buttons)
+ *                      Bit 2: Reset if left button pressed
+ *  
+ *      SET MOUSE CURSOR POSITION
+ *         Before, B  = 2
+ *                 HL = X value (0 - XSIZE-1)
+ *                 DE = Y value (0 - YSIZE-1)
+ *         After,  AF = Z flag set if operation was successful
+ *  
+ *      GET SENSITIVITY AND MAXIMUM VALUES
+ *         Before, B  = 3
+ *         After,  HL = current X maximum (XSIZE)
+ *                 DE = current Y maximum (YSIZE)
+ *                 A  = current sensitivity (0 - 3)
+ *  
+ *      SET SENSITIVITY AND MAXIMUM VALUES
+ *         Before, B =  4
+ *                 HL = new X maximum (XSIZE)
+ *                 DE = new Y maximum (YSIZE)
+ *                 C  = sensitivity (0 - 3); 3 is most sensitive
+ *         After,  AF = Z flag set if operation was successful
+ *  
+ *      GET MOUSE TYPE
+ *         Before, B =  5
+ *         After,  A =  0 if 2-button, 1 if 3-button
+ *
+ * ED2A-ED2F reserved
  *
  * ED30 emt_open
  *         Before, HL => path, null terminated
@@ -146,6 +190,7 @@
 #define EO_APPEND 02000
 
 extern void do_emt_system();
+extern void do_emt_mouse();
 extern void do_emt_open();
 extern void do_emt_close();
 extern void do_emt_read();

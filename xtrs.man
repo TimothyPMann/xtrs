@@ -20,8 +20,9 @@ There is also a rudimentary emulation of cassette I/O
 that uses files for cassette tapes (Model I mode only).
 Crude sound support is available under Linux if you have 
 SoundBlaster-compatible hardware.
-In Model 4/4P mode, the Micro Labs Grafyx Solution hi-res card is emulated;
-software written for the Radio Shack graphics card should also work.
+In Model 4/4P mode, a hi-res graphics card is emulated; you can select either
+the Radio Shack card or the Micro Labs Grafyx Solution card.
+There is also a mouse driver for Model 4/4P mode.
 
 The Z-80 emulator has a debugger called zbx.  It works sort of
 like dbx.  If you run with debugging turned on (see the options section for
@@ -161,8 +162,8 @@ which is better than on a real Model I!
 
 TRS-80 programs that attempt to measure the rotational
 speed of their floppy disk drives using timing loops will get the
-answers they expect, even though \fBxtrs\fP makes no
-attempt to emulate instructions at the same speed as the original
+answers they expect, even though \fBxtrs\fP does not
+emulate instructions at the same speed as the original
 machines. This works because \fBxtrs\fP keeps a virtual clock 
 (technically, a T-state counter),
 which measures how much time it should have taken to execute the
@@ -331,7 +332,7 @@ not work with it.
 .SH Data import and export
 The emulated floppy \fIutility.dsk\fP contains some programs for
 transferring data between the emulator and ordinary Unix files.  All
-the programs run on the emulator under Model I/III LDOS, Model I/III
+these programs run on the emulator under Model I/III LDOS, Model I/III
 Newdos/80, and Model 4/4P TRSDOS/LS-DOS 6; they may also work under other
 TRS-80 operating systems.
 
@@ -355,6 +356,29 @@ Simply run it under Disk Basic and answer the prompts.
 
 SETTIME/CMD reads the date and time from Unix and sets the TRS-80
 DOS's date and time accordingly.
+
+The emulated floppy \fIcpmutil.dsk\fP contains similar programs
+for Montezuma CP/M, written by Roland Gerlach. 
+It was formatted as a ``Montezuma Micro Standard SYSTEM disk
+(40T, SS, DD, 170K),'' but does not contain a copy of CP/M.
+
+IMPORT.COM imports a Unix file and writes it to an emulated CP/M disk.
+Usage: \fIIMPORT [-n] [unixfile [cpmfile]]\fP.  The -n flag converts
+Unix newlines (\\n) to CP/M newlines (\\r\\n).  If the second filename
+is omitted, it is taken to be the same as the first. If both names are
+omitted, the program prompts for filenames.  Note that the CP/M CCP
+converts all command line arguments to upper case, which is
+inconvenient if your Unix file names are in lower case; in that case
+you'll need to let the program prompt for the filenames.
+
+EXPORT.COM reads a file from an emulated CP/M disk and exports it to a
+Unix file.  Usage: \fIEXPORT [-n] [cpmfile [unixfile]]\fP.  The -n
+flag converts CP/M newlines (\\r\\n) to Unix newlines (\\n).  If the
+second filename is omitted, it is taken to be the same as the
+first. If both names are omitted, the program prompts for filenames.
+Note that the CP/M CCP converts all command line arguments to upper
+case, which is inconvenient if your Unix file names are in lower case;
+in that case you'll need to let the program prompt for the filenames.
 
 The emulator implements a set of pseudo-instructions (emulator traps)
 that give TRS-80 programs access to Unix files.  The programs listed
@@ -402,6 +426,26 @@ written to the Model 4/4P optional sound port, is copied to the
 SoundBlaster.  TRS-80 sound depends on timing loops, so the pitches
 will be wildly wrong unless you use the -autodelay option described
 below.  Even with -autodelay, don't expect pitches to be accurate or stable.
+.SH Mouse
+A few Model 4 programs could use a mouse, such as the shareware hi-res
+drawing program MDRAW-II. The program XTRSMOUS/CMD on the utility disk
+(utility.dsk) is a mouse driver for Model 4/4P mode that should work
+with most such programs.  \fBxtrs\fP does not emulate the actual mouse
+hardware (a serial mouse plugged into the Model 4 RS-232 port), so the
+original mouse drivers will not work under \fBxtrs\fP.  Instead,
+XTRSMOUS accesses the X mouse pointer using an emulator trap.
+XTRSMOUS implements the same TRSDOS/LS-DOS 6 SVC interface as the
+David Goben and Matthew Reed mouse drivers. (It does not implement the
+interface of the older Scott McBurney mouse driver, which may be
+required by some older programs.)
+
+By default XTRSMOUS installs itself in high memory. This is done
+because MDRAW-II tests for the presence of a mouse by
+looking to see whether the mouse SVC is vectored to high memory. If the
+driver is installed in low memory, MDRAW thinks it is not there at
+all. If you use mouse-aware programs that don't have this bug, or if
+you edit the first line of MDRAW to remove the test, you can install
+XTRSMOUS in low memory using the syntax ``XTRSMOUS (LOW)''.
 .SH Running games
 Some games run rather well under \fBxtrs\fP now, 
 provided that your
@@ -429,6 +473,10 @@ emulator seems to need a bit more work.
 Defaults for all options can be specified using the standard X resource
 mechanism, and the class name for \fBxtrs\fP is "Xtrs".
 .TP
+.B \-display \fIdisplay\fP
+Set your X display to \fIdisplay\fP. The default is to
+use the DISPLAY environment variable.
+.TP
 .B \-background \fIcolor\fP
 .PD 0
 .TP
@@ -445,7 +493,16 @@ Specifies the foreground color of the \fBxtrs\fP window.
 .TP
 .B \-borderwidth \fIwidth\fP
 Put a border of \fIwidth\fP pixels
-around the TRS-80 display.  The default is 0.
+around the TRS-80 display.  The default is 2.
+.TP
+.B \-resize
+In Model 4/4P mode, resize the X window whenever the emulated display
+mode changes between 64x16 and 80x24.
+.TP
+.B \-noresize
+In Model 4/4P mode, always keep the X window large enough for 80x24
+characters, putting a blank margin around the outside when the emulated
+display mode is 64x16.  This is the default.
 .TP
 .B \-usefont
 Use X fonts instead of the built-in character bitmaps.
@@ -477,9 +534,12 @@ Draw TRS-80 graphics blocks as bitmaps even if X fonts are being used
 for characters.  This is the
 default if the X font name does not begin with "-trs80".
 .TP
-.B \-display \fIdisplay\fP
-Set your X display to \fIdisplay\fP, instead of the default which is to
-use the DISPLAY environment variable.
+.B \-microlabs
+In Model 4/4P mode, emulate the Micro Labs Grafyx Solution hi-res
+graphics card.  This is the default.
+.TP
+.B \-nomicrolabs
+In Model 4/4P mode, emulate the Radio Shack hi-res card.
 .TP
 .B \-debug
 Enter zbx, the z80 debugger.
@@ -534,15 +594,6 @@ interrupts are disabled), the counter is decremented by
 \fIheartbeat\fP.  The default setting is "16,1,1"; this seems to work
 well with ordinary keyboard drivers, but you may want to experiment
 with different values for games if keyboard response seem sluggish.
-.TP
-.B \-resize
-In Model 4/4P mode, resize the X window whenever the emulated display
-mode changes between 64x16 and 80x24.
-.TP
-.B \-noresize
-In Model 4/4P mode, always keep the X window large enough for 80x24
-characters, putting a blank margin around the outside when the emulated
-display mode is 64x16.  This is the default.
 .TP
 .B \-doublestep
 Make real floppy drives double-step, allowing access to 35-track or
@@ -624,14 +675,16 @@ Digital Equipment Corporation, and Timothy Mann <mann@pa.dec.com> of
 Digital Equipment Corporation.  See README and README.tpm for
 additional notes from the authors.
 
-We also thank the following people for their help.  The floppy
-disk file formats were designed by Jeff Vavasour, originally for his
+We also thank the following people for their help.  The floppy disk
+file formats were designed by Jeff Vavasour, originally for his
 MSDOS-based TRS-80 emulators.  The hard disk file format was designed
 by Matthew Reed for his MSDOS-based TRS-80 emulators.  Al Petrofsky
 supplied the TRS-80 fonts in bdf format.  Roland Gerlach contributed
-several bug reports and fixes.  Fabio Ferrari contributed the sound
-support.  Ulrich Mueller added the -borderwidth option and ported the
-import, export, and settime utilities to Newdos/80.  Branden Robinson
-supplied the cassette man page and fixed Makefile bugs.  Mark McDougall
-provided documentation for the Micro Labs Grafyx Solution card.
+the CP/M import and export programs as well as several bug reports
+and fixes for the emulator itself.  Fabio Ferrari contributed the
+sound support.  Ulrich Mueller added the -borderwidth option and
+ported the import, export, and settime utilities to Newdos/80.
+Branden Robinson supplied the cassette man page and fixed Makefile
+bugs.  Mark McDougall provided documentation for the Micro Labs Grafyx
+Solution card.
 

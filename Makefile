@@ -104,15 +104,21 @@ MISC = \
 	trs80-model3.bdf \
 	utility.dsk \
 	utility.jcl \
+	cpmutil.dsk \
 	xtrs.man \
 	xtrs.txt \
 	xtrsemt.ccc \
 	xtrsemt.h \
 	xtrshard.dct \
 	xtrshard.lst \
-	xtrshard.z
+	xtrshard.z \
+	xtrsmous.cmd \
+	xtrsmous.lst \
+	xtrsmous.z
 
 default: xtrs mkdisk hex2cmd cmddump xtrs.txt mkdisk.txt cassette.txt
+
+cmds: export.cmd import.cmd settime.cmd xtrsmous.cmd xtrs8.dct xtrshard.dct
 
 # Local customizations for make variables are done in Makefile.local:
 include Makefile.local

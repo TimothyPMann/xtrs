@@ -15,8 +15,10 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Fri Sep 25 23:17:46 PDT 1998 by mann
+   Last modified on Sun Oct 11 00:31:33 PDT 1998 by mann
 */
+
+/*#define MOUSEDEBUG 1*/
 
 /*
  * trs_xinterface.c
@@ -71,7 +73,7 @@ static int col_chars = 16;
 static int resize = 0;
 static int top_margin = 0;
 static int left_margin = 0;
-static int border_width = 0;
+static int border_width = 2;
 static Pixmap trs_char[2][MAXCHARS];
 static Display *display;
 static int screen;
@@ -120,6 +122,8 @@ static XrmOptionDescRec opts[] = {
 {"-autodelay",  "*autodelay",   XrmoptionNoArg,         (caddr_t)"on"},
 {"-noautodelay","*autodelay",   XrmoptionNoArg,         (caddr_t)"off"},
 {"-keystretch", "*keystretch",  XrmoptionSepArg,        (caddr_t)NULL},
+{"-microlabs",  "*microlabs",   XrmoptionNoArg,         (caddr_t)"on"},
+{"-nomicrolabs","*microlabs",   XrmoptionNoArg,         (caddr_t)"off"},
 #if __linux
 {"-sb",         "*sb",          XrmoptionSepArg,        (caddr_t)NULL},
 #endif /* linux */
@@ -127,22 +131,29 @@ static XrmOptionDescRec opts[] = {
 
 static int num_opts = (sizeof opts / sizeof opts[0]);
 
-/* Grafyx Solution support.  Radio Shack graphics card should be the same. */
-char grafyx[512][128]; /* a bit bigger to allow for out-of-range coords */
+/* Support for Micro Labs Grafyx Solution and Radio Shack hi-res card */
+
+/* True size of graphics memory -- some is offscreen */
+#define G_XSIZE 128  
+#define G_YSIZE 256
+char grafyx[2*G_YSIZE][G_XSIZE];
+
+unsigned char grafyx_microlabs = 1;
 unsigned char grafyx_x = 0, grafyx_y = 0, grafyx_mode = 0;
+unsigned char grafyx_enable = 0;
+unsigned char grafyx_overlay = 0;
+unsigned char grafyx_xoffset = 0, grafyx_yoffset = 0;
 
-#define G_SELECT   3
-#define G_TEXT     0
-#define G_OVERLAY  1
-#define G_UNUSED   2  /* !!same as G_TEXT in Reed emulator */
-#define G_GRAFYX   3
-
-#define G_XDEC     4
-#define G_YDEC     8
-#define G_XNOCLKR  16
-#define G_YNOCLKR  32
-#define G_XNOCLKW  64
-#define G_YNOCLKW  128
+/* Port 0x83 bits */
+#define G_ENABLE    1
+#define G_UL_NOTEXT 2   /* Micro Labs only */
+#define G_RS_WAIT   2   /* Radio Shack only */
+#define G_XDEC      4
+#define G_YDEC      8
+#define G_XNOCLKR   16
+#define G_YNOCLKR   32
+#define G_XNOCLKW   64
+#define G_YNOCLKW   128
 
 XImage xim = {
     /*width, height*/    1024, 512,
@@ -365,6 +376,16 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
 	       &stretch_amount, &stretch_poll, &stretch_heartbeat);
     }
 
+    (void) sprintf(option, "%s%s", program_name, ".microlabs");
+    if (XrmGetResource(x_db, option, "Xtrs.Microlabs", &type, &value))
+    {
+	if (strcmp(value.addr,"on") == 0) {
+	    grafyx_set_microlabs(True);
+	} else if (strcmp(value.addr,"off") == 0) {
+	    grafyx_set_microlabs(False);
+	}
+    }
+
     return argc;
 }
 
@@ -430,7 +451,7 @@ void trs_screen_init()
 	if ((border_width = atoi(value.addr)) < 0)
 	    border_width = 0;
     } else {
-	border_width = 0;
+	border_width = 2;
     }
 
     (void) sprintf(option, "%s%s", program_name, ".usefont");
@@ -582,12 +603,15 @@ void trs_screen_init()
 
     if (trs_model >= 4 && !resize) {
       OrigWidth = cur_char_width * 80 + 2 * border_width;
-      left_margin = cur_char_width * (80 - row_chars)/2;
+      left_margin = cur_char_width * (80 - row_chars)/2 + border_width;
       OrigHeight = TRS_CHAR_HEIGHT4 * 24 + 2 * border_width;
-      top_margin = (TRS_CHAR_HEIGHT4 * 24 - cur_char_height * col_chars)/2;
+      top_margin = (TRS_CHAR_HEIGHT4 * 24 - cur_char_height * col_chars)/2
+	+ border_width;
     } else {
       OrigWidth = cur_char_width * row_chars + 2 * border_width;
+      left_margin = border_width;
       OrigHeight = cur_char_height * col_chars + 2 * border_width;
+      top_margin = border_width;
     }
     window = XCreateSimpleWindow(display, root_window, 400, 400,
 				 OrigWidth, OrigHeight, 1, foreground,
@@ -662,7 +686,10 @@ void trs_get_event(int wait)
 #ifdef XDEBUG
 	    fprintf(stderr,"Expose\n");
 #endif
-	    trs_screen_refresh();
+	    if (event.xexpose.count == 0) {
+	      while (XCheckMaskEvent(display, ExposureMask, &event)) /*skip*/;
+	      trs_screen_refresh();
+	    }
 	    break;
 
 	  case ResizeRequest:
@@ -697,7 +724,7 @@ void trs_get_event(int wait)
 	    break;
 
 	  case EnterNotify:
-#ifdef XDEBUG1
+#ifdef XDEBUG
 	    fprintf(stderr,"EnterNotify\n");
 #endif
 	    save_repeat();
@@ -705,7 +732,7 @@ void trs_get_event(int wait)
 	    break;
 
 	  case LeaveNotify:
-#ifdef XDEBUG1
+#ifdef XDEBUG
 	    fprintf(stderr,"LeaveNotify\n");
 #endif
 	    restore_repeat();
@@ -821,14 +848,19 @@ void trs_screen_80x24(int flag)
     if (resize) {
       OrigWidth = cur_char_width * row_chars + 2 * border_width;
       OrigHeight = cur_char_height * col_chars + 2 * border_width;
+      left_margin = border_width;
+      top_margin = border_width;
       XSelectInput(display, window, EVENT_MASK);
       XResizeWindow(display, window, OrigWidth, OrigHeight);
       XFlush(display);
       XSelectInput(display, window, EVENT_MASK | ResizeRedirectMask);
     } else {
-      left_margin = cur_char_width * (80 - row_chars)/2;
-      top_margin = (TRS_CHAR_HEIGHT4 * 24 - cur_char_height * col_chars)/2;
-      if (left_margin || top_margin) XClearWindow(display,window);
+      left_margin = cur_char_width * (80 - row_chars)/2 + border_width;
+      top_margin = (TRS_CHAR_HEIGHT4 * 24 - cur_char_height * col_chars)/2 +
+	border_width;
+      if (left_margin > border_width || top_margin > border_width) {
+	XClearWindow(display,window);
+      }
     }
     trs_screen_refresh();
 }
@@ -924,9 +956,35 @@ void trs_screen_refresh()
 {
     int i;
 
-    if ((grafyx_mode & G_SELECT) == G_GRAFYX) {
-	XPutImage(display, window, gc, &xim, 0, 0, 0, 0,
+    if (grafyx_enable && !grafyx_overlay) {
+	XPutImage(display, window, gc, &xim,
+		  TRS_CHAR_WIDTH*grafyx_xoffset, 2*grafyx_yoffset,
+		  left_margin,
+		  top_margin,
 		  TRS_CHAR_WIDTH*row_chars, cur_char_height*col_chars);
+	/* Draw wrapped portions if any */
+	if (grafyx_xoffset > G_XSIZE - row_chars) {
+	  XPutImage(display, window, gc, &xim, 0, 0,
+		    left_margin +
+		    TRS_CHAR_WIDTH*(grafyx_xoffset - G_XSIZE + row_chars),
+		    top_margin,
+		    TRS_CHAR_WIDTH*row_chars, cur_char_height*col_chars);
+	}
+	if (2*grafyx_yoffset > 2*G_YSIZE - cur_char_height*col_chars) {
+	  XPutImage(display, window, gc, &xim, 0, 0,
+		    left_margin,
+		    top_margin +
+		    2*grafyx_yoffset - 2*G_YSIZE + cur_char_height*col_chars,
+		    TRS_CHAR_WIDTH*row_chars, cur_char_height*col_chars);
+	  if (grafyx_xoffset > G_XSIZE - row_chars) {
+	    XPutImage(display, window, gc, &xim, 0, 0,
+		      left_margin +
+		      TRS_CHAR_WIDTH*(grafyx_xoffset - G_XSIZE + row_chars),
+		      top_margin +
+		      2*grafyx_yoffset - 2*G_YSIZE + cur_char_height*col_chars,
+		      TRS_CHAR_WIDTH*row_chars, cur_char_height*col_chars);
+	  }
+	}
     } else {
 	for (i = 0; i < screen_chars; i++) {
 	    trs_screen_write_char(i,trs_screen[i],False);
@@ -950,13 +1008,13 @@ void trs_screen_write_char(int position, int char_index, Bool doflush)
     if ((currentmode & EXPANDED) && (position & 1)) {
       return;
     }
-    if ((grafyx_mode & G_SELECT) == G_GRAFYX) {
+    if (grafyx_enable && !grafyx_overlay) {
       return;
     }
     row = position / row_chars;
     col = position - (row * row_chars);
-    destx = col * cur_char_width + left_margin + border_width;
-    desty = row * cur_char_height + top_margin + border_width;
+    destx = col * cur_char_width + left_margin;
+    desty = row * cur_char_height + top_margin;
     if (usefont) {
 	if (trs_model == 1 && !trsfont) {
 #ifndef UPPERCASE
@@ -1033,14 +1091,16 @@ void trs_screen_write_char(int position, int char_index, Bool doflush)
 	    break;
 	}
     }
-    if ((grafyx_mode & G_SELECT) == G_OVERLAY) {
-	XPutImage(display, window, gc_xor, &xim,
-		  col*TRS_CHAR_WIDTH, row*cur_char_height,
-		  destx, desty, TRS_CHAR_WIDTH, cur_char_height);
+    if (grafyx_enable) {
+      /* assert(grafyx_overlay); */
+      XPutImage(display, window, gc_xor, &xim,
+		((col+grafyx_xoffset) % G_XSIZE)*TRS_CHAR_WIDTH,
+		(row*cur_char_height + grafyx_yoffset*2) % (2*G_YSIZE),
+		destx, desty, TRS_CHAR_WIDTH, cur_char_height);
     }
 #ifdef DO_XFLUSH
     if (doflush)
-	XFlush(display);
+      XFlush(display);
 #endif
 }
 
@@ -1048,24 +1108,21 @@ void trs_screen_write_char(int position, int char_index, Bool doflush)
     Doesn't need to clear line col_chars-1. */
 void trs_screen_scroll()
 {
-    int i = 0;
+  int i = 0;
 
-    for (i = row_chars; i < screen_chars; i++)
-	trs_screen[i-row_chars] = trs_screen[i];
-    switch ((grafyx_mode & G_SELECT)) {
-      case G_TEXT:
-      case G_UNUSED:
-	XCopyArea(display,window,window,gc,
-		  border_width,cur_char_height+border_width,
-		  (cur_char_width*row_chars),(cur_char_height*col_chars),
-		  border_width,border_width);
-	break;
-      case G_GRAFYX:
-	break;
-      case G_OVERLAY:
-	trs_screen_refresh(); /* !!punt */
-	break;
+  for (i = row_chars; i < screen_chars; i++)
+    trs_screen[i-row_chars] = trs_screen[i];
+
+  if (grafyx_enable) {
+    if (grafyx_overlay) {
+      trs_screen_refresh();
     }
+  } else {
+    XCopyArea(display,window,window,gc,
+	      border_width,cur_char_height+border_width,
+	      (cur_char_width*row_chars),(cur_char_height*col_chars),
+	      border_width,border_width);
+  }
 }
 
 void trs_screen_write_chars(int *locations, int *values, int count)
@@ -1081,80 +1138,221 @@ void trs_screen_write_chars(int *locations, int *values, int count)
 
 void grafyx_write_byte(int x, int y, char byte)
 {
-    int gm = grafyx_mode & G_SELECT;
-    if (gm == G_OVERLAY) {
-	/* Erase old byte, preserving text */
-	XPutImage(display, window, gc_xor, &xim, x*TRS_CHAR_WIDTH, y*2,
-		  x*TRS_CHAR_WIDTH, y*2, TRS_CHAR_WIDTH, 2);
-    }
+  int screen_x = ((x - grafyx_xoffset + G_XSIZE) % G_XSIZE);
+  int screen_y = ((y - grafyx_yoffset + G_YSIZE) % G_YSIZE);
+  int on_screen = screen_x < row_chars && screen_y < col_chars*cur_char_height;
+  if (grafyx_enable && grafyx_overlay && on_screen) {
+    /* Erase old byte, preserving text */
+    XPutImage(display, window, gc_xor, &xim, x*TRS_CHAR_WIDTH, y*2,
+	      left_margin + screen_x*TRS_CHAR_WIDTH,
+	      top_margin + screen_y*2,
+	      TRS_CHAR_WIDTH, 2);
+  }
 
-    /* Save new byte in local memory */
-    grafyx[y*2][x] = grafyx[y*2+1][x] = byte;
+  /* Save new byte in local memory */
+  grafyx[y*2][x] = grafyx[y*2+1][x] = byte;
 
+  if (grafyx_enable && on_screen) {
     /* Draw new byte */
-    if (gm == G_GRAFYX) {
-	XPutImage(display, window, gc, &xim, x*TRS_CHAR_WIDTH, y*2,
-		  x*TRS_CHAR_WIDTH, y*2, TRS_CHAR_WIDTH, 2);
-    } else if (gm == G_OVERLAY) {
-	XPutImage(display, window, gc_xor, &xim, x*TRS_CHAR_WIDTH, y*2,
-		  x*TRS_CHAR_WIDTH, y*2, TRS_CHAR_WIDTH, 2);
+    if (grafyx_overlay) {
+      XPutImage(display, window, gc_xor, &xim, x*TRS_CHAR_WIDTH, y*2,
+		left_margin + screen_x*TRS_CHAR_WIDTH,
+		top_margin + screen_y*2,
+		TRS_CHAR_WIDTH, 2);
+    } else {
+      XPutImage(display, window, gc, &xim, x*TRS_CHAR_WIDTH, y*2,
+		left_margin + screen_x*TRS_CHAR_WIDTH,
+		top_margin + screen_y*2,
+		TRS_CHAR_WIDTH, 2);
     }
+  }
 }
 
 void grafyx_write_x(int value)
 {
-    grafyx_x = value;
+  grafyx_x = value;
 }
 
 void grafyx_write_y(int value)
 {
-    grafyx_y = value;
+  grafyx_y = value;
 }
 
 void grafyx_write_data(int value)
 {
-    grafyx_write_byte(grafyx_x & 0x7f, grafyx_y, value);
-    if (!(grafyx_mode & G_XNOCLKW)) {
-	if (grafyx_mode & G_XDEC) {
-	    grafyx_x--;
-	} else {
-	    grafyx_x++;
-	}
+  grafyx_write_byte(grafyx_x % G_XSIZE, grafyx_y, value);
+  if (!(grafyx_mode & G_XNOCLKW)) {
+    if (grafyx_mode & G_XDEC) {
+      grafyx_x--;
+    } else {
+      grafyx_x++;
     }
-    if (!(grafyx_mode & G_YNOCLKW)) {
-	if (grafyx_mode & G_YDEC) {
-	    grafyx_y--;
-	} else {
-	    grafyx_y++;
-	}
+  }
+  if (!(grafyx_mode & G_YNOCLKW)) {
+    if (grafyx_mode & G_YDEC) {
+      grafyx_y--;
+    } else {
+      grafyx_y++;
     }
+  }
 }
 
 int grafyx_read_data()
 {
-    int value = grafyx[grafyx_y*2][grafyx_x & 0x7f];
-    if (!(grafyx_mode & G_XNOCLKR)) {
-	if (grafyx_mode & G_XDEC) {
-	    grafyx_x--;
-	} else {
-	    grafyx_x++;
-	}
+  int value = grafyx[grafyx_y*2][grafyx_x % G_XSIZE];
+  if (!(grafyx_mode & G_XNOCLKR)) {
+    if (grafyx_mode & G_XDEC) {
+      grafyx_x--;
+    } else {
+      grafyx_x++;
     }
-    if (!(grafyx_mode & G_YNOCLKR)) {
-	if (grafyx_mode & G_YDEC) {
-	    grafyx_y--;
-	} else {
-	    grafyx_y++;
-	}
+  }
+  if (!(grafyx_mode & G_YNOCLKR)) {
+    if (grafyx_mode & G_YDEC) {
+      grafyx_y--;
+    } else {
+      grafyx_y++;
     }
-    return value;
+  }
+  return value;
 }
 
 void grafyx_write_mode(int value)
 {
-    int oldgm = grafyx_mode & G_SELECT;
-    grafyx_mode = value;
-    if (oldgm != (grafyx_mode & G_SELECT)) {
-	trs_screen_refresh(); /* !!punt */
-    }
+  unsigned char old_enable = grafyx_enable;
+  unsigned char old_overlay = grafyx_overlay;
+
+  grafyx_enable = value & G_ENABLE;
+  if (grafyx_microlabs) {
+    grafyx_overlay = (value & G_UL_NOTEXT) == 0;
+  }
+  grafyx_mode = value;
+  if (old_enable != grafyx_enable || 
+      (grafyx_enable && old_overlay != grafyx_overlay)) {
+    trs_screen_refresh();
+  }
+}
+
+void grafyx_write_xoffset(int value)
+{
+  unsigned char old_xoffset = grafyx_xoffset;
+  grafyx_xoffset = value % G_XSIZE;
+  if (grafyx_enable && old_xoffset != grafyx_xoffset) {
+    trs_screen_refresh();
+  }
+}
+
+void grafyx_write_yoffset(int value)
+{
+  unsigned char old_yoffset = grafyx_yoffset;
+  grafyx_yoffset = value;
+  if (grafyx_enable && old_yoffset != grafyx_yoffset) {
+    trs_screen_refresh();
+  }
+}
+
+void grafyx_write_overlay(int value)
+{
+  unsigned char old_overlay = grafyx_overlay;
+  grafyx_overlay = value & 1;
+  if (grafyx_enable && old_overlay != grafyx_overlay) {
+    trs_screen_refresh();
+  }
+}
+
+void grafyx_set_microlabs(int on_off)
+{
+  grafyx_microlabs = on_off;
+}
+
+/*---------- X mouse support --------------*/
+
+int mouse_x_size = 640, mouse_y_size = 240;
+int mouse_sens = 3;
+int mouse_last_x = -1, mouse_last_y = -1;
+unsigned int mouse_last_buttons;
+int mouse_old_style = 0;
+
+void trs_get_mouse_pos(int *x, int *y, unsigned int *buttons)
+{
+  Window root, child;
+  int root_x, root_y, win_x, win_y;
+  unsigned int mask;
+  XQueryPointer(display, window, &root, &child,
+		&root_x, &root_y, &win_x, &win_y, &mask);
+#if MOUSEDEBUG
+  fprintf(stderr, "get_mouse %d %d 0x%x ->", win_x, win_y, mask);
+#endif
+  if (win_x >= 0 && win_x < OrigWidth &&
+      win_y >= 0 && win_y < OrigHeight) {
+    /* Mouse is within emulator window */
+    if (win_x < left_margin) win_x = left_margin;
+    if (win_x >= OrigWidth - left_margin) win_x = OrigWidth - left_margin - 1;
+    if (win_y < top_margin) win_y = top_margin;
+    if (win_y >= OrigHeight - top_margin) win_y = OrigHeight - top_margin - 1;
+    *x = mouse_last_x = (win_x - left_margin)
+                        * mouse_x_size
+                        / (OrigWidth - 2*left_margin);
+    *y = mouse_last_y = (win_y - top_margin) 
+                        * mouse_y_size
+                        / (OrigHeight - 2*top_margin);
+    mouse_last_buttons = 7;
+    /* !!Note: assuming 3-button mouse */
+    if (mask & Button1Mask) mouse_last_buttons &= ~4;
+    if (mask & Button2Mask) mouse_last_buttons &= ~2;
+    if (mask & Button3Mask) mouse_last_buttons &= ~1;
+  }
+  *x = mouse_last_x;
+  *y = mouse_last_y;
+  *buttons = mouse_last_buttons;
+#if MOUSEDEBUG
+  fprintf(stderr, "%d %d 0x%x\n",
+	  mouse_last_x, mouse_last_y, mouse_last_buttons);
+#endif
+}
+
+void trs_set_mouse_pos(int x, int y)
+{
+  int dest_x, dest_y;
+  if (x == mouse_last_x && y == mouse_last_y) {
+    /* Kludge: Ignore warp if it says to move the mouse to where we
+       last said it was. In general someone could really want to do that,
+       but with MDRAW, gratuitous warps to the last location occur frequently.
+    */
+    return;
+  }
+  dest_x = left_margin + x * (OrigWidth - 2*left_margin) / mouse_x_size;
+  dest_y = top_margin  + y * (OrigHeight - 2*top_margin) / mouse_y_size;
+
+#if MOUSEDEBUG
+  fprintf(stderr, "set_mouse %d %d -> %d %d\n", x, y, dest_x, dest_y);
+#endif
+  XWarpPointer(display, window, window, 0, 0, OrigWidth, OrigHeight,
+	       dest_x, dest_y);
+}
+
+void trs_get_mouse_max(int *x, int *y, unsigned int *sens)
+{
+  *x = mouse_x_size - (mouse_old_style ? 0 : 1);
+  *y = mouse_y_size - (mouse_old_style ? 0 : 1);
+  *sens = mouse_sens;
+}
+
+void trs_set_mouse_max(int x, int y, unsigned int sens)
+{
+  if ((x & 1) == 0 && (y & 1) == 0) {
+    /* "Old style" mouse drivers took the size here; new style take
+       the maximum. As a heuristic kludge, we assume old style if
+       the values are even, new style if not. */
+    mouse_old_style = 1;
+  }
+  mouse_x_size = x + (mouse_old_style ? 0 : 1);
+  mouse_y_size = y + (mouse_old_style ? 0 : 1);
+  mouse_sens = sens;
+}
+
+int trs_get_mouse_type()
+{
+  /* !!Note: assuming 3-button mouse */
+  return 1;
 }
