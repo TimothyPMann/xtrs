@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Apr 25 00:55:03 PDT 1998 by mann
+   Last modified on Sat Dec 12 11:47:51 PST 1998 by mann
 */
 
 #include "z80.h"
@@ -48,7 +48,72 @@ static Uchar *traps;
 static int num_traps;
 static int print_instructions;
 static int stop_signaled;
-extern char help_message[];  /* defined at the end */
+
+static char help_message[] =
+
+"(zbx) commands:\n\
+\n\
+Running:\n\
+    run\n\
+        Reset the Z-80 and commence execution at address 0000.\n\
+    cont\n\
+        Continue execution.\n\
+    step\n\
+        Execute one instruction, disallowing interrupts.\n\
+    stepint\n\
+        Execute one instruction, allowing an interrupt afterwards.\n\
+    next\n\
+    nextint\n\
+        Execute one instruction.  If the instruction is a CALL, continue\n\
+        until the return.  Interrupts are always allowed inside the call,\n\
+        but only the nextint form allows an interrupt afterwards.\n\
+    reset\n\
+        Reset the Z-80.\n\
+    timeroff\n\
+    timeron\n\
+        Disable/enable the emulated TRS-80 real time clock interrupt.\n\
+Printing:\n\
+    dump\n\
+        Print the values of the Z-80 registers.\n\
+    list\n\
+    list <addr>\n\
+    list <start addr> , <end addr>\n\
+        Disassemble 10 instructions at the current pc, 10 instructions at\n\
+        the specified hex address, or the instructions in the range of hex\n\
+        addresses.\n\
+    <start addr> , <end addr> /\n\
+    <start addr> / <num bytes>\n\
+    <addr> =\n\
+        Print the memory values in the specified range.  All values are hex.\n\
+    traceon\n\
+        Enable tracing of all instructions.\n\
+    traceoff\n\
+        Disable tracing.\n\
+Traps:\n\
+    status\n\
+        Show all traps (breakpoints, trace points).\n\
+    clear\n\
+        Delete the trap at the current address.\n\
+    delete <n>\n\
+    delete *\n\
+        Delete trap n, or all traps.\n\
+    stop at <address>\n\
+        Set a breakpoint at the specified hex address.\n\
+    trace <address>\n\
+        Set a trap to trace execution at the specified hex address.\n\
+    traceon at <address>\n\
+        Set a trap to enable tracing at the specified hex address.\n\
+    traceoff at <address>\n\
+        Set a trap to disable tracing at the specified hex address.\n\
+Miscellaneous:\n\
+    assign $<reg> = <value>\n\
+    assign <addr> = <value>\n\
+        Change the value of a register, register pair, or memory byte.\n\
+    help\n\
+    ?\n\
+        Print this message.\n\
+    quit\n\
+        Exit the zbx.\n";
 
 static struct
 {
@@ -670,72 +735,6 @@ void debug_shell()
     write_history(history_file);
 #endif
 }
-
-static char help_message[] =
-
-"(zbx) commands:\n\
-\n\
-Running:\n\
-    run\n\
-        Reset the Z-80 and commence execution at address 0000.\n\
-    cont\n\
-        Continue execution.\n\
-    step\n\
-        Execute one instruction, disallowing interrupts.\n\
-    stepint\n\
-        Execute one instruction, allowing an interrupt afterwards.\n\
-    next\n\
-    nextint\n\
-        Execute one instruction.  If the instruction is a CALL, continue\n\
-        until the return.  Interrupts are always allowed inside the call,\n\
-        but only the nextint form allows an interrupt afterwards.\n\
-    reset\n\
-        Reset the Z-80.\n\
-    timeroff\n\
-    timeron\n\
-        Disable/enable the emulated TRS-80 real time clock interrupt.\n\
-Printing:\n\
-    dump\n\
-        Print the values of the Z-80 registers.\n\
-    list\n\
-    list <addr>\n\
-    list <start addr> , <end addr>\n\
-        Disassemble 10 instructions at the current pc, 10 instructions at\n\
-        the specified hex address, or the instructions in the range of hex\n\
-        addresses.\n\
-    <start addr> , <end addr> /\n\
-    <start addr> / <num bytes>\n\
-    <addr> =\n\
-        Print the memory values in the specified range.  All values are hex.\n\
-    traceon\n\
-        Enable tracing of all instructions.\n\
-    traceoff\n\
-        Disable tracing.\n\
-Traps:\n\
-    status\n\
-        Show all traps (breakpoints, trace points).\n\
-    clear\n\
-        Delete the trap at the current address.\n\
-    delete <n>\n\
-    delete *\n\
-        Delete trap n, or all traps.\n\
-    stop at <address>\n\
-        Set a breakpoint at the specified hex address.\n\
-    trace <address>\n\
-        Set a trap to trace execution at the specified hex address.\n\
-    traceon at <address>\n\
-        Set a trap to enable tracing at the specified hex address.\n\
-    traceoff at <address>\n\
-        Set a trap to disable tracing at the specified hex address.\n\
-Miscellaneous:\n\
-    assign $<reg> = <value>\n\
-    assign <addr> = <value>\n\
-        Change the value of a register, register pair, or memory byte.\n\
-    help\n\
-    ?\n\
-        Print this message.\n\
-    quit\n\
-        Exit the zbx.\n";
 
 #ifdef NEVER
 
