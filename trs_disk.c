@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Wed May 17 22:01:32 PDT 2000 by mann */
+/* Last modified on Tue May  1 20:34:56 PDT 2001 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
@@ -28,6 +28,7 @@
 #include "trs_hard.h"
 #include <stdio.h>
 #include <sys/time.h>
+#include <time.h>
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
@@ -175,8 +176,7 @@ typedef struct {
   unsigned char flags;
 } SectorId;
 
-/* Arbitrary maximum on tracks, chosen because LDOS can use at most 95 */
-#define MAXTRACKS    96
+#define MAXTRACKS   255
 #define JV1_SECSIZE 256
 #define MAXSECSIZE 1024
 
