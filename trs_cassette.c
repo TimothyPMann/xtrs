@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Apr 25 01:04:14 PDT 1998 by mann
+   Last modified on Sat Oct 10 20:22:08 PDT 1998 by mann
 */
 
 #include "trs.h"
@@ -43,81 +43,72 @@ static FILE *cassette_file;
 
 static void get_control()
 {
-    FILE *f;
+  FILE *f;
 
-    f = fopen(CONTROL_FILENAME, "r");
-    if((!f) ||
-       (fscanf(f, "%s %d", cassette_filename, &cassette_position) != 2))
-    {
-	fprintf(stderr, "Error reading %s, cassette file will be: %s\n",
-		CONTROL_FILENAME, DEFAULT_FILENAME);
-	strcpy(cassette_filename, DEFAULT_FILENAME);
-	cassette_position = 0;
-    }
+  f = fopen(CONTROL_FILENAME, "r");
+  if ((!f) ||
+      (fscanf(f, "%s %d", cassette_filename, &cassette_position) != 2)) {
+    fprintf(stderr, "Error reading %s, cassette file will be: %s\n",
+	    CONTROL_FILENAME, DEFAULT_FILENAME);
+    strcpy(cassette_filename, DEFAULT_FILENAME);
+    cassette_position = 0;
+  }
 
-    if(f)
-    {
-	fclose(f);
-    }
+  if (f) {
+    fclose(f);
+  }
 }
 
 static void put_control()
 {
-    FILE *f;
+  FILE *f;
 
-    f = fopen(CONTROL_FILENAME, "w");
+  f = fopen(CONTROL_FILENAME, "w");
 
-    if(f)
-    {
-	fprintf(f, "%s %d", cassette_filename, cassette_position);
-	fclose(f);
-    }
+  if (f) {
+    fprintf(f, "%s %d", cassette_filename, cassette_position);
+    fclose(f);
+  }
 }
 
 static int assert_state(int state)
 {
-    if(cassette_state == state)
-    {
-	return 1;
-    }
+  if (cassette_state == state) {
+    return 1;
+  }
 
-    if(cassette_state != CLOSE)
-    {
-	cassette_position = ftell(cassette_file);
-	fclose(cassette_file);
-	put_control();
-    }
+  if (cassette_state != CLOSE) {
+    cassette_position = ftell(cassette_file);
+    fclose(cassette_file);
+    put_control();
+  }
 
-    switch(state)
-    {
-      case READ:
-	get_control();
-	cassette_file = fopen(cassette_filename, "r");
-	if(cassette_file == NULL)
-	{
-	    fprintf(stderr, "Couldn't read %s\n", cassette_filename);
-	    return 1;
-	}
-	fseek(cassette_file, cassette_position, 0);
-	break;
-      case WRITE:
-	get_control();
-	cassette_file = fopen(cassette_filename, "r+");
-        if(cassette_file == NULL)
-	{
-	    cassette_file = fopen(cassette_filename, "w");
-	}
-	if(cassette_file == NULL)
-	{
-	    fprintf(stderr, "Couldn't write %s\n", cassette_filename);
-	    return 1;
-	}
-	fseek(cassette_file, cassette_position, 0);
-	break;
+  switch (state) {
+  case READ:
+    get_control();
+    cassette_file = fopen(cassette_filename, "r");
+    if (cassette_file == NULL) {
+      fprintf(stderr, "Couldn't read %s\n", cassette_filename);
+      return 1;
     }
+    fseek(cassette_file, cassette_position, 0);
+    break;
+  case WRITE:
+    get_control();
+    cassette_file = fopen(cassette_filename, "r+");
+    if (cassette_file == NULL) {
+      cassette_file = fopen(cassette_filename, "w");
+    }
+    if (cassette_file == NULL) {
+      fprintf(stderr, "Couldn't write %s\n", cassette_filename);
+      return 1;
+    }
+    fseek(cassette_file, cassette_position, 0);
+    break;
+  }
     
-    cassette_state = state;
-    return 0;
+  cassette_state = state;
+  return 0;
 }
 
 /* ioport of the SoundBlaster command register. 0 means none */
@@ -130,121 +121,111 @@ void trs_sound_init(int ioport, int vol)
 {
 #if __linux
 #define MAX_TRIES 65536
-    int tries;
+  int tries;
 #ifdef SOUNDDEBUG
-    int major, minor;
+  int major, minor;
 #endif
 
-    if(sb_address != 0) return;
-    if((ioport & 0xFFFFFF0F) != 0x200)
-    {
-        error("Invalid SoundBlaster I/O port");
-	return;
-    }
-    sb_address = ioport;
-    if(ioperm(ioport, 0x10, 1))
-    {
-        perror("Unable to access SoundBlaster");
-	sb_address = 0;
-	return;
-    }
+  if (sb_address != 0) return;
+  if ((ioport & 0xFFFFFF0F) != 0x200) {
+    error("Invalid SoundBlaster I/O port");
+    return;
+  }
+  sb_address = ioport;
+  if (ioperm(ioport, 0x10, 1)) {
+    perror("Unable to access SoundBlaster");
+    sb_address = 0;
+    return;
+  }
 
-    /* Reset SoundBlaster DSP */
-    outb(0x01, sb_address + 0x6);
-    usleep(3);
-    outb(0x00, sb_address + 0x6);
-    for (tries = 0; tries < MAX_TRIES; tries++) {
-	if ((inb(sb_address + 0xE) & 0x80) &&
-	    (inb(sb_address + 0xA) == 0xAA)) break;
-    }
-    if (tries == MAX_TRIES) {
-	error("Unable to detect SoundBlaster");
-	sb_address = 0;
-	return;
-    }
+  /* Reset SoundBlaster DSP */
+  outb(0x01, sb_address + 0x6);
+  usleep(3);
+  outb(0x00, sb_address + 0x6);
+  for (tries = 0; tries < MAX_TRIES; tries++) {
+    if ((inb(sb_address + 0xE) & 0x80) &&
+	(inb(sb_address + 0xA) == 0xAA)) break;
+  }
+  if (tries == MAX_TRIES) {
+    error("Unable to detect SoundBlaster");
+    sb_address = 0;
+    return;
+  }
 
 #ifdef SOUNDDEBUG
-    /* Get DSP version number */
-    while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
-    outb(0xE1, sb_address + 0xC);
-    while ((inb(sb_address + 0xE) & 0x80) == 0) /*poll*/ ;
-    major = inb(sb_address + 0xA);
-    while ((inb(sb_address + 0xE) & 0x80) == 0) /*poll*/ ;
-    minor = inb(sb_address + 0xA);
-    fprintf(stderr, "SoundBlaster DSP version %d.%d detected\n", major, minor);
+  /* Get DSP version number */
+  while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
+  outb(0xE1, sb_address + 0xC);
+  while ((inb(sb_address + 0xE) & 0x80) == 0) /*poll*/ ;
+  major = inb(sb_address + 0xA);
+  while ((inb(sb_address + 0xE) & 0x80) == 0) /*poll*/ ;
+  minor = inb(sb_address + 0xA);
+  fprintf(stderr, "SoundBlaster DSP version %d.%d detected\n", major, minor);
 #endif
 
-    /* Turn on DAC speaker */
-    while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
-    outb(0xD1, sb_address + 0xC);
+  /* Turn on DAC speaker */
+  while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
+  outb(0xD1, sb_address + 0xC);
 
-    /* Set up volume values */
-    if (vol < 0) vol = 0;
-    if (vol > 100) vol = 100;
-    /* Values in comments from Model I technical manual.  Model III/4 used
-       a different value for one resistor in the network, so these
-       voltages are not exactly right.  In particular 3 and 0 are no
-       longer almost identical, but as far as I know, 3 is still unused.
-    */
-    sb_cass_volume[0] = (vol*255)/200;  /* 0.46 V */
-    sb_cass_volume[1] = (vol*255)/100;  /* 0.85 V */
-    sb_cass_volume[2] = 0;              /* 0.00 V */
-    sb_cass_volume[3] = (vol*255)/200;  /* unused, but about 0.46 V */
-    sb_sound_volume[0] = 0;
-    sb_sound_volume[1] = (vol*255)/100;
+  /* Set up volume values */
+  if (vol < 0) vol = 0;
+  if (vol > 100) vol = 100;
+  /* Values in comments from Model I technical manual.  Model III/4 used
+     a different value for one resistor in the network, so these
+     voltages are not exactly right.  In particular 3 and 0 are no
+     longer almost identical, but as far as I know, 3 is still unused.
+     */
+  sb_cass_volume[0] = (vol*255)/200; /* 0.46 V */
+  sb_cass_volume[1] = (vol*255)/100; /* 0.85 V */
+  sb_cass_volume[2] = 0;	/* 0.00 V */
+  sb_cass_volume[3] = (vol*255)/200; /* unused, but about 0.46 V */
+  sb_sound_volume[0] = 0;
+  sb_sound_volume[1] = (vol*255)/100;
 #endif
 }
 
 void trs_cassette_motor(int value)
 {
-    if(value)
-    {
-	/* motor on */
-	if(!cassette_motor)
-	{
-	    cassette_motor = 1;
-	}
+  if (value) {
+    /* motor on */
+    if (!cassette_motor) {
+      cassette_motor = 1;
     }
-    else
-    {
-	/* motor off */
-	if(cassette_motor)
-	{
-	    assert_state(CLOSE);
-	    cassette_motor = 0;
-	}
+  } else {
+    /* motor off */
+    if (cassette_motor) {
+      assert_state(CLOSE);
+      cassette_motor = 0;
     }
+  }
 }
 
 void trs_cassette_out(int value)
 {
 #ifdef CASSDEBUG
-    fprintf(stderr, 
-    "cass out %02x, pc %04x, stack %04x %04x %04x %04 x%04x %04x %04x %04x\n",
-	    value, REG_PC, mem_read_word(REG_SP), mem_read_word(REG_SP + 2),
-	    mem_read_word(REG_SP + 4), mem_read_word(REG_SP + 6),
-	    mem_read_word(REG_SP + 8), mem_read_word(REG_SP + 10),
-	    mem_read_word(REG_SP + 12), mem_read_word(REG_SP + 14));
+  fprintf(stderr, 
+    "cass out %02x, pc %04x, stack %04x %04x %04x %04x %04x %04x %04x %04x\n",
+	  value, REG_PC, mem_read_word(REG_SP), mem_read_word(REG_SP + 2),
+	  mem_read_word(REG_SP + 4), mem_read_word(REG_SP + 6),
+	  mem_read_word(REG_SP + 8), mem_read_word(REG_SP + 10),
+	  mem_read_word(REG_SP + 12), mem_read_word(REG_SP + 14));
 #endif
 
-    if((trs_model == 1) &&
-       (REG_PC == 0x0228) &&  /* writing bit to cassette */
-       (mem_read_word(REG_SP) == 0x01df) &&  /* called from write-bit */
-       (mem_read_word(REG_SP + 2) == 0x026e)) /* called from write-byte */
-    {
-	if((mem_read_word(REG_SP + 12) == 0x028d) && /* from write-leader */
-	   (mem_read((REG_SP + 9) & 0xffff) == 0xff)) /* start of leader */
-	{
-	    if(assert_state(WRITE))
-	    {
-		return;
-	    }
-	}
+  if ((trs_model == 1) &&
+      (REG_PC == 0x0228) &&	/* writing bit to cassette */
+      (mem_read_word(REG_SP) == 0x01df) && /* called from write-bit */
+      (mem_read_word(REG_SP + 2) == 0x026e)) /* called from write-byte */ {
 
-	if(cassette_state == WRITE)
-	{
-	    /* write that byte! */
-	    fputc(REG_D, cassette_file);
+	if ((mem_read_word(REG_SP + 12) == 0x028d) && /* from write-leader */
+	    (mem_read((REG_SP + 9) & 0xffff) == 0xff)) /* start of leader */ {
+	      if (assert_state(WRITE)) {
+		return;
+	      }
+	    }
+
+	if (cassette_state == WRITE) {
+	  /* write that byte! */
+	  fputc(REG_D, cassette_file);
 	}
 
 	mem_write(0x40d3, REG_A); /* take care of instr at 0228 */
@@ -252,17 +233,16 @@ void trs_cassette_out(int value)
 	/* jump to the end of the write-byte routine */
 	REG_SP += 4;
 	REG_PC = 0x0279;
-    }
+      }
 
 #if __linux
-    /* Do sound emulation */
-    if((cassette_motor == 0) && sb_address)
-    {
-	while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
-	outb(0x10, sb_address + 0xC);
-	while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
-	outb(sb_cass_volume[value], sb_address + 0xC);
-    }
+  /* Do sound emulation */
+  if ((cassette_motor == 0) && sb_address) {
+    while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
+    outb(0x10, sb_address + 0xC);
+    while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
+    outb(sb_cass_volume[value], sb_address + 0xC);
+  }
 #endif /* linux */
 }
 
@@ -272,83 +252,75 @@ void
 trs_sound_out(int value)
 {
 #if __linux
-    /* Do sound emulation */
-    if(sb_address)
-    {
-	while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
-	outb(0x10, sb_address + 0xC);
-	while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
-	outb(sb_sound_volume[value], sb_address + 0xC);
-    }
+  /* Do sound emulation */
+  if (sb_address) {
+    while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
+    outb(0x10, sb_address + 0xC);
+    while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
+    outb(sb_sound_volume[value], sb_address + 0xC);
+  }
 #endif /* linux */
 }
 
 int trs_cassette_in(int modesel)
 {
 #ifdef CASSDEBUG
-    fprintf(stderr, 
-    "cass in, pc %04x, stack %04x %04x %04x %04x %04x %04x %04x %04x\n",
-	    REG_PC, mem_read_word(REG_SP), mem_read_word(REG_SP + 2),
-	    mem_read_word(REG_SP + 4), mem_read_word(REG_SP + 6),
-	    mem_read_word(REG_SP + 8), mem_read_word(REG_SP + 10),
-	    mem_read_word(REG_SP + 12), mem_read_word(REG_SP + 14));
+  fprintf(stderr, 
+	  "cass in, pc %04x, stack %04x %04x %04x %04x %04x %04x %04x %04x\n",
+	  REG_PC, mem_read_word(REG_SP), mem_read_word(REG_SP + 2),
+	  mem_read_word(REG_SP + 4), mem_read_word(REG_SP + 6),
+	  mem_read_word(REG_SP + 8), mem_read_word(REG_SP + 10),
+	  mem_read_word(REG_SP + 12), mem_read_word(REG_SP + 14));
 #endif
-    if (trs_model != 1) return 0xff; /* not implemented */
+  if (trs_model != 1) return 0xff; /* not implemented */
 
-    if(REG_PC == 0x0245)
-    {
-	if(mem_read_word(REG_SP + 4) == 0x029b)
-	{
-	    /* this is a read from the code which reads the header */
+  if (REG_PC == 0x0245) {
+    if (mem_read_word(REG_SP + 4) == 0x029b) {
+      /* this is a read from the code which reads the header */
 	    
-	    if(!assert_state(READ))
-	    {
-		int nextbyte;
+      if (!assert_state(READ)) {
+	int nextbyte;
 		
-		do
-		{
-		    if (z80_state.nmi) return 0; /* allow reboot */
-		    nextbyte = fgetc(cassette_file);
-		}
-		while(nextbyte != 0xa5);
+	do {
+	  if (z80_state.nmi) return 0; /* allow reboot */
+	  nextbyte = fgetc(cassette_file);
+	} while(nextbyte != 0xa5);
 
-		/* do the pop af instruction */
-		REG_AF = mem_read_word(REG_SP);
-		REG_SP += 2;
+	/* do the pop af instruction */
+	REG_AF = mem_read_word(REG_SP);
+	REG_SP += 2;
 
-		/* skip to the end of the function */
-		REG_PC = 0x025a;
+	/* skip to the end of the function */
+	REG_PC = 0x025a;
 
-		/* this will cause the A register to be loaded
-		   with the return value */
-		return 0xa5;
-	    }
-	}
-	else if(mem_read_word(REG_SP + 4) == 0x023c)
-	{
-	    /* reading a byte from the cassette */
+	/* this will cause the A register to be loaded
+	   with the return value */
+	return 0xa5;
+      }
+    } else if (mem_read_word(REG_SP + 4) == 0x023c) {
+      /* reading a byte from the cassette */
 
-	    int nextbyte;
+      int nextbyte;
 	    
-	    nextbyte = fgetc(cassette_file);
+      nextbyte = fgetc(cassette_file);
 	    
-	    /* spoof caller into thinking we are at end of loop */
-	    mem_write(REG_SP + 3, 1);
+      /* spoof caller into thinking we are at end of loop */
+      mem_write(REG_SP + 3, 1);
 	    
-	    /* do the pop af instruction */
-	    REG_AF = mem_read_word(REG_SP);
-	    REG_SP += 2;
+      /* do the pop af instruction */
+      REG_AF = mem_read_word(REG_SP);
+      REG_SP += 2;
 	    
-	    /* skip to the end of the function */
-	    REG_PC = 0x025a;
+      /* skip to the end of the function */
+      REG_PC = 0x025a;
 	    
-	    /* this will cause the A register to be loaded
-	       with the return value */
-	    return nextbyte;
-	}
+      /* this will cause the A register to be loaded
+	 with the return value */
+      return nextbyte;
     }
+  }
 
-    /* default -- return all 1's plus the modesel mask */
-    return modesel ? 0xff : 0xbf;
+  /* default -- return all 1's plus the modesel mask */
+  return modesel ? 0xff : 0xbf;
 }
 
