@@ -186,8 +186,8 @@ The emulator implements a set of pseudo-instructions (emulator traps)
 that give TRS-80 programs access to Unix files.  The programs listed
 above use them.  If you would like to write your own such programs,
 the traps are documented in the file trs_imp_exp.h, and source code
-for the existing programs that use them is supplied in import.z,
-export.z, xtrsemt.h, xtrsemt.ccc, and settime.ccc.
+for the existing programs is supplied in import.z, export.z,
+xtrsemt.h, xtrsemt.ccc, and settime.ccc.
 
 .SH Options
 Defaults for all options can be specified using the standard X resource
