@@ -991,7 +991,7 @@ static struct opcode minor[6][256] = {
 	"out	(c),c",		A_0,		/* ed49 */
 	"adc	hl,bc",		A_0,		/* ed4a */
 	"ld	bc,(%02x%02xh)",A_16,		/* ed4b */
-	"neg",			A_0,		/* ed4c [undocumented] */
+	"neg\t\t\t;undoc equiv",A_0,		/* ed4c [undocumented] */
 	"reti",			A_0,		/* ed4d */
 	undefined,		A_0,		/* ed4e */
 	"ld	r,a",		A_0,		/* ed4f */
@@ -1000,8 +1000,8 @@ static struct opcode minor[6][256] = {
 	"out	(c),d",		A_0,		/* ed51 */
 	"sbc	hl,de",		A_0,		/* ed52 */
 	"ld	(%02x%02xh),de",A_16,		/* ed53 */
-	"neg",			A_0,		/* ed54 [undocumented] */
-	"ret",			A_0,		/* ed55 [undocumented] */
+	"neg\t\t\t;undoc equiv",A_0,		/* ed54 [undocumented] */
+	"ret\t\t\t;undoc equiv",A_0,		/* ed55 [undocumented] */
 	"im	1",		A_0,		/* ed56 */
 	"ld	a,i",		A_0,		/* ed57 */
 
@@ -1009,26 +1009,28 @@ static struct opcode minor[6][256] = {
 	"out	(c),e",		A_0,		/* ed59 */
 	"adc	hl,de",		A_0,		/* ed5a */
 	"ld	de,(%02x%02xh)",A_16,		/* ed5b */
-	"neg",			A_0,		/* ed5c [undocumented] */
-	"ret",			A_0,		/* ed5d [undocumented] */
+	"neg\t\t\t;undoc equiv",A_0,		/* ed5c [undocumented] */
+	"ret\t\t\t;undoc equiv",A_0,		/* ed5d [undocumented] */
 	"im	2",		A_0,		/* ed5e */
-	undefined,		A_0,		/* ed5f */
+	"ld	a,r",		A_0,		/* ed5f */
 
 	"in	h,(c)",		A_0,		/* ed60 */
 	"out	(c),h",		A_0,		/* ed61 */
 	"sbc	hl,hl",		A_0,		/* ed62 */
-	"ld	(%02x%02xh),hl",A_16,		/* ed63 [semi-documented] */
-	"neg",			A_0,		/* ed64 [undocumented] */
-	"ret",			A_0,		/* ed65 [undocumented] */
-	"im	0",		A_0,		/* ed66 [undocumented] */
+	"ld	(%02x%02xh),hl\t;undoc equiv",A_16,
+	                                        /* ed63 [semi-documented] */
+	"neg\t\t\t;undoc equiv",A_0,		/* ed64 [undocumented] */
+	"ret\t\t\t;undoc equiv",A_0,		/* ed65 [undocumented] */
+	"im\t0\t\t;undoc equiv",A_0,		/* ed66 [undocumented] */
 	"rrd",			A_0,		/* ed67 */
 
 	"in	l,(c)",		A_0,		/* ed68 */
 	"out	(c),l",		A_0,		/* ed69 */
 	"adc	hl,hl",		A_0,		/* ed6a */
-	"ld	hl,(%02x%02xh)",A_16,		/* ed6b [semi-documented] */
-	"neg",			A_0,		/* ed6c [undocumented] */
-	"ret",			A_0,		/* ed6d [undocumented] */
+	"ld	hl,(%02x%02xh)\t;undoc equiv",A_16,
+                                                /* ed6b [semi-documented] */
+	"neg\t\t\t;undoc equiv",A_0,		/* ed6c [undocumented] */
+	"ret\t\t\t;undoc equiv",A_0,		/* ed6d [undocumented] */
 	undefined,		A_0,		/* ed6e */
 	"rld",			A_0,		/* ed6f */
 	
@@ -1036,18 +1038,18 @@ static struct opcode minor[6][256] = {
 	"out	(c),0",		A_0,		/* ed71 [undocumented] */
 	"sbc	hl,sp",		A_0,		/* ed72 */
 	"ld	(%02x%02xh),sp",A_16,		/* ed73 */
-	"neg",			A_0,		/* ed74 [undocumented] */
-	"ret",			A_0,		/* ed75 [undocumented] */
-	"im	1",		A_0,		/* ed76 [undocumented] */
+	"neg\t\t\t;undoc equiv",A_0,		/* ed74 [undocumented] */
+	"ret\t\t\t;undoc equiv",A_0,		/* ed75 [undocumented] */
+	"im\t1\t\t;undoc equiv",A_0,		/* ed76 [undocumented] */
 	undefined,		A_0,		/* ed77 */
 
 	"in	a,(c)",		A_0,		/* ed78 */
 	"out	(c),a",		A_0,		/* ed79 */
 	"adc	hl,sp",		A_0,		/* ed7a */
 	"ld	sp,(%02x%02xh)",A_16,		/* ed7b */
-	"neg",			A_0,		/* ed7c [undocumented] */
-	"ret",			A_0,		/* ed7d [undocumented] */
-	"im	2",		A_0,		/* ed7e [undocumented] */
+	"neg\t\t\t;undoc equiv",A_0,		/* ed7c [undocumented] */
+	"ret\t\t\t;undoc equiv",A_0,		/* ed7d [undocumented] */
+	"im\t2\t\t;undoc equiv",A_0,		/* ed7e [undocumented] */
 	undefined,		A_0,		/* ed7f */
 
 	undefined,		A_0,		/* ed80 */
