@@ -21,11 +21,14 @@
 ;
 ; 3-19-99, Tim Mann:  Improved disk error handling.  Ruled out 
 ;   attempts to work in plain Model 4 mode.
+; 4-4-99, Tim Mann:  Made read loop continue until NMI instead of
+;   counting 256 bytes; this should let boot sectors of other than
+;   256 bytes work.
 ;
 ; TODO:
 ;   possibly write code for the RST handlers as in the real 4P rom
 ;
-; Last modified on Fri Mar 19 14:30:10 PST 1999 by mann 
+; Last modified on Sun Apr  4 22:26:04 PDT 1999 by mann 
 ;      modified on Mon Mar 15 17:25:49 CST 1999 by petec
 ;
 ;------------------------------------------------------------------
@@ -239,17 +242,19 @@ rdlp1:	in	a,(fdcstat)	; get status
 	ld	a,d
 rdlp2:	out	(fdcslct),a
 	ini
-	jr	nz,rdlp2
-;	jr	$		; wait for nmi
-	in	a,(fdcstat)
-	ret
+	jr	rdlp2		; tight loop waiting for NMI
+;	jr	nz,rdlp2
+;	in	a,(fdcstat)
+;	ret
 
 nmiret:	xor	a
 	out	(wrnmiport),a	; no interrupts
 	ld	a,81h		; DS 0, dden
 	out	(fdcslct),a
 	in	a,(fdcstat)
-	ret
+	ex	(sp),hl		; discard one level of return address
+	pop	hl
+	retn
 
 ;
 ;	fdcmd - send command in A to fdc
