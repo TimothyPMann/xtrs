@@ -19,5 +19,11 @@ void error(string)
     char *string;
 {
     fprintf(stderr, "xtrs error: %s\n", string);
+}
+
+void fatal(string)
+    char *string;
+{
+    fprintf(stderr, "xtrs fatal error: %s\n", string);
     exit(1);
 }

@@ -206,7 +206,30 @@ that give TRS-80 programs access to Unix files.  The programs listed
 above use them.  If you would like to write your own such programs,
 the traps are documented in the file trs_imp_exp.h, and source code
 for the existing programs is supplied in import.z, export.z,
-xtrsemt.h, xtrsemt.ccc, and settime.ccc.
+xtrsemt.h, xtrsemt.ccc, and settime.ccc.  Don't base any future
+development on import.bas and export.bas, however.  They use an older,
+slower mechanism in the emulator that may be removed in a future
+release.
+
+.SH Interrupts
+
+The emulator supports only interrupt mode 1.  It will complain if your
+program enables interrupts after powerup without executing an IM 1
+instruction first.  All Model I/III/4 software does this, as these
+machines supported only IM 1.
+
+The Model I has a 40 Hz "heartbeat" clock interrupt, while the Model
+III used 30 Hz, and the Model 4 could run at either 30 Hz or 60 Hz.
+The emulator approximates this rather well even on a system where
+clock ticks come at some frequency that isn't divisible by the
+emulated frequency (e.g., 100 Hz on Intel Linux), as long as the true
+frequency is not slower than the emulated frequency.  The emulator has
+a notion of the absolute time at which each tick is supposed to occur,
+and it asks the host system to wake it up at each of those times.  The
+net result is that some ticks may be late, but there are always the
+proper number of ticks per second.  For example, running in Model I
+mode on Intel Linux you'd see this pattern: (tick, 30ms, tick,
+20ms,...) instead of seeing ticks every 25ms.
 
 .SH Options
 Defaults for all options can be specified using the standard X resource
@@ -341,9 +364,6 @@ the emulator's disk file format, ROM images, and TRS-80 software that
 has already been converted.  For pointers, see
 http://www.research. digital.com/SRC/personal/Tim_Mann/trs80.html.
 
-See README and README.tpm in this package for technical (and
-historical) data on \fIxtrs\fP not included in this man page.
-
 .SH Bugs
 There may be bugs in the Z-80 emulator which we haven't found yet.
 Some of the more bizarre undocumented Z-80 instructions are not
@@ -407,3 +427,5 @@ Alec Wolman <wolman@crl.dec.com>, Digital Equipment Corporation
 Timothy Mann <mann@pa.dec.com>, Digital Equipment Corporation
 
 Thanks to Al Petrofsky for supplying the TRS-80 fonts in bdf format.
+
+See README and README.tpm for additional notes from the authors.

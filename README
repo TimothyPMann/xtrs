@@ -1,6 +1,6 @@
 README.tpm
 Tim Mann <mann@pa.dec.com>
-11/7/97
+1/12/98
 
 As computer scientists, we always long for something bigger and better
 than what we have now.  Give us a megabyte, and we want a gigabyte.
@@ -22,71 +22,9 @@ worked as a programmer for Logical Systems, who produced LDOS, during
 recently found a box in my storage closet containing all my Model I
 hardware manuals, schematics, ROM disassemblies, and even the assembly
 listing for a version of the LDOS Percom Doubler driver that I helped
-write.
+write, giving me enough information to get my additions to xtrs off
+the ground.
 
-****
-Technical information omitted from the man page
-****
-
-* Interrupts
-
-The emulator supports only interrupt mode 1.  It will complain if your
-program enables interrupts after powerup without executing an im 1
-instruction first.  All Model I/III/4 software does this, as these
-machines supported only im 1.
-
-The Model I had a 40 Hz "heartbeat" interrupt, while the Model III
-used 30 Hz, and the Model 4 could run at either 30 Hz or 60 Hz.  The
-emulator approximates this rather well even on a system where clock
-ticks come at some frequency that isn't divisible by the emulated
-frequency (e.g., 100 Hz on Intel Linux), as long as the true frequency
-is not slower than the emulated frequency.  The emulator has a notion
-of the absolute time at which each tick is supposed to occur, and it
-asks the host system to wake it up at each of those times.  The net
-result is that some ticks may be late, but there are always the proper
-number of ticks per second.  For example, running in Model I mode on
-Intel Linux you'd see this pattern: (tick, 30ms, tick, 20ms, ...)
-instead of seeing ticks every 25ms.
-
-The debugger has some extra support to keep interrupts from making
-life intolerable.  The "step" command suppresses the normal test for a
-pending interrupt at the end of each instruction.  A "stepint" command
-is available if you really want to allow an interrupt.  If you do this
-while the emulated CPU has interrupts enabled, you'll usually find
-that your next emulated instruction is at 0038H (the im 1 interrupt
-vector).  New commands "timeroff" and "timeron" let you turn the
-emulated timer off entirely, which is useful while tracing (for
-example).  None of these features interfere with the emulated IFF1 and
-IFF2 (interrupt enable flip-flop) state.
-
-Note: Currently there is a bug in GNU readline() that makes it
-incompatible with my timer interrupt implementation.  Readline thinks
-that it is always supposed to clean up its state and exit when a
-SIGALRM comes in, but in fact, I handle the signal and continue the
-read system call.  I've reported this bug to readline's maintainer.
-
-* Data import/export
-
-See the man page for user information on this topic.
-
-There are two mechanisms for getting data into and out of the
-emulator.  See trs_imp_exp.h for technical details.  The old way that
-uses I/O ports is likely to go away eventually.  Before this can
-happen, either import.z and export.z need to be fixed to work under
-NEWDOS and friends, or import.bas and export.bas need to be hacked to
-use the new mechanism by calling out to assembly code.
-
-The new mechanism is quite flexible.  It's a tempting thought to
-implement hard disk emulation by writing an LDOS hard disk driver that
-uses it.  This would save all the bother of getting technical data on
-a real TRS-80 hard disk controller, finding the drivers for it, and
-emulating the controller well enough that the drivers work.  On the
-other hand, it would require writing Z-80 assembly code, which I find
-quite painful now that I'm out of practice.
-
-* Minor features
-
-I put in a silly kludge that lets LDOS know the correct date whenever
-it boots up.  It simulates the case where you just rebooted LDOS
-without power cycling and the date was left in memory.  Unfortunately
-LDOS doesn't provide a way to do this trick with the time of day.
+Since then I've done much more. Check out my TRS-80 Web page at
+http://www.research.digital.com/SRC/personal/Tim_Mann/trs80.html
+for details!

@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Sep 30 13:09:02 PDT 1997 by mann
+   Last modified on Mon Jan 12 15:44:47 PST 1998 by mann
 */
 
 #include "z80.h"
@@ -83,7 +83,7 @@ int load_hex(file)
 		value = hex_byte(b);
 		if(((0x100 - check) & 0xff) != value)
 		{
-		    error("bad checksum from hex file");
+		    fatal("bad checksum from hex file");
 		}
 	    }
 	}

@@ -6,7 +6,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Tue Sep 30 14:02:22 PDT 1997 by mann */
+/* Last modified on Mon Jan 12 15:44:48 PST 1998 by mann */
 
 #include <stdio.h>
 #include "cmd.h"
@@ -28,7 +28,7 @@ hex_transfer_address(int address)
 }
 
 void
-error(char* msg)
+fatal(char* msg)
 {
     fprintf(stderr, "%s: %s\n", program_name, msg);
     exit(1);

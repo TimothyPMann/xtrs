@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Sep 30 13:40:12 PDT 1997 by mann
+   Last modified on Mon Jan 12 15:44:50 PST 1998 by mann
 */
 
 #include "z80.h"
@@ -51,7 +51,7 @@ static void load_rom(filename)
     {
 	char message[100];
 	sprintf(message, "could not read %s", filename);
-	error(message);
+	fatal(message);
     }
     c = getc(program);
     if (c == ':') {
@@ -67,10 +67,10 @@ static void load_rom(filename)
     fclose(program);
 }
 
-void error(string)
+void fatal(string)
     char *string;
 {
-    fprintf(stderr, "compile_rom error: %s\n", string);
+    fprintf(stderr, "compile_rom fatal error: %s\n", string);
     exit(1);
 }
 
@@ -119,7 +119,7 @@ void main(argc, argv)
     }
     else if(argc != 3)
     {
-	error("usage: compile_rom model hexfile");
+	fatal("usage: compile_rom model hexfile");
     }
     else
     {

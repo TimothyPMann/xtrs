@@ -27,8 +27,8 @@ CR_OBJECTS = \
 	compile_rom.o \
 	load_hex.o
 
-MF_OBJECTS = \
-	mkfloppy.o
+MD_OBJECTS = \
+	mkdisk.o
 
 HC_OBJECTS = \
 	cmd.o \
@@ -56,8 +56,8 @@ SOURCES = \
 CR_SOURCES = \
 	compile_rom.c
 
-MF_SOURCES = \
-	mkfloppy.c
+MD_SOURCES = \
+	mkdisk.c
 
 HC_SOURCES = \
 	cmd.c \
@@ -80,7 +80,7 @@ MISC = \
 	xtrs.man \
 	xtrs.man.text
 
-default:	xtrs mkfloppy hex2cmd xtrs.man.txt
+default:	xtrs mkdisk hex2cmd xtrs.man.txt
 
 # Local customizations for make variables are done in Makefile.local:
 include Makefile.local
@@ -89,10 +89,13 @@ CFLAGS = $(DEBUG) $(ENDIAN) $(DEFAULT_ROM) $(READLINE) $(DISKDIR) $(IFLAGS) \
 	-DKBWAIT -DHAVE_SIGIO
 LIBS = $(XLIB) $(READLINELIBS) $(EXTRALIBS)
 
-.SUFFIXES:	.z .cmd
+.SUFFIXES:	.z .cmd .dct
 .z.cmd:
 	zmac $<
 	hex2cmd $*.hex > $*.cmd
+.z.dct:
+	zmac $<
+	hex2cmd $*.hex > $*.dct
 
 xtrs:		$(OBJECTS)
 		$(CC) $(LDFLAGS) -o xtrs $(OBJECTS) $(LIBS)
@@ -106,8 +109,8 @@ trs_rom1.c:	compile_rom $(BUILT_IN_ROM)
 trs_rom3.c:	compile_rom $(BUILT_IN_ROM3)
 		./compile_rom 3 $(BUILT_IN_ROM3) > trs_rom3.c
 
-mkfloppy:	$(MF_OBJECTS)
-		$(CC) -o mkfloppy $(MF_OBJECTS)
+mkdisk:		$(MD_OBJECTS)
+		$(CC) -o mkdisk $(MD_OBJECTS)
 
 hex2cmd:	$(HC_OBJECTS)
 		$(CC) -o hex2cmd $(HC_OBJECTS)
@@ -127,7 +130,7 @@ xtrs.man.txt:	xtrs.man
 
 clean:
 		rm -f $(OBJECTS) $(MF_OBJECTS) $(CR_OBJECTS) $(HC_OBJECTS) \
-			*~ xtrs mkfloppy compile_rom hex2cmd trs_rom*.c
+			*~ xtrs mkdisk compile_rom hex2cmd trs_rom*.c
 
 link:	
 		rm -f xtrs

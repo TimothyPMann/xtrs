@@ -114,9 +114,9 @@ emt_lseek(fd, offset, whence)
      int whence;
 {
 #asm
-    PUSH IX		;point IX to argument frame
-    LD IX,4		;skip return address and old IX value
-    ADD IX,SP
+    PUSH IX
+    LD IX,4		;point IX to argument frame, skipping
+    ADD IX,SP           ;  return address and old IX value
     LD E,(IX+0)		;fd to DE
     LD D,(IX+1)
     LD HL,0		;extend offset to 8 bytes, push on stack
@@ -305,3 +305,83 @@ emt_misc(func)
     RET
 #endasm
 }
+
+int
+emt_ftruncate(fd, length);
+     int fd;
+     long length; /* 4 bytes */
+{
+#asm
+    PUSH IX
+    LD IX,4		;point IX to argument frame, skipping
+    ADD IX,SP           ;  return address and old IX value
+    LD E,(IX+0)		;fd to DE
+    LD D,(IX+1)
+    LD HL,0		;extend length to 8 bytes, push on stack
+    PUSH HL
+    PUSH HL
+    LD L,(IX+4)		;high 2 bytes of 4-byte offset
+    LD H,(IX+5)
+    PUSH HL
+    LD L,(IX+2)		;low 2 bytes
+    LD H,(IX+3)
+    PUSH HL
+    LD HL,0		;point HL to 8-byte offset
+    ADD HL,SP
+    DEFW 3DEDH		;emt_ftruncate
+    POP DE		;pop length from stack
+    POP BC
+    POP HL
+    POP HL
+    POP IX		;restore
+    RET Z
+    LD H,0		;error code to errno
+    LD L,A
+    LD (ERRNO),HL
+#endasm
+}
+
+int
+emt_opendisk(fname, oflag, mode)
+     char *fname;
+     int oflag;
+     int mode;
+{
+#asm
+    POP AF		;save return address
+    POP HL		;fname to HL
+    POP BC		;oflag to BC
+    POP DE		;mode to DE
+    PUSH DE		;restore stack
+    PUSH BC
+    PUSH HL
+    PUSH AF
+    DEFW 3EEDH		;emt_opendisk
+    LD H,D		;return fd from DE
+    LD L,E
+    RET Z
+    LD B,0		;error code to errno
+    LD C,A
+    LD (ERRNO),BC
+#endasm
+}
+
+int
+emt_closedisk(fd)
+     int fd;
+{
+#asm
+    POP AF		;save return address
+    POP DE		;fd to DE
+    PUSH DE
+    PUSH AF
+    DEFW 3FEDH		;emt_closedisk
+    LD HL,0		;return 0 if no error
+    RET Z
+    LD B,0		;error code to errno
+    LD C,A
+    LD (ERRNO),BC
+    LD HL,0FFFFH	;return -1
+#endasm
+}
+

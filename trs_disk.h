@@ -27,6 +27,7 @@ extern void trs_disk_interrupt_write(unsigned char mask); /* M3 only */
 extern int trs_disk_spinfast;
 extern int trs_disk_doublestep;
 extern char* trs_disk_dir;
+extern unsigned short trs_disk_changecount;
 
 /* Model I drive select register -- address bits 0,1 not decoded */
 #define TRSDISK_SELECT(addr) (((addr)&~3) == 0x37e0)

@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Fri Dec 12 15:23:14 PST 1997 by mann
+   Last modified on Mon Jan 12 21:22:34 PST 1998 by mann
 */
 
 #include "z80.h"
@@ -327,9 +327,17 @@ void debug_shell()
 
 #ifdef READLINE
 	/*
-	 * Use the way cool gnu readline() utility.  Get completion, history,
-	 * way way cool.   **Doesn't work now that we use SIGALRM --tpm**
-	 */
+	 * Use the way cool gnu readline() utility.  Get completion,
+	 * history, way way cool.
+         *
+	 * ... but unfortunately, broken.  DO NOT USE THIS CODE.
+	 * Currently there is a bug in GNU readline() that makes it
+	 * incompatible with my timer interrupt implementation.
+	 * Readline thinks that it is always supposed to clean up its
+	 * state and exit when a SIGALRM comes in, but in fact, I
+	 * handle the signal and continue the read system call.  I've
+	 * reported this bug to readline's maintainer.  --tpm
+         */
         {
 
 	    line = readline("(zbx) ");

@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Tue Sep 30 13:47:25 PDT 1997 by mann */
+/* Last modified on Mon Jan 12 20:40:55 PST 1998 by mann */
 
 /*
  * trs_imp_exp.c
@@ -26,314 +26,459 @@
 #include "trs_imp_exp.h"
 #include "z80.h"
 #include "trs.h"
+#include "trs_disk.h"
 
 /* New emulator traps */
 
 #define MAX_OPENDIR 32
 DIR *dir[MAX_OPENDIR] = { NULL, };
 
+typedef struct {
+  int fd;
+  int inuse;
+} OpenDisk;
+#define MAX_OPENDISK 32
+OpenDisk od[MAX_OPENDISK];
+
 void do_emt_open()
 {
-    int fd;
-    fd = open(mem_pointer(REG_HL), REG_BC, REG_DE);
-    if (fd >= 0) {
-	REG_A = 0;
-	REG_F |= ZERO_MASK;
-    } else {
-	REG_A = errno;
-	REG_F &= ~ZERO_MASK;
-    }
-    REG_DE = fd;
+  int fd, oflag, eoflag;
+  eoflag = REG_BC;
+  switch (eoflag & EO_ACCMODE) {
+  case EO_RDONLY:
+  default:
+    oflag = O_RDONLY;
+    break;
+  case EO_WRONLY:
+    oflag = O_WRONLY;
+    break;
+  case EO_RDWR:
+    oflag = O_RDWR;
+    break;
+  }
+  if (eoflag & EO_CREAT)  oflag |= O_CREAT;
+  if (eoflag & EO_EXCL)   oflag |= O_EXCL;
+  if (eoflag & EO_TRUNC)  oflag |= O_TRUNC;
+  if (eoflag & EO_APPEND) oflag |= O_APPEND;
+
+  fd = open(mem_pointer(REG_HL), oflag, REG_DE);
+  if (fd >= 0) {
+    REG_A = 0;
+    REG_F |= ZERO_MASK;
+  } else {
+    REG_A = errno;
+    REG_F &= ~ZERO_MASK;
+  }
+  REG_DE = fd;
 }
 
 void do_emt_close()
 {
-    int res;
-    res = close(REG_DE);
-    if (res >= 0) {
-	REG_A = 0;
-	REG_F |= ZERO_MASK;
-    } else {
-	REG_A = errno;
-	REG_F &= ~ZERO_MASK;
-    }
+  int res;
+  res = close(REG_DE);
+  if (res >= 0) {
+    REG_A = 0;
+    REG_F |= ZERO_MASK;
+  } else {
+    REG_A = errno;
+    REG_F &= ~ZERO_MASK;
+  }
 }
 
 void do_emt_read()
 {
-    int size;
-    if (REG_HL + REG_BC > 0x10000) {
-	REG_A = EFAULT;
-	REG_F &= ~ZERO_MASK;
-        REG_BC = 0xFFFF;
-	return;
-    }
-    size = read(REG_DE, mem_pointer(REG_HL), REG_BC);
-    if (size >= 0) {
-	REG_A = 0;
-	REG_F |= ZERO_MASK;
-    } else {
-	REG_A = errno;
-	REG_F &= ~ZERO_MASK;
-    }
-    REG_BC = size;
+  int size;
+  if (REG_HL + REG_BC > 0x10000) {
+    REG_A = EFAULT;
+    REG_F &= ~ZERO_MASK;
+    REG_BC = 0xFFFF;
+    return;
+  }
+  size = read(REG_DE, mem_pointer(REG_HL), REG_BC);
+  if (size >= 0) {
+    REG_A = 0;
+    REG_F |= ZERO_MASK;
+  } else {
+    REG_A = errno;
+    REG_F &= ~ZERO_MASK;
+  }
+  REG_BC = size;
 }
 
 
 void do_emt_write()
 {
-    int size;
-    if (REG_HL + REG_BC > 0x10000) {
-	REG_A = EFAULT;
-	REG_F &= ~ZERO_MASK;
-        REG_BC = 0xFFFF;
-	return;
-    }
-    size = write(REG_DE, mem_pointer(REG_HL), REG_BC);
-    if (size >= 0) {
-	REG_A = 0;
-	REG_F |= ZERO_MASK;
-    } else {
-	REG_A = errno;
-	REG_F &= ~ZERO_MASK;
-    }
-    REG_BC = size;
+  int size;
+  if (REG_HL + REG_BC > 0x10000) {
+    REG_A = EFAULT;
+    REG_F &= ~ZERO_MASK;
+    REG_BC = 0xFFFF;
+    return;
+  }
+  size = write(REG_DE, mem_pointer(REG_HL), REG_BC);
+  if (size >= 0) {
+    REG_A = 0;
+    REG_F |= ZERO_MASK;
+  } else {
+    REG_A = errno;
+    REG_F &= ~ZERO_MASK;
+  }
+  REG_BC = size;
 }
 
 void do_emt_lseek()
 {
-    int i;
-    off_t offset;
-    if (REG_HL + 8 > 0x10000) {
-	REG_A = EFAULT;
-	REG_F &= ~ZERO_MASK;
-	return;
-    }
-    offset = 0;
-    for (i=REG_HL; i<8; i++) {
-	offset = offset + (mem_read(REG_HL + i) << i*8);
-    }
-    offset = lseek(REG_DE, offset, REG_BC);
-    if (offset != (off_t) -1) {
-	REG_A = 0;
-	REG_F |= ZERO_MASK;
-    } else {
-	REG_A = errno;
-	REG_F &= ~ZERO_MASK;
-    }
-    for (i=REG_HL; i<8; i++) {
-	mem_write(REG_HL + i, offset & 0xff);
-	offset >>= 8;
-    }
+  int i;
+  off_t offset;
+  if (REG_HL + 8 > 0x10000) {
+    REG_A = EFAULT;
+    REG_F &= ~ZERO_MASK;
+    return;
+  }
+  offset = 0;
+  for (i=0; i<8; i++) {
+    offset = offset + (mem_read(REG_HL + i) << i*8);
+  }
+  offset = lseek(REG_DE, offset, REG_BC);
+  if (offset != (off_t) -1) {
+    REG_A = 0;
+    REG_F |= ZERO_MASK;
+  } else {
+    REG_A = errno;
+    REG_F &= ~ZERO_MASK;
+  }
+  for (i=REG_HL; i<8; i++) {
+    mem_write(REG_HL + i, offset & 0xff);
+    offset >>= 8;
+  }
 }
 
 void do_emt_strerror()
 {
-    char *msg;
-    int size;
-    if (REG_HL + REG_BC > 0x10000) {
-	REG_A = EFAULT;
-	REG_F &= ~ZERO_MASK;
-	REG_BC = 0xFFFF;
-	return;
-    }
-    errno = 0;
-    msg = strerror(REG_A);
-    size = strlen(msg);
-    if (errno != 0) {
-	REG_A = errno;
-	REG_F &= ~ZERO_MASK;
-    } else if (REG_BC < size + 2) {
-	REG_A = ERANGE;
-	REG_F |= ZERO_MASK;
-	size = REG_BC - 1;
-    }
-    memcpy(mem_pointer(REG_HL), msg, size);
-    mem_write(REG_HL + size++, '\r');
-    mem_write(REG_HL + size, '\0');
-    if (errno == 0) {
-	REG_BC = size;
-    } else {
-	REG_BC = 0xFFFF;
-    }
+  char *msg;
+  int size;
+  if (REG_HL + REG_BC > 0x10000) {
+    REG_A = EFAULT;
+    REG_F &= ~ZERO_MASK;
+    REG_BC = 0xFFFF;
+    return;
+  }
+  errno = 0;
+  msg = strerror(REG_A);
+  size = strlen(msg);
+  if (errno != 0) {
+    REG_A = errno;
+    REG_F &= ~ZERO_MASK;
+  } else if (REG_BC < size + 2) {
+    REG_A = ERANGE;
+    REG_F |= ZERO_MASK;
+    size = REG_BC - 1;
+  }
+  memcpy(mem_pointer(REG_HL), msg, size);
+  mem_write(REG_HL + size++, '\r');
+  mem_write(REG_HL + size, '\0');
+  if (errno == 0) {
+    REG_BC = size;
+  } else {
+    REG_BC = 0xFFFF;
+  }
 }
 
 void do_emt_time()
 {
-    time_t now = time(0);
-    if (REG_A == 1) {
+  time_t now = time(0);
+  if (REG_A == 1) {
 #if __alpha
-	struct tm *loctm = localtime(&now);
-        now += loctm->tm_gmtoff;
+    struct tm *loctm = localtime(&now);
+    now += loctm->tm_gmtoff;
 #else
-	struct tm loctm = *(localtime(&now));
-	struct tm gmtm = *(gmtime(&now));
-        int daydiff = loctm.tm_mday - gmtm.tm_mday;
-	now += (loctm.tm_sec - gmtm.tm_sec)
-	     + (loctm.tm_min - gmtm.tm_min) * 60
-	     + (loctm.tm_hour - gmtm.tm_hour) * 3600;
-	switch (daydiff) {
-	  case 0:
-	  case 1:
-	  case -1:
-	    now += 24*3600 * daydiff;
-	    break;
-	  case 30:
-	  case 29:
-	  case 28:
-          case 27:
-            now -= 24*3600;
-            break;
-	  case -30:
-	  case -29:
-	  case -28:
-          case -27:
-            now += 24*3600;
-            break;
-	  default:
-	    error("trouble computing local time in emt_time");
-	}
-#endif
-    } else if (REG_A != 0) {
-	error("unsupported function code to emt_time");
+    struct tm loctm = *(localtime(&now));
+    struct tm gmtm = *(gmtime(&now));
+    int daydiff = loctm.tm_mday - gmtm.tm_mday;
+    now += (loctm.tm_sec - gmtm.tm_sec)
+      + (loctm.tm_min - gmtm.tm_min) * 60
+      + (loctm.tm_hour - gmtm.tm_hour) * 3600;
+    switch (daydiff) {
+    case 0:
+    case 1:
+    case -1:
+      now += 24*3600 * daydiff;
+      break;
+    case 30:
+    case 29:
+    case 28:
+    case 27:
+      now -= 24*3600;
+      break;
+    case -30:
+    case -29:
+    case -28:
+    case -27:
+      now += 24*3600;
+      break;
+    default:
+      error("trouble computing local time in emt_time");
     }
-    REG_BC = (now >> 16) & 0xffff;
-    REG_DE = now & 0xffff;
+#endif
+  } else if (REG_A != 0) {
+    error("unsupported function code to emt_time");
+  }
+  REG_BC = (now >> 16) & 0xffff;
+  REG_DE = now & 0xffff;
 }
 
 void do_emt_opendir()
 {
-    int i;
-    for (i = 0; i < MAX_OPENDIR; i++) {
-	if (dir[i] == NULL) break;
-    }
-    if (i == MAX_OPENDIR) {
-	REG_DE = 0xffff;
-	REG_A = EMFILE;
-	return;
-    }
-    dir[i] = opendir(mem_pointer(REG_HL));
-    if (dir[i] == NULL) {
-	REG_DE = 0xffff;
-	REG_A = errno;
-	REG_F &= ~ZERO_MASK;
-    } else {
-	REG_DE = i;
-	REG_A = 0;
-	REG_F |= ZERO_MASK;
-    }
+  int i;
+  for (i = 0; i < MAX_OPENDIR; i++) {
+    if (dir[i] == NULL) break;
+  }
+  if (i == MAX_OPENDIR) {
+    REG_DE = 0xffff;
+    REG_A = EMFILE;
+    return;
+  }
+  dir[i] = opendir(mem_pointer(REG_HL));
+  if (dir[i] == NULL) {
+    REG_DE = 0xffff;
+    REG_A = errno;
+    REG_F &= ~ZERO_MASK;
+  } else {
+    REG_DE = i;
+    REG_A = 0;
+    REG_F |= ZERO_MASK;
+  }
 }
 
 void do_emt_closedir()
 {
-    int i = REG_DE;
-    int ok;
-    if (i < 0 || i >= MAX_OPENDIR || dir[i] == NULL) {
-	REG_A = EBADF;
-	REG_F &= ~ZERO_MASK;
-	return;
-    }	
-    ok = closedir(dir[i]);
-    dir[i] = NULL;
-    if (ok >= 0) {
-	REG_A = 0;
-	REG_F |= ZERO_MASK;
-    } else {
-	REG_A = errno;
-	REG_F &= ~ZERO_MASK;
-    }
+  int i = REG_DE;
+  int ok;
+  if (i < 0 || i >= MAX_OPENDIR || dir[i] == NULL) {
+    REG_A = EBADF;
+    REG_F &= ~ZERO_MASK;
+    return;
+  }	
+  ok = closedir(dir[i]);
+  dir[i] = NULL;
+  if (ok >= 0) {
+    REG_A = 0;
+    REG_F |= ZERO_MASK;
+  } else {
+    REG_A = errno;
+    REG_F &= ~ZERO_MASK;
+  }
 }
 
 void do_emt_readdir()
 {
-    int size, i = REG_DE;
-    struct dirent *result;
+  int size, i = REG_DE;
+  struct dirent *result;
 
-    if (i < 0 || i >= MAX_OPENDIR || dir[i] == NULL) {
-	REG_A = EBADF;
-	REG_F &= ~ZERO_MASK;
-	REG_BC = 0xFFFF;
-	return;
-    }	
-    if (REG_HL + REG_BC > 0x10000) {
-	REG_A = EFAULT;
-	REG_F &= ~ZERO_MASK;
-	REG_BC = 0xFFFF;
-	return;
-    }
-    result = readdir(dir[i]);
-    if (result == NULL) {
-	REG_A = errno;
-	REG_F &= ~ZERO_MASK;
-	REG_BC = 0xFFFF;
-	return;
-    }
-    size = strlen(result->d_name);
-    if (size + 1 > REG_BC) {
-	REG_A = ERANGE;
-	REG_F &= ~ZERO_MASK;
-	REG_BC = 0xFFFF;
-	return;
-    }
-    strcpy(mem_pointer(REG_HL), result->d_name);
-    REG_A = 0;
-    REG_F |= ZERO_MASK;
-    REG_BC = size;
+  if (i < 0 || i >= MAX_OPENDIR || dir[i] == NULL) {
+    REG_A = EBADF;
+    REG_F &= ~ZERO_MASK;
+    REG_BC = 0xFFFF;
+    return;
+  }	
+  if (REG_HL + REG_BC > 0x10000) {
+    REG_A = EFAULT;
+    REG_F &= ~ZERO_MASK;
+    REG_BC = 0xFFFF;
+    return;
+  }
+  result = readdir(dir[i]);
+  if (result == NULL) {
+    REG_A = errno;
+    REG_F &= ~ZERO_MASK;
+    REG_BC = 0xFFFF;
+    return;
+  }
+  size = strlen(result->d_name);
+  if (size + 1 > REG_BC) {
+    REG_A = ERANGE;
+    REG_F &= ~ZERO_MASK;
+    REG_BC = 0xFFFF;
+    return;
+  }
+  strcpy(mem_pointer(REG_HL), result->d_name);
+  REG_A = 0;
+  REG_F |= ZERO_MASK;
+  REG_BC = size;
 }
 
 void do_emt_chdir()
 {
-    int ok = chdir(mem_pointer(REG_HL));
-    if (ok < 0) {
-	REG_A = errno;
-	REG_F &= ~ZERO_MASK;
-    } else {
-	REG_A = 0;
-	REG_F |= ZERO_MASK;
-    }
+  int ok = chdir(mem_pointer(REG_HL));
+  if (ok < 0) {
+    REG_A = errno;
+    REG_F &= ~ZERO_MASK;
+  } else {
+    REG_A = 0;
+    REG_F |= ZERO_MASK;
+  }
 }
 
 void do_emt_getcwd()
 {
-    char *result;
-    if (REG_HL + REG_BC > 0x10000) {
-	REG_A = EFAULT;
-	REG_F &= ~ZERO_MASK;
-	REG_BC = 0xFFFF;
-	return;
-    }
-    result = getcwd(mem_pointer(REG_HL), REG_BC);
-    if (result == NULL) {
-	REG_A = errno;
-	REG_F &= ~ZERO_MASK;
-	REG_BC = 0xFFFF;
-	return;
-    }
-    REG_A = 0;
-    REG_F |= ZERO_MASK;
-    REG_BC = strlen(result);
+  char *result;
+  if (REG_HL + REG_BC > 0x10000) {
+    REG_A = EFAULT;
+    REG_F &= ~ZERO_MASK;
+    REG_BC = 0xFFFF;
+    return;
+  }
+  result = getcwd(mem_pointer(REG_HL), REG_BC);
+  if (result == NULL) {
+    REG_A = errno;
+    REG_F &= ~ZERO_MASK;
+    REG_BC = 0xFFFF;
+    return;
+  }
+  REG_A = 0;
+  REG_F |= ZERO_MASK;
+  REG_BC = strlen(result);
 }
 
 void do_emt_misc()
 {
-    switch (REG_A) {
-      case 0:
-	trs_disk_change_all();
-	break;
-      case 1:
-	trs_exit();
-	break;
-      case 2:
-	trs_debug();
-	break;
-      case 3:
-	trs_reset();
-	break;
-      default:
-	error("unsupported function code to emt_misc");
-	break;
-    }
+  switch (REG_A) {
+  case 0:
+    trs_disk_change_all();
+    REG_HL = trs_disk_changecount;
+    break;
+  case 1:
+    trs_exit();
+    break;
+  case 2:
+    trs_debug();
+    break;
+  case 3:
+    trs_reset();
+    break;
+  case 4:
+    REG_HL = trs_disk_changecount;
+    break;
+  default:
+    error("unsupported function code to emt_misc");
+    break;
+  }
 }
+
+void do_emt_ftruncate()
+{
+  int i, result;
+  off_t offset;
+  if (REG_HL + 8 > 0x10000) {
+    REG_A = EFAULT;
+    REG_F &= ~ZERO_MASK;
+    return;
+  }
+  offset = 0;
+  for (i=0; i<8; i++) {
+    offset = offset + (mem_read(REG_HL + i) << i*8);
+  }
+  result = ftruncate(REG_DE, offset);
+  if (result == 0) {
+    REG_A = 0;
+    REG_F |= ZERO_MASK;
+  } else {
+    REG_A = errno;
+    REG_F &= ~ZERO_MASK;
+  }
+}
+
+void do_emt_opendisk()
+{
+  char *name = (char *)mem_pointer(REG_HL);
+  char *qname;
+  int i;
+  int oflag, eoflag;
+
+  eoflag = REG_BC;
+  switch (eoflag & EO_ACCMODE) {
+  case EO_RDONLY:
+  default:
+    oflag = O_RDONLY;
+    break;
+  case EO_WRONLY:
+    oflag = O_WRONLY;
+    break;
+  case EO_RDWR:
+    oflag = O_RDWR;
+    break;
+  }
+  if (eoflag & EO_CREAT)  oflag |= O_CREAT;
+  if (eoflag & EO_EXCL)   oflag |= O_EXCL;
+  if (eoflag & EO_TRUNC)  oflag |= O_TRUNC;
+  if (eoflag & EO_APPEND) oflag |= O_APPEND;
+
+  if (*name == '/' || *trs_disk_dir == '\0') {
+    qname = strdup(name);
+  } else {
+    qname = (char *)malloc(strlen(trs_disk_dir) + 1 + strlen(name));
+    strcpy(qname, trs_disk_dir);
+    strcat(qname, "/");
+    strcat(qname, name);
+  }
+  for (i = 0; i < MAX_OPENDISK; i++) {
+    if (!od[i].inuse) break;
+  }
+  if (i == MAX_OPENDISK) {
+    REG_DE = 0xffff;
+    REG_A = EMFILE;
+    REG_F &= ~ZERO_MASK;
+    free(qname);
+    return;
+  }
+  od[i].fd = open(qname, oflag, REG_DE);
+  free(qname);
+  if (od[i].fd >= 0) {
+    od[i].inuse = 1;
+    REG_A = 0;
+    REG_F |= ZERO_MASK;
+  } else {
+    REG_A = errno;
+    REG_F &= ~ZERO_MASK;
+  }
+  REG_DE = od[i].fd;
+}
+
+void do_emt_closedisk()
+{
+  int i;
+  int res;
+  if (REG_DE == 0xffff) {
+    for (i = 0; i < MAX_OPENDISK; i++) {
+      if (od[i].inuse) {
+	close(od[i].fd);
+	od[i].inuse = 0;
+      }
+    }
+    REG_A = 0;
+    REG_F |= ZERO_MASK;
+    return;
+  }
+
+  for (i = 0; i < MAX_OPENDISK; i++) {
+    if (od[i].inuse && od[i].fd == REG_DE) break;
+  }
+  if (i == MAX_OPENDISK) {
+    REG_A = EBADF;
+    REG_F &= ~ZERO_MASK;
+    return;
+  }
+  od[i].inuse = 0;
+  res = close(od[i].fd);
+  if (res >= 0) {
+    REG_A = 0;
+    REG_F |= ZERO_MASK;
+  } else {
+    REG_A = errno;
+    REG_F &= ~ZERO_MASK;
+  }
+}
+
 
 /* Old kludgey way using i/o ports */
 
@@ -350,118 +495,118 @@ Channel ch;
 static void
 reset()
 {
-    if (ch.f) {
-	int v;
-	v = fclose(ch.f);
-	ch.f = NULL;
-	if (v == 0) {
-	    ch.status = IMPEXP_EOF;
-	} else {
-	    ch.status = errno;
-	    if (ch.status == 0) ch.status = IMPEXP_UNKNOWN_ERROR;
-	}
+  if (ch.f) {
+    int v;
+    v = fclose(ch.f);
+    ch.f = NULL;
+    if (v == 0) {
+      ch.status = IMPEXP_EOF;
     } else {
-	ch.status = IMPEXP_EOF;
+      ch.status = errno;
+      if (ch.status == 0) ch.status = IMPEXP_UNKNOWN_ERROR;
     }
-    ch.cmd = IMPEXP_CMD_RESET;
-    ch.len = 0;
+  } else {
+    ch.status = IMPEXP_EOF;
+  }
+  ch.cmd = IMPEXP_CMD_RESET;
+  ch.len = 0;
 }
 
 /* Common routine for writing file names */
 static void
 filename_write(char* dir, unsigned char data)
 {
-    if (ch.len < IMPEXP_MAX_CMD_LEN) {
-	ch.filename[ch.len++] = data;
+  if (ch.len < IMPEXP_MAX_CMD_LEN) {
+    ch.filename[ch.len++] = data;
+  }
+  if (data == 0) {
+    ch.f = fopen(ch.filename, dir);
+    if (ch.f == NULL) {
+      ch.status = errno;
+      if (ch.status == 0) {
+	/* Bogus popen, doesn't set errno */
+	ch.status = IMPEXP_UNKNOWN_ERROR;
+      }
+      ch.cmd = IMPEXP_CMD_RESET;
+    } else {
+      ch.status = IMPEXP_EOF;
     }
-    if (data == 0) {
-	ch.f = fopen(ch.filename, dir);
-	if (ch.f == NULL) {
-	    ch.status = errno;
-	    if (ch.status == 0) {
-		/* Bogus popen, doesn't set errno */
-		ch.status = IMPEXP_UNKNOWN_ERROR;
-	    }
-	    ch.cmd = IMPEXP_CMD_RESET;
-	} else {
-	    ch.status = IMPEXP_EOF;
-	}
-    }
+  }
 }
 
 void
 trs_impexp_cmd_write(unsigned char data)
 {
-    switch (data) {
-      case IMPEXP_CMD_RESET:
-      case IMPEXP_CMD_EOF:
-	reset();
-	break;
-      case IMPEXP_CMD_IMPORT:
-      case IMPEXP_CMD_EXPORT:
-	if (ch.cmd != IMPEXP_CMD_RESET) reset();
-	ch.cmd = data;
-	break;
-    }
+  switch (data) {
+  case IMPEXP_CMD_RESET:
+  case IMPEXP_CMD_EOF:
+    reset();
+    break;
+  case IMPEXP_CMD_IMPORT:
+  case IMPEXP_CMD_EXPORT:
+    if (ch.cmd != IMPEXP_CMD_RESET) reset();
+    ch.cmd = data;
+    break;
+  }
 }
 
 unsigned char
 trs_impexp_status_read()
 {
-    return ch.status;
+  return ch.status;
 }
 
 void
 trs_impexp_data_write(unsigned char data)
 {
-    int c;
-    switch (ch.cmd) {
-      case IMPEXP_CMD_RESET:
-      case IMPEXP_CMD_EOF:
-	/* ignore */
-	break;
-      case IMPEXP_CMD_IMPORT:
-	if (ch.f != NULL) {
-	    /* error; ignore */
-	} else {
-	    filename_write("r", data);
-	}
-	break;
-      case IMPEXP_CMD_EXPORT:
-	if (ch.f != NULL) {
-	    c = putc(data, ch.f);
-	    if (c == EOF) {
-		reset();
-	    }
-	} else {
-	    filename_write("w", data);
-	}
-	break;
-    }	
+  int c;
+  switch (ch.cmd) {
+  case IMPEXP_CMD_RESET:
+  case IMPEXP_CMD_EOF:
+    /* ignore */
+    break;
+  case IMPEXP_CMD_IMPORT:
+    if (ch.f != NULL) {
+      /* error; ignore */
+    } else {
+      filename_write("r", data);
+    }
+    break;
+  case IMPEXP_CMD_EXPORT:
+    if (ch.f != NULL) {
+      c = putc(data, ch.f);
+      if (c == EOF) {
+	reset();
+      }
+    } else {
+      filename_write("w", data);
+    }
+    break;
+  }	
 }
 
 unsigned char
 trs_impexp_data_read()
 {
-    switch (ch.cmd) {
-      case IMPEXP_CMD_RESET:
-      case IMPEXP_CMD_EOF:
-	break;
-      case IMPEXP_CMD_IMPORT:
-	if (ch.f != NULL) {
-	    int c = getc(ch.f);
-	    if (c == EOF) {
-		reset();
-	    } else {
-		ch.status = IMPEXP_MORE_DATA;
-		return c;
-	    }
-	}
-	break;
-      case IMPEXP_CMD_EXPORT:
-	break;
-    }	
-    /* Return end of file or error */
-    if (ch.status == 0) ch.status = IMPEXP_EOF;
-    return IMPEXP_EOF;
+  switch (ch.cmd) {
+  case IMPEXP_CMD_RESET:
+  case IMPEXP_CMD_EOF:
+    break;
+  case IMPEXP_CMD_IMPORT:
+    if (ch.f != NULL) {
+      int c = getc(ch.f);
+      if (c == EOF) {
+	reset();
+      } else {
+	ch.status = IMPEXP_MORE_DATA;
+	return c;
+      }
+    }
+    break;
+  case IMPEXP_CMD_EXPORT:
+    break;
+  }	
+  /* Return end of file or error */
+  if (ch.status == 0) ch.status = IMPEXP_EOF;
+  return IMPEXP_EOF;
 }

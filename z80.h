@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Sep 30 18:01:50 PDT 1997 by mann
+   Last modified on Mon Jan 12 15:47:15 PST 1998 by mann
 */
 
 #ifndef _Z80_H
@@ -198,6 +198,7 @@ extern void mem_write_word();
 extern void mem_block_transfer();
 extern int load_hex(); /* returns highest address loaded + 1 */
 extern void error();
+extern void fatal();
 extern void z80_out();
 extern int z80_in();
 extern int disassemble();

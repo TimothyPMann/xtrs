@@ -25,11 +25,28 @@ extern int emt_dread(/* int dirfd, char *buffer, int bytes */);
 extern int emt_chdir(/* char *fname */);
 extern int emt_getcwd(/* char *buffer, int bytes */);
 extern void emt_misc(/* int func */);
+extern int emt_ftruncate(/* int fd, long length */);
+extern int emt_opendisk(/* char *fname, int oflag, int mode */);
+extern int emt_closedisk(/* int fd */);
 
+/* oflag values for emt_open and emt_opendisk */
+#define EO_ACCMODE   03
+#define EO_RDONLY    00
+#define EO_WRONLY    01
+#define EO_RDWR      02
+#define EO_CREAT   0100
+#define EO_EXCL    0200
+#define EO_TRUNC  01000
+#define EO_APPEND 02000
+
+/* local values for emt_time */
 #define EMT_TIME_GMT 0
 #define EMT_TIME_LOCAL 1
 
+/* func values for emt_misc */
 #define EMT_MISC_DISK_CHANGE 0
 #define EMT_MISC_EXIT 1
 #define EMT_MISC_DEBUG 2
 #define EMT_MISC_RESET_BUTTON 3
+
+

@@ -1,8 +1,8 @@
 ;; import.z
 ;; Timothy Mann, 8/24/97
-;; Last modified on Fri Dec  5 11:08:59 PST 1997 by mann
+;; Last modified on Sat Jan 24 23:13:29 PST 1998 by mann
 ;;
-;; Use xtrs 1.4 emulator traps to copy a file from Unix to TRS-80
+;; Use xtrs 1.9 emulator traps to copy a file from Unix to TRS-80
 ;; Usage: IMPORT [-n] unixfile tofile
 ;; If the -n parameter is given, each newline ('\n') in the Unix
 ;;  file is converted to a carriage return ('\r'), the TRS-80 end of
@@ -107,6 +107,15 @@ emt_write	equ 33edh
 emt_lseek	equ 34edh
 emt_strerror	equ 35edh
 
+EO_ACCMODE  equ     03
+EO_RDONLY   equ     00
+EO_WRONLY   equ     01
+EO_RDWR     equ     02
+EO_CREAT    equ   0100
+EO_EXCL     equ   0200
+EO_TRUNC    equ  01000
+EO_APPEND   equ  02000
+
 iobsize	equ 8192		; must be divisible by 256
 
 import: 
@@ -167,7 +176,7 @@ usage:  ld hl, usager           ; error message and exit
         jp abort
 openok:  
 uname:	ld hl, $-$              ; path
-        ld bc, 0                ; oflag (O_RDONLY)
+        ld bc, EO_RDONLY
         ld de, 0                ; mode (ignored)
         defw emt_open
         jr z, opn2ok            ; go if OK

@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Tue Sep 30 17:45:39 PDT 1997 by mann */
+/* Last modified on Mon Jan 12 21:30:43 PST 1998 by mann */
 
 /*
  * Emulate Model-I interrupts
@@ -36,7 +36,8 @@ static unsigned char nmi_mask = M3_RESET_BIT;
 #define TIMER_HZ_4 60
 static int timer_hz;
 
-/* Kludge: LDOS hides the date (not time) here over a reboot */
+/* Kludge: LDOS hides the date (not time) in a memory area across reboots. */
+/* We put it there on powerup, so LDOS magically knows the date! */
 #define LDOS_MONTH 0x4306
 #define LDOS_DAY   0x4307
 #define LDOS_YEAR  0x4466

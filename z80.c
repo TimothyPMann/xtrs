@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Wed Oct  1 15:33:22 PDT 1997 by mann
+   Last modified on Mon Jan 12 19:37:36 PST 1998 by mann
 */
 
 /*
@@ -2197,8 +2197,7 @@ static void do_CB_instruction()
 	break;
 
       default:
-	REG_PC -= 2;
-	disassemble(REG_PC);
+	disassemble(REG_PC - 2);
 	error("unsupported instruction");
     }
 }
@@ -2520,8 +2519,7 @@ static void do_indexed_instruction(ixp)
 	      break;
 	      
 	    default:
-	      REG_PC -= 4;
-	      disassemble(REG_PC);
+	      disassemble(REG_PC - 4);
 	      error("unsupported instruction");
 	  }
         }
@@ -2960,10 +2958,18 @@ static void do_ED_instruction()
       case 0x3c:	/* emt_misc */
 	do_emt_misc();
 	break;
+      case 0x3d:	/* emt_ftruncate */
+	do_emt_ftruncate();
+	break;
+      case 0x3e:        /* emt_opendisk */
+	do_emt_opendisk();
+	break;
+      case 0x3f:	/* emt_closedisk */
+	do_emt_closedisk();
+	break;
 
       default:
-	REG_PC -= 2;
-	disassemble(REG_PC);
+	disassemble(REG_PC - 2);
 	error("unsupported instruction");
     }
 }
@@ -4154,8 +4160,7 @@ int z80_run(continuous)
 	    break;
 	    
 	  default:
-	    REG_PC -= 1;
-	    disassemble(REG_PC);
+	    disassemble(REG_PC - 1);
 	    error("unsupported instruction");
 	}
 

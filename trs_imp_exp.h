@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Sat Sep 20 13:12:51 PDT 1997 by mann */
+/* Last modified on Mon Jan 12 19:48:21 PST 1998 by mann */
 
 /*
  * trs_imp_exp.h
@@ -20,7 +20,7 @@
  *
  * ED30 emt_open
  *         Before, HL => path, null terminated
- *                 BC =  oflag
+ *                 BC =  oflag (use EO_ values defined below)
  *                 DE =  mode
  *         After,  AF =  0 if OK, error number if not (Z flag affected)
  *                 DE =  fd, 0xFFFF if error
@@ -99,10 +99,63 @@
  *                      1 = exit emulator
  *                      2 = enter debugger (if active)
  *                      3 = press reset button
+ *                      4 = query disk change count
+ *         After,  HL = result, depending on function code
+ *                      0,4: disk change count (F7 or emt_misc)
+ *                      1-3: no result; HL unchanged
  *
- * ED3D-ED3F reserved
+ * ED3D emt_ftruncate
+ *         Before, DE =  fd
+ *                 HL => offset (8-byte little-endian integer)
+ *         After,  AF =  0 if OK, error number if not (Z flag affected)
  *
- * Old import feature
+ * ED3E emt_opendisk
+ *   Similar to emt_open, except that (1) the path, if not absolute, is
+ *   interpreted relative to -diskdir, (2) emt_closedisk must be
+ *   used in place of emt_close.
+ *         Before, HL => path, null terminated
+ *                 BC =  oflag (use EO_ values defined below)
+ *                 DE =  mode
+ *         After,  AF =  0 if OK, error number if not (Z flag affected)
+ *                 DE =  fd, 0xFFFF if error
+ *
+ * ED3F emt_closedisk
+ *   Similar to emt_close, but pairs with emt_opendisk.
+ *         Before, DE =  fd, or -1 to close all fds opened with emt_opendisk
+ *         After,  AF =  0 if OK, error number if not (Z flag affected)
+ */
+
+/* Minimal subset of standard O_ flags.  We have to define our own for
+   portability; the numeric values differ amongst Unix
+   implementations. */
+
+#define EO_ACCMODE   03
+#define EO_RDONLY    00
+#define EO_WRONLY    01
+#define EO_RDWR      02
+#define EO_CREAT   0100
+#define EO_EXCL    0200
+#define EO_TRUNC  01000
+#define EO_APPEND 02000
+
+extern void do_emt_open();
+extern void do_emt_close();
+extern void do_emt_read();
+extern void do_emt_write();
+extern void do_emt_lseek();
+extern void do_emt_strerror();
+extern void do_emt_time();
+extern void do_emt_opendir();
+extern void do_emt_closedir();
+extern void do_emt_readdir();
+extern void do_emt_chdir();
+extern void do_emt_getcwd();
+extern void do_emt_misc();
+extern void do_emt_ftruncate();
+extern void do_emt_opendisk();
+extern void do_emt_closedisk();
+
+/* Old import feature
  *  1) Write IMPEXP_CMD_IMPORT to the command port, write a Unix
  *     filename to the data port, and read the status port to
  *     check for errors on the fopen() call.
@@ -129,20 +182,6 @@
  *    it is currently open and makes the return status of fclose 
  *    available from the status port.  If no file was open,
  *    the status will be IMPEXP_EOF.  */
-
-extern void do_emt_open();
-extern void do_emt_close();
-extern void do_emt_read();
-extern void do_emt_write();
-extern void do_emt_lseek();
-extern void do_emt_strerror();
-extern void do_emt_time();
-extern void do_emt_opendir();
-extern void do_emt_closedir();
-extern void do_emt_readdir();
-extern void do_emt_chdir();
-extern void do_emt_getcwd();
-extern void do_emt_misc();
 
 #define IMPEXP_CMD     0xd0
 #define IMPEXP_STATUS  0xd0

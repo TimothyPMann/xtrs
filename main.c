@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Sep 30 13:15:25 PDT 1997 by mann
+   Last modified on Mon Jan 12 15:44:47 PST 1998 by mann
 */
 
 #include "z80.h"
@@ -31,7 +31,7 @@ static void check_endian()
     x.byte.high = 0;
     if(x.word != 1)
     {
-	error("Program compiled with wrong ENDIAN value -- adjust the Makefile.local, recompile, and try again.");
+	fatal("Program compiled with wrong ENDIAN value -- adjust the Makefile.local, recompile, and try again.");
     }
 }
 
@@ -45,7 +45,7 @@ void trs_load_rom(filename)
     {
 	char message[100];
 	sprintf(message, "could not read %s", filename);
-	error(message);
+	fatal(message);
     }
     c = getc(program);
     if (c == ':') {

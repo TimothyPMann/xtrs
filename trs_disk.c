@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Mon Dec  8 11:21:16 PST 1997 by mann */
+/* Last modified on Mon Jan 12 19:45:51 PST 1998 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
@@ -38,6 +38,7 @@ int trs_disk_spinfast = 0;
 int trs_disk_nocontroller = 0;
 int trs_disk_doublestep = 0;
 char *trs_disk_dir = DISKDIR;
+unsigned short trs_disk_changecount = 0;
 
 typedef struct {
   /* Registers */
@@ -230,6 +231,7 @@ trs_disk_change_all()
   for (i=0; i<NDRIVES; i++) {
     trs_disk_change(i);
   }
+  trs_disk_changecount++;
 }
 
 
