@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Tue Nov 18 14:49:00 PST 1997 by mann */
+/* Last modified on Wed Nov 26 17:32:46 PST 1997 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
@@ -1088,7 +1088,6 @@ trs_disk_command_write(unsigned char cmd)
   case TRSDISK_RESTORE:
     d->phytrack = 0;
     state.track = 0;
-    state.sector = 0;		/* ? */
     state.status = TRSDISK_TRKZERO;
     if (d->emutype == REAL) real_restore();
     /* Should this set lastdirection? */
