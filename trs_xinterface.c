@@ -48,10 +48,10 @@
 #include "z80.h"
 #include "trs_disk.h"
 
-#define DEF_FONT1	"-misc-fixed-medium-r-normal--20-200-75-75-*-100-*-*"
-#define DEF_WIDEFONT1	"-misc-fixed-medium-r-normal--20-200-75-75-*-200-*-*"
-#define DEF_FONT3	"-misc-fixed-medium-r-normal--20-200-75-75-*-100-*-*"
-#define DEF_WIDEFONT3	"-misc-fixed-medium-r-normal--20-200-75-75-*-200-*-*"
+#define DEF_FONT1	"-misc-fixed-medium-r-normal--20-200-75-75-*-100-iso8859-1"
+#define DEF_WIDEFONT1	"-misc-fixed-medium-r-normal--20-200-75-75-*-200-iso8859-1"
+#define DEF_FONT3	"-misc-fixed-medium-r-normal--20-200-75-75-*-100-iso8859-1"
+#define DEF_WIDEFONT3	"-misc-fixed-medium-r-normal--20-200-75-75-*-200-iso8859-1"
 #define DEF_USEFONT 0
 
 extern char trs_char_data[][MAXCHARS][TRS_CHAR_HEIGHT];
@@ -687,6 +687,7 @@ void trs_screen_init()
     }
     curfont = myfont;
     XSetFont(display,gc,myfont->fid);
+    XSetFont(display,gc_inv,myfont->fid);
     cur_char_width =  myfont->max_bounds.width;
     cur_char_height = myfont->ascent + myfont->descent;
   }
@@ -903,6 +904,7 @@ void trs_screen_expanded(int flag)
     if (usefont) {
       curfont = (flag ? mywidefont : myfont);
       XSetFont(display,gc,curfont->fid);
+      XSetFont(display,gc_inv,curfont->fid);
     }
     XClearWindow(display,window);
     trs_screen_refresh();

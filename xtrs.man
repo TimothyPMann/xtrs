@@ -24,6 +24,14 @@ In Model 4/4P mode, a hi-res graphics card is emulated; you can select either
 the Radio Shack card or the Micro Labs Grafyx Solution card.
 There is also a mouse driver for Model 4/4P mode.
 
+Because \fBxtrs\fP emulates the hardware, all known TRS-80 Model
+I/III/4/4P operating systems should run on it, including all flavors
+of TRSDOS, LDOS/LS-DOS, NEWDOS, DOSPLUS, MultiDOS, and TRS-80 CP/M.
+However, the emulator also includes some extensions to the standard
+hardware, and the special drivers, utilities, and instructions needed
+for these are not always provided for all systems. In particular, the
+hard disk emulation currently works only with LDOS/LS-DOS. 
+
 The Z-80 emulator has a debugger called zbx.  It works sort of
 like dbx.  If you run with debugging turned on (see the options section for
 how to do this), you'll enter the debugger, and
@@ -41,7 +49,7 @@ The following keys have special meanings to \fBxtrs\fP:
 LeftArrow, Backspace, or Delete is the TRS-80 left arrow key.
 RightArrow or Tab is the right arrow key.  UpArrow is the up arrow
 key.  DownArrow or Linefeed is the down arrow key.  Esc or Break is
-the Break key.  Home, Clear, or LeftAlt is the Clear key.  Control is
+the Break key.  Clear or LeftAlt is the Clear key.  Control is
 the Model 4 Ctrl key (address bit 7, data bit 2).  RightAlt is
 equivalent to the shifted down arrow key (used as a control key with
 some TRS-80 software).
@@ -57,17 +65,21 @@ exits the program.  F9 requests entry to the debugger if it is active.
 F10 is the reset button.
 
 In Model III, 4, and 4P modes, the left and right shift keys are distinct; in
-Model I mode, they are the same.  The F11 or F14 key activates the
+Model I mode, they are the same.  The Home key activates the
 position in the TRS-80 keyboard matrix that corresponds to the Model
 III/4/4P right shift key (address bit 7, data bit 1) even in Model I mode.
-F12 or End activates an unused position in the keyboard matrix
-(address bit 7, data bit 7).  The keys [, \\, ], ^, _, {, |, },
+The End key activates an unused position in the keyboard matrix
+(address bit 7, data bit 7).  
+
+The keys [, \\, ], ^, _, {, |, },
 and ~ also activate unused positions in the keyboard matrix (address
 bit 3, data bits 3-7).  These keys map to the corresponding ASCII
 characters under some TRS-80 keyboard drivers; under others, they do
-nothing.  F13 or Insert is equivalent to underscore (address bit 3,
+nothing.  The Insert key is equivalent to underscore (address bit 3,
 data bit 7), so that a shifted underscore can be obtained; this maps
-to ASCII code 0x7f under some TRS-80 keyboard drivers.
+to ASCII code 0x7f under some TRS-80 keyboard drivers.  Note: Common Model 4
+keyboard drivers seem to reverse the shift state of these keys, so you may
+need to press Shift+Insert to get an underscore, etc.
 .SH Emulated cassette
 To control the emulated cassette, a file called ``.cassette.ctl'' in the
 current directory keeps track of what file is currently loaded as
@@ -128,8 +140,9 @@ used to decide which type of image is in a drive, as neither type has
 a magic number or signature.
 
 JV1 supports only single density, single sided, with directory on
-track 17.  Sectors must be 256 bytes long.  Use FORMAT (DIR=17) to
-format JV1 disks with more (or less) than 35 tracks under LDOS.
+track 17.  Sectors must be 256 bytes long.  Use FORMAT (DIR=17) if you
+want to format JV1 disks with more (or less) than 35 tracks under
+LDOS.
 
 JV3 is much more flexible, though it still does not support everything
 the real controllers could do.  It is best to use JV3 for all the disk
@@ -143,12 +156,12 @@ intentional CRC error in the data field.  \fBxtrs\fP supports at most
 96 cylinders and at most 5802 total sectors on a JV3 image.
 
 The original Vavasour JV3 format supported only 256-byte sectors, and
-had a limit of 2901 total sectors.  If you use sectors sizes other
+had a limit of 2901 total sectors.  If you use sector sizes other
 than 256 bytes or format more than 2901 sectors on a disk image,
 emulators other than \fBxtrs\fP may be unable to read it.  Note that
 an 80 track, double-sided, double-density (18 sector) 5.25-inch floppy
 will fit within the original 2901 sector limit; the extension to 5802
-is primarily for emulation of 8-inch drives (see below).
+is primarily for emulation of 8-inch drives (discussed below).
 
 The program \fBmkdisk\fP(1) makes a blank emulated floppy or ``bulk
 erases'' an existing one.  By default, mkdisk makes a JV3 floppy, but
@@ -179,7 +192,8 @@ floppy disk index holes to this clock.
 In addition to the four standard 5.25-inch drives, \fBxtrs\fP also
 emulates four 8-inch floppy drives.  There is no widely-accepted
 standard hardware interface for 8-inch floppies on the TRS-80, so \fBxtrs\fP
-emulates a pseudo-hardware interface of its own and provides a driver for it.
+emulates a pseudo-hardware interface of its own and provides an LDOS/LS-DOS
+driver for it.
 
 Storage for the emulated 8-inch disks is in files named diskM-U, where
 M is the TRS-80 model number (1, 3, 4, or 4P) and U is a unit number (4,
@@ -190,7 +204,8 @@ floppy files.  A new JV3 floppy can be formatted as either 5.25-inch or
 emulated drives is that the emulator allows you to format more sectors
 per track in the latter.  Be careful not to put a 5.25-inch formatted
 emulated floppy into an 8-inch emulated drive or vice versa; the
-results are likely to be confusing.
+results are likely to be confusing.  Consider using different file
+extensions for the two types; say, \.dsk for 5.25-inch and \.8in for 8-inch.
 
 To use the emulated 8-inch drives, you'll need a driver.  Under LDOS
 or LS-DOS, use the program XTRS8/DCT supplied on the emulated floppy
@@ -231,6 +246,7 @@ like 5.25-inch drives.  The four 5.25-inch drives have hardware select codes
 1, 2, 4, and 8, corresponding respectively to files diskM-0, -1, -2, and
 -3.  The four 8-inch drives have hardware select codes 3, 5, 6, and 7,
 corresponding respectively to files diskM-4, -5, -6, and -7.
+(See also the \-sizemap option below, however.)
 .SH Real floppy disks
 Under Linux only, any diskM-U file can be a symbolic link to a real
 floppy disk drive, typically /dev/fd0 or /dev/fd1.  Most PCs should be
@@ -336,6 +352,11 @@ the next section.  Because \fBxtrs\fP does not emulate real hard drive
 controller hardware, hard disk drivers other than XTRSHARD/DCT will
 not work with it.
 .SH Data import and export
+Several Z-80 programs for data import and export from various TRS-80
+operating systems are included with \fBxtrs\fP on two emulated floppy
+images.  These programs use special support in the emulator to read
+and write external Unix files, discussed further at the end of this section.
+
 The emulated floppy \fIutility.dsk\fP contains some programs for
 transferring data between the emulator and ordinary Unix files.  All
 these programs run on the emulator under Model I/III LDOS, Model I/III
@@ -363,12 +384,14 @@ Simply run it under Disk Basic and answer the prompts.
 SETTIME/CMD reads the date and time from Unix and sets the TRS-80
 DOS's date and time accordingly.
 
-The emulated floppy \fIcpmutil.dsk\fP contains similar programs
-for Montezuma CP/M, written by Roland Gerlach. 
-It was formatted as a ``Montezuma Micro Standard SYSTEM disk
-(40T, SS, DD, 170K),'' but does not contain a copy of CP/M.
-Source code is included on the floppy; please pass any improvements
-you make back to the author.
+The emulated floppy \fIcpmutil.dsk\fP contains import and export
+programs for Montezuma CP/M, written by Roland Gerlach.  It was
+formatted as a ``Montezuma Micro Standard DATA disk (40T, SS, DD,
+200K),'' with 512-byte sectors.  Be careful to configure your CP/M to
+the proper disk format and drive parameters (40 track, not 80), or you
+will have confusing problems reading this disk.  Source code is
+included on the floppy; please pass any improvements you make back to
+the author.
 
 IMPORT.COM imports a Unix file and writes it to an emulated CP/M disk.
 Usage: \fIIMPORT [-n] [unixfile [cpmfile]]\fP.  The -n flag converts
@@ -553,13 +576,13 @@ Use the built-in character bitmaps, not a X font.  This is the default.
 If -usefont is also given,
 use the specified X font for normal width characters.
 The default uses a common X fixed-width font:
-"-misc-fixed-medium-r-normal--20-200-75-75-*-100-*-*".
+"-misc-fixed-medium-r-normal--20-200-75-75-*-100-iso8859-1".
 .TP
 .B \-widefont \fIfontname\fP
 If -usefont is also given,
 use the specified X font for double width characters.
 The default uses a common X fixed-width font, scaled to double width:
-"-misc-fixed-medium-r-normal--20-200-75-75-*-200-*-*".
+"-misc-fixed-medium-r-normal--20-200-75-75-*-200-iso8859-1".
 .TP
 .B \-microlabs
 In Model 4/4P mode, emulate the Micro Labs Grafyx Solution hi-res
@@ -671,8 +694,7 @@ the emulator's disk file format, ROM images, and TRS-80 software that
 has already been converted.  For pointers, see
 http://www.research.digital.com/SRC/personal/Tim_Mann/trs80.html.
 .SH Bugs and limitations
-There may be bugs in the Z-80 emulator which we haven't found yet.
-Some of the more bizarre undocumented Z-80 instructions and behaviors
+Some of the more bizarre undocumented Z-80 instructions
 are not implemented.
 
 Cassette emulation works only in Model I mode, and only for programs

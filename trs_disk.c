@@ -13,6 +13,7 @@
 
 /*#define DISKDEBUG 1*/
 /*#define DISKDEBUG2 1*/
+/*#define DISKDEBUG3 1*/
 #define TSTATEREV 1
 
 #include "z80.h"
@@ -55,6 +56,8 @@ typedef struct {
   int format;			/* write track state machine */
   int format_bytecount;         /* bytes left in this part of write track */
   int format_sec;               /* current sector number or id_index */
+  int format_gapcnt;            /* measure requested gaps */
+  int format_gap[5];
   unsigned curdrive;
   unsigned curside;
   unsigned density;		/* sden=0, dden=1 */
@@ -192,6 +195,10 @@ typedef struct {
   unsigned char buf[MAXSECSIZE];
 } DiskState;
 
+/* Reuse some fields */
+#define realfmt_nbytes nblocks      /* number of PC format command bytes */
+#define realfmt_fill sorted_valid   /* fill byte for data sectors */
+
 DiskState disk[NDRIVES];
 
 /* Emulate interleave in JV1 mode */
@@ -287,13 +294,15 @@ trs_disk_done(int dummy)
 static void
 trs_disk_unimpl(unsigned char cmd, char* more)
 {
+  char msg[2048];
   state.status = TRSDISK_WRITEFLT|TRSDISK_NOTFOUND;
   state.bytecount = state.format_bytecount = 0;
   state.format = FMT_DONE;
   trs_disk_drq_interrupt(0);
   trs_schedule_event(trs_disk_done, 0, 0);
-  fprintf(stderr, "trs_disk_command(0x%02x) not implemented - %s\n",
+  sprintf(msg, "trs_disk_command(0x%02x) not implemented - %s\n",
 	  cmd, more);
+  error(msg);
 }
 
 /* Sort first by track, second by side, third by position in emulated-disk
@@ -624,6 +633,10 @@ static int
 search(int sector)
 {
   DiskState *d = &disk[state.curdrive];
+  if (d->file == NULL) {
+    state.status |= TRSDISK_NOTFOUND;
+    return -1;
+  }
   if (d->emutype == JV1) { 
     if (d->phytrack < 0 || d->phytrack >= MAXTRACKS ||
 	state.curside > 0 || sector >= JV1_SECPERTRK || d->file == NULL ||
@@ -668,6 +681,10 @@ static int
 search_adr()
 {
   DiskState *d = &disk[state.curdrive];
+  if (d->file == NULL) {
+    state.status |= TRSDISK_NOTFOUND;
+    return -1;
+  }
   if (d->emutype == JV1) { 
     if (d->phytrack < 0 || d->phytrack >= MAXTRACKS ||
 	state.curside > 0 || d->file == NULL || state.density == 1) {
@@ -710,7 +727,9 @@ verify()
   if (d->emutype == REAL) {
     real_verify();
   } else if (d->emutype == JV1) {
-    if (state.density == 1) {
+    if (d->file == NULL) {
+      state.status |= TRSDISK_NOTFOUND;
+    } if (state.density == 1) {
       state.status |= TRSDISK_NOTFOUND;
     } else if (state.track != d->phytrack) {
       state.status |= TRSDISK_SEEKERR;
@@ -825,7 +844,7 @@ trs_disk_select_write(unsigned char data)
     state.curdrive = 7;
     break;
   default:
-    fprintf(stderr, "trs_disk: bogus drive select 0x%02x\n", data);
+    trs_disk_unimpl(data, "bogus drive select");
     break;
   }
 }
@@ -1046,37 +1065,79 @@ trs_disk_data_write(unsigned char data)
     }
     break;
   case TRSDISK_WRITETRK:
-    if (state.bytecount-- <= 0) state.format = FMT_GAP4;
+    if (state.bytecount-- <= 0) {
+      if (state.format == FMT_DONE) break;
+      if (state.format != FMT_GAP3) {
+	error("bad format data?\n");
+	state.format_gap[4] = 0;
+      } else {
+	/* This was GAP4 */
+	state.format_gap[4] = state.format_gapcnt;
+	state.format_gapcnt = 0;
+      }
+#if DISKDEBUG3
+      fprintf(stderr,
+	      "trk %d side %d gap0 %d gap1 %d gap2 %d gap3 %d gap4 %d\n",
+	      d->phytrack, state.curside,
+	      state.format_gap[0], state.format_gap[1], state.format_gap[2], 
+	      state.format_gap[3], state.format_gap[4]);
+#endif
+      state.format = FMT_DONE;
+      state.status &= ~TRSDISK_DRQ;
+      if (d->emutype == REAL) {
+	real_writetrk();
+      } else {
+	c = fflush(d->file);
+	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+      }
+      trs_disk_drq_interrupt(0);
+      trs_schedule_event(trs_disk_done, 0, 8);
+    }
     switch (state.format) {
     case FMT_GAP0:
-      if (d->emutype == REAL) {
-	d->nblocks = 0; /* (mis)use field to count sector header bytes */
-      }
       if (data == 0xfc) {
 	state.format = FMT_GAP1;
+	state.format_gap[0] = state.format_gapcnt;
+	state.format_gapcnt = 0;
       } else if (data == 0xfe) {
 	/* There wasn't a gap 0; we were really in gap 1 */
+	state.format_gap[0] = 0;
 	goto got_idam;
+      } else {
+	state.format_gapcnt++;
       }
       break;
     case FMT_GAP1:
-    case FMT_GAP3:
       if (data == 0xfe) {
       got_idam:
-	/* We've received an ID address mark */
+	/* We've received the first ID address mark */
+	state.format_gap[1] = state.format_gapcnt;
+	state.format_gapcnt = 0;
 	state.format = FMT_TRACKID;
+      } else {
+	state.format_gapcnt++;
+      }
+      break;
+    case FMT_GAP3:
+      if (data == 0xfe) {
+	/* We've received an ID address mark */
+	state.format_gap[3] = state.format_gapcnt;
+	state.format_gapcnt = 0;
+	state.format = FMT_TRACKID;
+      } else {
+	state.format_gapcnt++;
       }
       break;
     case FMT_TRACKID:
       if (d->emutype == REAL) {
-	if (d->nblocks >= sizeof(d->buf)) {
+	if (d->realfmt_nbytes >= sizeof(d->buf)) {
 	  /* Data structure full */
 	  state.status |= TRSDISK_WRITEFLT;
 	  state.bytecount = 0;
 	  state.format_bytecount = 0;
 	  state.format = FMT_DONE;
 	} else {
-	  d->buf[d->nblocks++] = data;
+	  d->buf[d->realfmt_nbytes++] = data;
 	  state.format = FMT_HEADID;
 	}
       } else {
@@ -1088,7 +1149,7 @@ trs_disk_data_write(unsigned char data)
       break;
     case FMT_HEADID:
       if (d->emutype == REAL) {
-	d->buf[d->nblocks++] = data;
+	d->buf[d->realfmt_nbytes++] = data;
       } else if (d->emutype == JV1) {
 	if (data != 0) {
 	  trs_disk_unimpl(state.currcommand, "JV1 double sided");
@@ -1105,7 +1166,7 @@ trs_disk_data_write(unsigned char data)
       break;
     case FMT_SECID:
       if (d->emutype == REAL) {
-	d->buf[d->nblocks++] = data;
+	d->buf[d->realfmt_nbytes++] = data;
       } else if (d->emutype == JV1) {
 	if (data >= JV1_SECPERTRK) {
 	  trs_disk_unimpl(state.currcommand, "JV1 sector number >= 10");
@@ -1139,7 +1200,7 @@ trs_disk_data_write(unsigned char data)
 	state.format_sec = id_index;
 
       } else if (d->emutype == REAL) {
-	d->buf[d->nblocks++] = data;
+	d->buf[d->realfmt_nbytes++] = data;
 	if (d->real_size_code != -1 && d->real_size_code != data) {
 	  trs_disk_unimpl(state.currcommand,
 			  "varying sector size on same track on real floppy");
@@ -1180,7 +1241,11 @@ trs_disk_data_write(unsigned char data)
 	} else if (d->emutype == REAL) {
 	  state.format_bytecount = size_code_to_size(d->real_size_code);
 	}
+	state.format_gap[2] = state.format_gapcnt;
+	state.format_gapcnt = 0;
 	state.format = FMT_DATA;
+      } else {
+	state.format_gapcnt++;
       }
       break;
     case FMT_DATA:
@@ -1207,6 +1272,8 @@ trs_disk_data_write(unsigned char data)
       if (d->emutype == JV3) {
 	c = putc(data, d->file);
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+      } else if (d->emutype == REAL) {
+	d->realfmt_fill = data;
       }
       if (--state.format_bytecount <= 0) {
 	state.format = FMT_DCRC;
@@ -1231,26 +1298,15 @@ trs_disk_data_write(unsigned char data)
       }
       state.format = FMT_GAP3;
       break;
-    case FMT_GAP4:
-      state.format = FMT_DONE;
-      state.status &= ~TRSDISK_DRQ;
-      if (d->emutype == REAL) {
-	real_writetrk();
-      } else {
-	c = fflush(d->file);
-	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
-      }
-      trs_disk_drq_interrupt(0);
-      trs_schedule_event(trs_disk_done, 0, 8);
-      break;
     case FMT_DONE:
       break;
+    case FMT_GAP4:
     case FMT_IAM:
     case FMT_IDAM:
     case FMT_IDCRC:
     case FMT_DAM:
     default:
-      fprintf(stderr, "error in format state machine\n");
+      error("error in format state machine\n");
       break;
     }      
   default:
@@ -1591,6 +1647,12 @@ trs_disk_command_write(unsigned char cmd)
 	state.status = TRSDISK_WRITEPRT;
 	break;
       }
+      if (d->file == NULL) {
+	/* How is this error indicated?  Did the controller just hang? */
+	state.status |= (TRSDISK_BUSY|TRSDISK_WRITEFLT);
+	trs_schedule_event(trs_disk_done, 0, 128);
+	break;
+      }
       if (d->emutype == JV3) {
 	/* Erase track if already formatted */
 	int i;
@@ -1602,10 +1664,12 @@ trs_disk_command_write(unsigned char cmd)
 	}
       } else if (d->emutype == REAL) {
 	d->real_size_code = -1; /* watch for first, then check others match */
+	d->realfmt_nbytes = 0; /* size of PC formatting command buffer */
       }
       state.status = TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
       state.format = FMT_GAP0;
+      state.format_gapcnt = 0;
       if (disk[state.curdrive].inches == 5) {
 	if (state.density) {
 	  state.bytecount = TRKSIZE_DD;
@@ -1741,62 +1805,73 @@ real_read()
 #if __linux
   DiskState *d = &disk[state.curdrive];
   struct floppy_raw_cmd raw_cmd;
-  int res, i = 0;
+  int res, i, retry;
   sigset_t set, oldset;
 
-  state.status = 0;
-  memset(&raw_cmd, 0, sizeof(raw_cmd));
-  raw_cmd.rate = real_rate(d);
-  raw_cmd.flags = FD_RAW_READ | FD_RAW_INTR;
-  raw_cmd.cmd[i++] = state.density ? 0x46 : 0x06;
-  raw_cmd.cmd[i++] = state.curside ? 4 : 0;
-  raw_cmd.cmd[i++] = state.track;
-  raw_cmd.cmd[i++] = state.curside;
-  raw_cmd.cmd[i++] = state.sector;
-  raw_cmd.cmd[i++] = d->real_size_code;
-  raw_cmd.cmd[i++] = 255;
-  raw_cmd.cmd[i++] = 0x0a;
-  raw_cmd.cmd[i++] = 0xff; /* unused */
-  raw_cmd.cmd_count = i;
-  raw_cmd.data = (void*) d->buf;
-  raw_cmd.length = 256;
-  sigemptyset(&set);
-  sigaddset(&set, SIGALRM);
-  sigaddset(&set, SIGIO);
-  sigprocmask(SIG_BLOCK, &set, &oldset);
-  res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
-  sigprocmask(SIG_SETMASK, &oldset, NULL);
-  if (res < 0) {
-    /*int reset_now = 0;*/
-    perror("real_read");
-    /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
-    state.status |= TRSDISK_NOTFOUND;
-  } else {
-    if (raw_cmd.reply[1] & 0x04) {
+  /* Try once at each supported sector size */
+  for (retry = 0; retry < 4; retry++) {
+    state.status = 0;
+    memset(&raw_cmd, 0, sizeof(raw_cmd));
+    raw_cmd.rate = real_rate(d);
+    raw_cmd.flags = FD_RAW_READ | FD_RAW_INTR;
+    i = 0;
+    raw_cmd.cmd[i++] = state.density ? 0x46 : 0x06;
+    raw_cmd.cmd[i++] = state.curside ? 4 : 0;
+    raw_cmd.cmd[i++] = state.track;
+    raw_cmd.cmd[i++] = state.curside;
+    raw_cmd.cmd[i++] = state.sector;
+    raw_cmd.cmd[i++] = d->real_size_code;
+    raw_cmd.cmd[i++] = 255;
+    raw_cmd.cmd[i++] = 0x0a;
+    raw_cmd.cmd[i++] = 0xff; /* unused */
+    raw_cmd.cmd_count = i;
+    raw_cmd.data = (void*) d->buf;
+    raw_cmd.length = 128 << d->real_size_code;
+    sigemptyset(&set);
+    sigaddset(&set, SIGALRM);
+    sigaddset(&set, SIGIO);
+    sigprocmask(SIG_BLOCK, &set, &oldset);
+    res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
+    sigprocmask(SIG_SETMASK, &oldset, NULL);
+    if (res < 0) {
+      /*int reset_now = 0;*/
+      perror("real_read");
+      /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
       state.status |= TRSDISK_NOTFOUND;
-      /* Could have been due to wrong sector size.  Presumably
-         the Z-80 software will do some retries, so we'll cause
-         it to try the next sector size next time. */
-      d->real_size_code = (d->real_size_code + 1) % 3;
-    }
-    if (raw_cmd.reply[1] & 0x81) state.status |= TRSDISK_NOTFOUND;
-    if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
-    if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
-    if (raw_cmd.reply[2] & 0x40) {
-      if (state.controller == TRSDISK_P1771) {
-        state.status |= TRSDISK_1771_FA;
-      } else {
-        state.status |= TRSDISK_1791_F8;
+    } else {
+      if (raw_cmd.reply[1] & 0x04) {
+	state.status |= TRSDISK_NOTFOUND;
+	/* Could have been due to wrong sector size, so we'll retry
+	   internally in each other size before returning an error. */
+#if DISKDEBUG3
+	fprintf(stderr,
+		"real_read not fnd: side %d tk %d sec %d size 0%d phytk %d\n",
+		state.curside, state.track, state.sector, d->real_size_code,
+		d->phytrack*d->real_step);
+#endif
+	d->real_size_code = (d->real_size_code + 1) % 4;
+	continue; /* retry */
+      }
+      if (raw_cmd.reply[1] & 0x81) state.status |= TRSDISK_NOTFOUND;
+      if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
+      if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
+      if (raw_cmd.reply[2] & 0x40) {
+	if (state.controller == TRSDISK_P1771) {
+	  state.status |= TRSDISK_1771_FA;
+	} else {
+	  state.status |= TRSDISK_1791_F8;
+	}
+      }
+      if (raw_cmd.reply[2] & 0x20) state.status |= TRSDISK_CRCERR;
+      if (raw_cmd.reply[2] & 0x13) state.status |= TRSDISK_NOTFOUND;
+      if ((raw_cmd.reply[0] & 0xc0) == 0) {
+	state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
+	trs_disk_drq_interrupt(1);
+	state.bytecount = size_code_to_size(d->real_size_code);
+	return;
       }
     }
-    if (raw_cmd.reply[2] & 0x20) state.status |= TRSDISK_CRCERR;
-    if (raw_cmd.reply[2] & 0x13) state.status |= TRSDISK_NOTFOUND;
-    if ((raw_cmd.reply[0] & 0xc0) == 0) {
-      state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
-      trs_disk_drq_interrupt(1);
-      state.bytecount = size_code_to_size(d->real_size_code);
-      return;
-    }
+    break;
   }
   state.status |= TRSDISK_BUSY;
   trs_schedule_event(trs_disk_done, 0, 128);
@@ -1831,7 +1906,7 @@ real_write()
   raw_cmd.cmd[i++] = 0xff; /* 256 */
   raw_cmd.cmd_count = i;
   raw_cmd.data = (void*) d->buf;
-  raw_cmd.length = 256;
+  raw_cmd.length = 128 << d->real_size_code;
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);
   sigaddset(&set, SIGIO);
@@ -1849,7 +1924,13 @@ real_write()
       /* Could have been due to wrong sector size.  Presumably
          the Z-80 software will do some retries, so we'll cause
          it to try the next sector size next time. */
-      d->real_size_code = (d->real_size_code + 1) % 3;
+#if DISKDEBUG3
+      fprintf(stderr,
+	      "real_write not found: side %d tk %d sec %d size 0%d phytk %d\n",
+	      state.curside, state.track, state.sector, d->real_size_code,
+	      d->phytrack*d->real_step);
+#endif
+      d->real_size_code = (d->real_size_code + 1) % 4;
     }
     if (raw_cmd.reply[1] & 0x81) state.status |= TRSDISK_NOTFOUND;
     if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
@@ -1943,22 +2024,101 @@ real_writetrk()
 #if __linux
   DiskState *d = &disk[state.curdrive];
   struct floppy_raw_cmd raw_cmd;
-  int res, i = 0;
+  int res, i, gap3;
   sigset_t set, oldset;
+  static int iso = -1;
 
   state.status = 0;
+
+#if 0
+  /* Try to respect the gaps requested by TRS-80 software */
+  /* Problem: requested gaps might not be possible on a PC FDC.
+     Not all PC FDCs support ISO formats (with no index mark),
+     and we have control only of gap3, not the others. */
+  gap3 = state.format_gap[3];
+  if ((state.format_gap[0] == 0) != iso) {
+    /* Set IBM format (index mark) vs. ISO format (no index mark) */
+    iso = (state.format_gap[0] == 0);
+    memset(&raw_cmd, 0, sizeof(raw_cmd));
+    raw_cmd.flags = 0;
+    raw_cmd.cmd[0] = 0x33; /* "option" */
+    raw_cmd.cmd[1] = iso;
+    raw_cmd.cmd_count = 2;
+    sigemptyset(&set);
+    sigaddset(&set, SIGALRM);
+    sigaddset(&set, SIGIO);
+    sigprocmask(SIG_BLOCK, &set, &oldset);
+    res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
+    sigprocmask(SIG_SETMASK, &oldset, NULL);
+    if (res < 0) {
+      /*int reset_now = 0;*/
+      perror("real_writetrk ISO option");
+      /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
+      state.status |= TRSDISK_WRITEFLT;
+    }
+  }
+#else
+  /* Compute a usable gap3 */
+  /* Constants based on IBM format as explained in "The floppy user guide"
+     by Michael Haardt, Alain Knaff, and David C. Niemi */
+  /* The formulas and constants are not factored out, in case some of
+     those that are the same now need to change when I learn more. */
+  if (state.density) {
+    /* MFM recording */
+    if (d->inches == 5) {
+      /* 5" DD = 250 kHz MFM */
+      gap3 = (TRKSIZE_DD - 161 - /*slop*/16)/(d->realfmt_nbytes / 4)
+	- 62 - (128 << d->real_size_code) - /*slop*/2;
+    } else {
+      /* 8" DD = 5" HD = 500 kHz MFM */
+      gap3 = (TRKSIZE_8DD - 161 - /*slop*/16)/(d->realfmt_nbytes / 4)
+	- 62 - (128 << d->real_size_code) - /*slop*/2;
+    }
+  } else {
+    /* FM recording */
+    if (d->inches == 5) {
+      /* 5" SD = 250 kHz FM (125 kbps) */
+      gap3 = (TRKSIZE_SD - 99 - /*slop*/16)/(d->realfmt_nbytes / 4)
+	- 33 - (128 << d->real_size_code) - /*slop*/2;
+    } else {
+      /* 8" SD = 5" HD operated in FM = 500 kHz FM (250 kbps) */
+      gap3 = (TRKSIZE_8SD - 99 - /*slop*/16)/(d->realfmt_nbytes / 4)
+	- 33 - (128 << d->real_size_code) - /*slop*/2;
+    }
+  }
+#endif
+  if (gap3 < 1) {
+    error("gap3 too small\n");
+    gap3 = 1;
+  } else if (gap3 > 0xff) {
+    gap3 = 0xff;
+  }
+
+  /* Do the actual write track */
   memset(&raw_cmd, 0, sizeof(raw_cmd));
   raw_cmd.rate = real_rate(d);
   raw_cmd.flags = FD_RAW_WRITE | FD_RAW_INTR;
+  i = 0;
   raw_cmd.cmd[i++] = 0x0d | (state.density ? 0x40 : 0x00);
   raw_cmd.cmd[i++] = state.curside ? 4 : 0;
   raw_cmd.cmd[i++] = d->real_size_code;
-  raw_cmd.cmd[i++] = d->nblocks / 4;
-  raw_cmd.cmd[i++] = 0x0c;
-  raw_cmd.cmd[i++] = state.density ? 0x6d : 0xe5;
+  raw_cmd.cmd[i++] = d->realfmt_nbytes / 4;
+  raw_cmd.cmd[i++] = gap3;
+  raw_cmd.cmd[i++] = d->realfmt_fill;
   raw_cmd.cmd_count = i;
   raw_cmd.data = (void*) d->buf;
-  raw_cmd.length = d->nblocks;
+  raw_cmd.length = d->realfmt_nbytes;
+#if DISKDEBUG3
+  fprintf(stderr,
+	  "real_writetrk %s size 0%d secs %d gap3 %d fill 0x%02x hex data ",
+	  (iso == 1) ? "iso" : "ibm",
+	  d->real_size_code, d->realfmt_nbytes/4, gap3, d->realfmt_fill);
+  for (i=0; i<d->realfmt_nbytes; i+=4) {
+    fprintf(stderr, "%02x%02x%02x%02x ",
+	    d->buf[i], d->buf[i+1], d->buf[i+2], d->buf[i+3]);
+  }
+  fprintf(stderr, "\n");
+#endif
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);
   sigaddset(&set, SIGIO);

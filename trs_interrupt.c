@@ -365,3 +365,12 @@ trs_cancel_event()
     event_func = NULL;
     z80_state.sched = -1;
 }
+
+/*
+ * Check if anything is scheduled.
+ */
+int
+trs_is_event_scheduled()
+{
+    return event_func != NULL;
+}

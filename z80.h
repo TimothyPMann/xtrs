@@ -24,6 +24,7 @@
 #include "config.h"
 #include <stdio.h>
 #include <ctype.h>
+#include <sys/time.h>
 
 #ifndef TRUE
 #define TRUE	(1)
@@ -176,7 +177,9 @@ struct z80_state_struct
 #define SUBTRACT_MASK		(0x2)
 #define PARITY_MASK		(0x4)
 #define OVERFLOW_MASK		(0x4)
+#define UNDOC3_MASK             (0x8)
 #define HALF_CARRY_MASK		(0x10)
+#define UNDOC5_MASK             (0x20)
 #define ZERO_MASK		(0x40)
 #define	SIGN_MASK		(0x80)
 #define ALL_FLAGS_MASK		(CARRY_MASK | SUBTRACT_MASK | OVERFLOW_MASK | \
@@ -204,7 +207,6 @@ struct z80_state_struct
 #define PARITY_FLAG		(REG_F & PARITY_MASK)
 #define SUBTRACT_FLAG		(REG_F & SUBTRACT_MASK)
 #define CARRY_FLAG		(REG_F & CARRY_MASK)
-#define SIGN_FLAG		(REG_F & SIGN_MASK)
 
 extern struct z80_state_struct z80_state;
 
@@ -217,8 +219,8 @@ extern void mem_write_rom(int address, int value);
 extern int mem_read_word(int address);
 extern void mem_write_word(int address, int value);
 Uchar *mem_pointer(int address, int writing);
-extern void mem_block_transfer(Ushort dest, Ushort source, int direction,
-			       Ushort count);
+extern int mem_block_transfer(Ushort dest, Ushort source, int direction,
+			      Ushort count);
 extern int load_hex(); /* returns highest address loaded + 1 */
 extern void error(char *string);
 extern void fatal(char *string);

@@ -152,18 +152,18 @@ static void do_add_flags(int a, int b, int result)
     int f;
 
     /*
-     * sign, carry, and overflow depend upon values of bit 7.
-     * half-carry depends upon values of bit 3.
+     * Sign, carry, and overflow depend upon values of bit 7.
+     * Half-carry depends upon values of bit 3.
      * We mask those bits, munge them into an index, and look
      * up the flag values in the above tables.
+     * Undocumented flags in bit 3, 5 of F come from the result.
      */
 
-    f = REG_F & ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK
-		  | OVERFLOW_MASK | SUBTRACT_MASK | CARRY_MASK);
 
     index = ((a & 0x88) >> 1) | ((b & 0x88) >> 2) | ((result & 0x88) >> 3);
-    f |= half_carry_table[index & 7] |
-      sign_carry_overflow_table[index >> 4];
+    f = half_carry_table[index & 7] |
+      sign_carry_overflow_table[index >> 4] |
+      (result & (UNDOC3_MASK|UNDOC5_MASK));
 
     if((result & 0xFF) == 0) f |= ZERO_MASK;
 
@@ -176,23 +176,23 @@ static void do_sub_flags(int a, int b, int result)
     int f;
 
     /*
-     * sign, carry, and overflow depend upon values of bit 7.
-     * half-carry depends upon values of bit 3.
+     * Sign, carry, and overflow depend upon values of bit 7.
+     * Half-carry depends upon values of bit 3.
      * We mask those bits, munge them into an index, and look
      * up the flag values in the above tables.
+     * Undocumented flags in bit 3, 5 of F come from the result.
      */
 
-    f = (REG_F | SUBTRACT_MASK) & ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK
-				    | OVERFLOW_MASK | CARRY_MASK);
-
     index = ((a & 0x88) >> 1) | ((b & 0x88) >> 2) | ((result & 0x88) >> 3);
-    f |= subtract_half_carry_table[index & 7] |
-      subtract_sign_carry_overflow_table[index >> 4];
+    f = SUBTRACT_MASK | subtract_half_carry_table[index & 7] |
+      subtract_sign_carry_overflow_table[index >> 4] |
+      (result & (UNDOC3_MASK|UNDOC5_MASK));
 
     if((result & 0xFF) == 0) f |= ZERO_MASK;
 
     REG_F = f;
 }
+
 
 static void do_adc_word_flags(int a, int b, int result)
 {
@@ -200,20 +200,19 @@ static void do_adc_word_flags(int a, int b, int result)
     int f;
 
     /*
-     * sign, carry, and overflow depend upon values of bit 15.
-     * half-carry depends upon values of bit 11.
+     * Sign, carry, and overflow depend upon values of bit 15.
+     * Half-carry depends upon values of bit 11.
      * We mask those bits, munge them into an index, and look
      * up the flag values in the above tables.
+     * Undocumented flags in bit 3, 5 of F come from the result high byte.
      */
-
-    f = REG_F & ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK
-		  | OVERFLOW_MASK | SUBTRACT_MASK | CARRY_MASK);
 
     index = ((a & 0x8800) >> 9) | ((b & 0x8800) >> 10) |
       ((result & 0x8800) >> 11);
 
-    f |= half_carry_table[index & 7] |
-      sign_carry_overflow_table[index >> 4];
+    f = half_carry_table[index & 7] |
+      sign_carry_overflow_table[index >> 4] |
+      ((result >> 8) & (UNDOC3_MASK|UNDOC5_MASK));
 
     if((result & 0xFFFF) == 0) f |= ZERO_MASK;
 
@@ -226,19 +225,20 @@ static void do_add_word_flags(int a, int b, int result)
     int f;
 
     /*
-     * carry depends upon values of bit 15.
-     * half-carry depends upon values of bit 11.
+     * Carry depends upon values of bit 15.
+     * Half-carry depends upon values of bit 11.
      * We mask those bits, munge them into an index, and look
      * up the flag values in the above tables.
+     * Undocumented flags in bit 3, 5 of F come from the result high byte.
      */
-
-    f = REG_F & ~(HALF_CARRY_MASK | SUBTRACT_MASK | CARRY_MASK);
 
     index = ((a & 0x8800) >> 9) | ((b & 0x8800) >> 10) |
       ((result & 0x8800) >> 11);
 
-    f |= half_carry_table[index & 7] |
-      (sign_carry_overflow_table[index >> 4] & CARRY_MASK);
+    f = half_carry_table[index & 7] |
+      (sign_carry_overflow_table[index >> 4] & CARRY_MASK) |
+      (REG_F & (ZERO_MASK | PARITY_MASK | SIGN_MASK)) |
+      ((result >> 8) & (UNDOC3_MASK | UNDOC5_MASK));
 
     REG_F = f;
 }
@@ -249,20 +249,19 @@ static void do_sbc_word_flags(int a, int b, int result)
     int f;
 
     /*
-     * sign, carry, and overflow depend upon values of bit 15.
-     * half-carry depends upon values of bit 11.
+     * Sign, carry, and overflow depend upon values of bit 15.
+     * Half-carry depends upon values of bit 11.
      * We mask those bits, munge them into an index, and look
      * up the flag values in the above tables.
+     * Undocumented flags in bit 3, 5 of F come from the result high byte.
      */
-
-    f = (REG_F | SUBTRACT_MASK) & ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK
-				    | OVERFLOW_MASK | CARRY_MASK);
 
     index = ((a & 0x8800) >> 9) | ((b & 0x8800) >> 10) |
       ((result & 0x8800) >> 11);
 
-    f |= subtract_half_carry_table[index & 7] |
-      subtract_sign_carry_overflow_table[index >> 4];
+    f = SUBTRACT_MASK | subtract_half_carry_table[index & 7] |
+      subtract_sign_carry_overflow_table[index >> 4] |
+      ((result >> 8) & (UNDOC3_MASK | UNDOC5_MASK));
 
     if((result & 0xFFFF) == 0) f |= ZERO_MASK;
 
@@ -271,10 +270,8 @@ static void do_sbc_word_flags(int a, int b, int result)
 
 static void do_flags_dec_byte(int value)
 {
-    Uchar clear, set;
+    Uchar set;
 
-    clear = (Uchar) ~(OVERFLOW_MASK | HALF_CARRY_MASK
-		      | ZERO_MASK | SIGN_MASK);
     set = SUBTRACT_MASK;
 
     if(value == 0x7f)
@@ -286,15 +283,14 @@ static void do_flags_dec_byte(int value)
     if(value & 0x80)
       set |= SIGN_MASK;
 
-    REG_F = (REG_F & clear) | set;
+    REG_F = (REG_F & CARRY_MASK) | set
+      | (value & (UNDOC3_MASK | UNDOC5_MASK));
 }
 
 static void do_flags_inc_byte(int value)
 {
-    Uchar clear, set;
+    Uchar set;
 
-    clear = (Uchar) ~(SUBTRACT_MASK | OVERFLOW_MASK
-		      | HALF_CARRY_MASK | ZERO_MASK | SIGN_MASK);
     set = 0;
 
     if(value == 0x80)
@@ -306,7 +302,8 @@ static void do_flags_inc_byte(int value)
     if(value & 0x80)
       set |= SIGN_MASK;
 
-    REG_F = (REG_F & clear) | set;
+    REG_F = (REG_F & CARRY_MASK) | set
+      | (value & (UNDOC3_MASK | UNDOC5_MASK));
 }
 
 /*
@@ -316,12 +313,10 @@ static void do_flags_inc_byte(int value)
 static void do_and_byte(int value)
 {
     int result;
-    Uchar clear, set;
+    Uchar set;
 
     result = (REG_A &= value);
 
-    clear = (Uchar) ~(CARRY_MASK | SUBTRACT_MASK | PARITY_MASK
-		      | ZERO_MASK | SIGN_MASK);
     set = HALF_CARRY_MASK;
 
     if(parity(result))
@@ -331,18 +326,16 @@ static void do_and_byte(int value)
     if(result & 0x80)
       set |= SIGN_MASK;
 
-    REG_F = (REG_F & clear) | set;
+    REG_F = set | (result & (UNDOC3_MASK | UNDOC5_MASK));
 }
 
 static void do_or_byte(int value)
 {
     int result;  /* the result of the or operation */
-    Uchar clear, set;
+    Uchar set;
 
     result = (REG_A |= value);
 
-    clear = (Uchar) ~(CARRY_MASK | SUBTRACT_MASK | PARITY_MASK
-	      | HALF_CARRY_MASK | ZERO_MASK | SIGN_MASK);
     set = 0;
 
     if(parity(result))
@@ -352,18 +345,16 @@ static void do_or_byte(int value)
     if(result & 0x80)
       set |= SIGN_MASK;
 
-    REG_F = (REG_F & clear) | set;
+    REG_F = set | (result & (UNDOC3_MASK | UNDOC5_MASK));
 }
 
 static void do_xor_byte(int value)
 {
     int result;  /* the result of the xor operation */
-    Uchar clear, set;
+    Uchar set;
 
     result = (REG_A ^= value);
 
-    clear = (Uchar) ~(CARRY_MASK | SUBTRACT_MASK | PARITY_MASK
-		      | HALF_CARRY_MASK | ZERO_MASK | SIGN_MASK);
     set = 0;
 
     if(parity(result))
@@ -373,7 +364,7 @@ static void do_xor_byte(int value)
     if(result & 0x80)
       set |= SIGN_MASK;
 
-    REG_F = (REG_F & clear) | set;
+    REG_F = set | (result & (UNDOC3_MASK | UNDOC5_MASK));
 }
 
 static void do_add_byte(int value)
@@ -413,11 +404,6 @@ static void do_negate()
     a = REG_A;
     REG_A = - a;
     do_sub_flags(0, a, REG_A);
-#ifdef WRONG
-    /* This is wrong.  Strange that it was here. --tpm */
-    if(a == 0)
-      REG_F |= CARRY_MASK;
-#endif
 }
 
 static void do_sbc_byte(int value)
@@ -484,82 +470,129 @@ static void do_add_word_index(Ushort *regp, int value)
 static void do_cp(int value)
 {
     int a, result;
+    int index;
+    int f;
 
     result = (a = REG_A) - value;
-    do_sub_flags(a, value, result);
+
+    /*
+     * Sign, carry, and overflow depend upon values of bit 7.
+     * Half-carry depends upon values of bit 3.
+     * We mask those bits, munge them into an index, and look
+     * up the flag values in the above tables.
+     * Undocumented flags in bit 3, 5 of F come from the second operand.
+     */
+
+    index = ((a & 0x88) >> 1) | ((value & 0x88) >> 2) | ((result & 0x88) >> 3);
+    f = SUBTRACT_MASK | subtract_half_carry_table[index & 7] |
+      subtract_sign_carry_overflow_table[index >> 4] |
+      (value & (UNDOC3_MASK|UNDOC5_MASK));
+
+    if((result & 0xFF) == 0) f |= ZERO_MASK;
+
+    REG_F = f;
 }
 
 static void do_cpd()
 {
-    do_cp(mem_read(REG_HL));
+    int oldcarry = REG_F & CARRY_MASK;
+    int a, value, result;
+    value = mem_read(REG_HL);
+    result = (a = REG_A) - value;
     REG_HL--;
     REG_BC--;
 
-    if(REG_BC == 0)
-      CLEAR_OVERFLOW();
-    else
-      SET_OVERFLOW();
+    do_sub_flags(a, value, result);
+    REG_F = (REG_F & ~(CARRY_MASK | OVERFLOW_MASK | UNDOC5_MASK))
+      | oldcarry | (REG_BC == 0 ? 0 : OVERFLOW_MASK)
+      | (((result - ((REG_F & HALF_CARRY_MASK) >> 4)) & 2) << 4);
+    if ((result & 15) == 8 && (REG_F & HALF_CARRY_MASK) != 0) {
+      REG_F &= ~UNDOC3_MASK;
+    }
+
     T_COUNT(16);
 }
 
 static void do_cpi()
 {
-    do_cp(mem_read(REG_HL));
+    int oldcarry = REG_F & CARRY_MASK;
+    int a, value, result;
+    value = mem_read(REG_HL);
+    result = (a = REG_A) - value;
     REG_HL++;
     REG_BC--;
 
-    if(REG_BC == 0)
-      CLEAR_OVERFLOW();
-    else
-      SET_OVERFLOW();
+    do_sub_flags(a, value, result);
+    REG_F = (REG_F & ~(CARRY_MASK | OVERFLOW_MASK | UNDOC5_MASK))
+      | oldcarry | (REG_BC == 0 ? 0 : OVERFLOW_MASK)
+      | (((result - ((REG_F & HALF_CARRY_MASK) >> 4)) & 2) << 4);
+    if ((result & 15) == 8 && (REG_F & HALF_CARRY_MASK) != 0) {
+      REG_F &= ~UNDOC3_MASK;
+    }
+
     T_COUNT(16);
 }
 
 static void do_cpdr()
 {
+    int oldcarry = REG_F & CARRY_MASK;
+    int a = REG_A, value, result;
     do
     {
-	do_cp(mem_read(REG_HL));
+        result = a - (value = mem_read(REG_HL));
 	REG_HL--;
 	REG_BC--;
-	
-	if(REG_BC == 0)
-	  CLEAR_OVERFLOW();
-	else
-	  SET_OVERFLOW();
+
 	T_COUNT(21);
-    } while((REG_BC != 0) && !ZERO_FLAG);
+
+    } while((REG_BC != 0) && (result != 0));
+
+    do_sub_flags(a, value, result);
+    REG_F = (REG_F & ~(CARRY_MASK | OVERFLOW_MASK | UNDOC5_MASK))
+      | oldcarry | (REG_BC == 0 ? 0 : OVERFLOW_MASK)
+      | (((result - ((REG_F & HALF_CARRY_MASK) >> 4)) & 2) << 4);
+    if ((result & 15) == 8 && (REG_F & HALF_CARRY_MASK) != 0) {
+      REG_F &= ~UNDOC3_MASK;
+    }
+
     T_COUNT(-5);
 }
 
 static void do_cpir()
 {
+    int oldcarry = REG_F & CARRY_MASK;
+    int a = REG_A, value, result;
     do
     {
-	do_cp(mem_read(REG_HL));
+        result = a - (value = mem_read(REG_HL));
 	REG_HL++;
 	REG_BC--;
-	
-	if(REG_BC == 0)
-	  CLEAR_OVERFLOW();
-	else
-	  SET_OVERFLOW();
+
 	T_COUNT(21);
-    } while((REG_BC != 0) && !ZERO_FLAG);
+
+    } while((REG_BC != 0) && (result != 0));
+
+    do_sub_flags(a, value, result);
+    REG_F = (REG_F & ~(CARRY_MASK | OVERFLOW_MASK | UNDOC5_MASK))
+      | oldcarry | (REG_BC == 0 ? 0 : OVERFLOW_MASK)
+      | (((result - ((REG_F & HALF_CARRY_MASK) >> 4)) & 2) << 4);
+    if ((result & 15) == 8 && (REG_F & HALF_CARRY_MASK) != 0) {
+      REG_F &= ~UNDOC3_MASK;
+    }
+
     T_COUNT(-5);
 }
 
-static void do_test_bit(int value, int bit)
+static void do_test_bit(int op, int value, int bit)
 {
-    Uchar clear, set;
-
-    clear = (Uchar) ~(SIGN_MASK | ZERO_MASK | OVERFLOW_MASK | SUBTRACT_MASK);
-    set = HALF_CARRY_MASK;
-
-    if((value & (1 << bit)) == 0)
-      set |= ZERO_MASK;
-
-    REG_F = (REG_F & clear) | set;
+    if (value & (1 << bit)) {
+      REG_F = (REG_F & CARRY_MASK) | HALF_CARRY_MASK
+	| (((op & 0x38) == 0x38) ? SIGN_MASK : 0);
+    } else {
+      REG_F = (REG_F & CARRY_MASK)
+	| OVERFLOW_MASK | HALF_CARRY_MASK | ZERO_MASK;
+    }
+    if ((op & 7) != 6) REG_F |= value & (UNDOC3_MASK | UNDOC5_MASK);
 }
 
 static int rl_byte(int value)
@@ -569,11 +602,9 @@ static int rl_byte(int value)
      * operation, setting flags as appropriate.
      */
 
-    Uchar clear, set;
+    Uchar set;
     int result;
 
-    clear = (Uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
-		      SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
     if(CARRY_FLAG)
@@ -594,7 +625,7 @@ static int rl_byte(int value)
     if(value & 0x80)
       set |= CARRY_MASK;
 
-    REG_F = (REG_F & clear) | set;
+    REG_F = (result & (UNDOC3_MASK | UNDOC5_MASK)) | set;
 
     return result;
 }
@@ -606,11 +637,9 @@ static int rr_byte(int value)
      * operation, setting flags as appropriate.
      */
 
-    Uchar clear, set;
+    Uchar set;
     int result;
 
-    clear = (Uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
-	      SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
     if(CARRY_FLAG)
@@ -631,10 +660,11 @@ static int rr_byte(int value)
     if(value & 0x1)
       set |= CARRY_MASK;
 
-    REG_F = (REG_F & clear) | set;
+    REG_F = (result & (UNDOC3_MASK | UNDOC5_MASK)) | set;
 
     return result;
 }
+
 static int rlc_byte(int value)
 {
     /*
@@ -642,11 +672,9 @@ static int rlc_byte(int value)
      * This does not do the right thing for the RLCA instruction.
      */
 
-    Uchar clear, set;
+    Uchar set;
     int result;
 
-    clear = (Uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
-		      SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
     if(value & 0x80)
@@ -666,18 +694,16 @@ static int rlc_byte(int value)
     if(parity(result))
       set |= PARITY_MASK;
 
-    REG_F = (REG_F & clear) | set;
+    REG_F = (result & (UNDOC3_MASK | UNDOC5_MASK)) | set;
 
     return result;
 }
 
 static int rrc_byte(int value)
 {
-    Uchar clear, set;
+    Uchar set;
     int result;
 
-    clear = (Uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
-		      SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
     if(value & 0x1)
@@ -697,7 +723,7 @@ static int rrc_byte(int value)
     if(parity(result))
       set |= PARITY_MASK;
 
-    REG_F = (REG_F & clear) | set;
+    REG_F = (result & (UNDOC3_MASK | UNDOC5_MASK)) | set;
 
     return result;
 }
@@ -708,9 +734,8 @@ static int rrc_byte(int value)
  */
 static void do_rla()
 {
-    Uchar clear, set;
+    Uchar set;
 
-    clear = ~(HALF_CARRY_MASK | SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
     if(REG_A & 0x80)
@@ -725,14 +750,14 @@ static void do_rla()
 	REG_A = (REG_A << 1) & 0xFF;
     }
 
-    REG_F = (REG_F & clear) | set;
+    REG_F = (REG_F & (OVERFLOW_MASK | ZERO_MASK | SIGN_MASK))
+      | set | (REG_A & (UNDOC3_MASK | UNDOC5_MASK ));
 }
 
 static void do_rra()
 {
-    Uchar clear, set;
+    Uchar set;
 
-    clear = ~(HALF_CARRY_MASK | SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
     if(REG_A & 0x1)
@@ -746,14 +771,14 @@ static void do_rra()
     {
 	REG_A = REG_A >> 1;
     }
-    REG_F = (REG_F & clear) | set;
+    REG_F = (REG_F & (OVERFLOW_MASK | ZERO_MASK | SIGN_MASK))
+      | set | (REG_A & (UNDOC3_MASK | UNDOC5_MASK ));
 }
 
 static void do_rlca()
 {
-    Uchar clear, set;
+    Uchar set;
 
-    clear = ~(HALF_CARRY_MASK | SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
     if(REG_A & 0x80)
@@ -765,14 +790,14 @@ static void do_rlca()
     {
 	REG_A = (REG_A << 1) & 0xFF;
     }
-    REG_F = (REG_F & clear) | set;
+    REG_F = (REG_F & (OVERFLOW_MASK | ZERO_MASK | SIGN_MASK))
+      | set | (REG_A & (UNDOC3_MASK | UNDOC5_MASK ));
 }
 
 static void do_rrca()
 {
-    Uchar clear, set;
+    Uchar set;
 
-    clear = ~(HALF_CARRY_MASK | SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
     if(REG_A & 0x1)
@@ -784,16 +809,15 @@ static void do_rrca()
     {
 	REG_A = REG_A >> 1;
     }
-    REG_F = (REG_F & clear) | set;
+    REG_F = (REG_F & (OVERFLOW_MASK | ZERO_MASK | SIGN_MASK))
+      | set | (REG_A & (UNDOC3_MASK | UNDOC5_MASK ));
 }
 
 static int sla_byte(int value)
 {
-    Uchar clear, set;
+    Uchar set;
     int result;
 
-    clear = (Uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
-		      SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
     result = (value << 1) & 0xFF;
@@ -807,18 +831,16 @@ static int sla_byte(int value)
     if(value & 0x80)
       set |= CARRY_MASK;
 
-    REG_F = (REG_F & clear) | set;
+    REG_F = (result & (UNDOC3_MASK | UNDOC5_MASK)) | set;
 
     return result;
 }
 
 static int sra_byte(int value)
 {
-    Uchar clear, set;
+    Uchar set;
     int result;
 
-    clear = (Uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
-		      SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
     if(value & 0x80)
@@ -838,7 +860,7 @@ static int sra_byte(int value)
     if(value & 0x1)
       set |= CARRY_MASK;
 
-    REG_F = (REG_F & clear) | set;
+    REG_F = (result & (UNDOC3_MASK | UNDOC5_MASK)) | set;
 
     return result;
 }
@@ -846,11 +868,9 @@ static int sra_byte(int value)
 /* undocumented opcode slia: shift left and increment */
 static int slia_byte(int value)
 {
-    Uchar clear, set;
+    Uchar set;
     int result;
 
-    clear = (Uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
-		      SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
     result = ((value << 1) & 0xFF) | 1;
@@ -864,18 +884,16 @@ static int slia_byte(int value)
     if(value & 0x80)
       set |= CARRY_MASK;
 
-    REG_F = (REG_F & clear) | set;
+    REG_F = (result & (UNDOC3_MASK | UNDOC5_MASK)) | set;
 
     return result;
 }
 
 static int srl_byte(int value)
 {
-    Uchar clear, set;
+    Uchar set;
     int result;
 
-    clear = (Uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
-		      SUBTRACT_MASK | CARRY_MASK);
     set = 0;
 
     result = value >> 1;
@@ -889,48 +907,53 @@ static int srl_byte(int value)
     if(value & 0x1)
       set |= CARRY_MASK;
 
-    REG_F = (REG_F & clear) | set;
+    REG_F = (result & (UNDOC3_MASK | UNDOC5_MASK)) | set;
 
     return result;
 }
 
 static void do_ldd()
 {
-    mem_write(REG_DE, mem_read(REG_HL));
+    int moved, undoc;
+    mem_write(REG_DE, moved = mem_read(REG_HL));
     REG_DE--;
     REG_HL--;
     REG_BC--;
 
-    CLEAR_HALF_CARRY();
-    CLEAR_SUBTRACT();
     if(REG_BC == 0)
       CLEAR_OVERFLOW();
     else
       SET_OVERFLOW();
+    undoc = REG_A + moved;
+    REG_F = (REG_F & ~(UNDOC3_MASK|UNDOC5_MASK|HALF_CARRY_MASK|SUBTRACT_MASK))
+      | (undoc & UNDOC3_MASK) | ((undoc & 2) ? UNDOC5_MASK : 0);
     T_COUNT(16);
 }
 
 static void do_ldi()
 {
-    mem_write(REG_DE, mem_read(REG_HL));
+    int moved, undoc;
+    mem_write(REG_DE, moved = mem_read(REG_HL));
     REG_DE++;
     REG_HL++;
     REG_BC--;
 
-    CLEAR_HALF_CARRY();
-    CLEAR_SUBTRACT();
     if(REG_BC == 0)
       CLEAR_OVERFLOW();
     else
       SET_OVERFLOW();
+    undoc = REG_A + moved;
+    REG_F = (REG_F & ~(UNDOC3_MASK|UNDOC5_MASK|HALF_CARRY_MASK|SUBTRACT_MASK))
+      | (undoc & UNDOC3_MASK) | ((undoc & 2) ? UNDOC5_MASK : 0);
     T_COUNT(16);
 }
 
 static void do_ldir()
 {
     /* repeating block load with increment */
+    int moved, undoc;
 
-    mem_block_transfer(REG_DE, REG_HL, 1, REG_BC);
+    moved = mem_block_transfer(REG_DE, REG_HL, 1, REG_BC);
     T_COUNT(((REG_BC-1) & 0xffff) * 21 + 16);
 
     /* set registers to final values */
@@ -938,15 +961,18 @@ static void do_ldir()
     REG_HL += REG_BC;
     REG_BC = 0;
 
-    /* clear flags */
-    REG_F &= ~(HALF_CARRY_MASK | OVERFLOW_MASK | SUBTRACT_MASK);
+    /* set up flags */
+    undoc = REG_A + moved;
+    REG_F = (REG_F & (CARRY_MASK | ZERO_MASK | SIGN_MASK)) 
+      | (undoc & UNDOC3_MASK) | ((undoc & 2) ? UNDOC5_MASK : 0);
 }
 
 static void do_lddr()
 {
     /* repeating block load with decrement */
+    int moved, undoc;
 
-    mem_block_transfer(REG_DE, REG_HL, -1, REG_BC);
+    moved = mem_block_transfer(REG_DE, REG_HL, -1, REG_BC);
     T_COUNT(((REG_BC-1) & 0xffff) * 21 + 16);
 
     /* set registers to final values */
@@ -954,16 +980,16 @@ static void do_lddr()
     REG_HL -= REG_BC;
     REG_BC = 0;
 
-    /* clear flags */
-    REG_F &= ~(HALF_CARRY_MASK | OVERFLOW_MASK | SUBTRACT_MASK);
+    /* set up flags */
+    undoc = REG_A + moved;
+    REG_F = (REG_F & (CARRY_MASK | ZERO_MASK | SIGN_MASK)) 
+      | (undoc & UNDOC3_MASK) | ((undoc & 2) ? UNDOC5_MASK : 0);
 }
 
 static void do_ld_a_i()
 {
-    Uchar clear, set;
+    Uchar set;
 
-    clear = (Uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | OVERFLOW_MASK |
-		      SUBTRACT_MASK);
     set = 0;
 
     REG_A = REG_I;
@@ -976,15 +1002,13 @@ static void do_ld_a_i()
     if(z80_state.iff2)
       set |= OVERFLOW_MASK;
 
-    REG_F = (REG_F & clear) | set;
+    REG_F = (REG_F & CARRY_MASK) | (REG_A & (UNDOC3_MASK | UNDOC5_MASK)) | set;
 }
 
 static void do_ld_a_r()
 {
-    Uchar clear, set;
+    Uchar set;
 
-    clear = (Uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | OVERFLOW_MASK |
-		      SUBTRACT_MASK);
     set = 0;
 
     /* Fetch a random value. */
@@ -998,123 +1022,41 @@ static void do_ld_a_r()
     if(z80_state.iff2)
       set |= OVERFLOW_MASK;
 
-    REG_F = (REG_F & clear) | set;
+    REG_F = (REG_F & CARRY_MASK) | (REG_A & (UNDOC3_MASK | UNDOC5_MASK)) | set;
 }
 
+/* Completely new implementation adapted from yaze.
+   The old one was very wrong. */
 static void do_daa()
 {
-    /*
-     * The bizzare decimal-adjust-accumulator instruction....
-     */
-
-    int high_nibble, low_nibble, add, carry, subtract_flag;
-
-    high_nibble = REG_A >> 4;
-    low_nibble = REG_A & 0xf;
-    subtract_flag = SUBTRACT_FLAG;
-
-    if(subtract_flag == 0) /* add, adc, inc */
-    {
-	if(CARRY_FLAG == 0) /* no carry */
-	{
-	    if(HALF_CARRY_FLAG == 0) /* no half-carry */
-	    {
-		if(low_nibble < 10)
-		{
-		    if(high_nibble < 10)
-		    {
-			add = 0x00;  carry = 0;
-		    }
-		    else
-		    {
-			add = 0x60;  carry = 1;
-		    }
-		}
-		else
-		{
-		    if(high_nibble < 9)
-		    {
-			add = 0x06;  carry = 0;
-		    }
-		    else
-		    {
-			add = 0x66;  carry = 1;
-		    }
-		}
-	    }
-	    else /* half-carry */
-	    {
-		if(high_nibble < 10)
-		{
-		    add = 0x06;  carry = 0;
-		}
-		else
-		{
-		    add = 0x66;  carry = 1;
-		}
-	    }
-	}
-	else /* carry */
-	{
-	    if(HALF_CARRY_FLAG == 0) /* no half-carry */
-	    {
-		if(low_nibble < 10)
-		{
-		    add = 0x60;  carry = 1;
-		}
-		else
-		{
-		    add = 0x66;  carry = 1;
-		}
-	    }
-	    else /* half-carry */
-	    {
-		add = 0x66;  carry = 1;
-	    }
-	}
+  int a = REG_A, f = REG_F;
+  int alow = a & 0xf;  
+  int carry = f & CARRY_MASK;
+  int hcarry = f & HALF_CARRY_MASK;
+  if (f & SUBTRACT_MASK) {
+    int hd = carry || a > 0x99;
+    if (hcarry || alow > 9) {
+       if (alow > 5) hcarry = 0;
+       a = (a - 6) & 0xff;
+     }
+     if (hd) a -= 0x160;
+  } else {
+    if (hcarry || alow > 9) {
+      hcarry = alow > 9 ? HALF_CARRY_MASK : 0;
+      a += 6;
     }
-    else /* sub, sbc, dec, neg */
-    {
-	if(CARRY_FLAG == 0) /* no carry */
-	{
-	    if(HALF_CARRY_FLAG == 0) /* no half-carry */
-	    {
-		add = 0x00;  carry = 0;
-	    }
-	    else /* half-carry */
-	    {
-		add = 0xFA;  carry = 0;
-	    }
-	}
-	else /* carry */
-	{
-	    if(HALF_CARRY_FLAG == 0) /* no half-carry */
-	    {
-		add = 0xA0;  carry = 1;
-	    }
-	    else /* half-carry */
-	    {
-		add = 0x9A;  carry = 1;
-	    }
-	}
+    if (carry || ((a & 0x1f0) > 0x90)) {
+      a += 0x60;
     }
+  }
+  if (a & 0x100) carry = CARRY_MASK;
 
-    do_add_byte(add);  /* adjust the value */
-
-    if(parity(REG_A))  /* This seems odd -- is it a mistake? */
-      SET_PARITY();
-    else
-      CLEAR_PARITY();
-
-    if(subtract_flag)  /* leave the subtract flag intact (right?) */
-      SET_SUBTRACT();
-    else
-      CLEAR_SUBTRACT();
-
-    if(carry)
-      SET_CARRY();
-    else
-      CLEAR_CARRY();
+  REG_A = a = a & 0xff;
+  REG_F = ((a & 0x80) ? SIGN_MASK : 0)
+    | (a & (UNDOC3_MASK|UNDOC5_MASK))
+    | (a ? 0 : ZERO_MASK)
+    | (f & SUBTRACT_MASK)
+    | hcarry | (parity(a) ? PARITY_MASK : 0) | carry;
 }
 
 static void do_rld()
@@ -1123,10 +1065,8 @@ static void do_rld()
      * Rotate-left-decimal.
      */
     int old_value, new_value;
-    Uchar clear, set;
+    Uchar set;
 
-    clear = (Uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
-		      SUBTRACT_MASK);
     set = 0;
 
     old_value = mem_read(REG_HL);
@@ -1144,7 +1084,7 @@ static void do_rld()
     if(parity(REG_A))
       set |= PARITY_MASK;
 
-    REG_F = (REG_F & clear) | set;
+    REG_F = (REG_F & CARRY_MASK) | set | (REG_A & (UNDOC3_MASK | UNDOC5_MASK));
     mem_write(REG_HL,new_value);
 }
 
@@ -1154,10 +1094,8 @@ static void do_rrd()
      * Rotate-right-decimal.
      */
     int old_value, new_value;
-    Uchar clear, set;
+    Uchar set;
 
-    clear = (Uchar) ~(SIGN_MASK | ZERO_MASK | HALF_CARRY_MASK | PARITY_MASK |
-		      SUBTRACT_MASK);
     set = 0;
 
     old_value = mem_read(REG_HL);
@@ -1175,7 +1113,7 @@ static void do_rrd()
     if(parity(REG_A))
       set |= PARITY_MASK;
 
-    REG_F = (REG_F & clear) | set;
+    REG_F = (REG_F & CARRY_MASK) | set | (REG_A & (UNDOC3_MASK | UNDOC5_MASK));
     mem_write(REG_HL,new_value);
 }
 
@@ -1395,9 +1333,8 @@ static void do_nmi()
 }
 
 /*
- * Extended instructions which have 0xED as the first byte:
+ * Extended instructions which have 0xCB as the first byte:
  */
-
 static void do_CB_instruction()
 {
     Uchar instruction;
@@ -1407,197 +1344,197 @@ static void do_CB_instruction()
     switch(instruction)
     {
       case 0x47:	/* bit 0, a */
-	do_test_bit(REG_A, 0);  T_COUNT(8);
+	do_test_bit(instruction, REG_A, 0);  T_COUNT(8);
 	break;
       case 0x40:	/* bit 0, b */
-	do_test_bit(REG_B, 0);  T_COUNT(8);
+	do_test_bit(instruction, REG_B, 0);  T_COUNT(8);
 	break;
       case 0x41:	/* bit 0, c */
-	do_test_bit(REG_C, 0);  T_COUNT(8);
+	do_test_bit(instruction, REG_C, 0);  T_COUNT(8);
 	break;
       case 0x42:	/* bit 0, d */
-	do_test_bit(REG_D, 0);  T_COUNT(8);
+	do_test_bit(instruction, REG_D, 0);  T_COUNT(8);
 	break;
       case 0x43:	/* bit 0, e */
-	do_test_bit(REG_E, 0);  T_COUNT(8);
+	do_test_bit(instruction, REG_E, 0);  T_COUNT(8);
 	break;
       case 0x44:	/* bit 0, h */
-	do_test_bit(REG_H, 0);  T_COUNT(8);
+	do_test_bit(instruction, REG_H, 0);  T_COUNT(8);
 	break;
       case 0x45:	/* bit 0, l */
-	do_test_bit(REG_L, 0);  T_COUNT(8);
+	do_test_bit(instruction, REG_L, 0);  T_COUNT(8);
 	break;
       case 0x4F:	/* bit 1, a */
-	do_test_bit(REG_A, 1);  T_COUNT(8);
+	do_test_bit(instruction, REG_A, 1);  T_COUNT(8);
 	break;
       case 0x48:	/* bit 1, b */
-	do_test_bit(REG_B, 1);  T_COUNT(8);
+	do_test_bit(instruction, REG_B, 1);  T_COUNT(8);
 	break;
       case 0x49:	/* bit 1, c */
-	do_test_bit(REG_C, 1);  T_COUNT(8);
+	do_test_bit(instruction, REG_C, 1);  T_COUNT(8);
 	break;
       case 0x4A:	/* bit 1, d */
-	do_test_bit(REG_D, 1);  T_COUNT(8);
+	do_test_bit(instruction, REG_D, 1);  T_COUNT(8);
 	break;
       case 0x4B:	/* bit 1, e */
-	do_test_bit(REG_E, 1);  T_COUNT(8);
+	do_test_bit(instruction, REG_E, 1);  T_COUNT(8);
 	break;
       case 0x4C:	/* bit 1, h */
-	do_test_bit(REG_H, 1);  T_COUNT(8);
+	do_test_bit(instruction, REG_H, 1);  T_COUNT(8);
 	break;
       case 0x4D:	/* bit 1, l */
-	do_test_bit(REG_L, 1);  T_COUNT(8);
+	do_test_bit(instruction, REG_L, 1);  T_COUNT(8);
 	break;
       case 0x57:	/* bit 2, a */
-	do_test_bit(REG_A, 2);  T_COUNT(8);
+	do_test_bit(instruction, REG_A, 2);  T_COUNT(8);
 	break;
       case 0x50:	/* bit 2, b */
-	do_test_bit(REG_B, 2);  T_COUNT(8);
+	do_test_bit(instruction, REG_B, 2);  T_COUNT(8);
 	break;
       case 0x51:	/* bit 2, c */
-	do_test_bit(REG_C, 2);  T_COUNT(8);
+	do_test_bit(instruction, REG_C, 2);  T_COUNT(8);
 	break;
       case 0x52:	/* bit 2, d */
-	do_test_bit(REG_D, 2);  T_COUNT(8);
+	do_test_bit(instruction, REG_D, 2);  T_COUNT(8);
 	break;
       case 0x53:	/* bit 2, e */
-	do_test_bit(REG_E, 2);  T_COUNT(8);
+	do_test_bit(instruction, REG_E, 2);  T_COUNT(8);
 	break;
       case 0x54:	/* bit 2, h */
-	do_test_bit(REG_H, 2);  T_COUNT(8);
+	do_test_bit(instruction, REG_H, 2);  T_COUNT(8);
 	break;
       case 0x55:	/* bit 2, l */
-	do_test_bit(REG_L, 2);  T_COUNT(8);
+	do_test_bit(instruction, REG_L, 2);  T_COUNT(8);
 	break;
       case 0x5F:	/* bit 3, a */
-	do_test_bit(REG_A, 3);  T_COUNT(8);
+	do_test_bit(instruction, REG_A, 3);  T_COUNT(8);
 	break;
       case 0x58:	/* bit 3, b */
-	do_test_bit(REG_B, 3);  T_COUNT(8);
+	do_test_bit(instruction, REG_B, 3);  T_COUNT(8);
 	break;
       case 0x59:	/* bit 3, c */
-	do_test_bit(REG_C, 3);  T_COUNT(8);
+	do_test_bit(instruction, REG_C, 3);  T_COUNT(8);
 	break;
       case 0x5A:	/* bit 3, d */
-	do_test_bit(REG_D, 3);  T_COUNT(8);
+	do_test_bit(instruction, REG_D, 3);  T_COUNT(8);
 	break;
       case 0x5B:	/* bit 3, e */
-	do_test_bit(REG_E, 3);  T_COUNT(8);
+	do_test_bit(instruction, REG_E, 3);  T_COUNT(8);
 	break;
       case 0x5C:	/* bit 3, h */
-	do_test_bit(REG_H, 3);  T_COUNT(8);
+	do_test_bit(instruction, REG_H, 3);  T_COUNT(8);
 	break;
       case 0x5D:	/* bit 3, l */
-	do_test_bit(REG_L, 3);  T_COUNT(8);
+	do_test_bit(instruction, REG_L, 3);  T_COUNT(8);
 	break;
       case 0x67:	/* bit 4, a */
-	do_test_bit(REG_A, 4);  T_COUNT(8);
+	do_test_bit(instruction, REG_A, 4);  T_COUNT(8);
 	break;
       case 0x60:	/* bit 4, b */
-	do_test_bit(REG_B, 4);  T_COUNT(8);
+	do_test_bit(instruction, REG_B, 4);  T_COUNT(8);
 	break;
       case 0x61:	/* bit 4, c */
-	do_test_bit(REG_C, 4);  T_COUNT(8);
+	do_test_bit(instruction, REG_C, 4);  T_COUNT(8);
 	break;
       case 0x62:	/* bit 4, d */
-	do_test_bit(REG_D, 4);  T_COUNT(8);
+	do_test_bit(instruction, REG_D, 4);  T_COUNT(8);
 	break;
       case 0x63:	/* bit 4, e */
-	do_test_bit(REG_E, 4);  T_COUNT(8);
+	do_test_bit(instruction, REG_E, 4);  T_COUNT(8);
 	break;
       case 0x64:	/* bit 4, h */
-	do_test_bit(REG_H, 4);  T_COUNT(8);
+	do_test_bit(instruction, REG_H, 4);  T_COUNT(8);
 	break;
       case 0x65:	/* bit 4, l */
-	do_test_bit(REG_L, 4);  T_COUNT(8);
+	do_test_bit(instruction, REG_L, 4);  T_COUNT(8);
 	break;
       case 0x6F:	/* bit 5, a */
-	do_test_bit(REG_A, 5);  T_COUNT(8);
+	do_test_bit(instruction, REG_A, 5);  T_COUNT(8);
 	break;
       case 0x68:	/* bit 5, b */
-	do_test_bit(REG_B, 5);  T_COUNT(8);
+	do_test_bit(instruction, REG_B, 5);  T_COUNT(8);
 	break;
       case 0x69:	/* bit 5, c */
-	do_test_bit(REG_C, 5);  T_COUNT(8);
+	do_test_bit(instruction, REG_C, 5);  T_COUNT(8);
 	break;
       case 0x6A:	/* bit 5, d */
-	do_test_bit(REG_D, 5);  T_COUNT(8);
+	do_test_bit(instruction, REG_D, 5);  T_COUNT(8);
 	break;
       case 0x6B:	/* bit 5, e */
-	do_test_bit(REG_E, 5);  T_COUNT(8);
+	do_test_bit(instruction, REG_E, 5);  T_COUNT(8);
 	break;
       case 0x6C:	/* bit 5, h */
-	do_test_bit(REG_H, 5);  T_COUNT(8);
+	do_test_bit(instruction, REG_H, 5);  T_COUNT(8);
 	break;
       case 0x6D:	/* bit 5, l */
-	do_test_bit(REG_L, 5);  T_COUNT(8);
+	do_test_bit(instruction, REG_L, 5);  T_COUNT(8);
 	break;
       case 0x77:	/* bit 6, a */
-	do_test_bit(REG_A, 6);  T_COUNT(8);
+	do_test_bit(instruction, REG_A, 6);  T_COUNT(8);
 	break;
       case 0x70:	/* bit 6, b */
-	do_test_bit(REG_B, 6);  T_COUNT(8);
+	do_test_bit(instruction, REG_B, 6);  T_COUNT(8);
 	break;
       case 0x71:	/* bit 6, c */
-	do_test_bit(REG_C, 6);  T_COUNT(8);
+	do_test_bit(instruction, REG_C, 6);  T_COUNT(8);
 	break;
       case 0x72:	/* bit 6, d */
-	do_test_bit(REG_D, 6);  T_COUNT(8);
+	do_test_bit(instruction, REG_D, 6);  T_COUNT(8);
 	break;
       case 0x73:	/* bit 6, e */
-	do_test_bit(REG_E, 6);  T_COUNT(8);
+	do_test_bit(instruction, REG_E, 6);  T_COUNT(8);
 	break;
       case 0x74:	/* bit 6, h */
-	do_test_bit(REG_H, 6);  T_COUNT(8);
+	do_test_bit(instruction, REG_H, 6);  T_COUNT(8);
 	break;
       case 0x75:	/* bit 6, l */
-	do_test_bit(REG_L, 6);  T_COUNT(8);
+	do_test_bit(instruction, REG_L, 6);  T_COUNT(8);
 	break;
       case 0x7F:	/* bit 7, a */
-	do_test_bit(REG_A, 7);  T_COUNT(8);
+	do_test_bit(instruction, REG_A, 7);  T_COUNT(8);
 	break;
       case 0x78:	/* bit 7, b */
-	do_test_bit(REG_B, 7);  T_COUNT(8);
+	do_test_bit(instruction, REG_B, 7);  T_COUNT(8);
 	break;
       case 0x79:	/* bit 7, c */
-	do_test_bit(REG_C, 7);  T_COUNT(8);
+	do_test_bit(instruction, REG_C, 7);  T_COUNT(8);
 	break;
       case 0x7A:	/* bit 7, d */
-	do_test_bit(REG_D, 7);  T_COUNT(8);
+	do_test_bit(instruction, REG_D, 7);  T_COUNT(8);
 	break;
       case 0x7B:	/* bit 7, e */
-	do_test_bit(REG_E, 7);  T_COUNT(8);
+	do_test_bit(instruction, REG_E, 7);  T_COUNT(8);
 	break;
       case 0x7C:	/* bit 7, h */
-	do_test_bit(REG_H, 7);  T_COUNT(8);
+	do_test_bit(instruction, REG_H, 7);  T_COUNT(8);
 	break;
       case 0x7D:	/* bit 7, l */
-	do_test_bit(REG_L, 7);  T_COUNT(8);
+	do_test_bit(instruction, REG_L, 7);  T_COUNT(8);
 	break;
 	
       case 0x46:	/* bit 0, (hl) */
-	do_test_bit(mem_read(REG_HL), 0);  T_COUNT(12);
+	do_test_bit(instruction, mem_read(REG_HL), 0);  T_COUNT(12);
 	break;
       case 0x4E:	/* bit 1, (hl) */
-	do_test_bit(mem_read(REG_HL), 1);  T_COUNT(12);
+	do_test_bit(instruction, mem_read(REG_HL), 1);  T_COUNT(12);
 	break;
       case 0x56:	/* bit 2, (hl) */
-	do_test_bit(mem_read(REG_HL), 2);  T_COUNT(12);
+	do_test_bit(instruction, mem_read(REG_HL), 2);  T_COUNT(12);
 	break;
       case 0x5E:	/* bit 3, (hl) */
-	do_test_bit(mem_read(REG_HL), 3);  T_COUNT(12);
+	do_test_bit(instruction, mem_read(REG_HL), 3);  T_COUNT(12);
 	break;
       case 0x66:	/* bit 4, (hl) */
-	do_test_bit(mem_read(REG_HL), 4);  T_COUNT(12);
+	do_test_bit(instruction, mem_read(REG_HL), 4);  T_COUNT(12);
 	break;
       case 0x6E:	/* bit 5, (hl) */
-	do_test_bit(mem_read(REG_HL), 5);  T_COUNT(12);
+	do_test_bit(instruction, mem_read(REG_HL), 5);  T_COUNT(12);
 	break;
       case 0x76:	/* bit 6, (hl) */
-	do_test_bit(mem_read(REG_HL), 6);  T_COUNT(12);
+	do_test_bit(instruction, mem_read(REG_HL), 6);  T_COUNT(12);
 	break;
       case 0x7E:	/* bit 7, (hl) */
-	do_test_bit(mem_read(REG_HL), 7);  T_COUNT(12);
+	do_test_bit(instruction, mem_read(REG_HL), 7);  T_COUNT(12);
 	break;
 
       case 0x87:	/* res 0, a */
@@ -2195,6 +2132,9 @@ static void do_CB_instruction()
 }
 
 
+/*
+ * Extended instructions which have 0xDD or 0xFD as the first byte:
+ */
 static void do_indexed_instruction(Ushort *ixp)
 {
     Uchar instruction;
@@ -2420,35 +2360,35 @@ static void do_indexed_instruction(Ushort *ixp)
 	  switch(sub_instruction)
 	  {
 	    case 0x46:	/* bit 0, (ix + offset) */
-	      do_test_bit(mem_read((*ixp + offset) & 0xffff), 0);
+	      do_test_bit(sub_instruction, mem_read((*ixp + offset) & 0xffff), 0);
 	      T_COUNT(20);
 	      break;
 	    case 0x4E:	/* bit 1, (ix + offset) */
-	      do_test_bit(mem_read((*ixp + offset) & 0xffff), 1);
+	      do_test_bit(sub_instruction, mem_read((*ixp + offset) & 0xffff), 1);
 	      T_COUNT(20);
 	      break;
 	    case 0x56:	/* bit 2, (ix + offset) */
-	      do_test_bit(mem_read((*ixp + offset) & 0xffff), 2);
+	      do_test_bit(sub_instruction, mem_read((*ixp + offset) & 0xffff), 2);
 	      T_COUNT(20);
 	      break;
 	    case 0x5E:	/* bit 3, (ix + offset) */
-	      do_test_bit(mem_read((*ixp + offset) & 0xffff), 3);
+	      do_test_bit(sub_instruction, mem_read((*ixp + offset) & 0xffff), 3);
 	      T_COUNT(20);
 	      break;
 	    case 0x66:	/* bit 4, (ix + offset) */
-	      do_test_bit(mem_read((*ixp + offset) & 0xffff), 4);
+	      do_test_bit(sub_instruction, mem_read((*ixp + offset) & 0xffff), 4);
 	      T_COUNT(20);
 	      break;
 	    case 0x6E:	/* bit 5, (ix + offset) */
-	      do_test_bit(mem_read((*ixp + offset) & 0xffff), 5);
+	      do_test_bit(sub_instruction, mem_read((*ixp + offset) & 0xffff), 5);
 	      T_COUNT(20);
 	      break;
 	    case 0x76:	/* bit 6, (ix + offset) */
-	      do_test_bit(mem_read((*ixp + offset) & 0xffff), 6);
+	      do_test_bit(sub_instruction, mem_read((*ixp + offset) & 0xffff), 6);
 	      T_COUNT(20);
 	      break;
 	    case 0x7E:	/* bit 7, (ix + offset) */
-	      do_test_bit(mem_read((*ixp + offset) & 0xffff), 7);
+	      do_test_bit(sub_instruction, mem_read((*ixp + offset) & 0xffff), 7);
 	      T_COUNT(20);
 	      break;
 
@@ -2739,6 +2679,9 @@ static void do_indexed_instruction(Ushort *ixp)
 }
 
 
+/*
+ * Extended instructions which have 0xED as the first byte:
+ */
 static void do_ED_instruction()
 {
     Uchar instruction;
@@ -3084,6 +3027,7 @@ int z80_run(int continuous)
     Uchar instruction;
     Ushort address; /* generic temps */
     int ret = 0;
+    int i;
 
     /* loop to do a z80 instruction */
     do {
@@ -3098,8 +3042,7 @@ int z80_run(int continuous)
 	x_poll_count--;
 #endif
         /* Speed control */
-        if (z80_state.delay) {
-	    int i = z80_state.delay;
+        if ((i = z80_state.delay)) {
 	    while (--i) /*nothing*/;
 	}
 
@@ -3348,7 +3291,10 @@ int z80_run(int continuous)
 	    
 	    
 	  case 0x3F:	/* ccf */
-	    REG_F = (REG_F ^ CARRY_MASK) & ~SUBTRACT_MASK;
+	    REG_F = (REG_F & (ZERO_MASK|PARITY_MASK|SIGN_MASK))
+	      | (~REG_F & CARRY_MASK)
+	      | ((REG_F & CARRY_MASK) ? HALF_CARRY_MASK : 0)
+	      | (REG_A & (UNDOC3_MASK|UNDOC5_MASK));
 	    T_COUNT(4);
 	    break;
 	    
@@ -3382,7 +3328,9 @@ int z80_run(int continuous)
 	    
 	  case 0x2F:	/* cpl */
 	    REG_A = ~REG_A;
-	    REG_F |= (HALF_CARRY_MASK | SUBTRACT_MASK);
+	    REG_F = (REG_F & (CARRY_MASK|PARITY_MASK|ZERO_MASK|SIGN_MASK))
+	      | (HALF_CARRY_MASK|SUBTRACT_MASK)
+	      | (REG_A & (UNDOC3_MASK|UNDOC5_MASK));
 	    T_COUNT(4);
 	    break;
 
@@ -3523,7 +3471,8 @@ int z80_run(int continuous)
 		/* Really halt (i.e., wait for interrupt) */
 		if (continuous > 0 &&
 		    !(z80_state.nmi && !z80_state.nmi_seen) &&
-		    !(z80_state.irq && z80_state.iff1)) {
+		    !(z80_state.irq && z80_state.iff1) &&
+		    !trs_is_event_scheduled()) {
 		    trs_paused = 1;
 		    pause();
 		}
@@ -4283,7 +4232,9 @@ int z80_run(int continuous)
 	    break;
 	    
 	  case 0x37:	/* scf */
-	    REG_F = (REG_F | CARRY_MASK) & ~(SUBTRACT_MASK | HALF_CARRY_MASK);
+	    REG_F = (REG_F & (ZERO_FLAG|PARITY_FLAG|SIGN_FLAG))
+	      | CARRY_MASK
+	      | (REG_A & (UNDOC3_MASK|UNDOC5_MASK));
 	    T_COUNT(4);
 	    break;
 	    

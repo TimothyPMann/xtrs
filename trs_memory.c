@@ -523,16 +523,17 @@ Uchar *mem_pointer(int address, int writing)
 /*
  * Block move instructions, for LDIR and LDDR instructions.
  *
- * Direction is either +1 or -1.
+ * Direction is either +1 or -1.  
  *
  * Note that a count of zero => move 64K bytes.
  *
  * These can be special cased to do fun stuff like fast
  * video scrolling.
  */
-void
+int
 mem_block_transfer(Ushort dest, Ushort source, int direction, Ushort count)
 {
+    int ret;
     /* special case for screen scroll */
     if(trs_model <= 3 &&
        (dest == VIDEO_START) && (source == VIDEO_START + 0x40) &&
@@ -542,7 +543,7 @@ mem_block_transfer(Ushort dest, Ushort source, int direction, Ushort count)
 	video_scroll();
 
 	do
-	  memory[dest++] = memory[source++];
+	  memory[dest++] = ret = memory[source++];
 	while(count--);
     }
     else
@@ -553,7 +554,7 @@ mem_block_transfer(Ushort dest, Ushort source, int direction, Ushort count)
 	{
 	    do
 	    {
-		mem_write(dest++, mem_read(source++));
+		mem_write(dest++, ret = mem_read(source++));
 		count--;
 	    }
 	    while(count);
@@ -562,7 +563,7 @@ mem_block_transfer(Ushort dest, Ushort source, int direction, Ushort count)
 	{
 	    do
 	    {
-		mem_write(dest--, mem_read(source--));
+		mem_write(dest--, ret = mem_read(source--));
 		count--;
 	    }
 	    while(count);
@@ -570,4 +571,6 @@ mem_block_transfer(Ushort dest, Ushort source, int direction, Ushort count)
 
 	uncache_video_writes();
     }
+    return ret;
 }
+
