@@ -231,20 +231,22 @@ void clear_key_queue()
 {
   key_queue_head = 0;
   key_queue_entries = 0;
+#if QDEBUG
+    debug("clear_key_queue\n");
+#endif
 }
 
 void queue_key(int state)
 {
   key_queue[(key_queue_head + key_queue_entries) % KEY_QUEUE_SIZE] = state;
 #if QDEBUG
-  debug("queue_key 0x%x", state);
+  debug("queue_key 0x%x\n", state);
 #endif
   if (key_queue_entries < KEY_QUEUE_SIZE) {
     key_queue_entries++;
-#if QDEBUG
-    debug("\n");
   } else {
-    debug(" (overflow)\n");
+#if QDEBUG
+    debug("queue_key overflow\n");
 #endif
   }
 }
