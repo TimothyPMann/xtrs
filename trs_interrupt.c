@@ -36,9 +36,9 @@ static unsigned char nmi_mask = M3_RESET_BIT;
 #define TIMER_HZ_4 60
 static int timer_hz;
 
-#define CLOCK_MHZ_1 1.774
-#define CLOCK_MHZ_3 2.017 /*!! is this right? */
-#define CLOCK_MHZ_4 4.034 /*!! is this right? */
+#define CLOCK_MHZ_1 1.77408
+#define CLOCK_MHZ_3 2.02752
+#define CLOCK_MHZ_4 4.05504
 
 /* Kludge: LDOS hides the date (not time) in a memory area across reboots. */
 /* We put it there on powerup, so LDOS magically knows the date! */
