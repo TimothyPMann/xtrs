@@ -425,7 +425,7 @@ SETTIME/CMD reads the date and time from Unix and sets the TRS-80
 DOS's date and time accordingly.
 
 The next several programs were written in Misosys C and exist in two
-versions on utility.dsk.  The version one whose name ends in "6" runs
+versions on utility.dsk.  The one whose name ends in "6" runs
 on Model 4 TRSDOS/LS-DOS 6.x; the other runs on LDOS 5.x and most
 other Model I/III operating systems.
 
