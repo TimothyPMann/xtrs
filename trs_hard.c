@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Sun May 14 21:30:57 PDT 2000 by mann */
+/* Last modified on Wed May 17 23:33:39 PDT 2000 by mann */
 
 /*
  * Emulation of the Radio Shack TRS-80 Model I/III/4/4P
@@ -14,9 +14,14 @@
  */
 
 #include <errno.h>
+#include <string.h>
 #include "trs.h"
 #include "trs_hard.h"
 #include "reed.h"
+
+#define HARDDEBUG1 1  /* show detail on all port i/o */
+#define HARDDEBUG2 1  /* show all commands */
+#define HARDDEBUG3 1  /* show failure to open a drive */
 
 /* Private types and data */
 
@@ -32,6 +37,9 @@ typedef struct {
 
 /* Structure describing controller state */
 typedef struct {
+  /* Controller present?  Yes if we have any drives, no if none */
+  int present;
+
   /* Controller register images */
   Uchar control;
   Uchar data;
@@ -64,9 +72,10 @@ static void hard_format(int cmd);
 static void hard_init(int cmd);
 static void hard_seek(int cmd);
 static int open_drive(int drive);
-static int find_sector();
+static int find_sector(int newstatus);
 static int open_drive(int n);
 static void set_dir_cyl(int cyl);
+static void hard_done(int cmd);
 
 /* Powerup or reset button */
 void trs_hard_init(int reset_button)
@@ -80,7 +89,7 @@ void trs_hard_init(int reset_button)
   state.cyl = 0;
   state.drive = 0;
   state.head = 0;
-  state.status = TRS_HARD_READY;
+  state.status = 0;
   state.command = 0;
   for (i=0; i<TRS_HARD_MAXDRIVES; i++) {
     if (state.d[i].file) {
@@ -97,49 +106,78 @@ void trs_hard_init(int reset_button)
 /* Read from an I/O port mapped to the controller */
 int trs_hard_in(int port)
 {
-  switch (port) {
-  case TRS_HARD_WP: {
-    int i, v;
-    v = 0;
-    for (i=0; i<TRS_HARD_MAXDRIVES; i++) {
-      open_drive(i);
-      if (state.d[i].writeprot) {
-	v |= TRS_HARD_WPBIT(i);
+  int v;
+  if (state.present) {
+    switch (port) {
+    case TRS_HARD_WP: {
+      int i;
+      v = 0;
+      for (i=0; i<TRS_HARD_MAXDRIVES; i++) {
+	open_drive(i);
+	if (state.d[i].writeprot) {
+	  v |= TRS_HARD_WPBIT(i);
+	}
       }
+      break; }
+    case TRS_HARD_CONTROL:
+      v = state.control;
+      break;
+    case TRS_HARD_DATA:
+      v = hard_data_in();
+      break;
+    case TRS_HARD_ERROR:
+      v = state.error;
+      break;
+    case TRS_HARD_SECCNT:
+      v = state.seccnt;
+      break;
+    case TRS_HARD_SECNUM:
+      v = state.secnum;
+      break;
+    case TRS_HARD_CYLLO:
+      v = state.cyl & 0xff;
+      break;
+    case TRS_HARD_CYLHI:
+      v = (state.cyl >> 8) & 0xff;
+      break;
+    case TRS_HARD_SDH:
+      v = (state.drive << 3) | state.head;
+      break;
+    case TRS_HARD_STATUS:
+      v = state.status;
+      break;
+    default:
+      v = 0xff;
+      break;
     }
-    return v; }
-  case TRS_HARD_CONTROL:
-    return state.control;
-  case TRS_HARD_DATA:
-    return hard_data_in();
-  case TRS_HARD_ERROR:
-    return state.error;
-  case TRS_HARD_SECCNT:
-    return state.seccnt;
-  case TRS_HARD_SECNUM:
-    return state.secnum;
-  case TRS_HARD_CYLLO:
-    return state.cyl & 0xff;
-  case TRS_HARD_CYLHI:
-    return (state.cyl >> 8) & 0xff;
-  case TRS_HARD_SDH:
-    return (state.drive << 3) | state.head;
-  case TRS_HARD_STATUS:
-    return state.status;
-  default:
-    return 0xff;
+  } else {
+    v = 0xff;
   }
+#if HARDDEBUG1
+  fprintf(stderr, "%02x -> %02x\n", port, v);
+#endif  
+  return v;
 }
 
 /* Write to an I/O port mapped to the controller */
 void trs_hard_out(int port, int value)
 {
+#if HARDDEBUG1
+  fprintf(stderr, "%02x <- %02x\n", port, value);
+#endif  
   switch (port) {
   case TRS_HARD_WP:
     break;
   case TRS_HARD_CONTROL:
     if (value & TRS_HARD_SOFTWARE_RESET) {
       trs_hard_init(1);
+    }
+    if (value & TRS_HARD_DEVICE_ENABLE) {
+      int i;
+      state.present = 0;
+      for (i=0; i<TRS_HARD_MAXDRIVES; i++) {
+	if (open_drive(i)) state.present = 1;
+      }
     }
     state.control = value;
     break;
@@ -162,16 +200,29 @@ void trs_hard_out(int port, int value)
     break;
   case TRS_HARD_SDH:
     if (value & TRS_HARD_SIZEMASK) {
-      error("trs_hard: size bits set to nonzero value (%d)",
+      error("trs_hard: size bits set to nonzero value (0x%02x)",
 	    value & TRS_HARD_SIZEMASK);
     }
     state.drive = (value & TRS_HARD_DRIVEMASK) >> TRS_HARD_DRIVESHIFT;
     state.head = (value & TRS_HARD_HEADMASK) >> TRS_HARD_HEADSHIFT;
+#if 0
+    if (!open_drive(state.drive)) state.status = 0;
+#else
+    /* Ready but perhaps not able... */
+    state.status = TRS_HARD_READY;
+#endif
     break;
 
   case TRS_HARD_COMMAND:
     state.bytesdone = 0;
     state.command = value;
+    if (trs_event_scheduled() == hard_done) {
+      trs_do_event();
+    }
+    if (!open_drive(state.drive)) {
+      /*state.status = 0;*/
+      break;
+    }
     switch (value & TRS_HARD_CMDMASK) {
     default:
       error("trs_hard: unknown command 0x%02x", value);
@@ -205,48 +256,63 @@ void trs_hard_out(int port, int value)
   }
 }
 
-void hard_restore(int cmd)
+static void hard_restore(int cmd)
 {
+#if HARDDEBUG2
+  fprintf(stderr, "hard_restore drive %d\n", state.drive);
+#endif
   state.cyl = 0;
   /*!! should anything else be zeroed? */
-  state.status = TRS_HARD_READY;
+  state.status = TRS_HARD_SEEKING;
+  trs_schedule_event(hard_done, TRS_HARD_READY,
+		     1000 * z80_state.clockMHz);
 }
 
-void hard_read(int cmd)
+static void hard_read(int cmd)
 {
+#if HARDDEBUG2
+  fprintf(stderr, "hard_read drive %d cyl %d hd %d sec %d\n",
+	  state.drive, state.cyl, state.head, state.secnum);
+#endif
   if (cmd & TRS_HARD_DMA) {
     error("trs_hard: dma read not supported (0x%02x)", cmd);
-    state.status = TRS_HARD_ERR;
+    state.status = TRS_HARD_READY | TRS_HARD_ERR;
     state.error = TRS_HARD_ABRTERR;
     return;
   }
-  if (find_sector()) {
-    state.status = TRS_HARD_READY | TRS_HARD_DRQ;
-  }
+  find_sector(TRS_HARD_READY | TRS_HARD_DRQ);
 }
 
-void hard_write(int cmd)
+static void hard_write(int cmd)
 {
+#if HARDDEBUG2
+  fprintf(stderr, "hard_write drive %d cyl %d hd %d sec %d\n",
+	  state.drive, state.cyl, state.head, state.secnum);
+#endif
   if (cmd & TRS_HARD_DMA) {
     error("trs_hard: dma write not supported (0x%02x)", cmd);
-    state.status = TRS_HARD_ERR;
+    state.status = TRS_HARD_READY | TRS_HARD_ERR;
     state.error = TRS_HARD_ABRTERR;
     return;
   }
-  if (find_sector()) {
-    state.status = TRS_HARD_READY | TRS_HARD_DRQ;
-  }
+  find_sector(TRS_HARD_READY | TRS_HARD_DRQ);
 }
 
-void hard_verify(int cmd)
+static void hard_verify(int cmd)
 {
-  if (find_sector()) {
-    state.status = TRS_HARD_READY;
-  }
+#if HARDDEBUG2
+  fprintf(stderr, "hard_verify drive %d cyl %d hd %d sec %d\n",
+	  state.drive, state.cyl, state.head, state.secnum);
+#endif
+  find_sector(TRS_HARD_READY);
 }
 
-void hard_format(int cmd)
+static void hard_format(int cmd)
 {
+#if HARDDEBUG2
+  fprintf(stderr, "hard_format drive %d cyl %d hd %d\n",
+	  state.drive, state.cyl, state.head);
+#endif
   if (state.seccnt != TRS_HARD_SEC_PER_TRK) {
     error("trs_hard: can only do %d sectors/track, not %d",
 	  TRS_HARD_SEC_PER_TRK, state.seccnt);
@@ -259,20 +325,25 @@ void hard_format(int cmd)
   state.status = TRS_HARD_READY;
 }
 
-void hard_init(int cmd)
+static void hard_init(int cmd)
 {
+#if HARDDEBUG2
+  fprintf(stderr, "hard_init drive %d cyl %d hd %d sec %d\n",
+	  state.drive, state.cyl, state.head, state.secnum);
+#endif
   /* I don't know what this command does */
   error("trs_hard: init command (0x%02x) not implemented", cmd);
   state.status = TRS_HARD_READY;
 }
 
-void hard_seek(int cmd)
+static void hard_seek(int cmd)
 {
-  if (find_sector()) {
-    state.status = TRS_HARD_READY;
-  }
+#if HARDDEBUG2
+  fprintf(stderr, "hard_seek drive %d cyl %d hd %d sec %d\n",
+	  state.drive, state.cyl, state.head, state.secnum);
+#endif
+  find_sector(TRS_HARD_READY);
 }
-
 
 /* 
  * 1) Make sure the file for the current drive is open.  If the file
@@ -283,9 +354,9 @@ void hard_seek(int cmd)
  *
  * 3) Return 1 if all OK.
  */
-int open_drive(int drive)
+static int open_drive(int drive)
 {
-  Drive *d = &state.d[state.drive];
+  Drive *d = &state.d[drive];
   char diskname[1024];
   ReedHardHeader rhh;
   size_t res;
@@ -294,9 +365,9 @@ int open_drive(int drive)
 
   /* Compute the filename */
   if (trs_model == 5) {
-    sprintf(diskname, "%s/hard4p-%d", trs_disk_dir, state.drive);
+    sprintf(diskname, "%s/hard4p-%d", trs_disk_dir, drive);
   } else {
-    sprintf(diskname, "%s/hard%d-%d", trs_disk_dir, trs_model, state.drive);
+    sprintf(diskname, "%s/hard%d-%d", trs_disk_dir, trs_model, drive);
   }
 
   /* First try opening for reading and writing */
@@ -305,6 +376,10 @@ int open_drive(int drive)
     /* No luck, try for reading only */
     d->file = fopen(diskname, "r");
     if (d->file == NULL) {
+#if HARDDEBUG3
+      error("trs_hard: could not open hard drive image %s: %s",
+	    diskname, strerror(errno));
+#endif
       goto fail;
     }
     d->writeprot = 1;
@@ -336,12 +411,13 @@ int open_drive(int drive)
     goto fail;
   }
 
+  state.status = TRS_HARD_READY;
   return 1;
 
  fail:
   if (d->file) fclose(d->file);
   d->file = NULL;
-  state.status = TRS_HARD_ERR;
+  state.status = TRS_HARD_READY | TRS_HARD_ERR;
   state.error = TRS_HARD_NFERR;
   return 0;
 }    
@@ -349,16 +425,21 @@ int open_drive(int drive)
 /*
  * Check whether the current position is in bounds for the geometry.
  * If not, return 0 and set the controller error status.  If so, fseek
- * the file to the start of the current sector and return 1. 
+ * the file to the start of the current sector, return 1, set the
+ * controller status to "seeking" for 50 us, and set the controller
+ * status to newstatus after that.  (The Model 4P boot ROM device
+ * driver needs the brief "seeking" status after every command, sigh.)
  */
-int find_sector()
+static int find_sector(int newstatus)
 {
   Drive *d = &state.d[state.drive];
   if (open_drive(state.drive) == 0) return 0;
   if (/**state.cyl >= d->cyls ||**/ /* ignore this limit */
       state.head >= d->heads ||
-      state.secnum >= d->secs) {
-    state.status = TRS_HARD_ERR;
+      state.secnum > d->secs /* allow 0-origin or 1-origin */ ) {
+    error("trs_hard: requested cyl %d hd %d sec %d; max cyl %d hd %d sec %d\n",
+	  state.cyl, state.head, state.secnum, d->cyls, d->heads, d->secs);
+    state.status = TRS_HARD_READY | TRS_HARD_ERR;
     state.error = TRS_HARD_NFERR;
     return 0;
   }
@@ -366,12 +447,14 @@ int find_sector()
 	sizeof(ReedHardHeader) +
 	TRS_HARD_SECSIZE * (state.cyl * d->heads * d->secs +
 			    state.head * d->secs +
-			    state.secnum),
+			    (state.secnum % d->secs)),
 	0);
+  trs_schedule_event(hard_done, newstatus, 50 * z80_state.clockMHz);
+  state.status = TRS_HARD_SEEKING;
   return 1;
 }
 
-int hard_data_in()
+static int hard_data_in()
 {
   Drive *d = &state.d[state.drive];
   if ((state.command & TRS_HARD_CMDMASK) == TRS_HARD_READ &&
@@ -384,7 +467,7 @@ int hard_data_in()
   return state.data;
 }
 
-void hard_data_out(int value)
+static void hard_data_out(int value)
 {
   Drive *d = &state.d[state.drive];
   int res = 0;
@@ -405,7 +488,7 @@ void hard_data_out(int value)
   }
   if (res == EOF) {
     error("trs_hard: errno %d while writing drive %d", errno, state.drive);
-    state.status = TRS_HARD_ERR;
+    state.status = TRS_HARD_READY | TRS_HARD_ERR;
     state.error = TRS_HARD_DATAERR; /* arbitrary choice */
   }
 }
@@ -414,11 +497,19 @@ void hard_data_out(int value)
    header.  This value is only needed by the Reed emulator itself, and
    we would like xtrs to set it automatically so that the user doesn't
    have to know about it. */
-void set_dir_cyl(int cyl)
+static void set_dir_cyl(int cyl)
 {
   Drive *d = &state.d[state.drive];
   long where = ftell(d->file);
   fseek(d->file, 31, 0);
   putc(cyl, d->file);
   fseek(d->file, where, 0);
+}
+
+static void hard_done(int newstatus)
+{
+#if HARDDEBUG2
+  /** fprintf(stderr, "hard_done newstatus %02x\n", newstatus); **/
+#endif
+  state.status = newstatus;
 }
