@@ -15,14 +15,12 @@
 
 #include "z80.h"
 
-void error(string)
-    char *string;
+void error(char *string)
 {
     fprintf(stderr, "xtrs error: %s\n", string);
 }
 
-void fatal(string)
-    char *string;
+void fatal(char *string)
 {
     fprintf(stderr, "xtrs fatal error: %s\n", string);
     exit(1);

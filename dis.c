@@ -2064,8 +2064,7 @@ static struct opcode minor[6][256] = {
 	undefined,		A_0,		/* fdcbff */
 };
 
-int disassemble(pc)
-    unsigned short pc;
+int disassemble(unsigned short pc)
 {
     int	i, j;
     struct opcode	*code;
