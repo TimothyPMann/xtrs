@@ -179,6 +179,9 @@ trs_nmi_mask_write(unsigned char value)
   if (!z80_state.nmi) z80_state.nmi_seen = 0;
 }
 
+#define UP_F   1.50
+#define DOWN_F 0.50 
+
 void
 trs_timer_event(int signo)
 {
@@ -190,19 +193,33 @@ trs_timer_event(int signo)
   gettimeofday(&tv, NULL);
   if (trs_autodelay) {
       static struct timeval oldtv;
+      static int increment = 1;
+      static int oldtoofast = 0;
 #if __GNUC__
-      static long long oldtcount;
+      static unsigned long long oldtcount;
 #else
-      static long oldtcount;
+      static unsigned long oldtcount;
 #endif
       if (!trs_pausing) {
-	  if (((tv.tv_sec*1000000 + tv.tv_usec) -
-	       (oldtv.tv_sec*1000000 + oldtv.tv_usec))*z80_state.clockMHz >
-	      (z80_state.t_count - oldtcount) && z80_state.delay > 0) {
-	      z80_state.delay--;
-	  } else {
-	      z80_state.delay++;
+	int toofast = (z80_state.t_count - oldtcount) >
+	  ((tv.tv_sec*1000000 + tv.tv_usec) -
+	   (oldtv.tv_sec*1000000 + oldtv.tv_usec))*z80_state.clockMHz;
+	if (toofast == oldtoofast) {
+	  increment = (int)(increment * UP_F + 0.5);
+	} else {
+	  increment = (int)(increment * DOWN_F + 0.5);
+	}
+	oldtoofast = toofast;
+	if (increment < 1) increment = 1;
+	if (toofast) {
+	  z80_state.delay += increment;
+	} else {
+	  z80_state.delay -= increment;
+	  if (z80_state.delay < 0) {
+	    z80_state.delay = 0;
+	    increment = 1;
 	  }
+	}
       }
       oldtv = tv;
       oldtcount = z80_state.t_count;
