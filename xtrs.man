@@ -1033,11 +1033,9 @@ If you discover other bugs, write fixes for any of these, or make any
 other enhancements, please let us know so that we can incorporate
 the changes into future releases.
 .SH Authors and acknowledgements
-\fBxtrs\fP 1.0 was written by David Gingold, then at
-Thinking Machines Corporation, and Alec Wolman, then at
-Digital Equipment Corporation.
+\fBxtrs\fP 1.0 was written by David Gingold and Alec Wolman.
 The current version was revised and much extended by Timothy Mann
-<tim.mann@compaq.com> of Compaq Computer Corporation.  See README and
+<tim@tim-mann.org>.  See README and
 README.tpm for additional notes from the authors.
 
 We also thank the following people for their help.  The JV1 and JV3

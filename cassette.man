@@ -140,11 +140,9 @@ the amount of time (in microseconds) to wait before changing the
 output to this value.
 
 .SH Authors
-\fBxtrs\fP 1.0 was written by David Gingold, then at
-Thinking Machines Corporation, and Alec Wolman, then at
-Digital Equipment Corporation.
+\fBxtrs\fP 1.0 was written by David Gingold and Alec Wolman.
 The current version was revised and much extended by Timothy Mann
-<tim.mann@compaq.com> of Compaq Computer Corporation.
+<tim@tim-mann.org>.
 An initial version of this man page, and
 the translation from C-shell (cassette) to Bourne shell (cassette.sh),
-are due to Branden Robinson of the Debian GNU/Linux project.
+are due to Branden Robinson.
