@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Tue Sep 30 14:18:37 PDT 1997 by mann */
+/* Last modified on Thu Oct 30 09:30:44 PST 1997 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
@@ -45,6 +45,8 @@ typedef struct {
   unsigned density;		/* sden=0, dden=1 */
   unsigned char controller;	/* TRSDISK_P1771 or TRSDISK_P1791 */
   int last_readadr;             /* id index found by last readadr */
+  int last_readadr_density;
+  int delayed_intrq_kludge;
 } FDCState;
 
 FDCState state;
@@ -103,13 +105,7 @@ typedef struct {
 #define SECSIZE       256
 #define MAXTRACKS     96
 
-/* Max bytes per unformatted track.  Not sure these are exactly right.
-   If they are too big, some formatting programs will pass extra
-   garbage bytes past the maximum length they are prepared for the
-   track to be, which the formatting state machine might interpret as
-   extra sector headers!  If they are too small, some formatting
-   programs will fail to format the physically last sector on a
-   track. */
+/* Max bytes per unformatted track. */
 #define TRKSIZE_SD    3125  /* 250kHz / 5 Hz [i.e. 300rpm] / (2 * 8) */
 #define TRKSIZE_DD    6250  /* 250kHz / 5 Hz [i.e. 300rpm] / 8 */
 
@@ -155,6 +151,9 @@ typedef struct {
 
 DiskState disk[NDRIVES];
 
+/* Emulate interleave in JV1 mode */
+unsigned char jv1_interleave[10] = {0, 5, 1, 6, 2, 7, 3, 8, 4, 9};
+
 void
 trs_disk_init(int reset_button)
 {
@@ -172,6 +171,8 @@ trs_disk_init(int reset_button)
   state.density = 0;
   state.controller = (trs_model == 1) ? TRSDISK_P1771 : TRSDISK_P1791;
   state.last_readadr = -1;
+  state.last_readadr_density = 0;
+  state.delayed_intrq_kludge = 0;
   for (i=0; i<NDRIVES; i++) {
     disk[i].phytrack = 0;
   }
@@ -414,7 +415,7 @@ search(int sector)
   /* Get true address within file of current sector data */
   if (d->emutype == JV1) { 
     if (d->phytrack < 0 || d->phytrack >= MAXTRACKS ||
-	state.curside > 0 || sector >= 10 || d->file == NULL ||
+	state.curside > 0 || sector >= JV1_SECPERTRK || d->file == NULL ||
 	d->phytrack != state.track || state.density == 1) {
       state.status |= TRSDISK_NOTFOUND;
       return -1;
@@ -450,23 +451,26 @@ search(int sector)
 
 
 /* Search for the first sector on the current physical track and
-   return its index within the sorted index array (JV3 only).  Return
-   -1 if there is no such sector. */
+   return its index within the sorted index array (JV3), or index
+   within the sector array (JV1).  Return -1 if there is no such sector. */
 static int
 search_adr()
 {
   DiskState *d = &disk[state.curdrive];
   /* Get true address within file of current sector data */
   if (d->emutype == JV1) { 
-    trs_disk_unimpl(state.currcommand, "!! JV1 read address");    
-    return -1;
+    if (d->phytrack < 0 || d->phytrack >= MAXTRACKS ||
+	state.curside > 0 || d->file == NULL || state.density == 1) {
+      state.status |= TRSDISK_NOTFOUND;
+      return -1;
+    }
+    return JV1_SECPERTRK * d->phytrack;
   } else {
     int i;
     SectorId *sid;
     if (d->phytrack < 0 || d->phytrack >= MAXTRACKS ||
-	state.curside >= JV3_SIDES ||
-	d->phytrack != state.track || d->file == NULL) {
-      /*!!state.status |= TRSDISK_NOTFOUND;*/
+	state.curside >= JV3_SIDES || d->file == NULL) {
+      state.status |= TRSDISK_NOTFOUND;
       return -1;
     }
     if (!d->sorted_valid) sort_ids(state.curdrive);
@@ -482,7 +486,7 @@ search_adr()
 	i++;
       }
     }
-    /*!!state.status |= TRSDISK_NOTFOUND;*/
+    state.status |= TRSDISK_NOTFOUND;
     return -1;
   }
 }
@@ -675,32 +679,54 @@ trs_disk_data_read(void)
     }
     break;
   case TRSDISK_READADR:
-    if (state.last_readadr == -1 || state.bytecount <= 0) break;
-    d = &disk[state.curdrive];
-    if (d->emutype == JV1) {
-      trs_disk_unimpl(state.currcommand, "!! JV1 read address");
-    } else {
-      sid = &d->id[d->sorted_id[state.last_readadr]];
-      switch (state.bytecount) {
-      case 6:
-        state.data = sid->track;
-        state.sector = sid->track;  //sic
-        break;
-      case 5:
-        state.data = (sid->flags & JV3_SIDE) != 0;
-        break;
-      case 4:
-        state.data = sid->sector;
-        break;
-      case 3:
-        state.data = 0x01;  // 256 bytes always
-        break;
-      case 2:
-        state.data = 0;     // CRC not emulated
-        break;
-      case 1:
-        state.data = 0;     // CRC not emulated
-	break;
+    if (state.bytecount <= 0) break;
+    if (state.last_readadr >= 0) {
+      d = &disk[state.curdrive];
+      if (d->emutype == JV1) {
+	switch (state.bytecount) {
+	case 6:
+	  state.data = d->phytrack;
+	  state.sector = d->phytrack; /*sic*/
+	  break;
+	case 5:
+	  state.data = 0;
+	  break;
+	case 4:
+	  state.data = jv1_interleave[state.last_readadr % JV1_SECPERTRK];
+	  break;
+	case 3:
+	  state.data = 0x01;  /* 256 bytes always */
+	  break;
+	case 2:
+	  state.data = 0;     /* CRC not emulated */
+	  break;
+	case 1:
+	  state.data = 0;     /* CRC not emulated */
+	  break;
+	}
+      } else {
+	sid = &d->id[d->sorted_id[state.last_readadr]];
+	switch (state.bytecount) {
+	case 6:
+	  state.data = sid->track;
+	  state.sector = sid->track;  /*sic*/
+	  break;
+	case 5:
+	  state.data = (sid->flags & JV3_SIDE) != 0;
+	  break;
+	case 4:
+	  state.data = sid->sector;
+	  break;
+	case 3:
+	  state.data = 0x01;  /* 256 bytes always */
+	  break;
+	case 2:
+	  state.data = 0;     /* CRC not emulated */
+	  break;
+	case 1:
+	  state.data = 0;     /* CRC not emulated */
+	  break;
+	}
       }
     }
     state.bytecount--;
@@ -835,7 +861,9 @@ trs_disk_data_write(unsigned char data)
 	  }
 	}
 	/* Prepare to write the data */
-	fseek(d->file, offset(JV3, d->unused_id), 0);
+	if (d->emutype == JV3) {
+	  fseek(d->file, offset(JV3, d->unused_id), 0);
+	}
 	state.format = FMT_DATA;
 	state.format_bytecount = SECSIZE;
       }
@@ -909,7 +937,12 @@ trs_disk_status_read(void)
     last_status = state.status;
   }
 #endif
-  trs_disk_intrq_interrupt(0);
+  if (state.delayed_intrq_kludge) {
+    trs_disk_intrq_interrupt(1);
+    state.delayed_intrq_kludge = 0;
+  } else {
+    trs_disk_intrq_interrupt(0);
+  }
   return state.status;
 }
 
@@ -1060,13 +1093,24 @@ trs_disk_command_write(unsigned char cmd)
     break;
   case TRSDISK_READADR:
     state.status = 0;
+    /* Note: not synchronized with emulated index hole */
     if (d->emutype == JV1) {
-      trs_disk_unimpl(state.currcommand, "!! JV1 read address");
+      if (state.last_readadr == -1 ||
+	  (state.last_readadr / JV1_SECPERTRK) != d->phytrack ||
+	  (state.last_readadr % JV1_SECPERTRK) == (JV1_SECPERTRK - 1) ||
+	  state.last_readadr_density != state.density) {
+	state.last_readadr = search_adr();
+      } else {
+	state.last_readadr++;
+	if ((state.last_readadr % JV1_SECPERTRK) == 0) {
+	  state.last_readadr -= JV1_SECPERTRK;
+	}
+      }
     } else {
-      /* !!Not synchronized with emulated index hole */
-      if (state.last_readadr == -1) {
+      if (state.last_readadr == -1 ||
+	  state.last_readadr_density != state.density) {
 	/* Start new track */
-	id_index = search_adr();
+	state.last_readadr = search_adr();
       } else {
 	SectorId *sid = &d->id[d->sorted_id[state.last_readadr]];
 	SectorId *sid2 = &d->id[d->sorted_id[state.last_readadr + 1]];
@@ -1075,20 +1119,29 @@ trs_disk_command_write(unsigned char cmd)
 	    sid2->track != d->phytrack ||
   	    ((sid2->flags & JV3_SIDE) != 0) != state.curside) {
 	  /* Start new track */
-	  id_index = search_adr();
+	  state.last_readadr = search_adr();
         } else {
 	  /* Give next sector on this track */
-	  id_index = state.last_readadr + 1;
+	  state.last_readadr = state.last_readadr + 1;
         }
       }
-      state.last_readadr = id_index;
-      if (id_index == -1) {
-	trs_disk_intrq_interrupt(1);
-      } else {
-        state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
-        trs_disk_drq_interrupt(1);
-        state.bytecount = 6;
-      }
+    }
+    if (state.last_readadr == -1) {
+#if 1
+      /* This ugly kludge is to make SuperUtility happy.  SuperUtility
+	 assumes it can execute a few dozen instructions between issuing
+	 a read-address command and receiving a completion interrupt.
+	 It assumes it will get the interrupt inside a procedure call that
+	 it makes shortly after issuing the command. */
+      state.delayed_intrq_kludge = 1;
+#else
+      trs_disk_intrq_interrupt(1);
+#endif
+    } else {
+      state.last_readadr_density = state.density;
+      state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
+      trs_disk_drq_interrupt(1);
+      state.bytecount = 6;
     }
     break;
   case TRSDISK_READTRK:
