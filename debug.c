@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Thu May 18 01:02:17 PDT 2000 by mann
+   Last modified on Wed Jan  3 11:58:05 PST 2001 by mann
 */
 
 #include "z80.h"
@@ -55,11 +55,11 @@ static char help_message[] =
 \n\
 Running:\n\
     run\n\
-        Reset the Z-80 and commence execution at address 0000.\n\
+        Hard reset the Z-80 and devices and commence execution.\n\
     cont\n\
         Continue execution.\n\
     step\n\
-        Execute one instruction, disallowing interrupts.\n\
+        Execute one instruction, disallowing all interrupts.\n\
     stepint\n\
         Execute one instruction, allowing an interrupt afterwards.\n\
     next\n\
@@ -68,7 +68,11 @@ Running:\n\
         until the return.  Interrupts are always allowed inside the call,\n\
         but only the nextint form allows an interrupt afterwards.\n\
     reset\n\
-        Reset the Z-80.\n\
+        Hard reset the Z-80 and devices.\n\
+    softreset\n\
+        Press the system reset button.  On Model I/III, softreset resets the
+        devices and posts a nonmaskable interrupt to the CPU; on Model 4/4P,
+        softreset is the same as hard reset.\n\
     timeroff\n\
     timeron\n\
         Disable/enable the emulated TRS-80 real time clock interrupt.\n\
@@ -100,6 +104,7 @@ Traps:\n\
     delete *\n\
         Delete trap n, or all traps.\n\
     stop at <address>\n\
+    break <address>\n\
         Set a breakpoint at the specified hex address.\n\
     trace <address>\n\
         Set a trap to trace execution at the specified hex address.\n\
@@ -115,7 +120,7 @@ Miscellaneous:\n\
     ?\n\
         Print this message.\n\
     quit\n\
-        Exit the zbx.\n";
+        Exit from xtrs.\n";
 
 static struct
 {
@@ -563,13 +568,18 @@ void debug_shell()
 	    }
 	    else if(!strcmp(command, "reset"))
 	    {
-		printf("Resetting.");
-		trs_reset();
+		printf("Performing hard reset.");
+		trs_reset(1);
+	    }
+	    else if(!strcmp(command, "softreset"))
+	    {
+		printf("Pressing reset button.");
+		trs_reset(0);
 	    }
 	    else if(!strcmp(command, "run"))
 	    {
-		printf("Resetting and running.\n");
-		trs_reset();
+		printf("Performing hard reset and running.\n");
+		trs_reset(1);
 		debug_run();
 	    }
 	    else if(!strcmp(command, "status"))
@@ -646,11 +656,12 @@ void debug_shell()
 	    {
 		z80_run(0);
 	    }
-	    else if(!strcmp(command, "stop"))
+	    else if(!strcmp(command, "stop") || !strcmp(command, "break"))
 	    {
 		int address;
 
-		if(sscanf(input, "stop at %x", &address) != 1)
+		if(sscanf(input, "stop at %x", &address) != 1 &&
+		   sscanf(input, "break %x", &address) != 1)
 		{
 		    address = REG_PC;
 		}

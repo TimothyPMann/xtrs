@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Mon Jul 26 12:52:24 PDT 1999 by mann
+   Last modified on Fri Dec 15 15:21:10 PST 2000 by mann
 */
 
 /*
@@ -103,8 +103,8 @@ void trs_exit()
     exit(0);
 }
 
-/* Handle reset button */
-void trs_reset()
+/* Handle reset button if hard=0; handle hard reset if hard=1 */
+void trs_reset(int hard)
 {
     /* Reset devices (Model I SYSRES, Model III/4 RESET) */
     trs_cassette_reset();
@@ -136,7 +136,8 @@ void trs_reset()
 #endif
     trs_kb_reset();  /* Part of keyboard stretch kludge */
 
-    if (trs_model >= 4) {
+    trs_cancel_event();
+    if (hard || trs_model >= 4) {
         /* Reset processor */
 	z80_reset();
     } else {

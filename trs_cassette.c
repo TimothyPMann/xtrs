@@ -65,9 +65,10 @@
 #include <signal.h>
 #include <errno.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 #if SB_SOUND
-#include <sys/io.h> /* delete this line if it gives you a compile error */
+/*#include <sys/io.h>  delete this line if it gives you a compile error */
 #include <asm/io.h>
 #endif
 

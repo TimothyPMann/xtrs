@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Wed May 17 21:45:39 PDT 2000 by mann
+   Last modified on Fri Dec 15 15:23:51 PST 2000 by mann
 */
 
 /*
@@ -53,14 +53,14 @@ extern void trs_screen_refresh(void);
 extern void trs_screen_batch();
 extern void trs_screen_unbatch();
 
-extern void trs_reset(void);
+extern void trs_reset(int hard);
 extern void trs_exit(void);
 
 extern void trs_kb_reset(void);
 extern int trs_kb_mem_read(int address);
 extern int trs_next_key(int wait);
 extern void trs_kb_heartbeat(void);
-extern void trs_xlate_keycode(int keycode);
+extern void trs_xlate_keysym(int keysym);
 extern void queue_key(int key);
 extern int dequeue_key(void);
 extern int stretch_amount, stretch_poll, stretch_heartbeat;
@@ -76,6 +76,8 @@ extern void trs_cassette_out(int value);
 extern int trs_cassette_in(void);
 extern void trs_sound_out(int value);
 extern void trs_sound_init(int ioport, int vol);
+
+extern int trs_joystick_in(void);
 
 extern int trs_rom_size;
 extern int trs_rom1_size;

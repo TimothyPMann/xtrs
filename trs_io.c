@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Sat Oct 10 22:15:30 PDT 1998 by mann
+   Last modified on Tue Jul 25 15:51:07 PDT 2000 by mann
 */
 
 /*#define PORTDEBUG1 1*/
@@ -39,7 +39,7 @@ static int rominimage = 0;  /* Model 4p */
 void z80_out(int port, int value)
 {
 #if PORTDEBUG1
-  debug("out (0x%02x), 0x%02x", port, value);
+  debug("out (0x%02x), 0x%02x; pc 0x%04x", port, value, z80_state.pc.word);
 #endif
   /* First, ports common to all models */
   switch (port) {
@@ -296,7 +296,7 @@ int z80_in(int port)
 {
   /* First, ports common to all models */
 #if PORTDEBUG2
-  debug("in (0x%02x)", port);
+  debug("in (0x%02x); pc %04x", port, z80_state.pc.word);
 #endif
 
   /* Support for a special HW real-time clock (TimeDate80?)
@@ -362,6 +362,8 @@ int z80_in(int port)
   }
 
   switch (port) {
+  case 0x00:
+    return trs_joystick_in();
   case TRS_HARD_WP:       /* 0xC0 */
   case TRS_HARD_CONTROL:  /* 0xC1 */
   case TRS_HARD_DATA:     /* 0xC8 */ 
@@ -373,7 +375,6 @@ int z80_in(int port)
   case TRS_HARD_SDH:      /* 0xCE */
   case TRS_HARD_STATUS:   /* 0xCF */ /*=TRS_HARD_COMMAND*/
     return trs_hard_in(port);
-    break;
   case IMPEXP_STATUS:     /* 0xD0 */
     return trs_impexp_status_read();
   case IMPEXP_DATA:       /* 0xD1 */

@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Wed May 17 22:15:33 PDT 2000 by mann
+   Last modified on Fri Dec 15 15:23:49 PST 2000 by mann
 */
 
 /*
@@ -3479,7 +3479,7 @@ int z80_run(int continuous)
 	    REG_PC--;	/* don't increment PC past this instruction */
 	    if (trs_model == 1) {
 		/* Z-80 HALT output is tied to reset button circuit */
-		trs_reset();
+		trs_reset(0);
 	    } else {
 		/* Really halt (i.e., wait for interrupt) */
 		if (continuous > 0 &&

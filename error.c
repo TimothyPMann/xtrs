@@ -16,6 +16,7 @@
 #include "z80.h"
 #include <stdarg.h>
 #include <string.h>
+#include <stdlib.h>
 
 extern char *program_name;
 

@@ -25,7 +25,9 @@ sound option, and through the optional Orchestra-85/90 music synthesizer
 card are all emulated.  In Model I mode, the HRG1B graphics card
 is emulated.  In Model III and 4/4P mode, you can select whether
 the Radio Shack graphics card or Micro Labs Grafyx Solution is emulated.
-There is also a mouse driver for Model 4/4P mode.
+There is also a mouse driver for Model 4/4P mode.  Several common
+time-of-day clock cards are emulated on all models.  The Alpha Products
+joystick is emulated using the PC's numeric keypad.
 
 Because \fBxtrs\fP emulates the hardware, all known TRS-80 Model
 I/III/4/4P operating systems should run on it, including all flavors
@@ -87,6 +89,13 @@ On a German keyboard, the umlaut and "ess-tsett" keys should activate
 the corresponding characters used in the GENIE, a German Model I clone.
 This feature is most useful together with the "-charset genie" command
 line argument.
+
+Pressing a key on a PC numeric keypad with NumLock disengaged emulates
+the Alpha Products joystick.  Keys 2, 4, 6, 8 (KP_Down, KP_Left,
+KP_Right, KP_Up) are the main directions; keys 1, 3, 7, and 9 (KP_End,
+KP_Page_Down, KP_Home, KP_Page_Up) work as diagonal directions by
+activating two main directions at once; and key 0 (KP_Insert) or 5
+(KP_Begin) is the fire button.
 .SH Emulated cassette
 To control the emulated cassette, a file called ".cassette.ctl" in the
 current directory keeps track of what file is currently loaded as
@@ -672,6 +681,13 @@ power up the emulated TRS-80, \fBxtrs\fP dumps the date into the
 places in memory where LDOS and LS-DOS normally save it across
 reboots, so it looks to the operating system as if you rebooted after
 setting the date.
+.SH Joystick
+Pressing a key on a PC numeric keypad with NumLock disengaged emulates
+the Alpha Products joystick.  See the Keys section above for details.
+The emulated joystick is mapped only at port 0, to avoid conflicts
+with other devices.  The joystick emulation could be made to work with
+real joysticks using the X input extension, but this is not
+implemented yet.
 .SH Running games
 Some games run rather well under \fBxtrs\fP now,
 provided that your
@@ -1006,6 +1022,9 @@ The emulator uses a heuristic to decide what format a ROM file is in.
 If a raw binary ROM image starts with 0x01, 0x05, or 0x22, it can be
 misidentified as being in a different format.  This is rather unlikely
 to occur, as ROMs typically begin with 0xF3, the DI instruction.
+
+The joystick emulation could be made to work with real joysticks using
+the X input extension, but this is not implemented yet.
 
 If you discover other bugs, or write fixes for any of these, please let
 us know.  We expect to incorporate fixes into future releases.

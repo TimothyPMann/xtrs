@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Wed May 17 21:22:40 PDT 2000 by mann
+   Last modified on Fri Dec 15 15:23:50 PST 2000 by mann
 */
 
 /*#define MOUSEDEBUG 1*/
@@ -954,7 +954,7 @@ void trs_get_event(int wait)
       debug("EnterNotify\n");
 #endif
       save_repeat();
-      trs_xlate_keycode(0x10000); /* all keys up */
+      trs_xlate_keysym(0x10000); /* all keys up */
       break;
 
     case LeaveNotify:
@@ -962,7 +962,7 @@ void trs_get_event(int wait)
       debug("LeaveNotify\n");
 #endif
       restore_repeat();
-      trs_xlate_keycode(0x10000); /* all keys up */
+      trs_xlate_keysym(0x10000); /* all keys up */
       break;
 
     case KeyPress:
@@ -974,7 +974,7 @@ void trs_get_event(int wait)
       switch (key) {
 	/* Trap some function keys here */
       case XK_F10:
-	trs_reset();
+	trs_reset(0);
 	key = 0;
 	key_immediate = 1;
 	break;
@@ -1006,11 +1006,11 @@ void trs_get_event(int wait)
 	key = XK_Shift_L;
       }
       if (last_key[event.xkey.keycode] != 0) {
-	trs_xlate_keycode(0x10000 | last_key[event.xkey.keycode]);
+	trs_xlate_keysym(0x10000 | last_key[event.xkey.keycode]);
       }
       last_key[event.xkey.keycode] = key;
       if (key != 0) {
-	trs_xlate_keycode(key);
+	trs_xlate_keysym(key);
       }
       break;
 
@@ -1018,7 +1018,7 @@ void trs_get_event(int wait)
       key = last_key[event.xkey.keycode];
       last_key[event.xkey.keycode] = 0;
       if (key != 0) {
-	trs_xlate_keycode(0x10000 | key);
+	trs_xlate_keysym(0x10000 | key);
       }
 #if XDEBUG
       debug("KeyRelease: state 0x%x, keycode 0x%x, last_key 0x%x\n",

@@ -15,11 +15,18 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Jan  4 17:03:53 PST 2000 by mann
+   Last modified on Wed Jan  3 11:15:17 PST 2001 by mann
 */
+
+/*#define KBDEBUG 1*/
+/*#define JOYDEBUG 1*/
+#define KP_JOYSTICK 1  /* emulate joystick with keypad */
+/*#define KPNUM_JOYSTICK 1*/  /* emulate joystick with keypad + NumLock */
 
 #include "z80.h"
 #include "trs.h"
+#include <X11/keysym.h>
+#include <X11/X.h>
 
 #define TK(a, b) (((a)<<4)+(b))
 #define TK_ADDR(tk) (((tk) >> 4)&0xf)
@@ -92,14 +99,23 @@
 #define TK_F3           TK(7, 6)  /* M4 only */
 #define TK_Unused       TK(7, 7)
 
+/* Fake keycodes with special meanings */
 #define TK_NULL                 TK(8, 0)
-
 #define TK_Neutral              TK(8, 1)
 #define TK_ForceShift           TK(8, 2)
 #define TK_ForceNoShift         TK(8, 3)
 #define TK_ForceShiftPersistent TK(8, 4)
-
 #define TK_AllKeysUp            TK(8, 5)
+#define TK_Joystick             TK(10,  0)
+#define TK_North                TK(10,  1)
+#define TK_Northeast            TK(10,  9)
+#define TK_East                 TK(10,  8)
+#define TK_Southeast            TK(10, 10)
+#define TK_South                TK(10,  2)
+#define TK_Southwest            TK(10,  5)
+#define TK_West                 TK(10,  4)
+#define TK_Northwest            TK(10,  6)
+#define TK_Fire                 TK(10, 16)
 
 typedef struct
 {
@@ -520,6 +536,18 @@ KeyTable function_key_table[] = {
 /* 0xff92   XK_KP_F2       */    { TK_F2, TK_Neutral },
 /* 0xff93   XK_KP_F3       */    { TK_F3, TK_Neutral },
 /* 0xff94   XK_KP_F4       */    { TK_CapsLock, TK_Neutral },
+#if KP_JOYSTICK
+/* 0xff95   XK_KP_Home     */    { TK_Northwest, TK_Neutral },
+/* 0xff96   XK_KP_Left     */    { TK_West, TK_Neutral },
+/* 0xff97   XK_KP_Up       */    { TK_North, TK_Neutral },
+/* 0xff98   XK_KP_Right    */    { TK_East, TK_Neutral },
+/* 0xff99   XK_KP_Down     */    { TK_South, TK_Neutral },
+/* 0xff9a   XK_KP_Prior, XK_KP_Page_Up  */ { TK_Northeast, TK_Neutral },
+/* 0xff9b   XK_KP_Next, XK_KP_Page_Down */ { TK_Southeast, TK_Neutral },
+/* 0xff9c   XK_KP_End      */    { TK_Southwest, TK_Neutral },
+/* 0xff9d   XK_KP_Begin    */    { TK_Fire, TK_Neutral },
+/* 0xff9e   XK_KP_Insert   */    { TK_Fire, TK_Neutral },
+#else
 /* 0xff95   XK_KP_Home     */    { TK_Clear, TK_Neutral },
 /* 0xff96   XK_KP_Left     */    { TK_Left, TK_Neutral },
 /* 0xff97   XK_KP_Up       */    { TK_Up, TK_Neutral },
@@ -530,6 +558,7 @@ KeyTable function_key_table[] = {
 /* 0xff9c   XK_KP_End      */    { TK_Unused, TK_Neutral },
 /* 0xff9d   XK_KP_Begin    */    { TK_NULL, TK_Neutral },
 /* 0xff9e   XK_KP_Insert   */    { TK_Underscore, TK_Neutral },
+#endif
 /* 0xff9f   XK_KP_Delete   */    { TK_Left, TK_Neutral },
 /* 0xffa0                  */    { TK_NULL, TK_Neutral },
 /* 0xffa1                  */    { TK_NULL, TK_Neutral },
@@ -547,6 +576,18 @@ KeyTable function_key_table[] = {
 /* 0xffad   XK_KP_Subtract */    { TK_Minus, TK_Neutral },
 /* 0xffae   XK_KP_Decimal  */    { TK_Period, TK_Neutral },
 /* 0xffaf   XK_KP_Divide   */    { TK_Slash, TK_Neutral },
+#if KPNUM_JOYSTICK
+/* 0xffb0   XK_KP_0        */    { TK_Fire, TK_Neutral },
+/* 0xffb1   XK_KP_1        */    { TK_Southwest, TK_Neutral },
+/* 0xffb2   XK_KP_2        */    { TK_South, TK_Neutral },
+/* 0xffb3   XK_KP_3        */    { TK_Southeast, TK_Neutral },
+/* 0xffb4   XK_KP_4        */    { TK_West, TK_Neutral },
+/* 0xffb5   XK_KP_5        */    { TK_Fire, TK_Neutral },
+/* 0xffb6   XK_KP_6        */    { TK_East, TK_Neutral },
+/* 0xffb7   XK_KP_7        */    { TK_Northwest, TK_Neutral },
+/* 0xffb8   XK_KP_8        */    { TK_North, TK_Neutral },
+/* 0xffb9   XK_KP_9        */    { TK_Northeast, TK_Neutral },
+#else
 /* 0xffb0   XK_KP_0        */    { TK_0, TK_Neutral },
 /* 0xffb1   XK_KP_1        */    { TK_1, TK_Neutral },
 /* 0xffb2   XK_KP_2        */    { TK_2, TK_Neutral },
@@ -557,6 +598,7 @@ KeyTable function_key_table[] = {
 /* 0xffb7   XK_KP_7        */    { TK_7, TK_Neutral },
 /* 0xffb8   XK_KP_8        */    { TK_8, TK_Neutral },
 /* 0xffb9   XK_KP_9        */    { TK_9, TK_Neutral },
+#endif
 /* 0xffba                  */    { TK_NULL, TK_Neutral },
 /* 0xffbb                  */    { TK_NULL, TK_Neutral },
 /* 0xffbc                  */    { TK_NULL, TK_Neutral },
@@ -632,6 +674,7 @@ KeyTable function_key_table[] = {
 
 static int keystate[8] = { 0, };
 static int force_shift = TK_Neutral;
+static int joystate = 0;
 
 /* Avoid changing state too fast so keystrokes aren't lost. */
 static int stretch = 0;
@@ -651,26 +694,47 @@ void trs_kb_heartbeat()
     }
 }
 
-void trs_xlate_keycode(int keycode)
+/* Emulate joystick with the keypad */
+int trs_emulate_joystick(int key_down, int bit_action)
+{
+  if (bit_action < TK_Joystick) return 0;
+  if (key_down) {
+    joystate |= (bit_action & 0x1f);
+  } else {
+    joystate &= ~(bit_action & 0x1f);
+  }
+  return 1;
+}
+
+int trs_joystick_in()
+{
+#if JOYDEBUG
+  debug("joy %02x ", joystate);
+#endif
+  return ~joystate;
+}
+
+void trs_xlate_keysym(int keysym)
 {
     int key_down;
     KeyTable* kt;
     static int shift_action = TK_Neutral;
 
-    if (keycode == 0x10000) {
+    if (keysym == 0x10000) {
 	/* force all keys up */
 	queue_key(TK_AllKeysUp);
 	shift_action = TK_Neutral;
 	return;
     }
 
-    key_down = (keycode & 0x10000) == 0;
-    if (keycode & 0xff00) {
-      kt = &function_key_table[keycode & 0xff];
+    key_down = (keysym & 0x10000) == 0;
+    if (keysym & 0xff00) {
+      kt = &function_key_table[keysym & 0xff];
     } else {
-      kt = &ascii_key_table[keycode & 0xff];
+      kt = &ascii_key_table[keysym & 0xff];
     }
     if (kt->bit_action == TK_NULL) return;
+    if (trs_emulate_joystick(key_down, kt->bit_action)) return;
 
     if (key_down) {
       if (shift_action != TK_ForceShiftPersistent &&
