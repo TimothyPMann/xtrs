@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Tue Nov 18 14:29:08 PST 1997 by mann */
+/* Last modified on Tue Nov 18 14:41:33 PST 1997 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
@@ -1566,11 +1566,7 @@ real_write()
   }
   state.bytecount = 0;
   trs_disk_drq_interrupt(0);
-#if DELAYED_INTRQ_KLUDGE
-  state.delayed_intrq_kludge = 1;
-#else
   trs_disk_intrq_interrupt(1);
-#endif
 #else
   trs_disk_unimpl(state.currcommand, "write real floppy");
 #endif
