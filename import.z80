@@ -1,6 +1,6 @@
 ;; import.z
 ;; Timothy Mann, 8/24/97
-;; Last modified on Sat Mar 25 21:35:11 PST 2000 by mann
+;; $Date$
 ;;
 ;; Use xtrs 1.9 emulator traps to copy a file from Unix to TRS-80
 ;; Usage: IMPORT [-ln] unixfile [tofile]
@@ -41,6 +41,8 @@ dodcb$	equ 401dh
 @abort6	equ 21
 @dsply6	equ 10
 
+;; Model 4 only: file init or open with wrong LRL.  Can be ignored.
+lrlerr  equ 42
 
 	org 5200h
 
@@ -206,6 +208,8 @@ openok:	push de			; save fd
         ld b, 0
         call init               ; open the file
 	pop de
+	jr z, opn2ok
+	cp lrlerr
 	jr z, opn2ok
 	ld c, a
         call error

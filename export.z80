@@ -1,6 +1,6 @@
 ;; export.z
 ;; Timothy Mann, 8/24/97
-;; Last modified on Sat Mar 25 21:36:04 PST 2000 by mann
+;; $Date$
 ;;
 ;; Use xtrs 1.9 emulator traps to copy a file from TRS-80 to Unix
 ;; Usage: EXPORT [-ln] fromfile [unixfile]
@@ -37,6 +37,9 @@ dodcb$	equ 401dh
 @exit6	equ 22
 @abort6	equ 21
 @dsply6	equ 10
+
+;; Model 4 only: file init or open with wrong LRL.  Can be ignored.
+lrlerr  equ 42
 
 	org 5200h
 
@@ -201,6 +204,8 @@ gotu:   ld hl, iobuf
         call open               ; open the TRS-80 file
         pop hl
         jr z, uname
+	cp lrlerr
+	jr z, uname
 	ld c, a
         call error
         jp abort
