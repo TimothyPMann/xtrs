@@ -13,7 +13,7 @@
  * must retain this notice.
  */
 
-#ifdef sun
+#if defined(sun) && !defined(i386)
 #define big_endian
 #endif
 
