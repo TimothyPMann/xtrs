@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Mon Sep  1 18:47:22 PDT 1997 by mann */
+/* Last modified on Tue Sep 23 14:53:43 PDT 1997 by mann */
 
 /*
  * Emulate Model-I interrupts
@@ -129,8 +129,8 @@ unsigned char
 trs_interrupt_latch_read()
 {
   unsigned char tmp = interrupt_latch;
-  trs_timer_interrupt(0); /* acknowledge this one (only) */
   if (trs_model == 1) {
+    trs_timer_interrupt(0); /* acknowledge this one (only) */
     return tmp;
   } else {
     return ~tmp;
