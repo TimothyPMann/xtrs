@@ -51,7 +51,6 @@ while($done != 1)
 		    switch($command[2])
 			case *.cas:
 			case *.bin:
-			default:
 			    set format = 1
 			    breaksw
 			case *.cpt:
@@ -65,6 +64,9 @@ while($done != 1)
 			    breaksw
 			case *.debug:
 			    set format = 5
+			    breaksw
+			default:
+			    set format = 1
 			    breaksw
 		    endsw
 		    echo $command[2] 0 $format > $control_file
