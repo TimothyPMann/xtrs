@@ -95,7 +95,10 @@ the Alpha Products joystick.  Keys 2, 4, 6, 8 (KP_Down, KP_Left,
 KP_Right, KP_Up) are the main directions; keys 1, 3, 7, and 9 (KP_End,
 KP_Page_Down, KP_Home, KP_Page_Up) work as diagonal directions by
 activating two main directions at once; and key 0 (KP_Insert) or 5
-(KP_Begin) is the fire button.
+(KP_Begin) is the fire button.  Note that your X server may default to
+sending digits for the keys on the numeric pad even if NumLock is not
+pressed.  If you have this problem, you can use the xmodmap program to remap
+your numeric pad, and use the xev program to debug it.
 .SH Emulated cassette
 To control the emulated cassette, a file called ".cassette.ctl" in the
 current directory keeps track of what file is currently loaded as
