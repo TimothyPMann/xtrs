@@ -1,6 +1,6 @@
 README.tpm
 Tim Mann <mann@pa.dec.com>
-9/27/97
+11/7/97
 
 As computer scientists, we always long for something bigger and better
 than what we have now.  Give us a megabyte, and we want a gigabyte.
@@ -67,6 +67,8 @@ read system call.  I've reported this bug to readline's maintainer.
 
 * Data import/export
 
+See the man page for user information on this topic.
+
 There are two mechanisms for getting data into and out of the
 emulator.  See trs_imp_exp.h for technical details.  The old way that
 uses I/O ports is likely to go away eventually.  Before this can
@@ -88,7 +90,6 @@ I put in a silly kludge that lets LDOS know the correct date whenever
 it boots up.  It simulates the case where you just rebooted LDOS
 without power cycling and the date was left in memory.  Unfortunately
 LDOS doesn't provide a way to do this trick with the time of day.
-This doesn't work (yet?) on the Model 4.
 
 * Bug fix history
 
