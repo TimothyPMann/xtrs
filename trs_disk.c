@@ -1208,7 +1208,8 @@ trs_disk_select_write(unsigned char data)
     if (data & TRSDISK3_WAIT) {
       /* If there was an event pending, simulate waiting until
 	 it was due. */
-      if (trs_event_scheduled() != trs_disk_lostdata) {
+      if (trs_event_scheduled() != NULL &&
+	  trs_event_scheduled() != trs_disk_lostdata) {
 	z80_state.t_count = z80_state.sched;
 	trs_do_event();
       }
