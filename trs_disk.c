@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Fri Jan 15 01:03:44 PST 1999 by mann */
+/* Last modified on Sat Apr 17 20:33:49 PDT 1999 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
@@ -2147,6 +2147,14 @@ real_seek()
   int res, i = 0;
   sigset_t set, oldset;
 
+  /* Always use a recal if going to track 0.  This should help us
+     recover from confusion about what track the disk is really on.
+     I'm still not sure why the confusion sometimes arises. */
+  if (d->phytrack == 0) {
+    real_restore(state.curdrive);
+    return;
+  }
+
   state.last_readadr = -1;
   memset(&raw_cmd, 0, sizeof(raw_cmd));
   raw_cmd.length = 256;
@@ -2231,7 +2239,10 @@ real_read()
 	state.status |= TRSDISK_NOTFOUND;
       }
       if (raw_cmd.reply[1] & 0x81) state.status |= TRSDISK_NOTFOUND;
-      if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
+      if (raw_cmd.reply[1] & 0x20) {
+	state.status |= TRSDISK_CRCERR;
+	if (!(raw_cmd.reply[2] & 0x20)) state.status |= TRSDISK_NOTFOUND;
+      }
       if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
       if (raw_cmd.reply[2] & 0x40) {
 	if (state.controller == TRSDISK_P1771) {
@@ -2332,7 +2343,10 @@ real_write()
 #endif
     }
     if (raw_cmd.reply[1] & 0x81) state.status |= TRSDISK_NOTFOUND;
-    if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
+    if (raw_cmd.reply[1] & 0x20) {
+      state.status |= TRSDISK_CRCERR;
+      if (!(raw_cmd.reply[2] & 0x20)) state.status |= TRSDISK_NOTFOUND;
+    }
     if (raw_cmd.reply[1] & 0x10) state.status |= TRSDISK_LOSTDATA;
     if (raw_cmd.reply[1] & 0x02) {
       state.status |= TRSDISK_WRITEPRT;
@@ -2360,7 +2374,7 @@ real_readadr()
   struct floppy_raw_cmd raw_cmd;
   int res, i = 0;
   sigset_t set, oldset;
-#if REAL_READADR_DELAY
+#if REALRADLY
   static struct timeval last_tv = {0, 0};
   struct timeval tv;
 #endif
@@ -2380,7 +2394,7 @@ real_readadr()
   sigprocmask(SIG_BLOCK, &set, &oldset);
   trs_paused = 1;
   res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
-#if REAL_READADR_DELAY
+#if REALRADLY
   gettimeofday(&tv, NULL);
 #endif
   sigprocmask(SIG_SETMASK, &oldset, NULL);
@@ -2401,7 +2415,7 @@ real_readadr()
     if (raw_cmd.reply[2] & 0x20) state.status |= TRSDISK_CRCERR;
     if (raw_cmd.reply[2] & 0x13) state.status |= TRSDISK_NOTFOUND;
     if ((state.status & TRSDISK_NOTFOUND) == 0) {
-#if REAL_READADR_DELAY
+#if REALRADLY
       /* Emulate spacing between sectors by delaying response an
 	 appropriate number of t-states, in an attempt to make
 	 HyperZap's A command work.  Problems: (1) On slow PCs, this
@@ -2462,7 +2476,7 @@ real_readadr()
       trs_schedule_event(trs_disk_firstdrq, savedelay, ts);
       state.last_readadr = (d->phytrack | (state.curdrive << 8));
       last_tv = tv;
-#else /*!REAL_READADR_DELAY*/
+#else /*!REALRADLY*/
       /* No delay */
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
