@@ -552,12 +552,14 @@ Use the built-in character bitmaps, not a X font.  This is the default.
 .B \-font \fIfontname\fP
 If -usefont is also given,
 use the specified X font for normal width characters.
-The default uses the supplied fonts.
+The default uses a common X fixed-width font:
+"-misc-fixed-medium-r-normal--20-200-75-75-*-100-*-*".
 .TP
 .B \-widefont \fIfontname\fP
 If -usefont is also given,
 use the specified X font for double width characters.
-The default uses the supplied fonts, scaled to double width.
+The default uses a common X fixed-width font, scaled to double width:
+"-misc-fixed-medium-r-normal--20-200-75-75-*-200-*-*".
 .TP
 .B \-microlabs
 In Model 4/4P mode, emulate the Micro Labs Grafyx Solution hi-res

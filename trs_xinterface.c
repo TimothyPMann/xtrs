@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Thu Oct 15 14:51:14 PDT 1998 by mann
+   Last modified on Sat Oct 24 18:11:30 PDT 1998 by mann
 */
 
 /*#define MOUSEDEBUG 1*/
@@ -48,14 +48,10 @@
 #include "z80.h"
 #include "trs_disk.h"
 
-#define DEF_FONT1 \
-    "-trs80-model1-medium-r-normal--24-*-64-64-c-80-trs80-model1"
-#define DEF_WIDEFONT1 \
-    "-trs80-model1-medium-r-normal--24-*-64-64-c-160-trs80-model1"
-#define DEF_FONT3 \
-    "-trs80-model3-medium-r-normal--24-*-64-64-c-80-trs80-model3"
-#define DEF_WIDEFONT3 \
-    "-trs80-model3-medium-r-normal--24-*-64-64-c-160-trs80-model3"
+#define DEF_FONT1	"-misc-fixed-medium-r-normal--20-200-75-75-*-100-*-*"
+#define DEF_WIDEFONT1	"-misc-fixed-medium-r-normal--20-200-75-75-*-200-*-*"
+#define DEF_FONT3	"-misc-fixed-medium-r-normal--20-200-75-75-*-100-*-*"
+#define DEF_WIDEFONT3	"-misc-fixed-medium-r-normal--20-200-75-75-*-200-*-*"
 #define DEF_USEFONT 0
 
 extern char trs_char_data[][MAXCHARS][TRS_CHAR_HEIGHT];
