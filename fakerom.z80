@@ -1,0 +1,42 @@
+;
+; Fake ROM for xtrs, initial hack
+;
+
+video	equ	3c00h+7*64
+
+	org	0
+start:	di
+	ld	hl,fakemsg
+	ld	de,video
+	ld	bc,fmend-fakemsg
+	ldir
+	ld	a,5		;query model
+	defw	3cedh		;emt_misc
+	ld	a,'0'
+	add	a,l
+	cp	'5'
+	jr	z,mod4p
+	ld	(model-fakemsg+video),a
+	cp	'4'
+	jr	z,mod4
+	jr	$
+
+mod4:	ld	hl,m4msg
+	ld	de,video+64
+	ld	bc,m4end-m4msg
+	ldir
+	jr	$
+
+mod4p:	ld	hl,model-fakemsg+video
+	ld	(hl),'4'
+	inc	hl
+	ld	(hl),'P'
+	jr	$
+
+fakemsg:defb	'You do not have a ROM image installed for Model '
+model	equ	$
+fmend	equ	$
+m4msg:	defb	'(Model 4 mode requires a Model 3 ROM image)'
+m4end	equ	$
+
+	end	start
