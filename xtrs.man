@@ -370,7 +370,9 @@ limitations even under Linux: Sectors must be 256 bytes long.
 difference between the PC and TRS-80 floppy controllers.)  Index holes
 are faked, not detected on the real disk.  Attempts to access a real
 drive with no disk in it are dealt with awkwardly (as documented
-above).  The code is new and not thoroughly tested.
+above).  The code is new and not thoroughly tested.  Read/write
+performance is poor; for example, the "verify" step of LDOS format
+seems to read only one sector per revolution.
 
 The emulator arbitrarily limits both JV1 and JV3 disk images to 96
 tracks.  The limit could easily be increased to 255 or maybe 256, but
