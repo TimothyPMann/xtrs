@@ -1,6 +1,6 @@
 ;; export.z
 ;; Timothy Mann, 8/24/97
-;; Last modified on Tue Dec 15 16:32:38 PST 1998 by mann
+;; Last modified on Sat Mar 25 21:36:04 PST 2000 by mann
 ;;
 ;; Use xtrs 1.9 emulator traps to copy a file from TRS-80 to Unix
 ;; Usage: EXPORT [-ln] fromfile [unixfile]
@@ -50,7 +50,7 @@ open:	call @open
 	ret
 close:	call @close
 	ret
-read:	call @read
+reed:	call @read
 	ret
 write:	call @write
 	ret
@@ -221,7 +221,7 @@ opn2ok:	call getern		; count down records in bc
 
 loop:	push de			; save fd
 	ld de, dcb
-	call read               ; read 256 bytes from file
+	call reed               ; read 256 bytes from file
 	pop de
         jr z, rdok		; got a full 256 bytes
 	cp 28			; eof?
