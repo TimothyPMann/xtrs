@@ -53,16 +53,16 @@ void z80_out(int port, int value)
     } else {
 	switch (port) {
 	  case 0x80:
-	    if (trs_model >= 4) grafyx_write_x(value);
+	    if (trs_model >= 3) grafyx_write_x(value);
 	    break;
 	  case 0x81:
-	    if (trs_model >= 4) grafyx_write_y(value);
+	    if (trs_model >= 3) grafyx_write_y(value);
 	    break;
 	  case 0x82:
-	    if (trs_model >= 4) grafyx_write_data(value);
+	    if (trs_model >= 3) grafyx_write_data(value);
 	    break;
 	  case 0x83:
-	    if (trs_model >= 4) grafyx_write_mode(value);
+	    if (trs_model >= 3) grafyx_write_mode(value);
 	    break;
 	  case 0x84:
 	  case 0x85:
@@ -186,7 +186,7 @@ int z80_in(int port)
     } else {
 	switch (port) {
 	  case 0x82:
-	    if (trs_model >= 4) {
+	    if (trs_model >= 3) {
 		return grafyx_read_data();
 	    }
 	    break;
