@@ -2,10 +2,10 @@
 40 REM-- Uses xtrs 1.3 export feature to copy a TRS-80 
 60 REM--   file to a Unix file.
 70 REM-- Timothy Mann, 10/30/96
-75 REM-- Last modified on Tue Aug  5 20:25:27 PDT 1997 by mann
+75 REM-- Last modified on Wed Oct  1 17:37:25 PDT 1997 by mann
 80 CLEAR 5000
-120 LINEINPUT "TRS-80 input file? ";F$
-130 LINEINPUT "Unix output file? ";C$
+120 LINE INPUT "TRS-80 input file? ";F$
+130 LINE INPUT "Unix output file? ";C$
 140 OPEN"RO",1,F$,1
 160 FIELD #1,1 AS B$
 180 INPUT "Convert newlines (y/n)";CN$
