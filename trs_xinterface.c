@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Wed Aug 27 21:50:55 PDT 1997 by mann
+   Last modified on Thu Sep 25 16:47:13 PDT 1997 by mann
 */
 
 /*
@@ -44,23 +44,33 @@
 #include "trs.h"
 #include "z80.h"
 
-#define DEF_FONT "fixed"
+#define DEF_FONT1 \
+    "-trs80-model1-medium-r-normal--24-*-64-64-c-80-trs80-model1"
+#define DEF_WIDEFONT1 \
+    "-trs80-model1-medium-r-normal--24-*-64-64-c-160-trs80-model1"
+#define DEF_FONT3 \
+    "-trs80-model3-medium-r-normal--24-*-64-64-c-80-trs80-model3"
+#define DEF_WIDEFONT3 \
+    "-trs80-model3-medium-r-normal--24-*-64-64-c-160-trs80-model3"
+#define DEF_USEFONT 0
 
-extern char trs_char_data[MAXCHARS][12];
+extern char trs_char_data[2][MAXCHARS][TRS_CHAR_HEIGHT];
+extern char trs_widechar_data[2][MAXCHARS][TRS_CHAR_HEIGHT][2];
 
 /* Private data */
 static int trs_screen[SCREENCHARS];
-static Pixmap trs_char[MAXCHARS];
+static Pixmap trs_char[2][MAXCHARS];
 static Display *display;
 static int screen;
 static Window window;
 static GC gc;
 static ScreenMode currentmode = NORMAL;
 static int OrigHeight,OrigWidth;
-static int usefont = 1;
+static int usefont = DEF_USEFONT;
+static int trsfont;
 static int cur_char_width = TRS_CHAR_WIDTH;
 static int cur_char_height = TRS_CHAR_HEIGHT;
-static XFontStruct *myfont;
+static XFontStruct *myfont, *mywidefont, *curfont;
 
 static XrmOptionDescRec opts[] = {
 {"-background",	"*background",	XrmoptionSepArg,	(caddr_t)NULL},
@@ -70,6 +80,9 @@ static XrmOptionDescRec opts[] = {
 {"-usefont",	"*usefont",	XrmoptionNoArg,		(caddr_t)"on"},
 {"-nofont",	"*usefont",	XrmoptionNoArg,		(caddr_t)"off"},
 {"-font",	"*font",	XrmoptionSepArg,	(caddr_t)NULL},
+{"-widefont",	"*widefont",	XrmoptionSepArg,	(caddr_t)NULL},
+{"-trsfont",	"*trsfont",	XrmoptionNoArg,		(caddr_t)"on"},
+{"-notrsfont",	"*trsfont",	XrmoptionNoArg,		(caddr_t)"off"},
 {"-display",	"*display",	XrmoptionSepArg,	(caddr_t)NULL},
 {"-debug",	"*debug",	XrmoptionNoArg,		(caddr_t)"on"},
 {"-romfile",	"*romfile",	XrmoptionSepArg,	(caddr_t)NULL},
@@ -148,6 +161,7 @@ int *debug;
     XColor cdef;
     XGCValues gcvals;
     char *fontname;
+    char *widefontname;
     int len;
     char *xrms;
     char *program_name;
@@ -230,9 +244,35 @@ int *debug;
 	    fontname = malloc(len + 1);
 	    strcpy(fontname,value.addr);
 	} else {
-	    len = strlen(DEF_FONT);
+	    char *def_font = (trs_model == 1 ? DEF_FONT1 : DEF_FONT3);
+	    len = strlen(def_font);
 	    fontname = malloc(len+1);
-	    strcpy(fontname,DEF_FONT);
+	    strcpy(fontname, def_font);
+	}
+	(void) sprintf(option, "%s%s", program_name, ".widefont");
+	if (XrmGetResource(x_db, option, "Xtrs.Widefont", &type, &value))
+	{
+	    len = strlen(value.addr);
+	    widefontname = malloc(len + 1);
+	    strcpy(widefontname,value.addr);
+	} else {
+	    char *def_widefont =
+	      (trs_model == 1 ? DEF_WIDEFONT1 : DEF_WIDEFONT3);
+	    len = strlen(def_widefont);
+	    widefontname = malloc(len+1);
+	    strcpy(widefontname, def_widefont);
+	}
+	/* Set default (kludge) */
+	trsfont = (strncasecmp(fontname, "-trs80", 6) == 0);
+    }
+
+    (void) sprintf(option, "%s%s", program_name, ".trsfont");
+    if (XrmGetResource(x_db, option, "Xtrs.Trsfont", &type, &value))
+    {
+	if (strcmp(value.addr,"on") == 0) {
+	    trsfont = 1;
+	} else if (strcmp(value.addr,"off") == 0) {
+	    trsfont = 0;
 	}
     }
 
@@ -286,6 +326,12 @@ int *debug;
 	    fprintf(stderr,"%s: Can't open font %s!\n",program_name,fontname);
 	    exit(-1);
 	}
+	if ((mywidefont = XLoadQueryFont(display,widefontname)) == NULL) {
+	    fprintf(stderr,"%s: Can't open font %s!\n",
+		    program_name,widefontname);
+	    exit(-1);
+	}
+	curfont = myfont;
 	XSetFont(display,gc,myfont->fid);
 	cur_char_width =  myfont->max_bounds.width;
 	cur_char_height = myfont->ascent + myfont->descent;
@@ -457,7 +503,15 @@ void trs_get_event(wait)
 void trs_screen_mode_select(mode)
     ScreenMode mode;
 {
-    currentmode = mode;
+    if (currentmode != mode) {
+	currentmode = mode;
+	if (usefont) {
+	    curfont = (mode == NORMAL ? myfont : mywidefont);
+	    XSetFont(display,gc,curfont->fid);
+	}
+	XClearWindow(display,window);
+	trs_screen_refresh();
+    }
 }
 
 void screen_init()
@@ -469,6 +523,50 @@ void screen_init()
 	trs_screen[i] = 32;
 }
 
+void boxes_init(foreground, background, width, height, expanded)
+{
+    int graphics_char, bit, p;
+    XRectangle bits[6];
+    XRectangle cur_bits[6];
+
+    /*
+     * Calculate what the 2x3 boxes look like.
+     */
+    bits[0].x = bits[2].x = bits[4].x = 0;
+    bits[0].width = bits[2].width = bits[4].width =
+      bits[1].x = bits[3].x = bits[5].x =  width / 2;
+    bits[1].width = bits[3].width = bits[5].width = width - bits[1].x;
+
+    bits[0].y = bits[1].y = 0;
+    bits[0].height = bits[1].height =
+      bits[2].y = bits[3].y = cur_char_height / 3;
+    bits[4].y = bits[5].y = (cur_char_height * 2) / 3;
+    bits[2].height = bits[3].height = bits[4].y - bits[2].y;
+    bits[4].height = bits[5].height = cur_char_height - bits[4].y;
+
+    for (graphics_char = 128; graphics_char < 192; ++graphics_char) {
+	trs_char[expanded][graphics_char] =
+	  XCreatePixmap(display, window, width, height,
+			DefaultDepth(display, screen));
+
+	/* Clear everything */
+	XSetForeground(display, gc, background);
+	XFillRectangle(display, trs_char[expanded][graphics_char],
+		       gc, 0, 0, width, height);
+
+	/* Set the bits */
+	XSetForeground(display, gc, foreground);
+
+	for (bit = 0, p = 0; bit < 6; ++bit) {
+	    if (graphics_char & (1 << bit)) {
+		cur_bits[p++] = bits[bit];
+	    }
+	}
+	XFillRectangles(display, trs_char[expanded][graphics_char],
+			  gc, cur_bits, p);
+    }
+}
+
 void bitmap_init(foreground, background)
     unsigned long foreground, background;
 {
@@ -477,55 +575,29 @@ void bitmap_init(foreground, background)
 	int i;
 	
 	for (i = 0; i < MAXCHARS; i++) {
-	    trs_char[i] =
-		XCreateBitmapFromData(display,window,trs_char_data[i],
+	    trs_char[0][i] =
+		XCreateBitmapFromData(display,window,
+				      trs_char_data[trs_model != 1][i],
 				      TRS_CHAR_WIDTH,TRS_CHAR_HEIGHT);
+	    trs_char[1][i] =
+		XCreateBitmapFromData(display,window,
+				      trs_widechar_data[trs_model != 1][i],
+				      TRS_CHAR_WIDTH*2,TRS_CHAR_HEIGHT);
 	}
-    } else {
-	int graphics_char, bit, p;
-	XRectangle bits[6];
-	XRectangle cur_bits[6];
+    } else if (!trsfont) {
+	int dwidth, dheight;
 
-	/*
-	 * Calculate what the 2x3 boxes look like.
-	 */
-	bits[0].x = bits[2].x = bits[4].x = 0;
-	bits[0].width = bits[2].width = bits[4].width =
-	  bits[1].x = bits[3].x = bits[5].x =  cur_char_width / 2;
-	bits[1].width = bits[3].width = bits[5].width =
-	  cur_char_width - bits[1].x;
-	bits[0].y = bits[1].y = 0;
-	bits[0].height = bits[1].height =
-	  bits[2].y = bits[3].y = cur_char_height / 3;
-
-	bits[4].y = bits[5].y = (cur_char_height * 2) / 3;
-	bits[2].height = bits[3].height = bits[4].y - bits[2].y;
-
-	bits[4].height = bits[5].height = cur_char_height - bits[4].y;
-
-	for(graphics_char = 128; graphics_char < 192; ++graphics_char)
-	{
-	    trs_char[graphics_char] =
-		XCreatePixmap(display,window,cur_char_width,cur_char_height,
-			      DefaultDepth(display,screen));	
-
-	    /* Clear everything */
-	    XSetForeground(display, gc, background);
-  	    XFillRectangle(display,trs_char[graphics_char],gc,
-			   0,0,cur_char_width,cur_char_height);
-
-	    /* Set the bits */
-	    XSetForeground(display, gc, foreground);
-
-	    for(bit = 0, p = 0; bit < 6; ++bit)
-	    {
-		if(graphics_char & (1 << bit))
-		{
-		    cur_bits[p++] = bits[bit];
-		}
-	    }
-	    XFillRectangles(display,trs_char[graphics_char],gc,cur_bits,p);
+	boxes_init(foreground, background,
+		   cur_char_width, cur_char_height, 0);
+	dwidth = 2*cur_char_width;
+	dheight = 2*cur_char_height;
+	if (dwidth > mywidefont->max_bounds.width) {
+	    dwidth = mywidefont->max_bounds.width;
 	}
+	if (dheight > mywidefont->ascent + mywidefont->descent) {
+	    dheight = mywidefont->ascent + mywidefont->descent;
+	}
+	boxes_init(foreground, background, dwidth, dheight, 1);
     }
 }
 
@@ -549,34 +621,51 @@ Bool doflush;
     char temp_char;
 
     trs_screen[position] = char_index;
-#ifndef UPPERCASE
-    /* Emulate Radio Shack lowercase mod.  The replacement character
-       generator ROM had another copy of the uppercase characters in
-       the control character positions, to compensate for a bug in the
-       Level II ROM that stores such values instead of uppercase.
-    */
-    if (char_index < 0x20) char_index += 0x40;
-#endif
+    if (currentmode == EXPANDED && (position & 1)) return;
     row = position / ROW_LENGTH;
     col = position - (row * ROW_LENGTH);
     destx = col * cur_char_width;
     desty = row * cur_char_height;
     if (usefont) {
-	if(char_index >= 128) {
-	    /* a graphics character */
+	if (trs_model == 1 && !trsfont) {
+#ifndef UPPERCASE
+	    /* Emulate Radio Shack lowercase mod.  The replacement character
+	       generator ROM had another copy of the uppercase characters in
+	       the control character positions, to compensate for a bug in the
+	       Level II ROM that stores such values instead of uppercase. */
+	    if (char_index < 0x20) char_index += 0x40;
+#endif
+	    if (char_index >= 0x80) char_index &= 0xbf;
+	}
+	if(!trsfont && char_index >= 0x80 && char_index <= 0xbf) {
+	    /* use graphics character bitmap instead of font */
 	    plane = 1;
-	    XCopyArea(display,trs_char[char_index&0xbf],window,gc,0,0,
-		      cur_char_width,cur_char_height,destx,desty);
+	    if (currentmode == NORMAL) {
+	      XCopyArea(display,
+			trs_char[0][char_index],window,gc,0,0,
+			cur_char_width,cur_char_height,destx,desty);
+	    } else {
+	      XCopyArea(display,
+			trs_char[1][char_index],window,gc,0,0,
+			cur_char_width*2,cur_char_height,destx,desty);
+	    }
 	} else {
-	    desty += myfont->ascent;
+	    XFontStruct *font;
+	    desty += curfont->ascent;
 	    temp_char = (char)char_index;
-	    XDrawImageString(display,window,gc,destx,desty,
-			     &temp_char,1);
+	    XDrawImageString(display,window,gc,destx,desty,&temp_char,1);
 	}
     } else {
         plane = 1;
-	XCopyPlane(display,trs_char[char_index],window,gc,0,0,TRS_CHAR_WIDTH,
-		   TRS_CHAR_HEIGHT,destx,desty,plane);
+	if (currentmode == NORMAL) {
+	    XCopyPlane(display,trs_char[0][char_index],
+		       window,gc,0,0,TRS_CHAR_WIDTH,
+		       TRS_CHAR_HEIGHT,destx,desty,plane);
+	} else {
+	    XCopyPlane(display,trs_char[1][char_index],
+		       window,gc,0,0,TRS_CHAR_WIDTH*2,
+		       TRS_CHAR_HEIGHT,destx,desty,plane);
+	}
     }
     if (doflush)
 	XFlush(display);
