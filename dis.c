@@ -373,14 +373,14 @@ static struct opcode minor[6][256] = {
 	"sra	(hl)",		0,		/* cb2e */
 	"sra	a",		0,		/* cb2f */
 	
-	"sll	b",		0,		/* cb30 [undocumented] */
-	"sll	c",		0,		/* cb31 [undocumented] */
-	"sll	d",		0,		/* cb32 [undocumented] */
-	"sll	e",		0,		/* cb33 [undocumented] */
-	"sll	h",		0,		/* cb34 [undocumented] */
-	"sll	l",		0,		/* cb35 [undocumented] */
-	"sll	(hl)",		0,		/* cb36 [undocumented] */
-	"sll	a",		0,		/* cb37 [undocumented] */
+	"slia	b",		0,		/* cb30 [undocumented] */
+	"slia	c",		0,		/* cb31 [undocumented] */
+	"slia	d",		0,		/* cb32 [undocumented] */
+	"slia	e",		0,		/* cb33 [undocumented] */
+	"slia	h",		0,		/* cb34 [undocumented] */
+	"slia	l",		0,		/* cb35 [undocumented] */
+	"slia	(hl)",		0,		/* cb36 [undocumented] */
+	"slia	a",		0,		/* cb37 [undocumented] */
 	
 	"srl	b",		0,		/* cb38 */
 	"srl	c",		0,		/* cb39 */
@@ -1533,7 +1533,7 @@ static struct opcode minor[6][256] = {
 	undefined,		0,		/* ddcb33 */
 	undefined,		0,		/* ddcb34 */
 	undefined,		0,		/* ddcb35 */
-	"sll	(ix+%02xh)",	3,		/* ddcb36 [undocumented] */
+	"slia	(ix+%02xh)",	3,		/* ddcb36 [undocumented] */
 	undefined,		0,		/* ddcb37 */
 	
 	undefined,		0,		/* ddcb38 */
@@ -1822,7 +1822,7 @@ static struct opcode minor[6][256] = {
 	undefined,		0,		/* fdcb33 */
 	undefined,		0,		/* fdcb34 */
 	undefined,		0,		/* fdcb35 */
-	"sll	(iy+%02xh)",	3,		/* fdcb36 [undocumented] */
+	"slia	(iy+%02xh)",	3,		/* fdcb36 [undocumented] */
 	undefined,		0,		/* fdcb37 */
 	
 	undefined,		0,		/* fdcb38 */

@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Sep 30 18:33:50 PDT 1997 by mann
+   Last modified on Wed Oct  1 17:18:42 PDT 1997 by mann
 */
 
 /*
@@ -32,18 +32,6 @@
 #include <stdlib.h>
 #include "trs_disk.h"
 
-Uchar memory[0x20001]; /* +1 so strings from mem_pointer are NUL-terminated */
-Uchar *rom;
-int trs_rom_size;
-Uchar *video;
-int trs_video_size;
-
-int memory_map = 0;
-int bank_offset[2];
-#define VIDEO_PAGE_0 0
-#define VIDEO_PAGE_1 1024
-int video_page = VIDEO_PAGE_0;
-
 #define MAX_ROM_SIZE	(0x3800)
 #define MAX_VIDEO_SIZE	(0x0800)
 
@@ -58,6 +46,18 @@ int video_page = VIDEO_PAGE_0;
 
 /* Interrupt latch register in EI (Model 1) */
 #define TRS_INTLATCH(addr) (((addr)&~3) == 0x37e0)
+
+Uchar memory[0x20001]; /* +1 so strings from mem_pointer are NUL-terminated */
+Uchar *rom;
+int trs_rom_size;
+Uchar *video;
+int trs_video_size;
+
+int memory_map = 0;
+int bank_offset[2];
+#define VIDEO_PAGE_0 0
+#define VIDEO_PAGE_1 1024
+int video_offset = (-VIDEO_START + VIDEO_PAGE_0);
 
 /*SUPPRESS 53*/
 /*SUPPRESS 112*/
@@ -123,7 +123,7 @@ static void uncache_video_writes()
 void mem_video_page(which)
      int which;
 {
-    video_page = which ? VIDEO_PAGE_1 : VIDEO_PAGE_0;
+    video_offset = -VIDEO_START + (which ? VIDEO_PAGE_1 : VIDEO_PAGE_0);
 }
 
 void mem_bank(command)
@@ -198,7 +198,7 @@ void mem_init()
     }
     mem_map(0);
     mem_bank(0);
-    video_page = 0;
+    mem_video_page(0);
     video_cache_on = 0;
 }
 
@@ -264,7 +264,7 @@ int mem_read(address)
 	if (address == PRINTER_ADDRESS) return trs_printer_read();
 	if (address < trs_rom_size) return rom[address];
 	if (address >= VIDEO_START) {
-	    return video[(address-VIDEO_START)|video_page];
+	    return video[address + video_offset];
 	}
 	if (address >= KEYBOARD_START) return trs_kb_mem_read(address);
 	return 0xff;
@@ -274,7 +274,7 @@ int mem_read(address)
 	    return memory[address + bank_offset[address>>15]];
 	}
 	if (address >= VIDEO_START) {
-	    return video[(address-VIDEO_START)|video_page];
+	    return video[address + video_offset];
 	}
 	if (address >= KEYBOARD_START) return trs_kb_mem_read(address);
 	return 0xff;
@@ -305,7 +305,7 @@ void mem_write(address, value)
 	if (address >= RAM_START) {
 	    memory[address] = value;
 	} else if (address >= VIDEO_START) {
-	    int vaddr = (address-VIDEO_START)|video_page;
+	    int vaddr = address + video_offset;
 #ifdef UPPERCASE
 	    /*
 	     * Video write.  Hack here to make up for the missing bit 6
@@ -342,7 +342,7 @@ void mem_write(address, value)
 	if (address >= RAM_START) {
 	    memory[address] = value;
 	} else if (address >= VIDEO_START) {
-	    int vaddr = (address-VIDEO_START)|video_page;
+	    int vaddr = address + video_offset;
 	    if (video[vaddr] != value) {
 		video[vaddr] = value;
 		video_write(vaddr, value);
@@ -357,7 +357,7 @@ void mem_write(address, value)
 	if (address >= RAM_START) {
 	    memory[address + bank_offset[address>>15]] = value;
 	} else if (address >= VIDEO_START) {
-	    int vaddr = (address-VIDEO_START)|video_page;
+	    int vaddr = address+ video_offset;
 	    if (video[vaddr] != value) {
 		video[vaddr] = value;
 		video_write(vaddr, value);
@@ -371,7 +371,7 @@ void mem_write(address, value)
 	if (address >= RAM_START || address < KEYBOARD_START) {
 	    memory[address + bank_offset[address>>15]] = value;
 	} else if (address >= VIDEO_START) {
-	    int vaddr = (address-VIDEO_START)|video_page;
+	    int vaddr = address + video_offset;
 	    if (video[vaddr] != value) {
 		video[vaddr] = value;
 		video_write(vaddr, value);
@@ -448,7 +448,7 @@ Uchar *mem_pointer(address)
 	}
 	if (address < trs_rom_size) return &rom[address];
 	if (address >= VIDEO_START) {
-	    return &video[(address-VIDEO_START)|video_page];
+	    return &video[address + video_offset];
 	}
 	return NULL;
 
@@ -457,7 +457,7 @@ Uchar *mem_pointer(address)
 	    return &memory[address + bank_offset[address>>15]];
 	}
 	if (address >= VIDEO_START) {
-	    return &video[(address-VIDEO_START)|video_page];
+	    return &video[address + video_offset];
 	}
 	return NULL;
 

@@ -156,12 +156,12 @@ The emulator implements a set of pseudo-instructions (emulator traps)
 that give TRS-80 programs access to Unix files.  The supplied Z-80
 assembly language programs import.z and export.z exercise these
 features; see the top of each file for usage instructions.
-Unfortunately, these programs currently run only under LDOS.  The
-Basic programs import.bas and export.bas use a different mechanism in
-the emulator that may be removed in the future, and are very slow, but
-they should work under all TRS-80 operating systems.  All these
-programs are supplied (in both source and executable form) on the
-emulated floppy disk utility.dsk to get you started.
+Unfortunately, these programs currently run only under Model I/III
+LDOS.  The Basic programs import.bas and export.bas use a different
+mechanism in the emulator that may be removed in the future, and are
+very slow, but they should work under all TRS-80 operating systems.
+All these programs are supplied (in both source and executable form)
+on the emulated floppy disk utility.dsk to get you started.
 
 See README and README.tpm in this package for additional technical
 (and historical) data.
@@ -328,6 +328,9 @@ emulate a hard drive.  5802 sectors is already enough for a 3" HD
 The emulator guesses a romfile is in .hex format if its first byte is
 a colon (':'), so a raw binary ROM image can't start with that byte
 value.  In the future it would be nice to accept MODELA/III files too.
+
+Versions of import/cmd and export/cmd for Model 4 LDOS (and non-LDOS
+systems on any model) are not currently provided.
 
 If you discover other bugs, or write fixes for any of these, please let
 us know.  We expect to incorporate fixes into future releases.

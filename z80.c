@@ -15,33 +15,34 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Sep 30 18:16:23 PDT 1997 by mann
+   Last modified on Wed Oct  1 15:33:22 PDT 1997 by mann
 */
 
 /*
  * z80.c:  The guts of the Z-80 emulator.
  *
  * The Z-80 emulator should be general and complete enough to be easily
- * adapted to emulate any Z-80 machine, although it's only really been tested
- * with TRS-80 code.  The only thing we cheat a little on is interrupt
- * handling and the refresh register.  All of the flags are supported.
- * All of the documented Z-80 instructions are implemented.  
+ * adapted to emulate any Z-80 machine, although it's only really been
+ * tested with TRS-80 code.  The only thing we cheat a little on is
+ * interrupt handling (modes 0 and 2 are not supported) and the
+ * refresh register (reading it returns a random number; writing it is
+ * ignored).   All of the documented flags are supported.  All of the
+ * documented Z-80 instructions are implemented.   
  *
- * Some undocumented Z-80 features are implemented too, but others are
- * not.  Currently implemented: "sll" instructions (CB30-CB37), DD or
- * FD prefix on instructions that use H or L, undocumented ED prefix
- * instructions including "in (c)" (ED70), "out (c), 0" (ED71).
- * Registers F, F' each have 8 working bits, usable with pop af/push af.
+ * Some undocumented Z-80 features are implemented too, but others are 
+ * not.  Currently implemented: "slia" instructions (CB30-CB37), DD or 
+ * FD prefix on instructions that use H or L (or that don't!),
+ * undocumented ED prefix instructions including "in (c)" (ED70), "out
+ * (c), 0" (ED71).  Registers F, F' each have 8 working bits, usable
+ * with pop af/push af. 
  *
- * Known omissions: DD or FD prefix on CB instructions that don't
- * reference HL (these are weird), DD or FD prefix on other
- * instructions that don't reference HL, H, or L (prefix should be
- * ignored), multiple DD or FD prefixes on one instruction (all but
- * the last should be ignored), ED prefix instructions that are no-ops
- * or that set IM to an undefined state.  Instructions other than "pop
- * af" and "ex af, af'" do not affect the undocumented flag bits in F.
+ * Known omissions: DD or FD prefix on CB instructions that don't 
+ * reference HL (these are weird), ED prefix instructions that are
+ * no-ops or that set IM to an undefined state.  Instructions other
+ * than "pop af" and "ex af, af'" do not affect the undocumented flag
+ * bits in F. 
  *
- * There are undoubtedly bugs in the emulator.  If you discover any,
+ * There may still be bugs in the emulator.  If you discover any,
  * please do send a report.  */
 
 #include "z80.h"
@@ -863,8 +864,8 @@ static int sra_byte(value)
     return result;
 }
 
-/* undocumented opcode sll: shift left and set bit 0 to 1 */
-static int sll_byte(value)
+/* undocumented opcode slia: shift left and increment */
+static int slia_byte(value)
     int value;
 {
     Uchar clear, set;
@@ -2145,29 +2146,29 @@ static void do_CB_instruction()
 	mem_write(REG_HL, sra_byte(mem_read(REG_HL)));
 	break;
 
-      case 0x37:	/* sll a [undocumented] */
-	REG_A = sll_byte(REG_A);
+      case 0x37:	/* slia a [undocumented] */
+	REG_A = slia_byte(REG_A);
 	break;
-      case 0x30:	/* sll b [undocumented] */
-	REG_B = sll_byte(REG_B);
+      case 0x30:	/* slia b [undocumented] */
+	REG_B = slia_byte(REG_B);
 	break;
-      case 0x31:	/* sll c [undocumented] */
-	REG_C = sll_byte(REG_C);
+      case 0x31:	/* slia c [undocumented] */
+	REG_C = slia_byte(REG_C);
 	break;
-      case 0x32:	/* sll d [undocumented] */
-	REG_D = sll_byte(REG_D);
+      case 0x32:	/* slia d [undocumented] */
+	REG_D = slia_byte(REG_D);
 	break;
-      case 0x33:	/* sll e [undocumented] */
-	REG_E = sll_byte(REG_E);
+      case 0x33:	/* slia e [undocumented] */
+	REG_E = slia_byte(REG_E);
 	break;
-      case 0x34:	/* sll h [undocumented] */
-	REG_H = sll_byte(REG_H);
+      case 0x34:	/* slia h [undocumented] */
+	REG_H = slia_byte(REG_H);
 	break;
-      case 0x35:	/* sll l [undocumented] */
-	REG_L = sll_byte(REG_L);
+      case 0x35:	/* slia l [undocumented] */
+	REG_L = slia_byte(REG_L);
 	break;
-      case 0x36:	/* sll (hl) [undocumented] */
-	mem_write(REG_HL, sll_byte(mem_read(REG_HL)));
+      case 0x36:	/* slia (hl) [undocumented] */
+	mem_write(REG_HL, slia_byte(mem_read(REG_HL)));
 	break;
 
       case 0x3F:	/* srl a */
@@ -2509,9 +2510,9 @@ static void do_indexed_instruction(ixp)
 	      mem_write(*ixp + offset,
 			sra_byte(mem_read((*ixp + offset) & 0xffff)));
 	      break;
-	    case 0x36:	/* sll (ix + offset) [undocumented] */
+	    case 0x36:	/* slia (ix + offset) [undocumented] */
 	      mem_write(*ixp + offset,
-			sll_byte(mem_read((*ixp + offset) & 0xffff)));
+			slia_byte(mem_read((*ixp + offset) & 0xffff)));
 	      break;
 	    case 0x3E:	/* srl (ix + offset) */
 	      mem_write(*ixp + offset,
@@ -2670,9 +2671,10 @@ static void do_indexed_instruction(ixp)
       /* end undocumented instructions */
 
       default:
-	REG_PC -= 2;
-	disassemble(REG_PC);
-	error("unsupported instruction");
+	/* Ignore DD or FD prefix and retry as normal instruction;
+	   this is a correct emulation. [undocumented] */
+	REG_PC--;
+	break;
     }
 }
 

@@ -43,6 +43,9 @@ static int timer_hz;
 #define LDOS3_MONTH 0x442f
 #define LDOS3_DAY   0x4457
 #define LDOS3_YEAR  0x4413
+#define LDOS4_MONTH 0x0035
+#define LDOS4_DAY   0x0034
+#define LDOS4_YEAR  0x0033
 
 static int timer_on = 1;
 #ifdef IDEBUG
@@ -240,6 +243,12 @@ trs_timer_init()
       mem_write(LDOS3_MONTH, (lt->tm_mon + 1) ^ 0x50);
       mem_write(LDOS3_DAY, lt->tm_mday);
       mem_write(LDOS3_YEAR, lt->tm_year - 80);
+      if (trs_model == 4) {
+        extern Uchar memory[];
+	memory[LDOS4_MONTH] = lt->tm_mon + 1;
+	memory[LDOS4_DAY] = lt->tm_mday;
+	memory[LDOS4_YEAR] = lt->tm_year;
+      }
   }
 }
 
