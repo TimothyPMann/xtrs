@@ -108,11 +108,9 @@ trs_disk_intrq_interrupt(int state)
 void
 trs_disk_motoroff_interrupt(int state)
 {
-  /* Drive motor timed out (stopped).
-     Not emulated; this routine is never called.
-   */
+  /* Drive motor timed out (stopped). */
   if (trs_model == 1) {
-    /* no effect */
+    /* no such interrupt */
   } else {
     if (state) {
       nmi_latch |= M3_MOTOROFF_BIT;
@@ -229,6 +227,7 @@ trs_timer_event(int signo)
 
   trs_timer_interrupt(1); /* generate */
   trs_kb_heartbeat(); /* part of keyboard stretch kludge */
+  trs_disk_motoroff_interrupt(trs_disk_motoroff());
 #if HAVE_SIGIO
   x_poll_count = 0; /* be sure to flush X events */
 #endif

@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Sat Apr 17 20:33:49 PDT 1999 by mann */
+/* Last modified on Thu Jun 17 20:09:27 PDT 1999 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
@@ -16,6 +16,7 @@
 /*#define DISKDEBUG3 1*/  /* Gaps and real_writetrk */
 /*#define DISKDEBUG4 1*/  /* REAL sector size detection */
 /*#define DISKDEBUG5 1*/  /* Read Address timing */
+/*#define DISKDEBUG6 1*/  /* DMK support */
 #define TSTATEREV 1       /* Index holes timed by T-states, not real time */
 #define SIZERETRY 1       /* Retry in different sizes on real_read */
 #define REALRADLY 0       /* Read Address timing for real disks; nonworking */
@@ -29,6 +30,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#include "crc.c"
 
 #if __linux
 #include <sys/types.h>
@@ -63,6 +66,7 @@ typedef struct {
   int format_sec;               /* current sector number or id_index */
   int format_gapcnt;            /* measure requested gaps */
   int format_gap[5];
+  unsigned short crc;
   unsigned curdrive;
   unsigned curside;
   unsigned density;		/* sden=0, dden=1 */
@@ -90,6 +94,7 @@ FDCState state, other_state;
 #define FMT_GAP3    13
 #define FMT_GAP4    14
 #define FMT_DONE    15
+#define FMT_PREAM   16  /* DDEN DMK only -- just saw preamble to an AM */
 
 
 /* Gap 0+1 and gap 4 angular size, used in Read Address timing emulation.
@@ -197,20 +202,12 @@ typedef struct {
 /* Values for emulated disk image type (emutype) below */
 #define JV1 1 /* compatible with Vavasour Model I emulator */
 #define JV3 3 /* compatible with Vavasour Model III/4 emulator */
-#define REAL 100
+#define DMK 4 /* compatible with Keil Model III/4 emulator */
+#define REAL 100 /* real floppy drive, PC controller */
+#define CATW 101 /* real floppy drive, Catweasel controller (future) */
 #define NONE 0
 
 typedef struct {
-  int writeprot;		  /* emulated write protect tab */
-  int phytrack;			  /* where are we really? */
-  int emutype;
-  int inches;                     /* 5 or 8, as seen by TRS-80 */
-  int real_rps;                   /* phys rotations/sec; emutype REAL only */
-  int real_size_code;             /* most recent sector size; REAL only */
-  int real_step;                  /* 1=normal, 2=double-step; REAL only */
-  int real_empty;                 /* 1=emulate empty drive */
-  time_t empty_timeout;           /* real_empty valid until this time */
-  FILE* file;
   int free_id[4];		  /* first free id, if any, of each size */
   int last_used_id;		  /* last used index */
   int nblocks;                    /* number of blocks of ids, 1 or 2 */
@@ -219,12 +216,68 @@ typedef struct {
   int offset[JV3_SECSMAX + 1];    /* offset into file for each id */
   short sorted_id[JV3_SECSMAX + 1];
   short track_start[MAXTRACKS][JV3_SIDES];
-  unsigned char buf[MAXSECSIZE];
-} DiskState;
+} JV3State;
 
-/* Reuse some fields */
-#define realfmt_nbytes nblocks      /* number of PC format command bytes */
-#define realfmt_fill sorted_valid   /* fill byte for data sectors */
+typedef struct {
+  int rps;                        /* phys rotations/sec; emutype REAL only */
+  int size_code;                  /* most recent sector size; REAL only */
+  int empty;                      /* 1=emulate empty drive */
+  time_t empty_timeout;           /* real_empty valid until this time */
+  int fmt_nbytes;                 /* number of PC format command bytes */
+  int fmt_fill;                   /* fill byte for data sectors */
+  unsigned char buf[MAXSECSIZE];
+} RealState;
+
+/* Some constants for DMK format */
+#define DMK_WRITEPROT     0
+#define DMK_NTRACKS       1
+#define DMK_TRACKLEN      2
+#define DMK_TRACKLEN_SIZE 2
+#define DMK_OPTIONS       4
+#define DMK_FORMAT        0x0c
+#define DMK_FORMAT_SIZE   4
+#define DMK_HDR_SIZE      0x10
+#define DMK_TKHDR_SIZE    0x80    /* Space reserved for IDAM pointers */
+#define DMK_TRACKLEN_MAX  0x2940  /* Note: too small for TRKSIZE_3HD */
+
+/* Bit assignments in options */
+#define DMK_SSIDE_OPT     0x10
+#define DMK_SDEN_OPT      0x40
+#define DMK_IGNDEN_OPT    0x80
+
+/* Bit assignments in IDAM pointers */
+#define DMK_DDEN_FLAG     0x8000
+#define DMK_EXTRA_FLAG    0x4000  /* unused */
+#define DMK_IDAMP_BITS    0x3fff
+
+#define dmk_incr(d) \
+  (((d)->u.dmk.ignden || (d)->u.dmk.sden || state.density) ? 1 : 2)
+
+typedef struct {
+  int ntracks;                    /* max number of tracks formatted */
+  int tracklen;                   /* bytes reserved per track in file */
+  int nsides;                     /* 1 or 2 (single-sided flag in header) */
+  int sden;                       /* single-density-only flag in header */
+  int ignden;                     /* ignore-density flag in header */
+  int curtrack, curside;          /* track/side in track buffer, or -1/-1 */
+  int curbyte;                    /* index in buf for current op */
+  int nextidam;                   /* index in buf to put next idam */
+  unsigned char buf[DMK_TRACKLEN_MAX];
+} DMKState;
+
+typedef struct {
+  int writeprot;		  /* emulated write protect tab */
+  int phytrack;			  /* where are we really? */
+  int emutype;
+  int inches;                     /* 5 or 8, as seen by TRS-80 */
+  int real_step;                  /* 1=normal, 2=double-step if REAL */
+  FILE* file;
+  union {
+    JV3State jv3;                 /* valid if emutype = JV3 */
+    RealState real;               /* valid if emutype = REAL */
+    DMKState dmk;                 /* valid if emutype = DMK */
+  } u;
+} DiskState;
 
 DiskState disk[NDRIVES];
 
@@ -241,6 +294,66 @@ void real_readadr();
 void real_readtrk();
 void real_writetrk();
 int real_check_empty(DiskState *d);
+
+/* Entry point for the zbx debugger */
+void
+trs_disk_debug()
+{
+  int i;
+  printf("Floppy disk controller state:\n");
+  printf("  status 0x%02x, track %d (0x%02x), sector %d (0x%02x), "
+	 "data 0x%02x\n", state.status, state.track, state.track,
+	 state.sector, state.sector, state.data);
+  printf("  currcommand 0x%02x, bytecount left %d, last step direction %d\n",
+	 state.currcommand, state.bytecount, state.lastdirection);
+  printf("  curdrive %d, curside %d, density %d, controller %s\n",
+	 state.curdrive, state.curside, state.density,
+	 state.controller == TRSDISK_P1771 ? "WD1771" : "WD1791/93");
+  printf("  crc state 0x%04x, last_readadr %d, motor timeout %" TSTATE_T_LEN
+	 "\n", state.crc, state.last_readadr, state.motor_timeout);
+  printf("  last (non-DMK) format gaps %d %d %d %d %d\n",
+	 state.format_gap[0], state.format_gap[1], state.format_gap[2],
+	 state.format_gap[3], state.format_gap[4]);
+  for (i=0; i<NDRIVES; i++) {
+    DiskState *d = &disk[i];
+    printf("Drive %d state: "
+	   "writeprot %d, phytrack %d (0x%02x), inches %d, step %d, type ",
+	   i, d->writeprot, d->phytrack, d->phytrack, d->inches, d->real_step);
+    if (d->file == NULL) {
+      printf("EMPTY\n");
+    } else {
+      switch (d->emutype) {
+      case JV1:
+	printf("JV1\n");
+	break;
+      case JV3:
+	printf("JV3\n");
+	printf("  last used id %d, id blocks %d\n",
+	       d->u.jv3.last_used_id, d->u.jv3.nblocks);
+	break;
+      case DMK:
+	printf("DMK\n");
+	printf("  ntracks %d (0x%02x), tracklen 0x%04x, nsides %d, sden %d, "
+	       "ignden %d\n", d->u.dmk.ntracks, d->u.dmk.ntracks,
+	       d->u.dmk.tracklen, d->u.dmk.nsides, d->u.dmk.sden,
+	       d->u.dmk.ignden);
+	printf("  buffered track %d, side %d, curbyte %d, nextidam %d\n",
+	       d->u.dmk.curtrack, d->u.dmk.curside, d->u.dmk.curbyte,
+	       d->u.dmk.nextidam);
+	break;
+      case REAL:
+	printf("REAL\n");
+	printf("  rpm %d, empty %d, last size code %d, last fmt fill 0x%02x\n",
+	       d->u.real.rps * 60, d->u.real.empty, d->u.real.size_code,
+	       d->u.real.fmt_fill);
+	break;
+      default:
+	printf("UNKNOWN\n");
+	break;
+      }
+    }
+  }
+}
 
 void
 trs_disk_setsize(int unit, int value)
@@ -347,68 +460,71 @@ trs_disk_unimpl(unsigned char cmd, char* more)
 }
 
 /* Sort first by track, second by side, third by position in emulated-disk
-   sector array (i.e., physical sector order on track).
-*/
+   sector array (i.e., physical sector order on track).  */
 static int
-id_compare(const void* p1, const void* p2)
+jv3_id_compare(const void* p1, const void* p2)
 {
   DiskState *d = &disk[state.curdrive];
   int i1 = *(short*)p1;
   int i2 = *(short*)p2;
-  int r = d->id[i1].track - d->id[i2].track;
+  int r = d->u.jv3.id[i1].track - d->u.jv3.id[i2].track;
   if (r != 0) return r;
-  r = (d->id[i1].flags & JV3_SIDE) - (d->id[i2].flags & JV3_SIDE);
+  r = (d->u.jv3.id[i1].flags & JV3_SIDE) - (d->u.jv3.id[i2].flags & JV3_SIDE);
   if (r != 0) return r;
   return i1 - i2;
 }
 
 /* (Re-)create the sorted_id data structure for the given drive */
 void
-sort_ids(int drive)
+jv3_sort_ids(int drive)
 {
   DiskState *d = &disk[drive];
   int olddrive = state.curdrive;
   int i, track, side;
 
   for (i=0; i<=JV3_SECSMAX; i++) {
-    d->sorted_id[i] = i;
+    d->u.jv3.sorted_id[i] = i;
   }
   state.curdrive = drive;
-  qsort((void*) d->sorted_id, JV3_SECSMAX, sizeof(short), id_compare);
+  qsort((void*) d->u.jv3.sorted_id, JV3_SECSMAX, sizeof(short),
+	jv3_id_compare);
   state.curdrive = olddrive;
 
   for (track=0; track<MAXTRACKS; track++) {
-    d->track_start[track][0] = -1;
-    d->track_start[track][1] = -1;
+    d->u.jv3.track_start[track][0] = -1;
+    d->u.jv3.track_start[track][1] = -1;
   }    
   track = side = -1;
   for (i=0; i<JV3_SECSMAX; i++) {
-    SectorId *sid = &d->id[d->sorted_id[i]];
+    SectorId *sid = &d->u.jv3.id[d->u.jv3.sorted_id[i]];
     if (sid->track != track ||
 	(sid->flags & JV3_SIDE ? 1 : 0) != side) {
       track = sid->track;
       if (track == JV3_FREE) break;
       side = sid->flags & JV3_SIDE ? 1 : 0;
-      d->track_start[track][side] = i;
+      d->u.jv3.track_start[track][side] = i;
     }
   }
 
-  d->sorted_valid = 1;  
+  d->u.jv3.sorted_valid = 1;  
 }
 
+/* JV3 only */
 int
 id_index_to_size_code(DiskState *d, int id_index)
 {
-  return (d->id[id_index].flags & JV3_SIZE) ^
-    ((d->id[id_index].track == JV3_FREE) ? 2 : 1);
+  return (d->u.jv3.id[id_index].flags & JV3_SIZE) ^
+    ((d->u.jv3.id[id_index].track == JV3_FREE) ? 2 : 1);
 }
 
+/* IBM formats only */
 int
 size_code_to_size(int code)
 {
   return 128 << code;
 }
 
+/* JV3 only */
 int
 id_index_to_size(DiskState *d, int id_index)
 {
@@ -416,41 +532,44 @@ id_index_to_size(DiskState *d, int id_index)
 }
 
 /* Return the offset of the data block for the id_index'th sector
-   in an emulated-disk file. */
+   in an emulated-disk file.  Not used for DMK. */
 static off_t
 offset(DiskState *d, int id_index)
 {
   if (d->emutype == JV1) {
     return id_index * JV1_SECSIZE;
+  } else if (d->emutype == JV3) {
+    return d->u.jv3.offset[id_index];
   } else {
-    return d->offset[id_index];
+    trs_disk_unimpl(state.currcommand, "DMK offset (internal error)");
+    return 0;
   }
 }
 
 /* Return the offset of the id block for the id_index'th sector
-   in an emulated-disk file.  Initialize a new block if needed. */
+   in an emulated-disk file.  Initialize a new block if needed.  JV3 only. */
 static off_t
 idoffset(DiskState *d, int id_index)
 {
-  if (d->emutype == JV1) {
-    trs_disk_unimpl(state.currcommand, "JV1 id (internal error)");
+  if (d->emutype == JV1 || d->emutype == DMK) {
+    trs_disk_unimpl(state.currcommand, "JV1 or DMK idoffset (internal error)");
     return -1;
   } else {
     if (id_index < JV3_SECSPERBLK) {
       return JV3_IDSTART + id_index * sizeof(SectorId);
     } else {
-      int idstart2 = d->offset[JV3_SECSPERBLK-1] +
+      int idstart2 = d->u.jv3.offset[JV3_SECSPERBLK-1] +
 	id_index_to_size(d, JV3_SECSPERBLK-1);
 
-      if (d->nblocks == 1) {
+      if (d->u.jv3.nblocks == 1) {
         /* Initialize new block of ids */
 	int c;
 	fseek(d->file, idstart2, 0);
-        c = fwrite((void*)&d->id[JV3_SECSPERBLK], JV3_SECSTART, 1, d->file);
+        c = fwrite((void*)&d->u.jv3.id[JV3_SECSPERBLK], JV3_SECSTART, 1, d->file);
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
 	c = fflush(d->file);
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
-	d->nblocks = 2;
+	d->u.jv3.nblocks = 2;
       }	
       return idstart2 + (id_index - JV3_SECSPERBLK) * sizeof(SectorId);
     }
@@ -458,60 +577,123 @@ idoffset(DiskState *d, int id_index)
 }
 
 int
-alloc_sector(DiskState *d, int size_code)
+jv3_alloc_sector(DiskState *d, int size_code)
 {
-  int maybe = d->free_id[size_code];
-  d->sorted_valid = 0;
-  while (maybe <= d->last_used_id) {
-    if (d->id[maybe].track == JV3_FREE &&
+  int maybe = d->u.jv3.free_id[size_code];
+  d->u.jv3.sorted_valid = 0;
+  while (maybe <= d->u.jv3.last_used_id) {
+    if (d->u.jv3.id[maybe].track == JV3_FREE &&
 	id_index_to_size_code(d, maybe) == size_code) {
-      d->free_id[size_code] = maybe + 1;
+      d->u.jv3.free_id[size_code] = maybe + 1;
       return maybe;
     }
     maybe++;
   }
-  d->free_id[size_code] = JV3_SECSMAX; /* none are free */
-  if (d->last_used_id >= JV3_SECSMAX-1) {
+  d->u.jv3.free_id[size_code] = JV3_SECSMAX; /* none are free */
+  if (d->u.jv3.last_used_id >= JV3_SECSMAX-1) {
     return -1;
   }
-  d->last_used_id++;
-  d->offset[d->last_used_id + 1] =
-    d->offset[d->last_used_id] + size_code_to_size(size_code);
-  if (d->last_used_id + 1 == JV3_SECSPERBLK) {
-      d->offset[d->last_used_id + 1] += JV3_SECSTART;
+  d->u.jv3.last_used_id++;
+  d->u.jv3.offset[d->u.jv3.last_used_id + 1] =
+    d->u.jv3.offset[d->u.jv3.last_used_id] + size_code_to_size(size_code);
+  if (d->u.jv3.last_used_id + 1 == JV3_SECSPERBLK) {
+      d->u.jv3.offset[d->u.jv3.last_used_id + 1] += JV3_SECSTART;
   }
-  return d->last_used_id;
+  return d->u.jv3.last_used_id;
 }
 
 void
-free_sector(DiskState *d, int id_index)
+jv3_free_sector(DiskState *d, int id_index)
 {
   int c;
-  int size_code = (d->id[id_index].flags & JV3_SIZE) ^ 1;
-  if (d->free_id[size_code] > id_index) d->free_id[size_code] = id_index;
-  d->sorted_valid = 0;
-  d->id[id_index].track = JV3_FREE;
-  d->id[id_index].sector = JV3_FREE;
-  d->id[id_index].flags = (d->id[id_index].flags | JV3_FREEF) ^ JV3_SIZE;
+  int size_code = (d->u.jv3.id[id_index].flags & JV3_SIZE) ^ 1;
+  if (d->u.jv3.free_id[size_code] > id_index) {
+    d->u.jv3.free_id[size_code] = id_index;
+  }
+  d->u.jv3.sorted_valid = 0;
+  d->u.jv3.id[id_index].track = JV3_FREE;
+  d->u.jv3.id[id_index].sector = JV3_FREE;
+  d->u.jv3.id[id_index].flags =
+    (d->u.jv3.id[id_index].flags | JV3_FREEF) ^ JV3_SIZE;
   fseek(d->file, idoffset(d, id_index), 0);
-  c = fwrite(&d->id[id_index], sizeof(SectorId), 1, d->file);
+  c = fwrite(&d->u.jv3.id[id_index], sizeof(SectorId), 1, d->file);
   if (c == EOF) state.status |= TRSDISK_WRITEFLT;
 
-  if (id_index == d->last_used_id) {
+  if (id_index == d->u.jv3.last_used_id) {
     int newlen;
-    while (d->id[d->last_used_id].track == JV3_FREE) {
-      d->last_used_id--;
+    while (d->u.jv3.id[d->u.jv3.last_used_id].track == JV3_FREE) {
+      d->u.jv3.last_used_id--;
     }
     fflush(d->file);
     rewind(d->file);
-    if (d->last_used_id >= 0) {
-      newlen = offset(d, d->last_used_id) +
-	id_index_to_size(d, d->last_used_id);
+    if (d->u.jv3.last_used_id >= 0) {
+      newlen = offset(d, d->u.jv3.last_used_id) +
+	id_index_to_size(d, d->u.jv3.last_used_id);
     } else {
       newlen = offset(d, 0);
     }
     ftruncate(fileno(d->file), newlen);
   }
+}
+
+/* Heuristic to decide what file format we have */
+/* Also decodes write-protect state */
+void
+trs_disk_emutype(DiskState *d)
+{
+  int c;
+  char fmt[4];
+  int count;
+
+  fseek(d->file, 0, 0);
+  c = getc(d->file);
+  if (c == -1) {
+    d->emutype = JV1;
+    return;
+  }
+  if (c == 0 || c == 0xff) {
+    fseek(d->file, DMK_FORMAT, 0);
+    count = fread(fmt, 1, DMK_FORMAT_SIZE, d->file);
+    if (count != DMK_FORMAT_SIZE) {
+      d->emutype = JV1;
+      return;
+    }
+    if (fmt[0] == 0 && fmt[1] == 0 && fmt[2] == 0 && fmt[3] == 0) {
+      fseek(d->file, DMK_TRACKLEN, 0);
+      count = (unsigned char) getc(d->file);
+      count += (unsigned char) getc(d->file) >> 8;
+      if (count < 16 || count > DMK_TRACKLEN_MAX) {
+	d->emutype = JV1;
+      } else {
+	d->emutype = DMK;
+	d->writeprot = (c == 0xff);
+      }
+      return;
+    }
+    if (fmt[0] == 0x78 && fmt[1] == 0x56 && fmt[2] == 0x34 && fmt[3] == 0x12) {
+      error("Real disk specifier file from DMK emulator not supported");
+      d->emutype = NONE;
+      fclose(d->file);
+      d->file = NULL;
+      return;
+    }
+
+  }
+  if (c == 0) {
+    fseek(d->file, 1, 0);
+    if (getc(d->file) == 0xfe) {
+      d->emutype = JV1;
+      return;
+    }
+  }
+  fseek(d->file, JV3_SECSPERBLK*sizeof(SectorId), 0);
+  c = getc(d->file);
+  if (c == 0 || c == 0xff) {
+    d->emutype = JV3;
+    d->writeprot = (c == 0);
+    return;
+  }
+  d->emutype = JV1;
 }
 
 void
@@ -558,9 +740,9 @@ trs_disk_change(int drive)
     d->writeprot = 0;
     ioctl(fileno(d->file), FDRESET, &reset_now);
     ioctl(fileno(d->file), FDGETDRVPRM, &fdp);
-    d->real_rps = fdp.rps;
-    d->real_size_code = 1; /* initial guess: 256 bytes */
-    d->empty_timeout = 0;
+    d->u.real.rps = fdp.rps;
+    d->u.real.size_code = 1; /* initial guess: 256 bytes */
+    d->u.real.empty_timeout = 0;
     if (d->emutype != REAL) {
       d->emutype = REAL;
       d->phytrack = 0;
@@ -577,79 +759,69 @@ trs_disk_change(int drive)
     } else {
       d->writeprot = 0;
     }
-    /* Heuristic to decide what file format we have */
-    if (st.st_size < JV3_SECSTART) {
-      d->emutype = JV1;
-    } else {
-      fseek(d->file, 0, 0);
-      if (getc(d->file) == 0 && getc(d->file) == 0xfe) {
-	d->emutype = JV1;
-      } else {
-	int c;
-	d->emutype = JV3;
-	fseek(d->file, JV3_SECSPERBLK*sizeof(SectorId), 0);
-	c = getc(d->file);
-	switch (c) {
-	case 0xff:
-	  /* Normal */
-	  break;
-	case 0x00:
-	  /* Write-protected internally (new feature JV is planning) */
-	  d->writeprot = 1;  /* !!Hmm, no way to unprotect */
-	  break;
-	default:
-	  d->emutype = JV1;
-	  break;
-	}
-      }
-    }
+    trs_disk_emutype(d);
   }
-
   if (d->emutype == JV3) {
     int id_index, n;
     int ofst;
 
-    memset((void*)d->id, JV3_FREE, sizeof(d->id));
+    memset((void*)d->u.jv3.id, JV3_FREE, sizeof(d->u.jv3.id));
 
     /* Read first block of ids */
     fseek(d->file, JV3_IDSTART, 0);
-    fread((void*)&d->id[0], 3, JV3_SECSPERBLK, d->file);
+    fread((void*)&d->u.jv3.id[0], 3, JV3_SECSPERBLK, d->file);
 
     /* Scan to find their offsets */
     ofst = JV3_SECSTART;
     for (id_index=0; id_index<JV3_SECSPERBLK; id_index++) {
-      d->offset[id_index] = ofst;
+      d->u.jv3.offset[id_index] = ofst;
       ofst += id_index_to_size(d, id_index);
     }
 
     /* Read second block of ids, if any */
     fseek(d->file, ofst, 0);
-    n = fread((void*)&d->id[JV3_SECSPERBLK], 3, JV3_SECSPERBLK, d->file);
-    d->nblocks = n > 0 ? 2 : 1;
+    n = fread((void*)&d->u.jv3.id[JV3_SECSPERBLK], 3, JV3_SECSPERBLK, d->file);
+    d->u.jv3.nblocks = n > 0 ? 2 : 1;
 
     /* Scan to find their offsets */
     ofst += JV3_SECSTART;
     for (id_index=JV3_SECSPERBLK; id_index<JV3_SECSPERBLK*2; id_index++) {
-      d->offset[id_index] = ofst;
+      d->u.jv3.offset[id_index] = ofst;
       ofst += id_index_to_size(d, id_index);
     }
 
-    /* Find last_used_id value and free_id hints */
+    /* Find u.jv3.last_used_id value and u.jv3.free_id hints */
     for (n=0; n<4; n++) {
-      d->free_id[n] = JV3_SECSMAX;
+      d->u.jv3.free_id[n] = JV3_SECSMAX;
     }
-    d->last_used_id = -1;
+    d->u.jv3.last_used_id = -1;
     for (id_index=0; id_index<JV3_SECSMAX; id_index++) {
-      if (d->id[id_index].track == JV3_FREE) {
+      if (d->u.jv3.id[id_index].track == JV3_FREE) {
 	int size_code = id_index_to_size_code(d, id_index);
-	if (d->free_id[size_code] == JV3_SECSMAX) {
-	  d->free_id[size_code] = id_index;
+	if (d->u.jv3.free_id[size_code] == JV3_SECSMAX) {
+	  d->u.jv3.free_id[size_code] = id_index;
 	}
       } else {
-	d->last_used_id = id_index;
+	d->u.jv3.last_used_id = id_index;
       }
     }
-    sort_ids(drive);
+    jv3_sort_ids(drive);
+  } else if (d->emutype == DMK) {
+    fseek(d->file, DMK_NTRACKS, 0);
+    d->u.dmk.ntracks = (unsigned char) getc(d->file);
+    d->u.dmk.tracklen = (unsigned char) getc(d->file) +
+      (((unsigned char) getc(d->file)) << 8);
+    c = getc(d->file);
+    d->u.dmk.nsides = (c & DMK_SSIDE_OPT) ? 1 : 2;
+    d->u.dmk.sden = (c & DMK_SDEN_OPT) != 0;
+    d->u.dmk.ignden = (c & DMK_IGNDEN_OPT) != 0;
+    d->u.dmk.curtrack = d->u.dmk.curside = -1;
+#if DISKDEBUG6
+    fprintf(stderr,
+	    "DMK drv=%d wp=%d #tk=%d tklen=0x%x nsides=%d sden=%d ignden=%d\n",
+	    drive, d->writeprot, d->u.dmk.ntracks, d->u.dmk.tracklen,
+	    d->u.dmk.nsides, d->u.dmk.sden, d->u.dmk.ignden);
+#endif
   }
 }
 
@@ -682,12 +854,63 @@ cmd_type(unsigned char cmd)
 }
 
 
-/* Search for a sector on the current physical track and return its
-   index within the emulated disk's array of sectors.  Set status and
-   return -1 if there is no such sector.  If sector == -1, 
-   the first sector found if any. */
+/* Called by the interrupt code to determine whether a motoroff NMI is
+   required.  Called even if this NMI is masked, so we also use it here
+   to set NOTRDY and LOSTDATA. */
+int
+trs_disk_motoroff()
+{
+  int stopped;
+  int cmdtype;
+
+  stopped = (state.motor_timeout - z80_state.t_count > TSTATE_T_MID);
+  if (stopped) {
+    state.status |= TRSDISK_NOTRDY;
+    cmdtype = cmd_type(state.currcommand);
+    if ((cmdtype == 2 || cmdtype == 3) && (state.status & TRSDISK_DRQ)) {
+      /* Also end the command and set Lost Data for good measure */
+      state.status = (state.status | TRSDISK_LOSTDATA) &
+	~(TRSDISK_BUSY | TRSDISK_DRQ);
+      state.bytecount = 0;
+    }
+  }
+  return stopped;
+}
+
+/* Get the on-disk track data from the current track/side into the buffer */
+void
+dmk_get_track(DiskState* d)
+{
+  int res;
+  if (d->phytrack == d->u.dmk.curtrack &&
+      state.curside == d->u.dmk.curside) return;
+  d->u.dmk.curtrack = d->phytrack;
+  d->u.dmk.curside = state.curside;
+  if (d->u.dmk.curtrack >= d->u.dmk.ntracks ||
+      (d->u.dmk.curside && d->u.dmk.nsides == 1)) {
+    memset(d->u.dmk.buf, 0, sizeof(d->u.dmk.buf));
+    return;
+  }
+  fseek(d->file, (DMK_HDR_SIZE +
+		  (d->u.dmk.curtrack * d->u.dmk.nsides + d->u.dmk.curside)
+		  * d->u.dmk.tracklen), 0);
+  res = fread(d->u.dmk.buf, d->u.dmk.tracklen, 1, d->file);
+  if (res != 1) {
+    memset(d->u.dmk.buf, 0, sizeof(d->u.dmk.buf));
+    return;
+  }    
+}
+
+
+/* Search for a sector on the current physical track.  For JV1 or JV3,
+   return its index within the emulated disk's array of sectors.  For
+   DMK, get the track into the buffer, return the index of the
+   sector's DAM, and set state.bytecount to its size code.  Set status
+   and return -1 if there is no such sector.  If sector == -1, return
+   the first sector found if any.  If side == 0 or 1, perform side
+   compare against sector ID; if -1, don't. */
 static int
-search(int sector)
+search(int sector, int side)
 {
   DiskState *d = &disk[state.curdrive];
   if (d->file == NULL) {
@@ -697,33 +920,126 @@ search(int sector)
   if (d->emutype == JV1) { 
     if (d->phytrack < 0 || d->phytrack >= MAXTRACKS ||
 	state.curside > 0 || sector >= JV1_SECPERTRK || d->file == NULL ||
-	d->phytrack != state.track || state.density == 1) {
+	d->phytrack != state.track || state.density == 1 || side == 1) {
       state.status |= TRSDISK_NOTFOUND;
       return -1;
     }
     return JV1_SECPERTRK * d->phytrack + (sector < 0 ? 0 : sector);
-  } else {
+  } else if (d->emutype == JV3) {
     int i;
     SectorId *sid;
     if (d->phytrack < 0 || d->phytrack >= MAXTRACKS ||
 	state.curside >= JV3_SIDES ||
+	(side != -1 && side != state.curside) ||
 	d->phytrack != state.track || d->file == NULL) {
       state.status |= TRSDISK_NOTFOUND;
       return -1;
     }
-    if (!d->sorted_valid) sort_ids(state.curdrive);
-    i = d->track_start[d->phytrack][state.curside];
+    if (!d->u.jv3.sorted_valid) jv3_sort_ids(state.curdrive);
+    i = d->u.jv3.track_start[d->phytrack][state.curside];
     if (i != -1) {
       for (;;) {
-	sid = &d->id[d->sorted_id[i]];
+	sid = &d->u.jv3.id[d->u.jv3.sorted_id[i]];
 	if (sid->track != d->phytrack ||
 	    (sid->flags & JV3_SIDE ? 1 : 0) != state.curside) break;
 	if ((sector == -1 || sid->sector == sector) &&
 	    ((sid->flags & JV3_DENSITY) ? 1 : 0) == state.density) {
-	  return d->sorted_id[i];
+	  return d->u.jv3.sorted_id[i];
 	}
 	i++;
       }
+    }
+    state.status |= TRSDISK_NOTFOUND;
+    return -1;
+  } else /* d->emutype == DMK */ {
+    /* !!maybe someday start at a point determined by angle() and wrap
+       back.  would deal more realistically with disks that have more
+       than one of the same sector. */
+    int i;
+    int incr = dmk_incr(d);
+
+    /* get current phytrack into buffer */
+    dmk_get_track(d);
+
+    /* loop through IDAMs in track */
+    for (i = 0; i < DMK_TKHDR_SIZE; i+=2) {
+      unsigned char *p;
+
+      /* fetch index of next IDAM */
+      int idamp = d->u.dmk.buf[i] + (d->u.dmk.buf[i+1] << 8);
+
+      /* max distance past ID CRC to search for DAM */
+      int damlimit = state.density ? 43 : 30; /* ref 1791 datasheet */
+
+      /* fail if no more IDAMs */
+      if (idamp == 0) break;
+
+      /* skip IDAM if wrong density */
+      if (!d->u.dmk.ignden &&
+	  state.density != ((idamp & DMK_DDEN_FLAG) != 0)) continue;
+
+      /* point p to IDAM */
+      idamp &= DMK_IDAMP_BITS;
+      p = &d->u.dmk.buf[idamp];
+
+      /* fail if IDAM out of range */
+      if (idamp >= DMK_TRACKLEN_MAX) break;
+
+      /* initialize ID CRC */
+      state.crc = state.density ? 0xcdb4 /* CRC of a1 a1 a1 */ : 0xffff;
+
+      /* sanity check; is this an IDAM at all? */
+      if (*p != 0xfe) continue;
+      state.crc = calc_crc1(state.crc, *p);
+      p += incr;
+
+      /* compare track field of ID */
+      if (*p != state.track) continue;
+      state.crc = calc_crc1(state.crc, *p);
+      p += incr;
+
+      /* compare side field of ID if desired */
+      if (*p != side && side != -1) continue;
+      state.crc = calc_crc1(state.crc, *p);
+      p += incr;
+
+      /* compare sector field of ID if desired */
+      if (*p != sector && sector != -1) continue;
+      state.crc = calc_crc1(state.crc, *p);
+      p += incr;
+
+      /* save size code field of ID; caller converts to actual byte count */
+      state.bytecount = *p;
+      state.crc = calc_crc1(state.crc, *p);
+      p += incr;
+
+      /* fold CRC field into computation; result should be 0 */
+      state.crc = calc_crc1(state.crc, *p);
+      p += incr;
+      state.crc = calc_crc1(state.crc, *p);
+      p += incr;
+
+      if (state.crc != 0) {
+	/* set CRC error flag and look for another ID that matches */
+	state.status |= TRSDISK_CRCERR;
+	continue;
+      } else {
+	/* clear CRC error flag in case set for an earlier ID match */
+	state.status &= ~TRSDISK_CRCERR;
+      }
+
+      /* search for valid DAM */
+      while (damlimit-- > 0) {
+	if (0xf8 <= *p && *p <= 0xfb) {
+	  /* got one! */
+	  d->u.dmk.nextidam = i + 2;
+	  return p - d->u.dmk.buf;
+	}
+	p += incr;
+      }
+
+      /* found ID with good CRC but no following DAM; fail */
+      break;
     }
     state.status |= TRSDISK_NOTFOUND;
     return -1;
@@ -733,9 +1049,10 @@ search(int sector)
 
 /* Search for the first sector on the current physical track (in
    either density) and return its index within the sorted index array
-   (JV3), or index within the sector array (JV1).  Return -1 if there
-   is no such sector, or if reading JV1 in double density.  Don't set
-   TRSDISK_NOTFOUND; leave the caller to do that. */
+   (JV3), or index within the sector array (JV1).  Not used for DMK.
+   Return -1 if there is no such sector, or if reading JV1 in double
+   density.  Don't set TRSDISK_NOTFOUND; leave the caller to do
+   that. */
 static int
 search_adr()
 {
@@ -754,8 +1071,8 @@ search_adr()
 	state.curside >= JV3_SIDES || d->file == NULL) {
       return -1;
     }
-    if (!d->sorted_valid) sort_ids(state.curdrive);
-    return d->track_start[d->phytrack][state.curside];
+    if (!d->u.jv3.sorted_valid) jv3_sort_ids(state.curdrive);
+    return d->u.jv3.track_start[d->phytrack][state.curside];
   }
 }
 
@@ -776,7 +1093,7 @@ verify()
       state.status |= TRSDISK_SEEKERR;
     }
   } else {
-    search(-1);	/* TRSDISK_SEEKERR == TRSDISK_NOTFOUND */
+    search(-1, -1); /* TRSDISK_SEEKERR == TRSDISK_NOTFOUND */
   }
 }
 
@@ -819,7 +1136,7 @@ type1_status()
     return;
   }
 
-  if (d->file == NULL || (d->emutype == REAL && d->real_empty)) {
+  if (d->file == NULL || (d->emutype == REAL && d->u.real.empty)) {
     state.status |= TRSDISK_INDEX;
   } else {
     if (angle() < trs_disk_holewidth) {
@@ -1005,9 +1322,14 @@ trs_disk_data_read(void)
     if (state.bytecount > 0) {
       int c;
       if (d->emutype == REAL) { 
-	c = d->buf[size_code_to_size(d->real_size_code) - state.bytecount];
+	c = d->u.real.buf[size_code_to_size(d->u.real.size_code)
+			 - state.bytecount];
+      } else if (d->emutype == DMK) {
+	c = d->u.dmk.buf[d->u.dmk.curbyte];
+	state.crc = calc_crc1(state.crc, c);
+	d->u.dmk.curbyte += dmk_incr(d);
       } else {
-	c = getc(disk[state.curdrive].file);
+	c = getc(d->file);
 	if (c == EOF) {
 	  /*state.status |= TRSDISK_NOTFOUND;*/
 	  c = 0xe5;
@@ -1021,6 +1343,14 @@ trs_disk_data_read(void)
       state.data = c;
       state.bytecount--;
       if (state.bytecount <= 0) {
+	if (d->emutype == DMK) {
+	  state.crc = calc_crc1(state.crc, d->u.dmk.buf[d->u.dmk.curbyte]);
+	  d->u.dmk.curbyte += dmk_incr(d);
+	  state.crc = calc_crc1(state.crc, d->u.dmk.buf[d->u.dmk.curbyte]);
+	  if (state.crc != 0) {
+	    state.status |= TRSDISK_CRCERR;
+	  }
+	}
 	state.bytecount = 0;
 	state.status &= ~TRSDISK_DRQ;
         trs_disk_drq_interrupt(0);
@@ -1032,7 +1362,11 @@ trs_disk_data_read(void)
     if (state.bytecount <= 0) break;
     if (d->emutype == REAL) {
       state.sector = d->phytrack; /*sic*/
-      state.data = d->buf[6 - state.bytecount];
+      state.data = d->u.real.buf[6 - state.bytecount];
+
+    } else if (d->emutype == DMK) {
+      state.data = d->u.dmk.buf[d->u.dmk.curbyte];
+      d->u.dmk.curbyte += dmk_incr(d);
 
     } else if (state.last_readadr >= 0) {
       if (d->emutype == JV1) {
@@ -1052,11 +1386,11 @@ trs_disk_data_read(void)
 	  break;
 	case 2:
 	case 1:
-	  state.data = 0;     /* CRC not emulated */
+	  state.data = state.crc >> 8;
 	  break;
 	}
-      } else {
-	sid = &d->id[d->sorted_id[state.last_readadr]];
+      } else if (d->emutype == JV3) {
+	sid = &d->u.jv3.id[d->u.jv3.sorted_id[state.last_readadr]];
 	switch (state.bytecount) {
 	case 6:
 	  state.data = sid->track;
@@ -1070,16 +1404,34 @@ trs_disk_data_read(void)
 	  break;
 	case 3:
 	  state.data =
-	    id_index_to_size_code(d, d->sorted_id[state.last_readadr]);
+	    id_index_to_size_code(d, d->u.jv3.sorted_id[state.last_readadr]);
 	  break;
 	case 2:
 	case 1:
-	  state.data = 0;     /* CRC not emulated */
+	  state.data = state.crc >> 8;
 	  break;
 	}
       }
     }
+    state.crc = calc_crc1(state.crc, state.data);
     state.bytecount--;
+    if (state.bytecount <= 0) {
+      if (d->emutype == DMK && state.crc != 0) {
+	state.status |= TRSDISK_CRCERR;
+      }
+      state.bytecount = 0;
+      state.status &= ~TRSDISK_DRQ;
+      trs_disk_drq_interrupt(0);
+      trs_schedule_event(trs_disk_done, 0, 32);
+    }
+    break;
+  case TRSDISK_READTRK:
+    /* assert(emutype == DMK) */
+    if (state.bytecount > 0) {
+      state.data = d->u.dmk.buf[d->u.dmk.curbyte];
+      d->u.dmk.curbyte += dmk_incr(d);
+      state.bytecount = state.bytecount - 2 + state.density;
+    }
     if (state.bytecount <= 0) {
       state.bytecount = 0;
       state.status &= ~TRSDISK_DRQ;
@@ -1109,7 +1461,8 @@ trs_disk_data_write(unsigned char data)
   case TRSDISK_WRITE:
     if (state.bytecount > 0) {
       if (d->emutype == REAL) {
-	d->buf[size_code_to_size(d->real_size_code) - state.bytecount] = data;
+	d->u.real.buf[size_code_to_size(d->u.real.size_code)
+		     - state.bytecount] = data;
 	state.bytecount--;
 	if (state.bytecount <= 0) {
 	  real_write();
@@ -1118,8 +1471,70 @@ trs_disk_data_write(unsigned char data)
       }
       c = putc(data, d->file);
       if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+      if (d->emutype == DMK) {
+	d->u.dmk.buf[d->u.dmk.curbyte++] = data;
+	if (dmk_incr(d) == 2) {
+	  d->u.dmk.buf[d->u.dmk.curbyte++] = data;
+	  c = putc(data, d->file);
+	  if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+	}
+	state.crc = calc_crc1(state.crc, data);
+      }	
       state.bytecount--;
       if (state.bytecount <= 0) {
+	if (d->emutype == DMK) {
+	  int idamp, i, j;
+	  c = state.crc >> 8;
+	  d->u.dmk.buf[d->u.dmk.curbyte++] = c;
+	  c = putc(c, d->file);
+	  if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+	  if (dmk_incr(d) == 2) {
+	    d->u.dmk.buf[d->u.dmk.curbyte++] = c;
+	    c = putc(c, d->file);
+	    if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+	  }
+	  c = state.crc & 0xff;
+	  d->u.dmk.buf[d->u.dmk.curbyte++] = c;
+	  c = putc(c, d->file);
+	  if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+	  if (dmk_incr(d) == 2) {
+	    d->u.dmk.buf[d->u.dmk.curbyte++] = c;
+	    c = putc(c, d->file);
+	    if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+	  }
+	  /* Check if we smashed one or more following IDAMs; can
+	     happen with weird "protected" formats */
+	  i = j = d->u.dmk.nextidam;
+	  while (i < DMK_TKHDR_SIZE) {
+	    idamp = (d->u.dmk.buf[i] + (d->u.dmk.buf[i+1] << 8))
+	      & DMK_IDAMP_BITS;
+	    if (idamp != 0 && idamp != DMK_IDAMP_BITS &&
+		d->u.dmk.curbyte /*!!+ erase shutoff slop?*/ > idamp) {
+	      /* Yes, smashed this one */
+	      i += 2;
+#if DISKDEBUG6
+	      fprintf(stderr, "DMK smashed phytk %d physec %d\n",
+		      d->phytrack, i/2);
+#endif
+	    } else {
+	      /* No, keep this one */
+	      if (j == i) break; /* none were smashed; early exit */
+	      d->u.dmk.buf[j++] = d->u.dmk.buf[i++];
+	      d->u.dmk.buf[j++] = d->u.dmk.buf[i++];
+	    }
+	  }
+	  if (j != i) {
+	    /* Smashed at least one; rewrite the track header */
+	    while (j < DMK_TKHDR_SIZE) {
+	      d->u.dmk.buf[j++] = 0;
+	    }
+	    fseek(d->file, DMK_HDR_SIZE +
+		  (d->phytrack * d->u.dmk.nsides + state.curside) *
+		  d->u.dmk.tracklen, 0);
+	    c = fwrite(d->u.dmk.buf, DMK_TKHDR_SIZE, 1, d->file);
+	    if (c != 1) state.status |= TRSDISK_WRITEFLT;
+	  }
+	}
 	state.bytecount = 0;
 	state.status &= ~TRSDISK_DRQ;
         trs_disk_drq_interrupt(0);
@@ -1131,6 +1546,95 @@ trs_disk_data_write(unsigned char data)
     break;
   case TRSDISK_WRITETRK:
     state.bytecount = state.bytecount - 2 + state.density;
+    if (d->emutype == DMK) {
+      if (state.bytecount <= 0) {
+	if (state.format != FMT_DONE) {
+#if DISKDEBUG6
+	  fprintf(stderr, "complete track format dens %d tk %d side %d\n",
+		  state.density, d->phytrack, state.curside);
+#endif
+	  state.format = FMT_DONE;
+	  state.status &= ~TRSDISK_DRQ;
+	  /* Done: write modified track */
+	  fseek(d->file, DMK_HDR_SIZE +
+		(d->phytrack * d->u.dmk.nsides + state.curside) *
+		d->u.dmk.tracklen, 0);
+	  c = fwrite(d->u.dmk.buf, d->u.dmk.tracklen, 1, d->file);
+	  if (c != 1) state.status |= TRSDISK_WRITEFLT;
+	  if (d->phytrack >= d->u.dmk.ntracks) {
+	    d->u.dmk.ntracks = d->phytrack + 1;
+	    fseek(d->file, DMK_NTRACKS, 0);
+	    putc(d->u.dmk.ntracks, d->file);
+	  }
+	  c = fflush(d->file);
+	  if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+	  trs_disk_drq_interrupt(0);
+	  trs_schedule_event(trs_disk_done, 0, 32);
+	}
+      } else {
+	switch (data) {
+	case 0xf5:
+	  if (state.density) {
+	    data = 0xa1;
+	    state.format = FMT_PREAM;
+	    state.crc = 0x968b;  /* CRC of a1 a1 */
+	  } else {
+	    state.format = FMT_DATA;
+	  }
+	  break;
+	case 0xf6:
+	  if (state.density) {
+	    data = 0xc2;
+	  }
+	  state.format = FMT_DATA;
+	  break;
+	case 0xf7:
+	  data = state.crc >> 8;
+	  d->u.dmk.buf[d->u.dmk.curbyte++] = data;
+	  if (dmk_incr(d) == 2) {
+	    d->u.dmk.buf[d->u.dmk.curbyte++] = data;
+	  }
+	  state.bytecount = state.bytecount - 2 + state.density;
+	  data = state.crc & 0xff;
+	  state.format = FMT_DATA;
+	  break;
+	case 0xfe:
+	  if (!state.density || state.format == FMT_PREAM) {
+	    unsigned short idamp = d->u.dmk.curbyte +
+	      (state.density ? DMK_DDEN_FLAG : 0);
+	    if (d->u.dmk.nextidam >= DMK_TKHDR_SIZE) {
+	      error("DMK formatting too many sectors on track");
+	    } else if (d->u.dmk.curbyte > d->u.dmk.tracklen) {
+	      error("DMK sectors past end of track");
+	    } else {
+	      d->u.dmk.buf[d->u.dmk.nextidam++] = idamp & 0xff;
+	      d->u.dmk.buf[d->u.dmk.nextidam++] = idamp >> 8;
+	    }
+	  }
+	  state.format = FMT_DATA;
+	  if (!state.density) {
+	    state.crc = 0xffff;
+	  }
+	  break;
+	case 0xf8:
+	case 0xf9:
+	case 0xfa:
+	case 0xfb:
+	  if (!state.density) {
+	    state.crc = 0xffff;
+	  }
+	  break;
+	default:
+	  break;
+	}
+	d->u.dmk.buf[d->u.dmk.curbyte++] = data;
+	if (dmk_incr(d) == 2) {
+	  d->u.dmk.buf[d->u.dmk.curbyte++] = data;
+	}
+	state.crc = calc_crc1(state.crc, data);
+      }	
+      break;
+    }
     if (state.bytecount <= 0) {
       if (state.format == FMT_DONE) break;
       if (state.format == FMT_GAP2) {
@@ -1139,12 +1643,13 @@ trs_disk_data_write(unsigned char data)
 	  trs_disk_unimpl(state.currcommand, "false sector ID (no data)");
 	} else {
 	  /* We do not have a flag for this; try using CRC error */
-	  d->id[state.format_sec].flags |= JV3_ERROR;
+	  d->u.jv3.id[state.format_sec].flags |= JV3_ERROR;
 	  error("warning: recording false sector ID as CRC error");
 
 	  /* Write the sector id */
 	  fseek(d->file, idoffset(d, state.format_sec), 0);
-	  c = fwrite(&d->id[state.format_sec], sizeof(SectorId), 1, d->file);
+	  c = fwrite(&d->u.jv3.id[state.format_sec],
+		     sizeof(SectorId), 1, d->file);
 	  if (c == EOF) state.status |= TRSDISK_WRITEFLT;
 	}
       } else if (state.format != FMT_GAP3) {
@@ -1179,6 +1684,7 @@ trs_disk_data_write(unsigned char data)
       }
       trs_disk_drq_interrupt(0);
       trs_schedule_event(trs_disk_done, 0, 32);
+      break;
     }
     switch (state.format) {
     case FMT_GAP0:
@@ -1218,14 +1724,14 @@ trs_disk_data_write(unsigned char data)
       break;
     case FMT_TRACKID:
       if (d->emutype == REAL) {
-	if (d->realfmt_nbytes >= sizeof(d->buf)) {
+	if (d->u.real.fmt_nbytes >= sizeof(d->u.real.buf)) {
 	  /* Data structure full */
 	  state.status |= TRSDISK_WRITEFLT;
 	  state.bytecount = 0;
 	  state.format_bytecount = 0;
 	  state.format = FMT_DONE;
 	} else {
-	  d->buf[d->realfmt_nbytes++] = data;
+	  d->u.real.buf[d->u.real.fmt_nbytes++] = data;
 	  state.format = FMT_HEADID;
 	}
       } else {
@@ -1237,7 +1743,7 @@ trs_disk_data_write(unsigned char data)
       break;
     case FMT_HEADID:
       if (d->emutype == REAL) {
-	d->buf[d->realfmt_nbytes++] = data;
+	d->u.real.buf[d->u.real.fmt_nbytes++] = data;
       } else if (d->emutype == JV1) {
 	if (data != 0) {
 	  trs_disk_unimpl(state.currcommand, "JV1 double sided");
@@ -1254,7 +1760,7 @@ trs_disk_data_write(unsigned char data)
       break;
     case FMT_SECID:
       if (d->emutype == REAL) {
-	d->buf[d->realfmt_nbytes++] = data;
+	d->u.real.buf[d->u.real.fmt_nbytes++] = data;
       } else if (d->emutype == JV1) {
 	if (data >= JV1_SECPERTRK) {
 	  trs_disk_unimpl(state.currcommand, "JV1 sector number >= 10");
@@ -1270,7 +1776,7 @@ trs_disk_data_write(unsigned char data)
       }
       if (d->emutype == JV3) {
 	int id_index;
-	id_index = alloc_sector(d, data);
+	id_index = jv3_alloc_sector(d, data);
 	if (id_index == -1) {
 	  /* Data structure full */
 	  state.status |= TRSDISK_WRITEFLT;
@@ -1279,21 +1785,21 @@ trs_disk_data_write(unsigned char data)
 	  state.format = FMT_DONE;
 	  break;
 	}
-	d->sorted_valid = 0;
-	d->id[id_index].track = d->phytrack;
-	d->id[id_index].sector = state.format_sec;
-	d->id[id_index].flags =
+	d->u.jv3.sorted_valid = 0;
+	d->u.jv3.id[id_index].track = d->phytrack;
+	d->u.jv3.id[id_index].sector = state.format_sec;
+	d->u.jv3.id[id_index].flags =
 	  (state.curside ? JV3_SIDE : 0) | (state.density ? JV3_DENSITY : 0) |
 	  ((data & 3) ^ 1);
 	state.format_sec = id_index;
 
       } else if (d->emutype == REAL) {
-	d->buf[d->realfmt_nbytes++] = data;
-	if (d->real_size_code != -1 && d->real_size_code != data) {
+	d->u.real.buf[d->u.real.fmt_nbytes++] = data;
+	if (d->u.real.size_code != -1 && d->u.real.size_code != data) {
 	  trs_disk_unimpl(state.currcommand,
 			  "varying sector size on same track on real floppy");
 	}
-	d->real_size_code = data;
+	d->u.real.size_code = data;
       } else {
 	if (data != 0x01) {
 	  trs_disk_unimpl(state.currcommand, "sector size != 256");
@@ -1356,12 +1862,12 @@ trs_disk_data_write(unsigned char data)
 	    switch (data) {
 	    case 0xf8: /* Standard deleted DAM */
 	    case 0xf9: /* Illegal, probably never used; ignore error. */
-	      d->id[state.format_sec].flags |= JV3_DAMDDF8;
+	      d->u.jv3.id[state.format_sec].flags |= JV3_DAMDDF8;
 	      break;
 	    case 0xfb: /* Standard DAM */
 	    case 0xfa: /* Illegal, but SuperUtility uses it! */
 	    default:   /* Impossible */
-	      d->id[state.format_sec].flags |= JV3_DAMDDFB;
+	      d->u.jv3.id[state.format_sec].flags |= JV3_DAMDDFB;
 	      break;
 	    }
 	  } else {
@@ -1369,20 +1875,20 @@ trs_disk_data_write(unsigned char data)
 	    switch (data) {
 	    case 0xf8:
 	      if (trs_disk_truedam) {
-		d->id[state.format_sec].flags |= JV3_DAMSDF8;
+		d->u.jv3.id[state.format_sec].flags |= JV3_DAMSDF8;
 	      } else {
-		d->id[state.format_sec].flags |= JV3_DAMSDFA;
+		d->u.jv3.id[state.format_sec].flags |= JV3_DAMSDFA;
 	      }
 	      break;
 	    case 0xf9:
-	      d->id[state.format_sec].flags |= JV3_DAMSDF9;
+	      d->u.jv3.id[state.format_sec].flags |= JV3_DAMSDF9;
 	      break;
 	    case 0xfa:
-	      d->id[state.format_sec].flags |= JV3_DAMSDFA;
+	      d->u.jv3.id[state.format_sec].flags |= JV3_DAMSDFA;
 	      break;
 	    default: /* impossible */
 	    case 0xfb:
-	      d->id[state.format_sec].flags |= JV3_DAMDDFB;
+	      d->u.jv3.id[state.format_sec].flags |= JV3_DAMDDFB;
 	      break;
 	    }
 	  }
@@ -1394,7 +1900,7 @@ trs_disk_data_write(unsigned char data)
 	} else if (d->emutype == JV1) {
 	  state.format_bytecount = JV1_SECSIZE;
 	} else if (d->emutype == REAL) {
-	  state.format_bytecount = size_code_to_size(d->real_size_code);
+	  state.format_bytecount = size_code_to_size(d->u.real.size_code);
 	}
 	state.format_gap[2] = state.format_gapcnt;
 	state.format_gapcnt = 0;
@@ -1406,11 +1912,11 @@ trs_disk_data_write(unsigned char data)
 	} else {
 	  /* We do not have a flag for this; try using CRC error */
 	  error("warning: recording false sector ID as CRC error");
-	  d->id[state.format_sec].flags |= JV3_ERROR;
+	  d->u.jv3.id[state.format_sec].flags |= JV3_ERROR;
 
 	  /* Write the sector id */
 	  fseek(d->file, idoffset(d, state.format_sec), 0);
-	  c = fwrite(&d->id[state.format_sec], sizeof(SectorId), 1, d->file);
+	  c = fwrite(&d->u.jv3.id[state.format_sec], sizeof(SectorId), 1, d->file);
 	  if (c == EOF) state.status |= TRSDISK_WRITEFLT;
 	}
 	goto got_idam2;
@@ -1422,17 +1928,17 @@ trs_disk_data_write(unsigned char data)
       if (data == 0xfe) {
 	/* Short sector with intentional CRC error */
 	if (d->emutype == JV3) {
-	  d->id[state.format_sec].flags |= JV3_NONIBM | JV3_ERROR;
+	  d->u.jv3.id[state.format_sec].flags |= JV3_NONIBM | JV3_ERROR;
 #if DISKDEBUG2
 	  fprintf(stderr,
 		  "non-IBM sector: drv %02x, sid %d, trk %02x, sec %02x\n",
 		  state.curdrive, state.curside,
-		  d->id[state.format_sec].track, 
-		  d->id[state.format_sec].sector);
+		  d->u.jv3.id[state.format_sec].track, 
+		  d->u.jv3.id[state.format_sec].sector);
 #endif
 	  /* Write the sector id */
 	  fseek(d->file, idoffset(d, state.format_sec), 0);
-	  c = fwrite(&d->id[state.format_sec], sizeof(SectorId), 1, d->file);
+	  c = fwrite(&d->u.jv3.id[state.format_sec], sizeof(SectorId), 1, d->file);
 	  if (c == EOF) state.status |= TRSDISK_WRITEFLT;
 	  goto got_idam;
 	} else {
@@ -1443,7 +1949,7 @@ trs_disk_data_write(unsigned char data)
 	c = putc(data, d->file);
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
       } else if (d->emutype == REAL) {
-	d->realfmt_fill = data;
+	d->u.real.fmt_fill = data;
       }
       if (--state.format_bytecount <= 0) {
 	state.format = FMT_DCRC;
@@ -1457,13 +1963,13 @@ trs_disk_data_write(unsigned char data)
 	if (d->emutype != JV3) {
 	  trs_disk_unimpl(state.currcommand, "intentional CRC error");
 	} else {
-	  d->id[state.format_sec].flags |= JV3_ERROR;
+	  d->u.jv3.id[state.format_sec].flags |= JV3_ERROR;
 	}
       }
       if (d->emutype == JV3) {
 	/* Write the sector id */
 	fseek(d->file, idoffset(d, state.format_sec), 0);
-	c = fwrite(&d->id[state.format_sec], sizeof(SectorId), 1, d->file);
+	c = fwrite(&d->u.jv3.id[state.format_sec], sizeof(SectorId), 1, d->file);
 	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
       }
       state.format = FMT_GAP3;
@@ -1511,7 +2017,7 @@ trs_disk_status_read(void)
   /* Clear intrq unless user did a Force Interrupt with immediate interrupt. */
   /* The 17xx data sheets say this is how it is supposed to work, but it
    * makes Model I SuperUtility hang due to the interrupt routine failing
-   * to clear the interrupt.
+   * to clear the interrupt.  I suspect the data sheets are wrong.
    */
   if (!(((state.currcommand & TRSDISK_CMDMASK) == TRSDISK_FORCEINT) &&
 	((state.currcommand & 0x08) != 0)))
@@ -1532,12 +2038,78 @@ trs_disk_status_read(void)
 void
 trs_disk_command_write(unsigned char cmd)
 {
-  int id_index, non_ibm;
+  int id_index, non_ibm, goal_side;
   DiskState *d = &disk[state.curdrive];
 
 #ifdef DISKDEBUG
   fprintf(stderr, "command_write(0x%02x)\n", cmd);
 #endif
+  /* Handle DMK partial track reformat */
+  if (d->emutype == DMK &&
+      (state.currcommand & ~TRSDISK_EBIT) == TRSDISK_WRITETRK &&
+      state.format != FMT_DONE) {
+    /* Interrupted format: must write out partial track */
+    unsigned char oldtkhdr[DMK_TKHDR_SIZE];
+    int c, i, j, idamp;
+
+#if DISKDEBUG6
+    fprintf(stderr, "partial track format dens %d tk %d side %d\n",
+	    state.density, d->phytrack, state.curside);
+#endif
+    /* Fetch old IDAM pointers if any */
+    fseek(d->file, DMK_HDR_SIZE +
+	  (d->phytrack * d->u.dmk.nsides + state.curside) *
+	  d->u.dmk.tracklen, 0);
+    c = fread(oldtkhdr, DMK_TKHDR_SIZE, 1, d->file);
+    if (c == 1) {
+      /* Copy any pointers to IDAMs that are not being overwritten */
+      i = 0;
+      j = d->u.dmk.nextidam;
+      while (i < DMK_TKHDR_SIZE) {
+	idamp = (oldtkhdr[i] + (oldtkhdr[i+1] << 8)) & DMK_IDAMP_BITS;
+	if (idamp == 0 || idamp == DMK_IDAMP_BITS) break;
+	if (idamp < d->u.dmk.curbyte) {
+	  /* IDAM overwritten; don't copy */
+	  i += 2;
+#if DISKDEBUG6
+	  fprintf(stderr, "  discarding physec %d\n", i);
+#endif
+	} else {
+	  /* IDAM not overwritten; need to copy in */
+	  if (j >= DMK_TKHDR_SIZE) {
+	    /* No room */
+	    error("DMK reformatting adds too many sectors to track");
+	    break;
+	  }
+	  d->u.dmk.buf[j++] = oldtkhdr[i++];
+	  d->u.dmk.buf[j++] = oldtkhdr[i++];
+#if DISKDEBUG6
+	  fprintf(stderr, "  preserving physec %d as %d\n", i, j);
+#endif
+	}
+      }
+    } else {
+#if DISKDEBUG6
+      fprintf(stderr, "  no existing sectors\n");
+#endif
+    }
+    /* Write modified portion of track only */
+    fseek(d->file, DMK_HDR_SIZE +
+	  (d->phytrack * d->u.dmk.nsides + state.curside) *
+	  d->u.dmk.tracklen, 0);
+    fwrite(d->u.dmk.buf, d->u.dmk.curbyte, 1, d->file);
+    if (d->phytrack >= d->u.dmk.ntracks) {
+      d->u.dmk.ntracks = d->phytrack + 1;
+      fseek(d->file, DMK_NTRACKS, 0);
+      putc(d->u.dmk.ntracks, d->file);
+    }
+    fflush(d->file);
+
+    /* Invalidate buffer since not all data is here */
+    d->u.dmk.curtrack = d->u.dmk.curside = -1;
+    state.format = FMT_DONE;
+  }
+
   /* Cancel any ongoing command */
   trs_schedule_event(trs_disk_intrq_interrupt, 0, 0);
   state.bytecount = 0;
@@ -1598,6 +2170,7 @@ trs_disk_command_write(unsigned char cmd)
     state.last_readadr = -1;
     state.status = 0;
     non_ibm = 0;
+    goal_side = -1;
     if (state.controller == TRSDISK_P1771) {
       if (!(cmd & TRSDISK_BBIT)) {
 #if DISKDEBUG2
@@ -1618,17 +2191,22 @@ trs_disk_command_write(unsigned char cmd)
 	}
 #endif
       }
+    } else {
+      if (cmd & TRSDISK_CBIT) {
+	goal_side = (cmd & TRSDISK_BBIT) != 0;
+      }
     }
     if (d->emutype == REAL) {
       real_read();
       break;
     }
-    id_index = search(state.sector);
+    id_index = search(state.sector, goal_side);
     if (id_index == -1) {
       state.status |= TRSDISK_BUSY;
       trs_schedule_event(trs_disk_done, 0, 512);
     } else {
       if (d->emutype == JV1) {
+
 	if (d->phytrack == 17) {
 	  if (state.controller == TRSDISK_P1771) {
 	    state.status |= TRSDISK_1771_FA;
@@ -1637,9 +2215,12 @@ trs_disk_command_write(unsigned char cmd)
 	  }
 	}
 	state.bytecount = JV1_SECSIZE;
-      } else {
+	fseek(d->file, offset(d, id_index), 0);
+
+      } else if (d->emutype == JV3) {
+
 	if (state.controller == TRSDISK_P1771) {
-	  switch (d->id[id_index].flags & JV3_DAM) {
+	  switch (d->u.jv3.id[id_index].flags & JV3_DAM) {
 	  case JV3_DAMSDFB:
 	    state.status |= TRSDISK_1771_FB;
 	    break;
@@ -1653,9 +2234,9 @@ trs_disk_command_write(unsigned char cmd)
 	    state.status |= TRSDISK_1771_F8;
 	    break;
 	  }
-	} else if ((d->id[id_index].flags & JV3_DENSITY) == 0) {
+	} else if (state.density == 0) {
 	  /* single density 179x */
-	  switch (d->id[id_index].flags & JV3_DAM) {
+	  switch (d->u.jv3.id[id_index].flags & JV3_DAM) {
 	  case JV3_DAMSDFB:
 	    state.status |= TRSDISK_1791_FB;
 	    break;
@@ -1675,7 +2256,7 @@ trs_disk_command_write(unsigned char cmd)
 	  }
 	} else {
 	  /* double density 179x */
-	  switch (d->id[id_index].flags & JV3_DAM) {
+	  switch (d->u.jv3.id[id_index].flags & JV3_DAM) {
 	  default: /*impossible*/
 	  case JV3_DAMDDFB:
 	    state.status |= TRSDISK_1791_FB;
@@ -1685,7 +2266,7 @@ trs_disk_command_write(unsigned char cmd)
 	    break;
 	  }
 	}
-	if (d->id[id_index].flags & JV3_ERROR) {
+	if (d->u.jv3.id[id_index].flags & JV3_ERROR) {
 	  state.status |= TRSDISK_CRCERR;
 	}
 	if (non_ibm) {
@@ -1693,10 +2274,69 @@ trs_disk_command_write(unsigned char cmd)
 	} else {
 	  state.bytecount = id_index_to_size(d, id_index);
 	}
-      }
+	fseek(d->file, offset(d, id_index), 0);
+
+      } else /* d->emutype == DMK */ {
+
+	/* DMK search dumps the size code into state.bytecount; adjust
+           to real bytecount here */
+	if (non_ibm) {
+	  state.bytecount = 16 * (((state.bytecount - 1)&0xff)+1);
+	} else {
+	  state.bytecount = 128 << (state.bytecount & 3);
+	}
+	/* Set flags for DAM */
+	if (state.controller == TRSDISK_P1771) {
+	  /* 1771 */
+	  switch (d->u.dmk.buf[id_index]) {
+	  case 0xfb:
+	    state.status |= TRSDISK_1771_FB;
+	    break;
+	  case 0xfa:
+	    state.status |= TRSDISK_1771_FA;
+	    break;
+	  case 0xf9:
+	    state.status |= TRSDISK_1771_F9;
+	    break;
+	  case 0xf8:
+	    state.status |= TRSDISK_1771_F8;
+	    break;
+	  }
+	} else /* state.controller == TRSDISK_P1791 */ {
+	  switch (d->u.dmk.buf[id_index]) {
+	  case 0xfb:
+	    state.status |= TRSDISK_1791_FB;
+	    break;
+	  case 0xfa:
+	    /* Note: Illegal in DDEN but Write Track can still
+	       generate it, and of course 1771 can generate in SDEN */
+	    if (trs_disk_truedam) {
+	      state.status |= TRSDISK_1791_FB;
+	    } else {
+	      state.status |= TRSDISK_1791_F8;
+	    }
+	    break;
+	  case 0xf9:
+	    /* Note: Illegal in DDEN but Write Track can still
+	       generate it, and of course 1771 can generate in SDEN */
+	    state.status |= TRSDISK_1791_F8;
+	    break;
+	  case 0xf8:
+	    state.status |= TRSDISK_1791_F8;
+	    break;
+	  }
+	}
+	state.crc = calc_crc1((state.density
+			       ? 0xcdb4 /* CRC of a1 a1 a1 */
+			       : 0xffff),
+			      d->u.dmk.buf[id_index]);
+
+	d->u.dmk.curbyte = id_index + dmk_incr(d);
+
+      } /* end if (d->emutype == ...) */
+
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
-      fseek(d->file, offset(d, id_index), 0);
     }
     break;
   case TRSDISK_READM:
@@ -1707,6 +2347,7 @@ trs_disk_command_write(unsigned char cmd)
     state.last_readadr = -1;
     state.status = 0;
     non_ibm = 0;
+    goal_side = -1;
     if (state.controller == TRSDISK_P1771) {
       if (!(cmd & TRSDISK_BBIT)) {
 #if DISKDEBUG2
@@ -1727,39 +2368,48 @@ trs_disk_command_write(unsigned char cmd)
 	}
 #endif
       }
+    } else {
+      if (cmd & TRSDISK_CBIT) {
+	goal_side = (cmd & TRSDISK_BBIT) != 0;
+      }
     }
     if (d->emutype == REAL) {
       state.status = TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
-      state.bytecount = size_code_to_size(d->real_size_code);
+      state.bytecount = size_code_to_size(d->u.real.size_code);
       break;
     }
     if (d->writeprot) {
       state.status = TRSDISK_WRITEPRT;
       break;
     }
-    id_index = search(state.sector);
+    id_index = search(state.sector, goal_side);
     if (id_index == -1) {
       state.status |= TRSDISK_BUSY;
       trs_schedule_event(trs_disk_done, 0, 512);
     } else {
-      int dam = 0;
+      int jv3dam = 0, dam = 0;
       if (state.controller == TRSDISK_P1771) {
 	switch (cmd & (TRSDISK_CBIT|TRSDISK_DBIT)) {
 	case 0:
-	  dam = JV3_DAMSDFB;
+	  dam = 0xfb;
+	  jv3dam = JV3_DAMSDFB;
 	  break;
 	case 1:
-	  dam = JV3_DAMSDFA;
+	  dam = 0xfa;
+	  jv3dam = JV3_DAMSDFA;
 	  break;
 	case 2:
-	  dam = JV3_DAMSDF9;
+	  dam = 0xf9;
+	  jv3dam = JV3_DAMSDF9;
 	  break;
 	case 3:
 	  if (trs_disk_truedam) {
-	    dam = JV3_DAMSDF8;
+	    dam = 0xf8;
+	    jv3dam = JV3_DAMSDF8;
 	  } else {
-	    dam = JV3_DAMSDFA;
+	    dam = 0xfa;
+	    jv3dam = JV3_DAMSDFA;
 	  }
 	  break;
 	}
@@ -1767,13 +2417,16 @@ trs_disk_command_write(unsigned char cmd)
 	/* 179x single */
 	switch (cmd & TRSDISK_DBIT) {
 	case 0:
-	  dam = JV3_DAMSDFB;
+	  dam = 0xfb;
+	  jv3dam = JV3_DAMSDFB;
 	  break;
 	case 1:
 	  if (trs_disk_truedam) {
-	    dam = JV3_DAMSDF8;
+	    dam = 0xf8;
+	    jv3dam = JV3_DAMSDF8;
 	  } else {
-	    dam = JV3_DAMSDFA;
+	    dam = 0xfa;
+	    jv3dam = JV3_DAMSDFA;
 	  }
 	  break;
 	}
@@ -1781,27 +2434,31 @@ trs_disk_command_write(unsigned char cmd)
 	/* 179x double */
 	switch (cmd & TRSDISK_DBIT) {
 	case 0:
-	  dam = JV3_DAMDDFB;
+	  dam = 0xfb;
+	  jv3dam = JV3_DAMDDFB;
 	  break;
 	case 1:
-	  dam = JV3_DAMDDF8;
+	  dam = 0xf8;
+	  jv3dam = JV3_DAMDDF8;
 	  break;
 	}
       }
 
       if (d->emutype == JV1) {
-	if (dam == JV3_DAMSDF9) {
+	if (dam == 0xf9) {
 	  trs_disk_unimpl(state.currcommand, "JV1 DAM cannot be F9");
-	} else if ((dam == JV3_DAMSDFB) == (d->phytrack == 17)) {
+	} else if ((dam == 0xfb) == (d->phytrack == 17)) {
 	  trs_disk_unimpl(state.currcommand, "JV1 directory must be track 17");
 	  break;
 	}
 	state.bytecount = JV1_SECSIZE;
-      } else {
-	SectorId *sid = &d->id[id_index];
+	fseek(d->file, offset(d, id_index), 0);
+
+      } else if (d->emutype == JV3) {
+	SectorId *sid = &d->u.jv3.id[id_index];
 	unsigned char newflags = sid->flags;
 	newflags &= ~(JV3_ERROR|JV3_DAM); /* clear CRC error and DAM */
-	newflags |= dam;
+	newflags |= jv3dam;
 	if (newflags != sid->flags) {
 	  int c;
 	  fseek(d->file, idoffset(d, id_index) 
@@ -1820,12 +2477,13 @@ trs_disk_command_write(unsigned char cmd)
 	     it uses the sector numbers, not the known physical sector
 	     order. */
 	  for (i = state.sector+1; i <= 0x7f; i++) {
-	    j = search(i);
+	    j = search(i, -1);
 	    if (j != -1) {
 #if DISKDEBUG2
-	      fprintf(stderr, "smashing sector %02x\n", i);
+	      fprintf(stderr, "smashing tk %d sector %02x id_index %d\n",
+		      state.track, i, j);
 #endif
-	      free_sector(d, idoffset(d, j));
+	      jv3_free_sector(d, j);
 	      c = fflush(d->file);
 	      if (c == EOF) state.status |= TRSDISK_WRITEFLT;
 	    }	      
@@ -1835,15 +2493,48 @@ trs_disk_command_write(unsigned char cmd)
 	}
 	/* end kludge */
 
-      }
+	if (non_ibm) {
+	  state.bytecount = 16;
+	} else {
+	  state.bytecount = id_index_to_size(d, id_index);
+	}
+	fseek(d->file, offset(d, id_index), 0);
+
+      } else /* d->emutype == DMK */ {
+	int c;
+	
+	/* DMK search dumps the size code into state.bytecount; adjust
+           to real bytecount here */
+	if (non_ibm) {
+	  state.bytecount = 16 * (((state.bytecount - 1)&0xff)+1);
+	} else {
+	  state.bytecount = 128 << (state.bytecount & 3);
+	}
+
+	/* Write DAM */
+	fseek(d->file, (DMK_HDR_SIZE +
+			(d->u.dmk.curtrack*d->u.dmk.nsides + d->u.dmk.curside)
+			* d->u.dmk.tracklen + id_index), 0);
+	c = putc(dam, d->file);
+	d->u.dmk.buf[id_index++] = dam;
+	if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+	if (dmk_incr(d) == 2) {
+	  c = putc(dam, d->file);
+	  if (c == EOF) state.status |= TRSDISK_WRITEFLT;
+	  d->u.dmk.buf[id_index++] = dam;
+	}
+
+	/* Initialize CRC */
+	state.crc = calc_crc1((state.density
+			       ? 0xcdb4 /* CRC of a1 a1 a1 */
+			       : 0xffff), dam);
+
+	d->u.dmk.curbyte = id_index;
+
+      } /* end if (d->emutype == ...) */
+
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
-      if (non_ibm) {
-	state.bytecount = 16;
-      } else {
-	state.bytecount = id_index_to_size(d, id_index);
-      }
-      fseek(d->file, offset(d, id_index), 0);
     }
     break;
   case TRSDISK_WRITEM:
@@ -1855,10 +2546,15 @@ trs_disk_command_write(unsigned char cmd)
     trs_disk_unimpl(cmd, "write multiple");
     break;
   case TRSDISK_READADR:
+    if (state.density) {
+      state.crc = 0xb230;  /* CRC of a1 a1 a1 fe */
+    } else {
+      state.crc = 0xef21;  /* CRC of fe */
+    }
     if (d->emutype == REAL) {
       real_readadr();
       break;
-    } else {
+    } else if (d->emutype == JV1 || d->emutype == JV3) {
       int totbyt, i, ts, denok;
       float a, b, bytlen;
       id_index = search_adr();
@@ -1900,11 +2596,12 @@ trs_disk_command_write(unsigned char cmd)
 	totbyt = 0;
 	denok = 0;
 	for (;;) {
-	  SectorId *sid = &d->id[d->sorted_id[i]];
+	  SectorId *sid = &d->u.jv3.id[d->u.jv3.sorted_id[i]];
 	  int dden = (sid->flags & JV3_DENSITY) != 0;
 	  if (sid->track != d->phytrack ||
 	      (sid->flags & JV3_SIDE ? 1 : 0) != state.curside) break;
-	  totbyt += (dden ? 1 : 2) * id_index_to_size(d, d->sorted_id[i]);
+	  totbyt += (dden ? 1 : 2) *
+	    id_index_to_size(d, d->u.jv3.sorted_id[i]);
 	  if (dden == state.density) denok = 1;
 	  i++;
 	}
@@ -1912,7 +2609,7 @@ trs_disk_command_write(unsigned char cmd)
 	  /* No sectors of the correct density */
 	  state.status = TRSDISK_BUSY;
 	  trs_schedule_event(trs_disk_done, TRSDISK_NOTFOUND,
-			     200000*z80_state.clockMHz);
+			     1000000*z80_state.clockMHz);
 	  break;
 	}
 	/* Which sector header is next?  Use a rough assumption that
@@ -1925,7 +2622,7 @@ trs_disk_command_write(unsigned char cmd)
 	bytlen = (1.0 - GAP1ANGLE - GAP4ANGLE)/((float)totbyt);
 	i = id_index;
 	for (;;) {
-	  SectorId *sid = &d->id[d->sorted_id[i]];
+	  SectorId *sid = &d->u.jv3.id[d->u.jv3.sorted_id[i]];
 	  if (sid->track != d->phytrack ||
 	      (sid->flags & JV3_SIDE ? 1 : 0) != state.curside) {
 	    /* Wrap around to start of track */
@@ -1937,7 +2634,7 @@ trs_disk_command_write(unsigned char cmd)
 	    break;
 	  }
 	  b += ((sid->flags & JV3_DENSITY) ? 1 : 2) *
-  	    id_index_to_size(d, d->sorted_id[i]) * bytlen;
+  	    id_index_to_size(d, d->u.jv3.sorted_id[i]) * bytlen;
 	  i++;
 	}
       }
@@ -1952,21 +2649,92 @@ trs_disk_command_write(unsigned char cmd)
       fprintf(stderr, "readadr phytrack %d angle %f i %d ts %d\n",
 	      d->phytrack, a, i, ts);
 #endif
+    } else /* d->emutype == DMK */ {
+      /* Compute how far it will be to the next ID in the correct density */
+      float a = angle();
+      int ia = a * (d->inches ? TRKSIZE_DD : TRKSIZE_8DD);
+      int ib = 0;
+      int i, j, idamp, dden, prev_idamp, prev_dden, ts;
+
+      dmk_get_track(d);
+
+      for (j = 0; j < 2; j++) {
+	idamp = d->u.dmk.buf[0] + (d->u.dmk.buf[1] << 8);
+	dden = (idamp & DMK_DDEN_FLAG) != 0;
+	idamp = DMK_TKHDR_SIZE;
+
+	for (i = 0; i < DMK_TKHDR_SIZE; i+=2) {
+	  prev_idamp = idamp;
+	  prev_dden = dden;
+	  idamp = d->u.dmk.buf[i] + (d->u.dmk.buf[i+1] << 8);
+	  if (idamp == 0) break;
+	  dden = (idamp & DMK_DDEN_FLAG) != 0;
+	  idamp &= DMK_IDAMP_BITS;
+	  if (idamp >= DMK_TRACKLEN_MAX) break;
+	  ib += (idamp - prev_idamp) *
+	    ((!prev_dden && (d->u.dmk.sden || d->u.dmk.ignden)) ? 2 : 1);
+	  if (ib > ia && dden == state.density) goto found;
+	}
+	/* Next ID (if any) is past the index hole */
+	ib = (d->inches ? TRKSIZE_DD : TRKSIZE_8DD);
+      }
+      /* no suitable ID found */
+      state.status = TRSDISK_BUSY;
+      trs_schedule_event(trs_disk_done, TRSDISK_NOTFOUND,
+			 1000000*z80_state.clockMHz);
+      break;
+    found:
+      /* Convert dden byte count to t-states */
+      ts = ((float) ((ib - ia) * (d->inches == 5 ? 32 : 16)))
+	* z80_state.clockMHz;
+
+      state.status = TRSDISK_BUSY;
+      state.last_readadr = i;
+      state.bytecount = 6;
+      state.crc = calc_crc1((state.density
+			     ? 0xcdb4 /* CRC of a1 a1 a1 */
+			     : 0xffff),
+			    d->u.dmk.buf[idamp]);
+      d->u.dmk.curbyte = idamp + dmk_incr(d);
+      trs_schedule_event(trs_disk_firstdrq, -1, ts);
+#if DISKDEBUG5
+      fprintf(stderr, "readadr phytrack %d angle %f i %d ts %d\n",
+	      d->phytrack, a, i, ts);
+#endif
     }
     break;
   case TRSDISK_READTRK:
     state.last_readadr = -1;
+    if (d->file == NULL) {
+      /* Data sheet says we wait forever for an index pulse, ugh */
+      state.status = TRSDISK_BUSY;
+      state.bytecount = 0;
+      break;
+    }
     if (d->emutype == REAL) {
       real_readtrk();
       break;
     }
-    trs_disk_unimpl(cmd, "read track");
+    if (d->emutype != DMK) {
+      trs_disk_unimpl(cmd, "read track");
+      break;
+    }
+    dmk_get_track(d);
+    d->u.dmk.curbyte = DMK_TKHDR_SIZE;
+    if (disk[state.curdrive].inches == 5) {
+      state.bytecount = TRKSIZE_DD;  /* decrement by 2's if SD */
+    } else {
+      state.bytecount = TRKSIZE_8DD; /* decrement by 2's if SD */
+    }
+    state.status = TRSDISK_BUSY|TRSDISK_DRQ;
+    trs_disk_drq_interrupt(1);
     break;
   case TRSDISK_WRITETRK:
     state.last_readadr = -1;
     /* Really a write track? */
     if (trs_model == 1 && (cmd == TRSDISK_P1771 || cmd == TRSDISK_P1791)) {
       /* No; emulate Percom Doubler */
+      state.currcommand = TRSDISK_FORCEINT;
       if (trs_disk_doubler & TRSDISK_PERCOM) {
 	trs_disk_set_controller(cmd);
 	/* The Doubler's 1791 is hardwired to double density */
@@ -1978,26 +2746,41 @@ trs_disk_command_write(unsigned char cmd)
 	state.status = TRSDISK_WRITEPRT;
 	break;
       }
+      state.status = 0;
       if (d->file == NULL) {
-	/* How is this error indicated?  Did the controller just hang? */
-	state.status |= (TRSDISK_BUSY|TRSDISK_WRITEFLT);
-	trs_schedule_event(trs_disk_done, 0, 512);
+	/* Data sheet says we wait forever for an index pulse, ugh */
+	state.status = TRSDISK_BUSY;
+	state.bytecount = 0;
 	break;
       }
       if (d->emutype == JV3) {
 	/* Erase track if already formatted */
 	int i;
-	for (i=0; i<=d->last_used_id; i++) {
-	  if (d->id[i].track == d->phytrack &&
-	      ((d->id[i].flags & JV3_SIDE) != 0) == state.curside) {
-	    free_sector(d, i);
+	for (i=0; i<=d->u.jv3.last_used_id; i++) {
+	  if (d->u.jv3.id[i].track == d->phytrack &&
+	      ((d->u.jv3.id[i].flags & JV3_SIDE) != 0) == state.curside) {
+	    jv3_free_sector(d, i);
 	  }
 	}
       } else if (d->emutype == REAL) {
-	d->real_size_code = -1; /* watch for first, then check others match */
-	d->realfmt_nbytes = 0; /* size of PC formatting command buffer */
+	d->u.real.size_code = -1; /* watch for first, then check others match*/
+	d->u.real.fmt_nbytes = 0; /* size of PC formatting command buffer */
+      } else if (d->emutype == DMK) {
+	if (state.density && d->u.dmk.sden) {
+	  error("DMK disk created as single density only");
+	  state.status |= TRSDISK_WRITEFLT;
+	}
+	if (state.curside && d->u.dmk.nsides == 1) {
+	  error("DMK disk created as single sided only");
+	  state.status |= TRSDISK_WRITEFLT;
+	}
+	d->u.dmk.curtrack = d->phytrack;
+	d->u.dmk.curside = state.curside;
+	memset(d->u.dmk.buf, 0, sizeof(d->u.dmk.buf));
+	d->u.dmk.curbyte = DMK_TKHDR_SIZE;
+	d->u.dmk.nextidam = 0;
       }
-      state.status = TRSDISK_BUSY|TRSDISK_DRQ;
+      state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
       state.format = FMT_GAP0;
       state.format_gapcnt = 0;
@@ -2030,9 +2813,9 @@ int
 real_rate(DiskState *d)
 {
   if (d->inches == 5) {
-    if (d->real_rps == 5) {
+    if (d->u.real.rps == 5) {
       return 2;
-    } else if (d->real_rps == 6) {
+    } else if (d->u.real.rps == 6) {
       return 1;
     }
   } else if (d->inches == 8) {
@@ -2046,9 +2829,9 @@ void
 real_error(DiskState *d, unsigned int flags, char *msg, unsigned char status)
 {
   time_t now = time(NULL);
-  if (now > d->empty_timeout) {
-    d->empty_timeout = time(NULL) + EMPTY_TIMEOUT;
-    d->real_empty = 1;
+  if (now > d->u.real.empty_timeout) {
+    d->u.real.empty_timeout = time(NULL) + EMPTY_TIMEOUT;
+    d->u.real.empty = 1;
   }
   state.status |= status;
   /*fprintf(stderr, "error on real_%s\n", msg);*/
@@ -2057,8 +2840,8 @@ real_error(DiskState *d, unsigned int flags, char *msg, unsigned char status)
 void
 real_ok(DiskState *d)
 {
-  d->empty_timeout = time(NULL) + EMPTY_TIMEOUT;
-  d->real_empty = 0;
+  d->u.real.empty_timeout = time(NULL) + EMPTY_TIMEOUT;
+  d->u.real.empty = 0;
 }
 
 int
@@ -2070,7 +2853,7 @@ real_check_empty(DiskState *d)
   int res, i = 0;
   sigset_t set, oldset;
 
-  if (time(NULL) <= d->empty_timeout) return d->real_empty;
+  if (time(NULL) <= d->u.real.empty_timeout) return d->u.real.empty;
   
   ioctl(fileno(d->file), FDRESET, &reset_now);
 
@@ -2099,7 +2882,7 @@ real_check_empty(DiskState *d)
 #else
   trs_disk_unimpl(state.currcommand, "check for empty on real floppy");
 #endif
-  return d->real_empty;
+  return d->u.real.empty;
 }
 
 void
@@ -2203,13 +2986,13 @@ real_read()
     raw_cmd.cmd[i++] = state.track;
     raw_cmd.cmd[i++] = state.curside;
     raw_cmd.cmd[i++] = state.sector;
-    raw_cmd.cmd[i++] = d->real_size_code;
+    raw_cmd.cmd[i++] = d->u.real.size_code;
     raw_cmd.cmd[i++] = 255;
     raw_cmd.cmd[i++] = 0x0a;
     raw_cmd.cmd[i++] = 0xff; /* unused */
     raw_cmd.cmd_count = i;
-    raw_cmd.data = (void*) d->buf;
-    raw_cmd.length = 128 << d->real_size_code;
+    raw_cmd.data = (void*) d->u.real.buf;
+    raw_cmd.length = 128 << d->u.real.size_code;
     sigemptyset(&set);
     sigaddset(&set, SIGALRM);
     sigaddset(&set, SIGIO);
@@ -2227,11 +3010,11 @@ real_read()
 #if DISKDEBUG4
 	fprintf(stderr,
 		"real_read not fnd: side %d tk %d sec %d size 0%d phytk %d\n",
-		state.curside, state.track, state.sector, d->real_size_code,
+		state.curside, state.track, state.sector, d->u.real.size_code,
 		d->phytrack*d->real_step);
 #endif
 #if SIZERETRY
-	d->real_size_code = (d->real_size_code + 1) % 4;
+	d->u.real.size_code = (d->u.real.size_code + 1) % 4;
 	if (++retry < 4) {
 	  continue; /* retry */
 	}
@@ -2261,7 +3044,7 @@ real_read()
 	/* Start read */
 	state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
 	trs_disk_drq_interrupt(1);
-	state.bytecount = size_code_to_size(d->real_size_code);
+	state.bytecount = size_code_to_size(d->u.real.size_code);
 	return;
       }
     }
@@ -2309,13 +3092,13 @@ real_write()
   raw_cmd.cmd[i++] = state.track;
   raw_cmd.cmd[i++] = state.curside;
   raw_cmd.cmd[i++] = state.sector;
-  raw_cmd.cmd[i++] = d->real_size_code;
+  raw_cmd.cmd[i++] = d->u.real.size_code;
   raw_cmd.cmd[i++] = 255;
   raw_cmd.cmd[i++] = 0x0a;
   raw_cmd.cmd[i++] = 0xff; /* 256 */
   raw_cmd.cmd_count = i;
-  raw_cmd.data = (void*) d->buf;
-  raw_cmd.length = 128 << d->real_size_code;
+  raw_cmd.data = (void*) d->u.real.buf;
+  raw_cmd.length = 128 << d->u.real.size_code;
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);
   sigaddset(&set, SIGIO);
@@ -2335,11 +3118,11 @@ real_write()
 #if DISKDEBUG4
       fprintf(stderr,
 	      "real_write not found: side %d tk %d sec %d size 0%d phytk %d\n",
-	      state.curside, state.track, state.sector, d->real_size_code,
+	      state.curside, state.track, state.sector, d->u.real.size_code,
 	      d->phytrack*d->real_step);
 #endif
 #if SIZERETRY
-      d->real_size_code = (d->real_size_code + 1) % 4;
+      d->u.real.size_code = (d->u.real.size_code + 1) % 4;
 #endif
     }
     if (raw_cmd.reply[1] & 0x81) state.status |= TRSDISK_NOTFOUND;
@@ -2435,8 +3218,8 @@ real_readadr()
 	/* Yes; emulate the waiting time for this sector to come around */
 	float realus = ((tv.tv_usec - last_tv.tv_usec) +
 	      1000000.0 * (tv.tv_sec - last_tv.tv_sec)) *
-	  d->real_rps / (d->inches == 5 ? 5 : 6);
-	float nomus = ((float)size_code_to_size(d->real_size_code)) /
+	  d->u.real.rps / (d->inches == 5 ? 5 : 6);
+	float nomus = ((float)size_code_to_size(d->u.real.size_code)) /
 	  ((d->inches ? TRKSIZE_DD : TRKSIZE_8DD) /
 	   (state.density ? 1 : 2)) *
 	  (1000000.0 / (d->inches == 5 ? 5 : 6));
@@ -2481,10 +3264,10 @@ real_readadr()
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
 #endif
-      memcpy(d->buf, &raw_cmd.reply[3], 4);
-      d->buf[4] = d->buf[5] = 0; /* CRC not emulated */
+      memcpy(d->u.real.buf, &raw_cmd.reply[3], 4);
+      d->u.real.buf[4] = d->u.real.buf[5] = 0; /* CRC not emulated */
       state.bytecount = 6;
-      d->real_size_code = d->buf[3]; /* update hint */
+      d->u.real.size_code = d->u.real.buf[3]; /* update hint */
       return;
     }
   }
@@ -2522,23 +3305,23 @@ real_writetrk()
     /* MFM recording */
     if (d->inches == 5) {
       /* 5" DD = 250 kHz MFM */
-      gap3 = (TRKSIZE_DD - 161 - /*slop*/16)/(d->realfmt_nbytes / 4)
-	- 62 - (128 << d->real_size_code) - /*slop*/2;
+      gap3 = (TRKSIZE_DD - 161 - /*slop*/16)/(d->u.real.fmt_nbytes / 4)
+	- 62 - (128 << d->u.real.size_code) - /*slop*/2;
     } else {
       /* 8" DD = 5" HD = 500 kHz MFM */
-      gap3 = (TRKSIZE_8DD - 161 - /*slop*/16)/(d->realfmt_nbytes / 4)
-	- 62 - (128 << d->real_size_code) - /*slop*/2;
+      gap3 = (TRKSIZE_8DD - 161 - /*slop*/16)/(d->u.real.fmt_nbytes / 4)
+	- 62 - (128 << d->u.real.size_code) - /*slop*/2;
     }
   } else {
     /* FM recording */
     if (d->inches == 5) {
       /* 5" SD = 250 kHz FM (125 kbps) */
-      gap3 = (TRKSIZE_SD - 99 - /*slop*/16)/(d->realfmt_nbytes / 4)
-	- 33 - (128 << d->real_size_code) - /*slop*/2;
+      gap3 = (TRKSIZE_SD - 99 - /*slop*/16)/(d->u.real.fmt_nbytes / 4)
+	- 33 - (128 << d->u.real.size_code) - /*slop*/2;
     } else {
       /* 8" SD = 5" HD operated in FM = 500 kHz FM (250 kbps) */
-      gap3 = (TRKSIZE_8SD - 99 - /*slop*/16)/(d->realfmt_nbytes / 4)
-	- 33 - (128 << d->real_size_code) - /*slop*/2;
+      gap3 = (TRKSIZE_8SD - 99 - /*slop*/16)/(d->u.real.fmt_nbytes / 4)
+	- 33 - (128 << d->u.real.size_code) - /*slop*/2;
     }
   }
   if (gap3 < 1) {
@@ -2555,20 +3338,20 @@ real_writetrk()
   i = 0;
   raw_cmd.cmd[i++] = 0x0d | (state.density ? 0x40 : 0x00);
   raw_cmd.cmd[i++] = state.curside ? 4 : 0;
-  raw_cmd.cmd[i++] = d->real_size_code;
-  raw_cmd.cmd[i++] = d->realfmt_nbytes / 4;
+  raw_cmd.cmd[i++] = d->u.real.size_code;
+  raw_cmd.cmd[i++] = d->u.real.fmt_nbytes / 4;
   raw_cmd.cmd[i++] = gap3;
-  raw_cmd.cmd[i++] = d->realfmt_fill;
+  raw_cmd.cmd[i++] = d->u.real.fmt_fill;
   raw_cmd.cmd_count = i;
-  raw_cmd.data = (void*) d->buf;
-  raw_cmd.length = d->realfmt_nbytes;
+  raw_cmd.data = (void*) d->u.real.buf;
+  raw_cmd.length = d->u.real.fmt_nbytes;
 #if DISKDEBUG3
   fprintf(stderr,
 	  "real_writetrk size 0%d secs %d gap3 %d fill 0x%02x hex data ",
-	  d->real_size_code, d->realfmt_nbytes/4, gap3, d->realfmt_fill);
-  for (i=0; i<d->realfmt_nbytes; i+=4) {
+	  d->u.real.size_code, d->u.real.fmt_nbytes/4, gap3, d->u.real.fmt_fill);
+  for (i=0; i<d->u.real.fmt_nbytes; i+=4) {
     fprintf(stderr, "%02x%02x%02x%02x ",
-	    d->buf[i], d->buf[i+1], d->buf[i+2], d->buf[i+3]);
+	    d->u.real.buf[i], d->u.real.buf[i+1], d->u.real.buf[i+2], d->u.real.buf[i+3]);
   }
   fprintf(stderr, "\n");
 #endif
@@ -2603,3 +3386,4 @@ real_writetrk()
   trs_disk_unimpl(state.currcommand, "write track on real floppy");
 #endif
 }
+

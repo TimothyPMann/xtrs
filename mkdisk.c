@@ -20,8 +20,11 @@
 void Usage(char *progname)
 {
   fprintf(stderr, 
-	  "Usage: %s [-1|-3|-h] [-c cyl] [-s sec] [-g gran] [-d dir] file\n",
-	  progname);
+	  "Usage:\t%s -1 file\n"
+	  "\t%s [-3] file\n"
+	  "\t%s -k [-s sides] [-d density] [-8] [-i] file\n"
+	  "\t%s -h [-c cyl] [-s sec] [-g gran] [-d dir] file\n",
+	  progname, progname, progname, progname);
   exit(2);
 }
 
@@ -80,14 +83,15 @@ ReedHardHeader rhh;
 int
 main(int argc, char *argv[])
 {
-  int jv1 = 0, jv3 = 0, hard = 0, cyl = 202, sec = 256, gran = 8;
-  int i, c, hardopts = 0, dir = 1;
+  int jv1 = 0, jv3 = 0, dmk = 0, hard = 0;
+  int cyl = -1, sec = -1, gran = -1, dir = -1, eight = 0, ignden = 0;
+  int i, c;
   char *fname;
   FILE *f;
 
   opterr = 0;
   for (;;) {
-    c = getopt(argc, argv, "13hc:s:g:d:");
+    c = getopt(argc, argv, "13khc:s:g:d:8i");
     if (c == -1) break;
     switch (c) {
     case '1':
@@ -96,24 +100,29 @@ main(int argc, char *argv[])
     case '3':
       jv3 = 1;
       break;
+    case 'k':
+      dmk = 1;
+      break;
     case 'h':
       hard = 1;
       break;
     case 'c':
       cyl = atoi(optarg);
-      hardopts++;
       break;
     case 's':
       sec = atoi(optarg);
-      hardopts++;
       break;
     case 'g':
       gran = atoi(optarg);
-      hardopts++;
       break;
     case 'd':
       dir = atoi(optarg);
-      hardopts++;
+      break;
+    case '8':
+      eight = 1;
+      break;
+    case 'i':
+      ignden = 1;
       break;
     case '?':
     default:
@@ -124,22 +133,33 @@ main(int argc, char *argv[])
 
   if (argc - optind != 1) Usage(argv[0]);
 
-  switch (jv1 + jv3 + hard) {
+  switch (jv1 + jv3 + dmk + hard) {
   case 0:
     jv3 = 1;
     break;
   case 1:
     break;
   default:
-    fprintf(stderr, "%s: -1, -3, and -h are mutually exclusive\n", argv[0]);
+    fprintf(stderr,
+	    "%s: -1, -3, -k, and -h are mutually exclusive\n", argv[0]);
     exit(2);
   }
 
-  if (!hard && hardopts > 0) {
-    fprintf(stderr, "%s: -c, -s, -g, and -d are meaningful only with -h\n",
-	    argv[0]);
+  if ((jv1 || jv3) && (cyl >= 0 || sec >= 0 || gran >= 0 || dir >= 0)) {
+    fprintf(stderr,
+	    "%s: -c, -s, -g, -d are not meaningful with -1 or -3\n", argv[0]);
     exit(2);
   }
+
+  if (dmk && (cyl >= 0 || gran >= 0)) {
+    fprintf(stderr, "%s: -c and -g are not meaningful with -k\n", argv[0]);
+    exit(2);
+  }
+
+  if (!dmk && (eight || ignden)) {
+    fprintf(stderr, "%s: -8 and -i are only meaningful with -k\n", argv[0]);
+    exit(2);
+  }    
 
   fname = argv[optind];
 
@@ -150,7 +170,6 @@ main(int argc, char *argv[])
       perror(fname);
       exit(1);
     }
-    fclose(f);
 
   } else if (jv3) {
     /* Unformatted JV3 disk. */
@@ -162,7 +181,56 @@ main(int argc, char *argv[])
     for (i=0; i<(256*34); i++) {
       putc(0xff, f);
     }
-    fclose(f);
+
+  } else if (dmk) {
+    /* Unformatted DMK disk */
+    /* Reuse flag letters s, d */
+#define sides sec
+#define density dir
+    if (sides == -1) sides = 2;
+    if (density == -1) density = 2;
+
+    if (sides != 1 && sides != 2) {
+      fprintf(stderr, "%s error: sides must be 1 or 2\n", argv[0]);
+      exit(2);
+    }	    
+    if (density < 1 || density > 2) {
+      fprintf(stderr, "%s error: density must be 1 or 2\n", argv[0]);
+      exit(2);
+    }	    
+    
+    f = fopen(fname, "w");
+    putc(0, f);           /* 0: not write protected */
+    putc(0, f);           /* 1: initially zero tracks */
+    if (eight) {
+      if (density == 1)
+	i = 0x14e0;
+      else
+	i = 0x2940;
+    } else {
+      if (density == 1)
+	i = 0x0cc0;
+      else
+	i = 0x1900;
+    }
+    putc(i & 0xff, f);    /* 2: LSB of track length */
+    putc(i >> 8, f);      /* 3: MSB of track length */
+    i = 0;
+    if (sides == 1)   i |= 0x10;
+    if (density == 1) i |= 0x40;
+    if (ignden)       i |= 0x80;
+    putc(i, f);           /* 4: options */
+    putc(0, f);           /* 5: reserved */
+    putc(0, f);           /* 6: reserved */
+    putc(0, f);           /* 7: reserved */
+    putc(0, f);           /* 8: reserved */
+    putc(0, f);           /* 9: reserved */
+    putc(0, f);           /* a: reserved */
+    putc(0, f);           /* b: reserved */
+    putc(0, f);           /* c: MBZ */
+    putc(0, f);           /* d: MBZ */
+    putc(0, f);           /* e: MBZ */
+    putc(0, f);           /* f: MBZ */
 
   } else /* hard */ {
     /* Unformatted hard disk */
@@ -175,6 +243,11 @@ main(int argc, char *argv[])
     struct tm *lt = localtime(&tt);
     Uchar *rhhp;
     int cksum;
+
+    if (cyl == -1) cyl = 202;
+    if (sec == -1) sec = 256;
+    if (gran == -1) gran = 8;
+    if (dir == -1) dir = 1;
 
     if (cyl < 3) {
       fprintf(stderr, "%s error: cyl < 3\n", argv[0]);
@@ -256,11 +329,11 @@ main(int argc, char *argv[])
       exit(1);
     }
     fwrite(&rhh, sizeof(rhh), 1, f);
-    fclose(f);
 
     printf("%s: Be sure to format this drive with FORMAT (DIR=%d)\n",
            argv[0], dir);
   }
+  fclose(f);
   return 0;
 }
 

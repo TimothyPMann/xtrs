@@ -89,6 +89,8 @@ Printing:\n\
         Enable tracing of all instructions.\n\
     traceoff\n\
         Disable tracing.\n\
+    diskdump\n\
+        Print the state of the floppy disk controller emulation.\n\
 Traps:\n\
     status\n\
         Show all traps (breakpoints, trace points).\n\
@@ -708,6 +710,10 @@ void debug_shell()
 	        /* Turn off emulated real time clock interrupt */
 	        trs_timer_on();
             }
+	    else if(!strcmp(command, "diskdump"))
+	    {
+		trs_disk_debug();
+	    }
 	    else
 	    {
 		int start_address, end_address, num_bytes;

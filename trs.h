@@ -95,6 +95,8 @@ extern void trs_timer_speed(int flag);
 
 extern void trs_disk_change(int drive);
 extern void trs_disk_change_all();
+extern void trs_disk_debug();
+extern int trs_disk_motoroff();
 
 extern void mem_video_page(int which);
 extern void mem_bank(int which);

@@ -131,13 +131,14 @@ be double-sided in Model I mode.  In the original Model I, you could
 not have a drive :3 at all if any drive in the system was
 double-sided, but the emulator is able to be more forgiving.
 
-Emulated floppy image files can be of either of two types: JV1,
+Emulated floppy image files can be of any of three types: JV1,
 compatible with Jeff Vavasour's popular freeware Model I emulator for
-the PC; or JV3, a compatible extension of a format first used in
-Vavasour's commercial Model III/4 emulator.  Both types work in
-\fBxtrs\fP regardless of what model it is emulating.  A heuristic is
-used to decide which type of image is in a drive, as neither type has
-a magic number or signature.
+MS-DOS; JV3, a compatible extension of a format first used in
+Vavasour's commercial Model III/4 emulator; or DMK, compatible with
+David Keil's Model 4 emulator.  All three types work in \fBxtrs\fP
+regardless of what model it is emulating.  A heuristic is used to
+decide which type of image is in a drive, as none of the types has a
+magic number or signature.
 
 JV1 supports only single density, single sided, with directory on
 track 17.  Sectors must be 256 bytes long.  Use FORMAT (DIR=17) if you
@@ -145,16 +146,17 @@ want to format JV1 disks with more (or less) than 35 tracks under
 LDOS.
 
 JV3 is much more flexible, though it still does not support everything
-the real controllers could do.  It is best to use JV3 for all the disk
-images you create, unless you need to exchange images with someone who
-is using the Vavasour Model I emulator.  A JV3 disk can be formatted
-with 128, 256, 512, or 1024-byte sectors, 1 or 2 sides, single or
-double density, with either FB (normal) or F8 (deleted) data address
-mark on any sector.  In single density the nonstandard data address
-marks FA and F9 are also available.  You cannot format a sector with
-an incorrect track number or head number.  You can format a sector
-with an intentional CRC error in the data field.  \fBxtrs\fP supports
-at most 96 cylinders and at most 5802 total sectors on a JV3 image.
+the real controllers could do.  It is probably best to use JV3 for all
+the disk images you create, since it is the most widely implemented by
+other emulators, unless you have a special reason to use one of the
+others.  A JV3 disk can be formatted with 128, 256, 512, or 1024-byte
+sectors, 1 or 2 sides, single or double density, with either FB
+(normal) or F8 (deleted) data address mark on any sector.  In single
+density the nonstandard data address marks FA and F9 are also
+available.  You cannot format a sector with an incorrect track number
+or head number.  You can format a sector with an intentional CRC error
+in the data field.  \fBxtrs\fP supports at most 96 cylinders and at
+most 5802 total sectors on a JV3 image.
 
 The original Vavasour JV3 format supported only 256-byte sectors, and
 had a limit of 2901 total sectors.  If you use sector sizes other
@@ -164,10 +166,17 @@ an 80 track, double-sided, double-density (18 sector) 5.25-inch floppy
 will fit within the original 2901 sector limit; the extension to 5802
 is primarily for emulation of 8-inch drives (discussed below).
 
+The DMK format is the most flexible.  It supports essentially
+everything that the original hardware could do, including all
+"protected" disk formats.  However, a few protected disks still may
+not work with xtrs due to limitations in xtrs's floppy disk controller
+emulation rather than limitations of the DMK format; see the
+LIMITATIONS section below.
+
 The program \fBmkdisk\fP(1) makes a blank emulated floppy or "bulk
 erases" an existing one.  By default, mkdisk makes a JV3 floppy, but
-with the -1 flag it makes a JV1 floppy.  See the \fBmkdisk\fP man page
-for more information.
+with the -1 flag it makes a JV1 floppy, or with the -k flag a DMK
+floppy.  See the \fBmkdisk\fP man page for more information.
 
 Early Model I operating systems used an FA data address mark for the
 directory on single density disks, while later ones wrote F8 but would
@@ -202,16 +211,19 @@ emulates a pseudo-hardware interface of its own and provides an LDOS/LS-DOS
 driver for it.
 
 Storage for the emulated 8-inch disks is in files named diskM-U, where
-M is the TRS-80 model number (1, 3, 4, or 4P) and U is a unit number (4,
-5, 6, or 7).  These files are in exactly the same JV3 format as 5.25-inch
-floppy files.  A new JV3 floppy can be formatted as either 5.25-inch or
-8-inch depending on whether you initially put it into a 5.25-inch or
-8-inch emulated drive.  The only difference between 5.25-inch and 8-inch
-emulated drives is that the emulator allows you to format more sectors
-per track in the latter.  Be careful not to put a 5.25-inch formatted
-emulated floppy into an 8-inch emulated drive or vice versa; the
-results are likely to be confusing.  Consider using different file
-extensions for the two types; say, \.dsk for 5.25-inch and \.8in for 8-inch.
+M is the TRS-80 model number (1, 3, 4, or 4P) and U is a unit number
+(4, 5, 6, or 7).  The only difference between 5.25-inch and 8-inch
+emulated drives is that the emulator allows you to format more bytes
+per track in the latter.  A new JV3 floppy can be formatted as either
+5.25-inch or 8-inch depending on whether you initially put it into a
+5.25-inch or 8-inch emulated drive.  A new DMK floppy, however, must
+be created with the -8 flag to mkdisk in order to be large enough for
+use in an 8-inch emulated drive.  JV1 floppies cannot be used in
+8-inch drives.  Be careful not to put an emulated floppy into a
+5.25-inch emulated drive after it has been formatted in an 8-inch
+emulated drive or vice versa; the results are likely to be confusing.
+Consider using different file extensions for the two types; say, \.dsk
+for 5.25-inch and \.8in for 8-inch.
 
 To use the emulated 8-inch drives, you'll need a driver.  Under LDOS
 or LS-DOS, use the program XTRS8/DCT supplied on the emulated floppy
@@ -782,15 +794,17 @@ Serial ports are not emulated.
 
 Some features of the disk controller are not currently emulated: Force
 Interrupt with condition bits 0x01, 0x02, or 0x04 is not
-implemented. Read Track is not implemented. The multiple-sector flags
-in Read and Write are not implemented.  Certain errors (such as Lost
-Data) cannot occur, which makes disk diagnostic programs that try to
-generate them on purpose unhappy.  The timing of returned sectors is
+implemented. Read Track is implemented only for DMK emulated
+floppies. The multiple-sector flags in Read and Write are not
+implemented.  A Lost Data error will not occur until the emulated
+drive times out and stops, which may cause problems in code that
+generates this error deliberately.  The timing of returned sectors is
 emulated only for the Read Address command, and not very accurately
-there.  Partially reformatting a track (which TRS-80 programs like
-HyperZap and Model I Super Utility did to achieve mixed density) is
-not supported; however, switching densities while formatting (which
-Model III and 4 Super Utility did) works on emulated floppies.
+for JV1 or JV3.  Partially reformatting a track (which TRS-80 programs
+like HyperZap and Model I Super Utility do to achieve mixed density)
+is supported for DMK but not JV3; however, switching densities while
+formatting (which Model III and 4 Super Utility do) works on both DMK
+and JV3.
 
 Real physical floppy disks are supported only under Linux, because
 Unix does not provide a portable interface to the low-level floppy
@@ -818,6 +832,16 @@ blocks of 2901.  Again, this does not seem too useful.  5802 sectors
 is already enough for a 3.5-inch HD (1.44MB) floppy, which the TRS-80 didn't
 support anyway.
 
+JV3, DMK, and the emulated hard drive format all define flags for
+internally marking the disk as write-protected.  \fBxtrs\fP respects
+the JV3 and DMK write-protect flags if set by another emulator, but
+provides no way to turn them on or off.  It ignores the
+write-protected flag in hard drive images.  However, you can write
+protect any floppy or hard drive image file by using the Unix chmod(1)
+command to turn off write permission on it (and forcing a disk change
+if xtrs is currently using the image); xtrs will detect this and
+gracefully emulate the presence of a write-protect tab or switch.
+
 The emulator uses a heuristic to decide what format a ROM file is in.
 If a raw binary ROM image starts with 0x01, 0x05, or 0x22, it can be
 misidentified as being in a different format.  This is rather unlikely
@@ -832,16 +856,19 @@ Digital Equipment Corporation, and Timothy Mann <mann@pa.dec.com> of
 Digital Equipment Corporation.  See README and README.tpm for
 additional notes from the authors.
 
-We also thank the following people for their help.  The floppy disk
-file formats were designed by Jeff Vavasour, originally for his
-MSDOS-based TRS-80 emulators.  The hard disk file format was designed
-by Matthew Reed for his MSDOS-based TRS-80 emulators.  Al Petrofsky
-and Todd P. Cromwell III supplied font data.  Roland Gerlach
-contributed the CP/M import and export programs as well as several bug
-reports and fixes for the emulator itself.  Fabio Ferrari contributed
-the sound support.  Ulrich Mueller added the -borderwidth option and
-ported the import, export, and settime utilities to Newdos/80.
-Branden Robinson supplied the cassette man page and fixed Makefile
-bugs.  Mark McDougall provided documentation for the Micro Labs Grafyx
-Solution card.
+We also thank the following people for their help.  The JV1 and JV3
+floppy disk file formats were designed by Jeff Vavasour, originally
+for his MSDOS-based TRS-80 emulators.  The DMK format was designed by
+David Keil for his MSDOS-based TRS-80 emulator.  The hard disk file
+format was designed by Matthew Reed for his MSDOS-based TRS-80
+emulators.  Al Petrofsky and Todd P. Cromwell III supplied font data.
+Roland Gerlach contributed the CP/M import and export programs as well
+as several bug reports and fixes for the emulator itself.  Fabio
+Ferrari contributed the sound support.  Ulrich Mueller added the
+-borderwidth option and ported the import, export, and settime
+utilities to Newdos/80.  Branden Robinson supplied the cassette man
+page and fixed Makefile bugs.  Mark McDougall provided documentation
+for the Micro Labs Grafyx Solution card.
+
+
 

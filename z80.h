@@ -37,9 +37,11 @@ typedef unsigned char Uchar;
 #ifdef NOTDEF /*__GNUC__*/
 typedef unsigned long long tstate_t;
 #define TSTATE_T_MID (((unsigned long long) -1LL)/2ULL)
+#define TSTATE_T_LEN "Lu"
 #else
 typedef unsigned long tstate_t;
 #define TSTATE_T_MID (((unsigned long) -1L)/2UL)
+#define TSTATE_T_LEN "lu"
 #endif
 
 struct twobyte
