@@ -24,7 +24,8 @@ OBJECTS = \
 	trs_rom4p.o \
 	trs_disk.o \
 	trs_interrupt.o \
-	trs_imp_exp.o
+	trs_imp_exp.o \
+	trs_hard.o
 
 CR_OBJECTS = \
 	compile_rom.o \
@@ -61,6 +62,7 @@ SOURCES = \
 	trs_chars.c \
 	trs_wide_chars.c \
 	trs_disk.c \
+	trs_hard.c \
 	trs_imp_exp.c \
 	trs_interrupt.c \
 	trs_io.c \
@@ -73,8 +75,10 @@ SOURCES = \
 HEADERS = \
 	cmd.h \
 	config.h \
+	reed.h \
 	trs.h \
 	trs_disk.h \
+	trs_hard.h \
 	trs_imp_exp.h \
 	trs_iodefs.h \
 	z80.h
@@ -139,7 +143,7 @@ CFLAGS = $(DEBUG) $(ENDIAN) $(DEFAULT_ROM) $(READLINE) $(DISKDIR) $(IFLAGS) \
 	-DKBWAIT -DHAVE_SIGIO
 LIBS = $(XLIB) $(READLINELIBS) $(EXTRALIBS)
 
-ZMACFLAGS = -h
+#ZMACFLAGS = -h
 .SUFFIXES:	.z .cmd .dct .man .txt .hex
 .z.cmd:
 	zmac $(ZMACFLAGS) $<

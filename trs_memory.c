@@ -31,6 +31,7 @@
 #include <malloc.h>
 #include <stdlib.h>
 #include "trs_disk.h"
+#include "trs_hard.h"
 
 #define MAX_ROM_SIZE	(0x3800)
 #define MAX_VIDEO_SIZE	(0x0800)
@@ -165,6 +166,7 @@ void trs_reset()
     trs_cassette_reset();
     trs_timer_speed(0);
     trs_disk_init(1);
+    trs_hard_init(1);
     if (trs_model == 5) {
 	z80_out(0x9C, 1);
     }
@@ -296,7 +298,7 @@ int mem_read(int address)
 
       case 0x42: /* Model 4 map 2 */
       case 0x52: /* Model 4P map 2, boot ROM out */
-      case 0x56: /* Model 4P map 2, boot ROM in (!!?) */
+      case 0x56: /* Model 4P map 2, boot ROM in */
 	if (address < 0xf400) {
 	    return memory[address + bank_offset[address>>15]];
 	}
@@ -305,7 +307,7 @@ int mem_read(int address)
 
       case 0x43: /* Model 4 map 3 */
       case 0x53: /* Model 4P map 3, boot ROM out */
-      case 0x57: /* Model 4P map 3, boot ROM in (!!?) */
+      case 0x57: /* Model 4P map 3, boot ROM in */
 	return memory[address + bank_offset[address>>15]];
     }
     /* not reached */
@@ -399,7 +401,7 @@ void mem_write(int address, int value)
 
       case 0x42: /* Model 4 map 2 */
       case 0x52: /* Model 4P map 2, boot ROM out */
-      case 0x56: /* Model 4P map 2, boot ROM in (!!?) */
+      case 0x56: /* Model 4P map 2, boot ROM in */
 	if (address < 0xf400) {
 	    memory[address + bank_offset[address>>15]] = value;
 	} else if (address >= 0xf800) {
@@ -413,7 +415,7 @@ void mem_write(int address, int value)
 
       case 0x43: /* Model 4 map 3 */
       case 0x53: /* Model 4P map 3, boot ROM out */
-      case 0x57: /* Model 4P map 3, boot ROM in (!!?) */
+      case 0x57: /* Model 4P map 3, boot ROM in */
 	memory[address + bank_offset[address>>15]] = value;
 	break;
     }
@@ -502,8 +504,8 @@ Uchar *mem_pointer(int address, int writing)
       case 0x4a: /* Model 4 map 1, writing */
       case 0x52: /* Model 4P map 2, boot ROM out, reading */
       case 0x5a: /* Model 4P map 2, boot ROM out, writing */
-      case 0x56: /* Model 4P map 2, boot ROM in, reading (!!?) */
-      case 0x5e: /* Model 4P map 2, boot ROM in, writing (!!?) */
+      case 0x56: /* Model 4P map 2, boot ROM in, reading */
+      case 0x5e: /* Model 4P map 2, boot ROM in, writing */
 	if (address < 0xf400) {
 	    return &memory[address + bank_offset[address>>15]];
 	}
@@ -514,8 +516,8 @@ Uchar *mem_pointer(int address, int writing)
       case 0x4b: /* Model 4 map 3, writing */
       case 0x53: /* Model 4P map 3, boot ROM out, reading */
       case 0x5b: /* Model 4P map 3, boot ROM out, writing */
-      case 0x57: /* Model 4P map 3, boot ROM in, reading (!!?) */
-      case 0x5f: /* Model 4P map 3, boot ROM in, writing (!!?) */
+      case 0x57: /* Model 4P map 3, boot ROM in, reading */
+      case 0x5f: /* Model 4P map 3, boot ROM in, writing */
 	return &memory[address + bank_offset[address>>15]];
     }
     /* not reached */

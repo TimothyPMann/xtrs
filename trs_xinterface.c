@@ -853,7 +853,6 @@ void trs_get_event(int wait)
   KeySym key;
   char buf[10];
   XComposeStatus status;
-  XWindowChanges xwc;
 
   key_immediate = 0;
   do {

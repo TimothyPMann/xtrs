@@ -20,6 +20,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+typedef unsigned char Uchar;
+#include "reed.h"
+ReedHardHeader rhh;
+
 void Usage(char *progname)
 {
   fprintf(stderr, 
@@ -31,58 +35,6 @@ void Usage(char *progname)
 	  progname, progname, progname, progname, progname);
   exit(2);
 }
-
-typedef unsigned char Uchar;
-
-/* Matthew Reed's hard drive format.  Thanks to Matthew for providing
-   documentation.  The comments below are copied from his mail
-   messages, with some additions. */
-
-typedef struct {
-  Uchar id1;       /* 0: Identifier #1: 56H */
-  Uchar id2;       /* 1: Identifier #2: CBH */
-  Uchar ver;       /* 2: Version of format: 10H = version 1.0 */
-  Uchar cksum;     /* 3: Simple checksum: 
-		      To calculate, add together bytes 0 to 31 of header
-		      (excepting byte 3), then XOR result with 4CH */
-  Uchar blks;      /* 4: Number of 256 byte blocks in header: should be 1 */
-  Uchar mb4;       /* 5: Not used, but HDFORMAT sets to 4 */
-  Uchar media;     /* 6: Media type: 0 for hard disk */
-  Uchar flag1;     /* 7: Flags #1:
-		      bit 7: Write protected: 0 for no, 1 for yes 
-                             [xtrs ignores for now]
-		      bit 6: Must be 0
-		      bit 5 - 0: reserved */
-  Uchar flag2;     /* 8: Flags #2: reserved */
-  Uchar flag3;     /* 9: Flags #3: reserved */
-  Uchar crtr;      /* 10: Created by: 
-		      14H = HDFORMAT
-		      42H = xtrs mkdisk
-                      80H = Cervasio xtrshard port to Vavasour M4 emulator */
-  Uchar dfmt;      /* 11: Disk format: 0 = LDOS/LS-DOS */
-  Uchar mm;        /* 12: Creation month: mm */
-  Uchar dd;        /* 13: Creation day: dd */
-  Uchar yy;        /* 14: Creation year: yy (offset from 1900) */
-  Uchar res1[12];  /* 15 - 26: reserved */
-  Uchar dparm;     /* 27: Disk parameters: (unused with hard drives)
-		      bit 7: Density: 0 = double, 1 = single
-		      bit 6: Sides: 0 = one side, 1 = 2 sides
-		      bit 5: First sector: 0 if sector 0, 1 if sector 1
-		      bit 4: DAM convention: 0 if normal (LDOS),
-		      1 if reversed (TRSDOS 1.3)
-		      bit 3 - 0: reserved */
-  Uchar cyl;       /* 28: Number of cylinders per disk */
-  Uchar sec;       /* 29: Number of sectors per track (floppy); cyl (hard) */
-  Uchar gran;      /* 30: Number of granules per track (floppy); cyl (hard)*/
-  Uchar dcyl;      /* 31: Directory cylinder [mkdisk sets to 1; xtrs ignores]*/
-  char label[32];  /* 32: Volume label: 31 bytes terminated by 0 */
-  char filename[8];/* 64 - 71: 8 characters of filename (without extension)
-		      [Cervasio addition.  xtrs actually doesn't limit this 
-                       to 8 chars or strip the extension] */
-  Uchar res2[184]; /* 72 - 255: reserved */
-} ReedHardHeader;
-
-ReedHardHeader rhh;
 
 int
 main(int argc, char *argv[])
@@ -343,9 +295,14 @@ main(int argc, char *argv[])
       fprintf(stderr, "%s error: cyl < 3\n", argv[0]);
       exit(2);
     }
-    if (cyl > 203) {
-      fprintf(stderr, "%s error: cyl > 203\n", argv[0]);
+    if (cyl > 256) {
+      fprintf(stderr, "%s error: cyl > 256\n", argv[0]);
       exit(2);
+    }
+    if (cyl > 203) {
+      fprintf(stderr,
+	      "%s warning: cyl > 203 is incompatible with XTRSHARD/DCT\n",
+	      argv[0]);
     }
     if (sec < 4) {
       fprintf(stderr, "%s error: sec < 4\n", argv[0]);
@@ -354,6 +311,15 @@ main(int argc, char *argv[])
     if (sec > 256) {
       fprintf(stderr, "%s error: sec > 256\n", argv[0]);
       exit(2);
+    }
+    if ((sec % 32) != 0) {
+      fprintf(stderr, "%s warning: %s\n", argv[0],
+	      "(sec % 32) != 0 is incompatible with WD1000/1010 emulation");
+      if (sec > 32) {
+	fprintf(stderr, "%s warning: %s\n", argv[0],
+		"(sec % 32) != 0 and sec > 32 "
+		"is incompatible with Matthew Reed's emulators");
+      }
     }
     if (gran < 1) {
       fprintf(stderr, "%s error: gran < 1\n", argv[0]);
@@ -420,8 +386,10 @@ main(int argc, char *argv[])
     }
     fwrite(&rhh, sizeof(rhh), 1, f);
 
+#if 0 /* Applies only when using XTRSHARD/DCT */
     printf("%s: Be sure to format this drive with FORMAT (DIR=%d)\n",
            argv[0], dir);
+#endif
   }
   fclose(f);
   return 0;

@@ -31,8 +31,7 @@ I/III/4/4P operating systems should run on it, including all flavors
 of TRSDOS, LDOS/LS-DOS, NEWDOS, DOSPLUS, MultiDOS, and TRS-80 CP/M.
 However, the emulator also includes some extensions to the standard
 hardware, and the special drivers, utilities, and instructions needed
-for these are not always provided for all systems. In particular, the
-hard disk emulation currently works only with LDOS/LS-DOS.
+for these are not always provided for all systems.
 
 The Z-80 emulator has a debugger called zbx.  It works sort of
 like dbx.  If you run with debugging turned on (see the options section for
@@ -221,7 +220,7 @@ emulates a pseudo-hardware interface of its own and provides an LDOS/LS-DOS
 driver for it.
 
 Storage for the emulated 8-inch disks is in files named diskM-U, where
-M is the TRS-80 model number (1, 3, 4, or 4P) and U is a unit number
+M is the TRS-80 model number (1, 3, 4, or 4p) and U is a unit number
 (4, 5, 6, or 7).  The only difference between 5.25-inch and 8-inch
 emulated drives is that the emulator allows you to format more bytes
 per track in the latter.  A new JV3 floppy can be formatted as either
@@ -323,8 +322,15 @@ only), F8 is returned as FA.  If you need more accurate behavior, the
 -truedam flag will turn on error messages on attempts to write F9 or
 FA DAMs and will turn off translation of F8 to FA on reading.
 .SH Emulated hard disks
-\fBxtrs\fP can emulate a hard disk in a file with the aid of a special
-LDOS driver called XTRSHARD/DCT.  This driver has been tested and
+\fBxtrs\fP can emulate a hard disk in a file in one of two ways: it
+can use a special, xtrs-specific LDOS driver called XTRSHARD/DCT,
+or it can emulate the Radio Shack hard drive controller (based on
+the Western Digital WD1010) and use the native drivers for the 
+original hardware.
+
+.B Using XTRSHARD/DCT
+
+The XTRSHARD/DCT driver has been tested and
 works under both LDOS 5.3.1 for Model I or III and TRSDOS/LS-DOS 6.3.1
 for Model 4/4P.  It may or may not work under earlier LDOS versions.  It
 definitely will not work under other TRS-80 operating systems or with
@@ -333,12 +339,12 @@ Matthew Reed for his Model I/III and Model 4 emulators; \fBxtrs\fP
 duplicates the format so that users can exchange hard drive images
 across the emulators.
 
-To use the hard disk emulation, first run the \fBmkdisk\fP program
+To use XTRSHARD/DCT, first run the \fBmkdisk\fP program
 under Unix to create a blank hard drive (.hdv) file.  Typical usage
 would be: \fImkdisk -h mydisk.hdv\fP.  See the \fBmkdisk\fP(1) man
 page for other options.
 
-Second, link the file to an appropriate name.  \fBxtrs\fP supports up
+Second, link the file to an appropriate name.  XTRSHARD/DCT supports up
 to eight hard drives, with names of the form hardM-U, where M is the
 TRS-80 model (1, 3, or 4; in this case Model 4P also uses M=4) and U
 is a unit number from 0 to 7.  It looks for these files in the same
@@ -361,9 +367,10 @@ is the unit number you chose when naming the file (most likely 0).
     FORMAT \fId\fP (DIR=1)
 .fi
 
-Answer the questions asked by FORMAT as you prefer.  If you are
-curious about the \fIDIR=1\fP parameter to FORMAT, see
-\fBmkdisk\fP(1).  You can repeat these steps with different values of
+Answer the questions asked by FORMAT as you prefer.  The 
+\fIDIR=1\fP parameter to FORMAT is optional; it causes the hard
+drive's directory to be on track 1, making the initial size of
+the image smaller.  You can repeat these steps with different values of
 \fId\fP and \fIu\fP to have more than one hard drive.
 
 Finally, it's a good idea to give the SYSTEM (SYSGEN) command (Model
@@ -375,18 +382,41 @@ the same SYSTEM command(s) again, but don't FORMAT.  You can freely
 use a different drive number or (if you renamed the hard disk file) a
 different unit number.
 
-The F7 key currently doesn't allow hard disk changes to be recognized,
-but you can change to a different hard disk file for the same unit by
-renaming files as needed and rebooting LDOS.
+The F7 key currently doesn't allow XTRSHARD/DCT disk changes to be
+recognized, but you can change to a different hard disk file for the
+same unit by renaming files as needed and rebooting LDOS.
 
 Technical note: XTRSHARD/DCT is a small Z-80 program that implements
 all the required functions of an LDOS disk driver.  Instead of talking
 to a real (or emulated) hard disk controller, however, it uses special
 support in \fBxtrs\fP that allows Z-80 programs to open, close, read,
 and write Unix files directly.  This support is described further in
-the next section.  Because \fBxtrs\fP does not emulate real hard drive
-controller hardware, hard disk drivers other than XTRSHARD/DCT will
-not work with it.
+the "Data import and export" section below.
+
+.B Using native hard disk drivers
+
+Beginning in version 4.1, \fBxtrs\fP also emulates the Radio Shack
+hard disk controller (based on the Western Digital WD1010) and will
+work with the native drivers for this hardware.  This emulation uses
+the same hard drive (.hdv) file format that XTRSHARD/DCT does.  With
+LDOS/LS-DOS, the RSHARDx/DCT driver will work; other drivers may also
+work. The hard disk drivers for NEWDOS/80 and for CP/M should work,
+but they have not yet been tested at this writing.  Any bugs should be
+reported.
+
+To get started, run the \fBmkdisk\fP program under Unix to create a
+blank hard drive (.hdv) file.  Typical usage would be: \fImkdisk -h
+mydisk.hdv\fP.  See the \fBmkdisk\fP(1) man page for other options.
+
+Second, link the file to an appropriate name.  The WD1010 emulation
+supports up to four hard drives, with names of the form hardM-U, where
+M is the TRS-80 model (1, 3, 4, or 4p) and U is a unit number from 0
+to 3.  It looks for these files in the same directory as the floppy
+disk files diskM-U.
+
+Finally, obtain the correct driver for the operating system you will be
+using, read its documentation, configure the driver, and format the drive.  
+Detailed instructions are beyond the scope of this manual page.
 .SH Data import and export
 Several Z-80 programs for data import and export from various TRS-80
 operating systems are included with \fBxtrs\fP on two emulated floppy
@@ -532,7 +562,7 @@ net result is that some ticks may be late, but there are always the
 proper number of ticks per second.  For example, running in Model I
 mode on Intel Linux you'd see this pattern: (tick, 30ms, tick,
 20ms,...) instead of seeing ticks every 25ms.
-.SH Clock speed selection
+.SH Processor speed selection
 A standard Model 4 has a software-controlled switch to select
 operation at either 4.05504 MHz (with heartbeat clock at 60 Hz)
 or 2.02752 MHz (with heartbeat clock at 30 Hz)  xtrs emulates this
@@ -602,6 +632,31 @@ driver is installed in low memory, MDRAW thinks it is not there at
 all. If you use mouse-aware programs that don't have this bug, or if
 you edit the first line of MDRAW to remove the test, you can install
 XTRSMOUS in low memory using the syntax "XTRSMOUS (LOW)".
+.SH Time of day clock
+Several battery-backed time of day clocks were sold for the various TRS-80 models,
+including the TimeDate80, TChron1, TRSWatch, and T-Timer.  They were
+essentially all the same hardware, but resided at a few different port
+ranges.  \fBxtrs\fP currently emulates them at port ranges 0x70-0x7C and
+0xB0-0xBC.  The T-Timer port range at 0xC0-0xCC conflicts with the Radio Shack
+hard drive controller and is not emulated.
+
+The clocks were apparently not Y2K compliant.  The current version of
+\fBxtrs\fP attempts to do better by allowing the tens digit of the
+year to roll over past 9 to 10, 11, etc.  It's not clear that this is
+the best solution.  If you have software that uses these clocks and
+another solution would work better for you, please send email with
+details.
+
+Also see SETTIME/CMD in the "Data import and export" section above for
+another way to get the correct time into a Z-80 operating system
+running under \fBxtrs\fP.
+
+Finally, you might notice that LDOS/LS-DOS always magically knows the
+correct date when you boot it (but not the time).  When you first
+power up the emulated TRS-80, \fBxtrs\fP dumps the date into the
+places in memory where LDOS and LS-DOS normally save it across
+reboots, so it looks to the operating system as if you rebooted after
+setting the date.
 .SH Running games
 Some games run rather well under \fBxtrs\fP now,
 provided that your
@@ -900,7 +955,7 @@ blocks of 2901.  Again, this does not seem too useful.  5802 sectors
 is already enough for a 3.5-inch HD (1.44MB) floppy, which the TRS-80 didn't
 support anyway.
 
-\fBxtrshard\fP ignores the internal write-protected flag in hard drive
+XTRSHARD/DCT ignores the internal write-protected flag in hard drive
 images, but a hard drive image can still be effectively write
 protected by turning off its Unix write permission bits.
 

@@ -11,7 +11,7 @@
 ;	the date included.  
 ;
 ;	Created 1-10-98
-;       Last modified on Tue Sep 29 13:27:01 PDT 1998 by mann
+;       Last modified on Sun May 14 21:30:57 PDT 2000 by mann
 ;*=*=*
 
 
@@ -328,6 +328,7 @@ move:
 ;*=*=*
 setdct:
 	ld	iy,(dct)
+	ld	(iy),0c3h	  ;JP instruction (enable driver)
 	ld      (iy+1),l          ;Driver address
 	ld      (iy+2),h
 	ld	(iy+3),00001100b  ;Flags: rigid, fixed, step rate 0
@@ -604,19 +605,13 @@ creatd:	pop	hl
 	ret
 ;*=*=*
 wrsec:				;Write with X'FB' data address mark
-	ld	a,(iy+9)	;Can't do on designated dir cylinder
-	cp	d		
-	jr	nz,wrok
-baddam:	ld	a,12		;"Directory write error" (?)
-	and	a
-	ret
+	ld	a,d		;Check if writing track 0, sector 0
+	or	e
+	call	z,setdir	;Set directory cyl in Reed header
+rx20	equ	$-2
 ;*=*=*
 wrssc:				;Write with X'F8' data address mark
-	ld	a,(iy+9)	;Can do only on designated dir cylinder
-	cp	d
-	jr	nz,baddam
-;*=*=*
-wrok:	ld	a,(iy+6)	;Get high cyl #
+	ld	a,(iy+6)	;Get high cyl #
 	cp	d		;Beyond it?
 	jr	nc,wrok1
 	ld	a,10		;"Seek error during write"
@@ -748,6 +743,32 @@ opnerr:	pop	hl
 	pop	de
 	ret
 ;*=*=*
+;	Sleazy trick to update dir cyl in Reed header: do
+;	it whenever track 0, sector 0 is written.
+;	Only important if sharing images with Reed emulator.
+;*=*=*
+setdir: push	hl
+	push	bc
+	push	de
+	ld	hl,offset
+rx18	equ	$-2
+	ld	b,d		;de is known to be 0 here
+	ld	c,e
+	ld	e,(ix)		;Get fd
+	ld	d,(ix+1)
+	ld	(hl),31		;offset to dir cyl param
+	ld	(offset+1),bc
+rx19	equ	$-2
+	defw	emt_lseek
+	ld	a,(iy+9)	;dir cyl value to write
+	ld	(hl),a
+	inc	bc
+	defw	emt_write
+	pop	de		;cheat, ignore errors
+	pop	bc
+	pop	hl
+	ret
+;*=*=*
 ;	Boot-time initialization
 ;*=*=*
 dvrcfg:	ld	de,-1		;@ICNFG chains in here
@@ -774,5 +795,6 @@ hadr:	defb	'0',0
 dvrend  equ     $-1
 length  equ     $-entry
 reltab: defw    rx00,rx01,rx02,rx03,rx04,rx05,rx06,rx07,rx08,rx09
-	defw	rx10,rx11,rx12,rx13,rx14,rx15,rx16,rx17,0
+	defw	rx10,rx11,rx12,rx13,rx14,rx15,rx16,rx17,rx18,rx19
+	defw	rx20,0
 	end     instal

@@ -9,7 +9,7 @@ or add/remove an emulated write protect tab
 .br
 .B mkdisk -k [-s sides] [-d density] [-8] [-i] filename
 .br
-.B mkdisk -h [-c cyl] [-s sec] [-g gran] [-d dir] filename
+.B mkdisk -h [-c cyl] [-s sec] [-g gran] filename
 .br
 .B mkdisk {-p|-u} {-1|-3|-k|-h} filename
 .SH Description
@@ -48,27 +48,65 @@ both single and double density.
 .SH Making Emulated Hard Drives
 With the -h flag, \fBmkdisk\fP makes an unformatted emulated hard
 drive with \fIcyl\fP cylinders, \fIsec\fP sectors, and \fIgran\fP
-granules (LDOS allocation units) per cylinder.  You should format the
-drive with its directory on cylinder \fIdir\fP.  You will usually want
-to use the default values for all these parameters.
+granules (LDOS allocation units) per cylinder.  The hard drive
+will have cylinder \fIdir\fP marked for use as its directory.
 
-For \fIcyl\fP, the default value is 202, the maximum is 202 (Model
-I/III) or 203 (Model 4), and the minimum is 3.  Note: Model I/III LDOS
-could handle 203 cylinders except for a minor bug in FORMAT/CMD that
-prevents such a large drive from being formatted.  You can use a
-203-cylinder drive with Model I/III LDOS if you format it with Model 4
-LDOS.
+You will usually want to use the default values for all these
+parameters.  The default is 202 cylinders, 256 sectors per cylinder
+(that is, 8 heads and 32 sectors per track), and 8 granules per
+cylinder.  This is the largest hard drive that can be used by all
+LDOS/LS-DOS operating systems without partitioning the drive or
+patching the FORMAT command.  The details on what nondefault values
+are possible vary, depending on which of xtrs's two hard drive
+emulations you are using and which other emulators you want to be
+compatible with, and it is probably best not to delve into these
+complexities, but read on if you really want to.
 
-For \fIsec\fP, the default value is 256, the maximum is 256, and the
-minimum is 4.  Note: if you are using version 1.1 of Matthew Reed's
-Model I/III emulator and you would like to share emulated hard drives
-with it, then if \fIsec\fP is greater than 32, it must be divisible by
-32.  Later Reed emulators do not have this limitation.
+For \fIcyl\fP, the number of cylinders on the drive, the default value
+is 202, the minimum is 3, and the maximum that can be represented in
+the HDV file's header is 256.  You can use 203 cylinders with LDOS and
+LS-DOS if you format the drive with Model 4 LS-DOS; a minor bug in
+Model I/III FORMAT/CMD prevents more than 202 cylinders from being
+formatted, but the system can use 203 thereafter.  203 cylinders is
+the absolute maximum for LDOS/LS-DOS drivers that do not support
+partitioning, including the emulator-specific drivers supplied with xtrs
+(XTRSHARD/DCT), with Matthew Reed's emulator (HARD/CMD), and with
+David Keil's emulator (EHARD/DCT).  
+
+In xtrs 4.1 and later, and in David Keil's emulator version 6.0 and
+later, a true emulation of Radio Shack's WD1010-based hard disk
+controller is also available, which works with the native drivers for
+the original hardware, such as RSHARDx/DCT and the hard disk drivers
+for NEWDOS and CP/M.  In xtrs, the WD1010 emulation ignores the
+maximum number of cylinders specified in the HDV file's header and
+allows the driver to format up to 65536 cylinders.  This may be useful
+if your drivers support partitioning (but why would anyone want to
+partition an emulated hard drive instead of just making two smaller
+ones?), or if your operating system supports more than 203 cylinders
+per partition.  Note that although RSHARDx/DCT allows up to 406
+cylinders per partition, if you use more than 203, the maximum number
+of sectors per cylinder is limited to 128, so you gain nothing; the
+maximum size of a partition is still the same.
+
+For \fIsec\fP, the number of sectors per cylinder, the default value
+is 256, the maximum is 256, and the minimum is 4.  There are some
+restrictions on the values that will work.  For the greatest
+portability, choose a value that is divisible by 32.  With xtrs's
+XTRSHARD/DCT and David Keil's EHARD/DCT, any value is allowed that can
+be evenly divided into granules; see the next paragraph.  With Matthew
+Reed's HARD/CMD, if \fIsec\fP is greater than 32, it must be divisible
+by 32.  With the emulation of a real WD1010 in newer versions of xtrs
+(and probably David Keil's emulator too), \fIsec\fP must always be
+divisible by 32, because we always emulate a drive with 32 sectors per
+track and from 1 to 8 heads (tracks per cylinder).  The RSHARDx/DCT
+driver assumes that there are always 32 sectors per track.
 
 For \fIgran\fP, the default value is 8, the maximum is 8, and the
 minimum is 1.  In addition, it is necessary that \fIsec\fP be evenly
 divisible by \fIgran\fP, and that \fIsec/gran\fP be less than or equal
-to 32.
+to 32.  This value is used only with the emulator-specific drivers
+listed above; it is ignored when xtrs is using native hardware drivers
+such as RSHARDx/DCT.
 
 The maximum size of a hard drive image is controlled by \fIcyl\fP and
 \fIsec\fP: it can be at most \fIcyl*sec\fP 256-byte sectors.  The
@@ -79,22 +117,11 @@ allocates file space in granules.  Therefore (1)
 \fIsec\fP, thereby making the granules smaller, reduces wasted space
 due to fragmentation but limits the maximum size of the drive.
 
-Seeing that the absolute maximum drive size is less than 13 MB and
+Seeing that the maximum unpartitioned drive size is less than 13 MB and
 that the maximum granule size is only 8 KB, wasted space should not be
 much of a concern for most \fBxtrs\fP users.  Therefore the default
-parameters have been chosen to give you the largest drive possible.
-
-The \fIdir\fP parameter declares which cylinder will contain the LDOS
-directory.  The default value is 1, a good choice so that the emulated
-drive image can start out small, with no data written past cylinder 1
-by the LDOS FORMAT program.  You should invoke the LDOS FORMAT program
-on the new image with the same \fIdir\fP value you used with
-\fBmkdisk\fP; for example, if you omitted the -d option and accepted
-the default value of 1, then type \fIFORMAT (DIR=1)\fP.  Note: setting
-the \fI-d dir\fP and \fIDIR=dir\fP values to agree is not essential
-unless you plan to share hard drive images with Matthew Reed's
-emulators; \fBxtrs\fP itself ignores the \fIdir\fP parameter and
-allows FORMAT to place the directory on any cylinder.
+parameters have been chosen to give you the largest drive possible without
+partitioning.
 .SH Write Protection
 With the -p flag, \fBmkdisk\fP turns on write protection
 for an existing emulated floppy or hard drive.  It turns off all Unix
@@ -105,8 +132,9 @@ With the -u flag, \fBmkdisk\fP turns off write protection
 for an existing emulated floppy or hard drive.  It turns on Unix
 write permissions to the file, masked by your current umask and
 the file's current read permissions.
-It also (except for JV1 floppies) clears
-a write-protected flag inside the file.
+It also clears
+a write-protected flag inside the file (except on JV1 floppies, which
+don't have such a flag).
 
 \fBmkdisk\fP currently does not have code to auto-recognize file
 formats, so the -p or -u flag must be accompanied by either -1 (JV1),
