@@ -14,7 +14,9 @@
 /*#define DISKDEBUG 1*/
 /*#define DISKDEBUG2 1*/
 /*#define DISKDEBUG3 1*/
+/*#define DISKDEBUG4 1*/
 #define TSTATEREV 1
+#define SIZERETRY 1
 
 #include "z80.h"
 #include "trs.h"
@@ -1815,7 +1817,8 @@ real_read()
   sigset_t set, oldset;
 
   /* Try once at each supported sector size */
-  for (retry = 0; retry < 4; retry++) {
+  retry = 0;
+  for (;;) {
     state.status = 0;
     memset(&raw_cmd, 0, sizeof(raw_cmd));
     raw_cmd.rate = real_rate(d);
@@ -1846,17 +1849,21 @@ real_read()
       state.status |= TRSDISK_NOTFOUND;
     } else {
       if (raw_cmd.reply[1] & 0x04) {
-	state.status |= TRSDISK_NOTFOUND;
 	/* Could have been due to wrong sector size, so we'll retry
 	   internally in each other size before returning an error. */
-#if DISKDEBUG3
+#if DISKDEBUG4
 	fprintf(stderr,
 		"real_read not fnd: side %d tk %d sec %d size 0%d phytk %d\n",
 		state.curside, state.track, state.sector, d->real_size_code,
 		d->phytrack*d->real_step);
 #endif
+#if SIZERETRY
 	d->real_size_code = (d->real_size_code + 1) % 4;
-	continue; /* retry */
+	if (++retry < 4) {
+	  continue; /* retry */
+	}
+#endif
+	state.status |= TRSDISK_NOTFOUND;
       }
       if (raw_cmd.reply[1] & 0x81) state.status |= TRSDISK_NOTFOUND;
       if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
@@ -1870,15 +1877,17 @@ real_read()
       }
       if (raw_cmd.reply[2] & 0x20) state.status |= TRSDISK_CRCERR;
       if (raw_cmd.reply[2] & 0x13) state.status |= TRSDISK_NOTFOUND;
-      if ((raw_cmd.reply[0] & 0xc0) == 0) {
+      if ((state.status & TRSDISK_NOTFOUND) == 0) {
+	/* Start read */
 	state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
 	trs_disk_drq_interrupt(1);
 	state.bytecount = size_code_to_size(d->real_size_code);
 	return;
       }
     }
-    break;
+    break; /* exit retry loop */
   }
+  /* Sector not found; fail */
   state.status |= TRSDISK_BUSY;
   trs_schedule_event(trs_disk_done, 0, 128);
 #else
@@ -1930,13 +1939,15 @@ real_write()
       /* Could have been due to wrong sector size.  Presumably
          the Z-80 software will do some retries, so we'll cause
          it to try the next sector size next time. */
-#if DISKDEBUG3
+#if DISKDEBUG4
       fprintf(stderr,
 	      "real_write not found: side %d tk %d sec %d size 0%d phytk %d\n",
 	      state.curside, state.track, state.sector, d->real_size_code,
 	      d->phytrack*d->real_step);
 #endif
+#if SIZERETRY
       d->real_size_code = (d->real_size_code + 1) % 4;
+#endif
     }
     if (raw_cmd.reply[1] & 0x81) state.status |= TRSDISK_NOTFOUND;
     if (raw_cmd.reply[1] & 0x20) state.status |= TRSDISK_CRCERR;
@@ -2001,7 +2012,7 @@ real_readadr()
     }
     if (raw_cmd.reply[2] & 0x20) state.status |= TRSDISK_CRCERR;
     if (raw_cmd.reply[2] & 0x13) state.status |= TRSDISK_NOTFOUND;
-    if ((raw_cmd.reply[0] & 0xc0) == 0) {
+    if ((state.status & TRSDISK_NOTFOUND) == 0) {
       state.status |= TRSDISK_BUSY|TRSDISK_DRQ;
       trs_disk_drq_interrupt(1);
       memcpy(d->buf, &raw_cmd.reply[3], 4);
@@ -2032,38 +2043,8 @@ real_writetrk()
   struct floppy_raw_cmd raw_cmd;
   int res, i, gap3;
   sigset_t set, oldset;
-  static int iso = -1;
-
   state.status = 0;
 
-#if 0
-  /* Try to respect the gaps requested by TRS-80 software */
-  /* Problem: requested gaps might not be possible on a PC FDC.
-     Not all PC FDCs support ISO formats (with no index mark),
-     and we have control only of gap3, not the others. */
-  gap3 = state.format_gap[3];
-  if ((state.format_gap[0] == 0) != iso) {
-    /* Set IBM format (index mark) vs. ISO format (no index mark) */
-    iso = (state.format_gap[0] == 0);
-    memset(&raw_cmd, 0, sizeof(raw_cmd));
-    raw_cmd.flags = 0;
-    raw_cmd.cmd[0] = 0x33; /* "option" */
-    raw_cmd.cmd[1] = iso;
-    raw_cmd.cmd_count = 2;
-    sigemptyset(&set);
-    sigaddset(&set, SIGALRM);
-    sigaddset(&set, SIGIO);
-    sigprocmask(SIG_BLOCK, &set, &oldset);
-    res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
-    sigprocmask(SIG_SETMASK, &oldset, NULL);
-    if (res < 0) {
-      /*int reset_now = 0;*/
-      perror("real_writetrk ISO option");
-      /*ioctl(fileno(d->file), FDRESET, &reset_now);*/
-      state.status |= TRSDISK_WRITEFLT;
-    }
-  }
-#else
   /* Compute a usable gap3 */
   /* Constants based on IBM format as explained in "The floppy user guide"
      by Michael Haardt, Alain Knaff, and David C. Niemi */
@@ -2092,7 +2073,6 @@ real_writetrk()
 	- 33 - (128 << d->real_size_code) - /*slop*/2;
     }
   }
-#endif
   if (gap3 < 1) {
     error("gap3 too small\n");
     gap3 = 1;
@@ -2116,8 +2096,7 @@ real_writetrk()
   raw_cmd.length = d->realfmt_nbytes;
 #if DISKDEBUG3
   fprintf(stderr,
-	  "real_writetrk %s size 0%d secs %d gap3 %d fill 0x%02x hex data ",
-	  (iso == 1) ? "iso" : "ibm",
+	  "real_writetrk size 0%d secs %d gap3 %d fill 0x%02x hex data ",
 	  d->real_size_code, d->realfmt_nbytes/4, gap3, d->realfmt_fill);
   for (i=0; i<d->realfmt_nbytes; i+=4) {
     fprintf(stderr, "%02x%02x%02x%02x ",
