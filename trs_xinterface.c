@@ -86,7 +86,7 @@ static int cur_char_height = TRS_CHAR_HEIGHT;
 static int text80x24 = 0, screen640x240 = 0;
 static XFontStruct *myfont, *mywidefont, *curfont;
 static XKeyboardState repeat_state;
-static trs_charset;
+static int trs_charset;
 
 static XrmOptionDescRec opts[] = {
 {"-background",	"*background",	XrmoptionSepArg,	(caddr_t)NULL},
