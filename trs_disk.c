@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Sat Feb 14 14:02:47 PST 1998 by mann */
+/* Last modified on Sat Feb 14 14:06:11 PST 1998 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
@@ -313,12 +313,14 @@ trs_disk_change(int drive)
     d->inches = 5; /* i.e., not 8" */
     fd = open(diskname, O_ACCMODE|O_NDELAY);
     if (fd == -1) {
+      perror(diskname);
       d->file = NULL;
       d->emutype = JV3;
       return;
     }
     d->file = fdopen(fd, "r+");
     if (d->file == NULL) {
+      perror(diskname);
       d->emutype = JV3;
       return;
     }
