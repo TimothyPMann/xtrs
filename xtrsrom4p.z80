@@ -29,7 +29,7 @@
 ; TODO:
 ;   possibly write code for the RST handlers as in the real 4P rom
 ;
-; Last modified on Mon Apr  5 00:42:15 PDT 1999 by mann 
+; Last modified on Sat Mar 25 21:33:08 PST 2000 by mann 
 ;      modified on Mon Mar 15 17:25:49 CST 1999 by petec
 ;
 ;------------------------------------------------------------------
@@ -209,14 +209,14 @@ rstdrv:	ld	a,81h		; drive 0, dden (no nmi)
 ;
 readbt:	ld	de,0001h	; trk 0, sec 1
 	ld	hl,bootram	; set buffer
-	call	read		; attempt read
+	call	readsb		; attempt read
 	and	1ch		; keep RNF,CRC,LOST DATA
 	ret	z		; return if no error
 	jp	dskerr		; go on error
 ;
-;	read - read sector to buffer
+;	readsb - read sector to buffer
 ;
-read:	ld	b,81h
+readsb:	ld	b,81h
 	ld	c,fdcslct	; set dden,ds0
 	out	(c),b		; select
 	dec	c		; set to data register
