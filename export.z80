@@ -1,12 +1,13 @@
 ;; export.z
 ;; Timothy Mann, 8/24/97
-;; Last modified on Thu Sep  4 13:13:07 PDT 1997 by mann
+;; Last modified on Fri Dec  5 11:08:49 PST 1997 by mann
 ;;
 ;; Use xtrs 1.4 emulator traps to copy a file from TRS-80 to Unix
 ;; Usage: EXPORT [-n] fromfile unixfile
-;; If the (NL) parameter is given, each carriage return ('\r')
+;; If the -n parameter is given, each carriage return ('\r')
 ;;  in the TRS-80 file is converted to a newline ('\n') in the Unix file.
 
+;; Model I/III addresses
 @fspec  equ 441ch
 @init   equ 4420h
 @open   equ 4424h
@@ -19,6 +20,79 @@
 @put	equ 001bh
 dodcb$	equ 401dh
 
+;; Model 4 SVCs
+@svc	equ 40  ; rst address for SVCs
+;@svc	equ 5   ; older zmac requires 8080-style "rst 5"
+@fspec6	equ 78
+@init6	equ 58
+@open6	equ 59
+@close6	equ 60
+@read6	equ 67
+@write6	equ 75
+@error6	equ 26
+@exit6	equ 22
+@abort6	equ 21
+@dsply6	equ 10
+
+	org 5200h
+
+;; Jump tables for OS independence
+startj:
+fspec:	call @fspec
+	ret
+init:	call @init
+	ret
+open:	call @open
+	ret
+close:	call @close
+	ret
+read:	call @read
+	ret
+write:	call @write
+	ret
+error:	call @error
+	ret
+exit:	call @exit
+	ret
+abort:	call @abort
+	ret
+dsply:	call dsply5
+	ret
+endj:
+
+; Model 4
+startj6:
+	ld a, @fspec6
+	rst @svc
+	ret
+	ld a, @init6
+	rst @svc
+	ret
+	ld a, @open6
+	rst @svc
+	ret
+	ld a, @close6
+	rst @svc
+	ret
+	ld a, @read6
+	rst @svc
+	ret
+	ld a, @write6
+	rst @svc
+	ret
+	ld a, @error6
+	rst @svc
+	ret
+	ld a, @exit6
+	rst @svc
+	ret
+	ld a, @abort6
+	rst @svc
+	ret
+	ld a, @dsply6
+	rst @svc
+	ret
+
 ; Emulator trap instructions, byte-reversed for use in defw:
 emt_open	equ 30edh
 emt_close	equ 31edh
@@ -27,8 +101,18 @@ emt_write	equ 33edh
 emt_lseek	equ 34edh
 emt_strerror	equ 35edh
 
-	org 5200h
 export:
+	ld a, (000ah)		; Model 4?
+	cp 40h
+	jr z, not4
+	push hl
+	ld de, startj
+	ld hl, startj6
+	ld bc, endj - startj
+	ldir
+	pop hl
+not4:
+
 flag0:	ld a, (hl)		; look for -n flag
 	cp ' '
 	jp c, usage		; error if line ends here
@@ -51,7 +135,7 @@ flag2:	inc hl			; skip spaces
 	jp c, usage
 
 fromf:	ld de, dcb              ; ready to get LDOS filename from (HL)
-        call @fspec
+        call fspec
         jp nz, usage
 
 unix0:	ld a, (hl)              ; scan over Unix filename
@@ -70,11 +154,12 @@ unix2:	inc hl                  ; now scan for end of Unix name
         ld hl, iobuf
         ld de, dcb
         ld b, 0
-        call @open              ; open the TRS-80 file
+        call open               ; open the TRS-80 file
         pop hl
         jr z, uname
-        call @error
-        jp @abort
+	ld c, a
+        call error
+        jp abort
 
 uname:	ld hl, $-$              ; path
         ld bc, 3001q            ; oflag (O_WRONLY+O_CREAT+O_TRUNC)
@@ -90,13 +175,14 @@ opn2ok:
 
 loop:	push de			; save fd
 	ld de, dcb
-	call @read              ; read 256 bytes from file
+	call read               ; read 256 bytes from file
 	pop de
         jr z, rdok		; got a full 256 bytes
 	cp 28			; eof?
 	jr z, closit		; yes, OK
-        call @error             ; oops, i/o error
-        jp @abort
+	ld c, a
+        call error              ; oops, i/o error
+        jp abort
 rdok:	inc bc
 
 ;; Translate
@@ -142,16 +228,18 @@ closit:	defw emt_close		; close Unix file
         ld hl, uclser           ; close error
 	jr uerror
 closok:	ld de, dcb
-        call @close             ; close the TRS-80 file
+        call close              ; close the TRS-80 file
         jr z, cls2ok
-        call @error             ; oops, i/o error
-        jp @abort
-cls2ok: jp @exit                ; all is well
+	ld c, a
+        call error              ; oops, i/o error
+        jp abort
+cls2ok: ld hl, 0	        ; all is well
+	jp exit
 
 ;; Usage message
 usage:  ld hl, usager           ; error message and exit
         call dsply
-        jp @abort
+        jp abort
 
 ;; Unix error, msg in hl, errno in a
 uerror: push af
@@ -161,10 +249,10 @@ uerror: push af
 	ld bc, 256
 	defw emt_strerror
 	call dsply
-        jp @abort
+        jp abort
 
 ;; Display message in HL.  03h terminate, 0dh newline and terminate.
-dsply:	ld de, dodcb$
+dsply5:	ld de, dodcb$
 	push hl
 dsply0:	ld a, (hl)
 	cp 03h

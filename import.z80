@@ -1,6 +1,6 @@
 ;; import.z
 ;; Timothy Mann, 8/24/97
-;; Last modified on Thu Sep  4 13:12:23 PDT 1997 by mann
+;; Last modified on Fri Dec  5 11:08:59 PST 1997 by mann
 ;;
 ;; Use xtrs 1.4 emulator traps to copy a file from Unix to TRS-80
 ;; Usage: IMPORT [-n] unixfile tofile
@@ -12,15 +12,92 @@
 ;;  command line (tough on Unix filenames), and setting the EOF offset
 ;;  works differently.
 
+;; Model I/III addresses
 @fspec  equ 441ch
 @init   equ 4420h
-@write  equ 4439h
+@open   equ 4424h
 @close  equ 4428h
+@read   equ 4436h
+@write  equ 4439h
 @error  equ 4409h
 @exit   equ 402dh
 @abort  equ 4030h       
 @put	equ 001bh
 dodcb$	equ 401dh
+
+;; Model 4 SVCs
+@svc	equ 40  ; rst address for SVCs
+;@svc	equ 5   ; older zmac requires 8080-style "rst 5"
+@fspec6	equ 78
+@init6	equ 58
+@open6	equ 59
+@close6	equ 60
+@read6	equ 67
+@write6	equ 75
+@error6	equ 26
+@exit6	equ 22
+@abort6	equ 21
+@dsply6	equ 10
+
+
+	org 5200h
+
+;; Jump tables for OS independence
+startj:
+fspec:	call @fspec
+	ret
+init:	call @init
+	ret
+open:	call @open
+	ret
+close:	call @close
+	ret
+read:	call @read
+	ret
+write:	call @write
+	ret
+error:	call @error
+	ret
+exit:	call @exit
+	ret
+abort:	call @abort
+	ret
+dsply:	call dsply5
+	ret
+endj:
+
+; Model 4
+startj6:
+	ld a, @fspec6
+	rst @svc
+	ret
+	ld a, @init6
+	rst @svc
+	ret
+	ld a, @open6
+	rst @svc
+	ret
+	ld a, @close6
+	rst @svc
+	ret
+	ld a, @read6
+	rst @svc
+	ret
+	ld a, @write6
+	rst @svc
+	ret
+	ld a, @error6
+	rst @svc
+	ret
+	ld a, @exit6
+	rst @svc
+	ret
+	ld a, @abort6
+	rst @svc
+	ret
+	ld a, @dsply6
+	rst @svc
+	ret
 
 ; Emulator trap instructions, byte-reversed for use in defw:
 emt_open	equ 30edh
@@ -32,8 +109,18 @@ emt_strerror	equ 35edh
 
 iobsize	equ 8192		; must be divisible by 256
 
-	org 5200h
 import: 
+	ld a, (000ah)		; Model 4?
+	cp 40h
+	jr z, not4
+	push hl
+	ld de, startj
+	ld hl, startj6
+	ld bc, endj - startj
+	ldir
+	pop hl
+not4:
+
 flag0:	ld a, (hl)		; look for -n flag
 	cp ' '
 	jr c, usage		; error if line ends here
@@ -63,20 +150,21 @@ unix2:	inc hl                  ; scan for its end
 	ld (hl), 0              ; NUL terminate
         inc hl
 	ld de, dcb              ; ready to get TRS-80 filename from (HL)
-        call @fspec
+        call fspec
         jr nz, usage
         push hl                 ; save position in command line
         ld hl, iobuf
         ld de, dcb
         ld b, 0
-        call @init              ; open the file
+        call init               ; open the file
         pop hl
         jr z, openok
-        call @error
-        jp @abort
+	ld c, a
+        call error
+        jp abort
 usage:  ld hl, usager           ; error message and exit
         call dsply
-        jp @abort
+        jp abort
 openok:  
 uname:	ld hl, $-$              ; path
         ld bc, 0                ; oflag (O_RDONLY)
@@ -125,10 +213,11 @@ nlfals:	push bc			; save byte count
 	and a
 	jr z, wstrt
 wloop:  ld (dcb+3), hl
-	call @write             ; write 256 bytes to file
+	call write              ; write 256 bytes to file
         jr z, wrok
-        call @error             ; oops, i/o error
-        jp @abort
+	ld c, a
+        call error              ; oops, i/o error
+        jp abort
 wrok:	inc h
 wstrt:  djnz wloop
 	pop bc			; restore byte count
@@ -150,11 +239,13 @@ closok:	ld a, c
 	ld hl, (dcb+10)		; record number (in case shortening file)
 	ld (dcb+12), hl
 	ld de, dcb
-        call @close             ; close the TRS-80 file
+        call close              ; close the TRS-80 file
         jr z, cls2ok
-        call @error             ; oops, i/o error
-        jp @abort
-cls2ok: jp @exit                ; all is well
+	ld c, a
+        call error              ; oops, i/o error
+        jp abort
+cls2ok: ld hl, 0                ; all is well
+	jp exit
 
 ;; Unix error, msg in hl, errno in a
 uerror: push af
@@ -164,10 +255,10 @@ uerror: push af
 	ld bc, 256
 	defw emt_strerror
 	call dsply
-        jp @abort
+        jp abort
 
 ;; Display message in HL.  03h terminate, 0dh newline and terminate.
-dsply:	ld de, dodcb$
+dsply5:	ld de, dodcb$
 	push hl
 dsply0:	ld a, (hl)
 	cp 03h
@@ -192,3 +283,8 @@ dcb:	defs 32
 iobuf:	defs iobsize
         
         end import
+
+
+
+
+

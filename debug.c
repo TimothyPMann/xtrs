@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Tue Sep 30 17:58:39 PDT 1997 by mann
+   Last modified on Fri Dec 12 15:23:14 PST 1997 by mann
 */
 
 #include "z80.h"
@@ -428,7 +428,7 @@ void debug_shell()
 	    }
 	    else if(!strcmp(command, "next") || !strcmp(command, "nextint"))
 	    {
-		int is_call;
+		int is_call = 0, is_rst = 0;
 		switch(mem_read(REG_PC)) {
 		  case 0xCD:	/* call address */
 		    is_call = 1;
@@ -457,12 +457,24 @@ void debug_shell()
 		  case 0xFC:	/* call m, address */
 		    is_call = SIGN_FLAG;
 		    break;
+		  case 0xC7:
+		  case 0xCF:
+		  case 0xD7:
+		  case 0xDF:
+		  case 0xE7:
+		  case 0xEF:
+		  case 0xF7:
+		  case 0xFF:
+		    is_rst = 1;
+		    break;
 		  default:
-		    is_call = 0;
 		    break;
 		}
 		if (is_call) {
 		    set_trap((REG_PC + 3) % ADDRESS_SPACE, BREAK_ONCE_FLAG);
+		    debug_run();
+		} else if (is_rst) {
+		    set_trap((REG_PC + 1) % ADDRESS_SPACE, BREAK_ONCE_FLAG);
 		    debug_run();
 		} else {
 		    z80_run((!strcmp(command, "nextint")) ? 0 : -1);
