@@ -15,7 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996
-   Last modified on Mon Mar 22 20:49:18 PST 1999 by mann
+   Last modified on Fri Mar 31 14:32:06 PST 2000 by mann
 */
 
 /*
@@ -92,7 +92,7 @@
 #define AUTODETECT_FORMAT  6  /*!! autodetect not implemented yet */
 static char *format_name[] = {
   NULL, "cas", "cpt", "wav", "direct", "debug", "autodetect" };
-#define DEFAULT_SAMPLE_RATE 11025  /* samples/sec to use for .wav files */
+#define DEFAULT_SAMPLE_RATE 44100  /* samples/sec to use for .wav files */
 #define NOISE_FLOOR 64
 
 #define CONTROL_FILENAME	".cassette.ctl"
