@@ -1,0 +1,11 @@
+. M1FORMAT/FIX - 01/24/98 - Tim Mann
+. Patch to Model I LDOS 5.3.1 FORMAT to allow formatting a hard
+.  drive.  NOPs out some buggy code that makes it fail.  Odd
+.  that this bug is still present; README/TXT suggests it was
+.  fixed.  This patch is required to format an emulated hard 
+.  drive with XTRSHARD/DCT on an emulated Model I. 
+.
+. Apply with PATCH FORMAT/CMD.RS0LT0FF USING M1FORMAT
+. Do not apply to Model III LDOS or Model 4 LS-DOS!
+.
+X'630B'=00 00
