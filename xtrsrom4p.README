@@ -46,3 +46,44 @@ would allow xtrs to boot a Model III disk when in Model 4P mode.
 This would require considerable work, and isn't planned for any
 time in the forseeable future.
 
+Any questions?
+==============
+
+Here's my list of IEQ's (Infreqently Expected Questions) about the
+xtrsrom4p rom image:
+
+1) Does xtrsrom4p handle the special keypresses the 4P uses at boot up
+time, such as F1, F2 and F3 to modify the boot sequence?
+
+Sorry, but it doesn't look at the keyboard.  See the answer to #2.
+
+2) Will it load MODELA/III from disk so I can boot LDOS/TRSDOS 1.3 or
+NewDos/80 for the Model III?
+
+Sorry.  You're welcome to write the code for it, though.
+
+3) Can I use it to boot from from a hard disk image?
+
+Um.... no.  See the answer to #2.
+
+4) How about Network 4?
+
+Uh... no, it won't do that either.  Also see #2's answer.
+
+5) What about booting from RS-232?
+
+See #2 again.
+
+6) How about the diagnostics?  
+
+What diagnostics?  Oh, those diagnostics.  See the answer to #2.
+
+<grin>
+
+Along with not doing any of that other stuff, it also doesn't follow
+the technical reference as far as RST handlers go, so if you have a
+custom 4P setup that uses the RST instructions, that's not going to
+work without some additional code.  I wrote this so people could get
+something up and running with what's in the xtrs distribution.  From
+there, you can export a MODELA/III image from a disk (or disk image)
+to use in booting up Model III mode.
