@@ -5,7 +5,7 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Wed Nov 26 17:32:46 PST 1997 by mann */
+/* Last modified on Mon Dec  8 11:21:16 PST 1997 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
@@ -1470,7 +1470,7 @@ real_read()
   raw_cmd.cmd[i++] = 0xff; /* 256 */
   raw_cmd.cmd_count = i;
   raw_cmd.data = (void*) d->buf;
-  raw_cmd.length = raw_cmd.buffer_length = raw_cmd.phys_length = 256;
+  raw_cmd.length = 256;
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);
   sigaddset(&set, SIGIO);
@@ -1538,7 +1538,7 @@ real_write()
   raw_cmd.cmd[i++] = 0xff; /* 256 */
   raw_cmd.cmd_count = i;
   raw_cmd.data = (void*) d->buf;
-  raw_cmd.length = raw_cmd.buffer_length = raw_cmd.phys_length = 256;
+  raw_cmd.length = 256;
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);
   sigaddset(&set, SIGIO);
@@ -1588,7 +1588,7 @@ real_readadr()
   raw_cmd.cmd[i++] = state.curside ? 4 : 0;
   raw_cmd.cmd_count = i;
   raw_cmd.data = NULL;
-  raw_cmd.length = raw_cmd.buffer_length = raw_cmd.phys_length = 0;
+  raw_cmd.length = 0;
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);
   sigaddset(&set, SIGIO);
@@ -1658,7 +1658,7 @@ real_writetrk()
   raw_cmd.cmd[i++] = state.density ? 0x6d : 0xe5;
   raw_cmd.cmd_count = i;
   raw_cmd.data = (void*) d->buf;
-  raw_cmd.length = raw_cmd.buffer_length = raw_cmd.phys_length = d->nblocks;
+  raw_cmd.length = d->nblocks;
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);
   sigaddset(&set, SIGIO);
