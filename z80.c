@@ -3100,12 +3100,6 @@ int z80_run(int continuous)
 	    while (--i) /*nothing*/;
 	}
 
-	/* Event scheduler */
-	if (z80_state.sched > -1) {
-	    if (z80_state.sched == 0) trs_do_event();
-	    z80_state.sched--;
-	}
-
 	instruction = mem_read(REG_PC++);
 	
 	switch(instruction)
@@ -4379,6 +4373,12 @@ int z80_run(int continuous)
 	  default:
 	    disassemble(REG_PC - 1);
 	    error("unsupported instruction");
+	}
+
+	/* Event scheduler */
+	if (z80_state.sched > -1) {
+	    if (z80_state.sched == 0) trs_do_event();
+	    z80_state.sched--;
 	}
 
 	/* Check for an interrupt */
