@@ -353,7 +353,7 @@ get_sample(int convert, FILE* f)
       ret = getc(f);
       break;
     case AFMT_S16_LE:
-      ret = get_twobyte(&s, cassette_file);      
+      ret = get_twobyte((Ushort *)&s, cassette_file);      
       if (ret == EOF) break;
       ret = ((s + 0x8000) >> 8) & 0xff;
       break;

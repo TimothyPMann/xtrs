@@ -43,7 +43,7 @@ OpenDisk od[MAX_OPENDISK];
 void do_emt_system()
 {
   int res;
-  res = system(mem_pointer(REG_HL, 0));
+  res = system((char *)mem_pointer(REG_HL, 0));
   if (res == -1) {
     REG_A = errno;
     REG_F &= ~ZERO_MASK;
@@ -114,7 +114,7 @@ void do_emt_getddir()
     REG_BC = 0xFFFF;
     return;
   }
-  strcpy(mem_pointer(REG_HL, 1), trs_disk_dir);
+  strcpy((char *)mem_pointer(REG_HL, 1), trs_disk_dir);
   REG_A = 0;
   REG_F |= ZERO_MASK;
   REG_BC = strlen(trs_disk_dir);
@@ -122,7 +122,7 @@ void do_emt_getddir()
 
 void do_emt_setddir()
 {
-  trs_disk_dir = strdup(mem_pointer(REG_HL, 0));
+  trs_disk_dir = strdup((char *)mem_pointer(REG_HL, 0));
   if (trs_disk_dir[0] == '~' &&
       (trs_disk_dir[1] == '/' || trs_disk_dir[1] == '\0')) {
     char* home = getenv("HOME");
@@ -158,7 +158,7 @@ void do_emt_open()
   if (eoflag & EO_TRUNC)  oflag |= O_TRUNC;
   if (eoflag & EO_APPEND) oflag |= O_APPEND;
 
-  fd = open(mem_pointer(REG_HL, 0), oflag, REG_DE);
+  fd = open((char *)mem_pointer(REG_HL, 0), oflag, REG_DE);
   if (fd >= 0) {
     REG_A = 0;
     REG_F |= ZERO_MASK;
@@ -338,7 +338,7 @@ void do_emt_opendir()
     REG_A = EMFILE;
     return;
   }
-  dir[i] = opendir(mem_pointer(REG_HL, 0));
+  dir[i] = opendir((char *)mem_pointer(REG_HL, 0));
   if (dir[i] == NULL) {
     REG_DE = 0xffff;
     REG_A = errno;
@@ -401,7 +401,7 @@ void do_emt_readdir()
     REG_BC = 0xFFFF;
     return;
   }
-  strcpy(mem_pointer(REG_HL, 1), result->d_name);
+  strcpy((char *)mem_pointer(REG_HL, 1), result->d_name);
   REG_A = 0;
   REG_F |= ZERO_MASK;
   REG_BC = size;
@@ -409,7 +409,7 @@ void do_emt_readdir()
 
 void do_emt_chdir()
 {
-  int ok = chdir(mem_pointer(REG_HL, 0));
+  int ok = chdir((char *)mem_pointer(REG_HL, 0));
   if (ok < 0) {
     REG_A = errno;
     REG_F &= ~ZERO_MASK;
@@ -428,7 +428,7 @@ void do_emt_getcwd()
     REG_BC = 0xFFFF;
     return;
   }
-  result = getcwd(mem_pointer(REG_HL, 1), REG_BC);
+  result = getcwd((char *)mem_pointer(REG_HL, 1), REG_BC);
   if (result == NULL) {
     REG_A = errno;
     REG_F &= ~ZERO_MASK;
