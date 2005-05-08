@@ -39,6 +39,7 @@ void trs_restore_delay(void);
 extern int trs_continuous; /* 1= run continuously,
 			      0= enter debugger after instruction,
 			     -1= suppress interrupt and enter debugger */
+extern int trs_disk_debug_flags;
 
 extern int trs_parse_command_line(int argc, char **argv, int *debug);
 

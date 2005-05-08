@@ -73,9 +73,6 @@ Running:\n\
         Press the system reset button.  On Model I/III, softreset resets the\n\
         devices and posts a nonmaskable interrupt to the CPU; on Model 4/4P,\n\
         softreset is the same as hard reset.\n\
-    timeroff\n\
-    timeron\n\
-        Disable/enable the emulated TRS-80 real time clock interrupt.\n\
 Printing:\n\
     dump\n\
         Print the values of the Z-80 registers.\n\
@@ -116,6 +113,13 @@ Miscellaneous:\n\
     assign $<reg> = <value>\n\
     assign <addr> = <value>\n\
         Change the value of a register, register pair, or memory byte.\n\
+    timeroff\n\
+    timeron\n\
+        Disable/enable the emulated TRS-80 real time clock interrupt.\n\
+    diskdebug <hexval>\n\
+        Set floppy disk controller debug flags to hexval.\n\
+	1=FDC register I/O, 2=FDC commands, 4=VTOS 3.0 JV3 kludges, 8=Gaps,\n\
+        10=Phys sector sizes, 20=Readadr timing, 40=DMK, 80=ioctl errors.\n\
     help\n\
     ?\n\
         Print this message.\n\
@@ -724,6 +728,11 @@ void debug_shell()
 	    else if(!strcmp(command, "diskdump"))
 	    {
 		trs_disk_debug();
+	    }
+	    else if(!strcmp(command, "diskdebug"))
+	    {
+		trs_disk_debug_flags = 0;
+		sscanf(input, "diskdebug %x", &trs_disk_debug_flags);
 	    }
 	    else
 	    {

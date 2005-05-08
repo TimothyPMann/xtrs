@@ -11,14 +11,18 @@
  * Emulate Model I or III/4 disk controller
  */
 
-/*#define DISKDEBUG  1*/  /* FDC register reads and writes */
-/*#define DISKDEBUG1 1*/  /* FDC commands */
-/*#define DISKDEBUG2 1*/  /* VTOS 3.0 kludges */
-/*#define DISKDEBUG3 1*/  /* Gaps and real_writetrk */
-/*#define DISKDEBUG4 1*/  /* REAL sector size detection */
-/*#define DISKDEBUG5 1*/  /* Read Address timing */
-/*#define DISKDEBUG6 1*/  /* DMK support */
-/*#define DISKDEBUG7 1*/  /* ioctl errors accessing real disks */
+/*
+ * Debug flags.  Update help_message in debug.c if these change.
+ */
+#define DISKDEBUG_FDCREG   (1<<0)  /* FDC register reads and writes */
+#define DISKDEBUG_FDCCMD   (1<<1)  /* FDC commands */
+#define DISKDEBUG_VTOS3    (1<<2)  /* VTOS 3.0 JV3 kludges */
+#define DISKDEBUG_GAPS     (1<<3)  /* Gaps and real_writetrk */
+#define DISKDEBUG_REALSIZE (1<<4)  /* REAL sector size detection */
+#define DISKDEBUG_READADR  (1<<5)  /* Read Address timing */
+#define DISKDEBUG_DMK      (1<<6)  /* DMK support */
+#define DISKDEBUG_REALERR  (1<<7)  /* ioctl errors accessing real disks */
+
 #define TSTATEREV 1       /* Index holes timed by T-states, not real time */
 #define SIZERETRY 1       /* Retry in different sizes on real_read */
 #define DMK_MARK_IAM 0    /* Mark IAMs in track header; poor idea */
@@ -56,6 +60,7 @@ unsigned short trs_disk_changecount = 0;
 static int trs_disk_needchange = 0;
 float trs_disk_holewidth = 0.01;
 int trs_disk_truedam = 0;
+int trs_disk_debug_flags = 0;
 
 typedef struct {
   /* Registers */
@@ -244,7 +249,7 @@ typedef struct {
 #define DMK_FORMAT_SIZE   4
 #define DMK_HDR_SIZE      0x10
 #define DMK_TKHDR_SIZE    0x80    /* Space reserved for IDAM pointers */
-#define DMK_TRACKLEN_MAX  0x2940  /* Note: too small for TRKSIZE_3HD */
+#define DMK_TRACKLEN_MAX  0x4000
 
 /* Bit assignments in options */
 #define DMK_SSIDE_OPT     0x10
@@ -321,6 +326,7 @@ trs_disk_debug()
   printf("  last (non-DMK) format gaps %d %d %d %d %d\n",
 	 state.format_gap[0], state.format_gap[1], state.format_gap[2],
 	 state.format_gap[3], state.format_gap[4]);
+  printf("  debug flags: %#x\n", trs_disk_debug_flags);
   for (i=0; i<NDRIVES; i++) {
     DiskState *d = &disk[i];
     printf("Drive %d state: "
@@ -849,11 +855,12 @@ trs_disk_change(int drive)
     d->u.dmk.sden = (c & DMK_SDEN_OPT) != 0;
     d->u.dmk.ignden = (c & DMK_IGNDEN_OPT) != 0;
     d->u.dmk.curtrack = d->u.dmk.curside = -1;
-#if DISKDEBUG6
-    debug("DMK drv=%d wp=%d #tk=%d tklen=0x%x nsides=%d sden=%d ignden=%d\n",
-	  drive, d->writeprot, d->u.dmk.ntracks, d->u.dmk.tracklen,
-	  d->u.dmk.nsides, d->u.dmk.sden, d->u.dmk.ignden);
-#endif
+
+    if (trs_disk_debug_flags & DISKDEBUG_DMK) {
+      debug("DMK drv=%d wp=%d #tk=%d tklen=0x%x nsides=%d sden=%d ignden=%d\n",
+	    drive, d->writeprot, d->u.dmk.ntracks, d->u.dmk.tracklen,
+	    d->u.dmk.nsides, d->u.dmk.sden, d->u.dmk.ignden);
+    }
   }
 }
 
@@ -1186,13 +1193,13 @@ type1_status()
 void
 trs_disk_select_write(unsigned char data)
 {
-#if DISKDEBUG
   static int old_data = -1;
-  if (data != old_data) {
-    debug("select_write(0x%02x) pc %04x\n", data, REG_PC);
+
+  if ((trs_disk_debug_flags & DISKDEBUG_FDCREG) && data != old_data) {
+    debug("select_write(0x%02x) pc 0x%04x\n", data, REG_PC);
     old_data = data;
   }
-#endif
+
   state.status &= ~TRSDISK_NOTRDY;
   if (trs_model == 1) {
     /* Disk 3 and side select share a bit.  You can't have a drive :3
@@ -1276,27 +1283,27 @@ trs_disk_select_write(unsigned char data)
 unsigned char
 trs_disk_track_read(void)
 {
-#if DISKDEBUG
-  debug("track_read() => 0x%02x pc %04x\n", state.track, REG_PC);
-#endif
+  if (trs_disk_debug_flags & DISKDEBUG_FDCREG) {
+    debug("track_read() => 0x%02x pc 0x%04x\n", state.track, REG_PC);
+  }
   return state.track;
 }
 
 void
 trs_disk_track_write(unsigned char data)
 {
-#if DISKDEBUG
-  debug("track_write(0x%02x) pc %04x\n", data, REG_PC);
-#endif
+  if (trs_disk_debug_flags & DISKDEBUG_FDCREG) {
+    debug("track_write(0x%02x) pc 0x%04x\n", data, REG_PC);
+  }
   state.track = data;
 }
 
 unsigned char
 trs_disk_sector_read(void)
 {
-#if DISKDEBUG
-  debug("sector_read() => 0x%02x pc %04x\n", state.sector, REG_PC);
-#endif
+  if (trs_disk_debug_flags & DISKDEBUG_FDCREG) {
+    debug("sector_read() => 0x%02x pc 0x%04x\n", state.sector, REG_PC);
+  }
   return state.sector;
 }
 
@@ -1327,9 +1334,9 @@ trs_disk_set_controller(int controller)
 void
 trs_disk_sector_write(unsigned char data)
 {
-#if DISKDEBUG
-  debug("sector_write(0x%02x) pc %04x\n", data, REG_PC);
-#endif
+  if (trs_disk_debug_flags & DISKDEBUG_FDCREG) {
+    debug("sector_write(0x%02x) pc 0x%04x\n", data, REG_PC);
+  }
   if (trs_model == 1 && (trs_disk_doubler & TRSDISK_TANDY)) {
     switch (data) {
       /* Emulate Radio Shack doubler */
@@ -1521,9 +1528,9 @@ trs_disk_data_read(void)
   default:
     break;
   }
-#if DISKDEBUG
-  debug("data_read() => 0x%02x pc %04x\n", state.data, REG_PC);
-#endif
+  if (trs_disk_debug_flags & DISKDEBUG_FDCREG) {
+    debug("data_read() => 0x%02x pc 0x%04x\n", state.data, REG_PC);
+  }
   return state.data;
 }
 
@@ -1533,9 +1540,9 @@ trs_disk_data_write(unsigned char data)
   DiskState *d = &disk[state.curdrive];
   int c;
 
-#if DISKDEBUG
-  debug("data_write(0x%02x) pc %04x\n", data, REG_PC);
-#endif
+  if (trs_disk_debug_flags & DISKDEBUG_FDCREG) {
+    debug("data_write(0x%02x) pc 0x%04x\n", data, REG_PC);
+  }
   switch (state.currcommand & TRSDISK_CMDMASK) {
   case TRSDISK_WRITE:
     if (state.bytecount > 0) {
@@ -1591,9 +1598,9 @@ trs_disk_data_write(unsigned char data)
 		d->u.dmk.curbyte /*!!+ erase shutoff slop?*/ > idamp) {
 	      /* Yes, smashed this one */
 	      i += 2;
-#if DISKDEBUG6
-	      debug("DMK smashed phytk %d physec %d\n", d->phytrack, i/2);
-#endif
+	      if (trs_disk_debug_flags & DISKDEBUG_DMK) {
+		debug("DMK smashed phytk %d physec %d\n", d->phytrack, i/2);
+	      }
 	    } else {
 	      /* No, keep this one */
 	      if (j == i) break; /* none were smashed; early exit */
@@ -1630,10 +1637,10 @@ trs_disk_data_write(unsigned char data)
     if (d->emutype == DMK) {
       if (state.bytecount <= 0) {
 	if (state.format != FMT_DONE) {
-#if DISKDEBUG6
-	  debug("complete track format dens %d tk %d side %d\n",
-		state.density, d->phytrack, state.curside);
-#endif
+	  if (trs_disk_debug_flags & DISKDEBUG_DMK) {
+	    debug("complete track format dens %d tk %d side %d\n",
+		  state.density, d->phytrack, state.curside);
+	  }
 	  state.format = FMT_DONE;
 	  state.status &= ~TRSDISK_DRQ;
 	  /* Done: write modified track */
@@ -1776,12 +1783,12 @@ trs_disk_data_write(unsigned char data)
 	state.format_gap[4] = state.format_gapcnt;
 	state.format_gapcnt = 0;
       }
-#if DISKDEBUG3
-      debug("trk %d side %d gap0 %d gap1 %d gap2 %d gap3 %d gap4 %d\n",
-	    d->phytrack, state.curside,
-	    state.format_gap[0], state.format_gap[1], state.format_gap[2], 
-	    state.format_gap[3], state.format_gap[4]);
-#endif
+      if (trs_disk_debug_flags & DISKDEBUG_GAPS) {
+	debug("trk %d side %d gap0 %d gap1 %d gap2 %d gap3 %d gap4 %d\n",
+	      d->phytrack, state.curside,
+	      state.format_gap[0], state.format_gap[1], state.format_gap[2], 
+	      state.format_gap[3], state.format_gap[4]);
+      }
       state.format = FMT_DONE;
       state.status &= ~TRSDISK_DRQ;
       if (d->emutype == REAL) {
@@ -2040,15 +2047,17 @@ trs_disk_data_write(unsigned char data)
 	/* Short sector with intentional CRC error */
 	if (d->emutype == JV3) {
 	  d->u.jv3.id[state.format_sec].flags |= JV3_NONIBM | JV3_ERROR;
-#if DISKDEBUG2
-	  debug("non-IBM sector: drv %02x, sid %d, trk %02x, sec %02x\n",
-		state.curdrive, state.curside,
-		d->u.jv3.id[state.format_sec].track, 
-		d->u.jv3.id[state.format_sec].sector);
-#endif
+	  if (trs_disk_debug_flags & DISKDEBUG_VTOS3) {
+	    debug("non-IBM sector: drv 0x%02x, sid %d,"
+		  " trk 0x%02x, sec 0x%02x\n",
+		  state.curdrive, state.curside,
+		  d->u.jv3.id[state.format_sec].track, 
+		  d->u.jv3.id[state.format_sec].sector);
+	  }
 	  /* Write the sector id */
 	  fseek(d->file, idoffset(d, state.format_sec), 0);
-	  c = fwrite(&d->u.jv3.id[state.format_sec], sizeof(SectorId), 1, d->file);
+	  c = fwrite(&d->u.jv3.id[state.format_sec],
+		     sizeof(SectorId), 1, d->file);
 	  if (c == EOF) state.status |= TRSDISK_WRITEFLT;
 	  goto got_idam;
 	} else {
@@ -2105,9 +2114,8 @@ trs_disk_data_write(unsigned char data)
 unsigned char
 trs_disk_status_read(void)
 {
-#if DISKDEBUG
   static int last_status = -1;
-#endif
+
   if (trs_disk_nocontroller) return 0xff;
   type1_status();
   if (!(state.status & TRSDISK_NOTRDY)) {
@@ -2116,12 +2124,11 @@ trs_disk_status_read(void)
       state.status |= TRSDISK_NOTRDY;
     }
   }
-#if DISKDEBUG
-  if (state.status != last_status) {
-    debug("status_read() => 0x%02x pc %04x\n", state.status, REG_PC);
+  if ((trs_disk_debug_flags & DISKDEBUG_FDCREG) &&
+      state.status != last_status) {
+    debug("status_read() => 0x%02x pc 0x%04x\n", state.status, REG_PC);
     last_status = state.status;
   }
-#endif
 
 #if BOGUS
   /* Clear intrq unless user did a Force Interrupt with immediate interrupt. */
@@ -2152,9 +2159,10 @@ trs_disk_command_write(unsigned char cmd)
   DiskState *d = &disk[state.curdrive];
   trs_event_func event;
 
-#if DISKDEBUG
-  debug("command_write(0x%02x) pc %04x\n", cmd, REG_PC);
-#endif
+  if (trs_disk_debug_flags & DISKDEBUG_FDCREG) {
+    debug("command_write(0x%02x) pc 0x%04x\n", cmd, REG_PC);
+  }
+
   /* Handle DMK partial track reformat */
   if (d->emutype == DMK &&
       (state.currcommand & ~TRSDISK_EBIT) == TRSDISK_WRITETRK &&
@@ -2163,10 +2171,11 @@ trs_disk_command_write(unsigned char cmd)
     unsigned char oldtkhdr[DMK_TKHDR_SIZE];
     int c, i, j, idamp;
 
-#if DISKDEBUG6
-    debug("partial track format dens %d tk %d side %d\n",
-	  state.density, d->phytrack, state.curside);
-#endif
+    if (trs_disk_debug_flags & DISKDEBUG_DMK) {
+      debug("partial track format dens %d tk %d side %d\n",
+	    state.density, d->phytrack, state.curside);
+    }
+
     /* Fetch old IDAM pointers if any */
     fseek(d->file, DMK_HDR_SIZE +
 	  (d->phytrack * d->u.dmk.nsides + state.curside) *
@@ -2182,9 +2191,9 @@ trs_disk_command_write(unsigned char cmd)
 	if (idamp < d->u.dmk.curbyte) {
 	  /* IDAM overwritten; don't copy */
 	  i += 2;
-#if DISKDEBUG6
-	  debug("  discarding physec %d\n", i);
-#endif
+	  if (trs_disk_debug_flags & DISKDEBUG_DMK) {
+	    debug("  discarding physec %d\n", i);
+	  }
 	} else {
 	  /* IDAM not overwritten; need to copy in */
 	  if (j >= DMK_TKHDR_SIZE) {
@@ -2194,15 +2203,15 @@ trs_disk_command_write(unsigned char cmd)
 	  }
 	  d->u.dmk.buf[j++] = oldtkhdr[i++];
 	  d->u.dmk.buf[j++] = oldtkhdr[i++];
-#if DISKDEBUG6
-	  debug("  preserving physec %d as %d\n", i, j);
-#endif
+	  if (trs_disk_debug_flags & DISKDEBUG_DMK) {
+	    debug("  preserving physec %d as %d\n", i, j);
+	  }
 	}
       }
     } else {
-#if DISKDEBUG6
-      debug("  no existing sectors\n");
-#endif
+      if (trs_disk_debug_flags & DISKDEBUG_FDCREG) {
+	debug("  no existing sectors\n");
+      }
     }
     /* Write modified portion of track only */
     fseek(d->file, DMK_HDR_SIZE +
@@ -2232,9 +2241,9 @@ trs_disk_command_write(unsigned char cmd)
   switch (cmd & TRSDISK_CMDMASK) {
 
   case TRSDISK_RESTORE:
-#if DISKDEBUG1
-      debug("%02x restore drv %d\n", cmd, state.curdrive);
-#endif
+    if (trs_disk_debug_flags & DISKDEBUG_FDCCMD) {
+      debug("restore 0x%02x drv %d\n", cmd, state.curdrive);
+    }
     state.last_readadr = -1;
     d->phytrack = 0;
     state.track = 0;
@@ -2246,10 +2255,10 @@ trs_disk_command_write(unsigned char cmd)
     break;
 
   case TRSDISK_SEEK:
-#if DISKDEBUG1
-      debug("%02x seek drv %d ptk %d otk %d ntk %d\n",
+    if (trs_disk_debug_flags & DISKDEBUG_FDCCMD) {
+      debug("seek 0x%02x drv %d ptk %d otk %d ntk %d\n",
 	    cmd, state.curdrive, d->phytrack, state.track, state.data);
-#endif
+    }
     state.last_readadr = -1;
     d->phytrack += (state.data - state.track);
     state.track = state.data;
@@ -2268,13 +2277,12 @@ trs_disk_command_write(unsigned char cmd)
   case TRSDISK_STEP:
   case TRSDISK_STEPU:
   step:
-#if DISKDEBUG1
-      debug("%02x step%s %s drv %d ptk %d otk %d\n",
-	    cmd, (cmd & TRSDISK_UBIT) ? "u" : "",
-	    (state.lastdirection < 0) ? "out" : "in",
+    if (trs_disk_debug_flags & DISKDEBUG_FDCCMD) {
+      debug("step%s %s 0x%02x drv %d ptk %d otk %d\n",
+	    (cmd & TRSDISK_UBIT) ? "u" : "",
+	    (state.lastdirection < 0) ? "out" : "in", cmd,
 	    state.curdrive, d->phytrack, state.track);
-	      
-#endif
+    }      
     state.last_readadr = -1;
     d->phytrack += state.lastdirection;
     if (cmd & TRSDISK_UBIT) {
@@ -2302,11 +2310,11 @@ trs_disk_command_write(unsigned char cmd)
     goto step;
 
   case TRSDISK_READ:
-#if DISKDEBUG1
-      debug("%02x read drv %d ptk %d tk %d sec %d %sden\n", cmd,
+    if (trs_disk_debug_flags & DISKDEBUG_FDCCMD) {
+      debug("read 0x%02x drv %d ptk %d tk %d sec %d %sden\n", cmd,
 	    state.curdrive, d->phytrack, state.track, state.sector,
 	    state.density ? "d" : "s");
-#endif
+    }
     state.last_readadr = -1;
     state.status = 0;
     non_ibm = 0;
@@ -2314,21 +2322,21 @@ trs_disk_command_write(unsigned char cmd)
     new_status = 0;
     if (state.controller == TRSDISK_P1771) {
       if (!(cmd & TRSDISK_BBIT)) {
-#if DISKDEBUG2
-	debug("non-IBM read: drv %02x, sid %d, trk %02x, sec %02x\n",
-	      state.curdrive, state.curside, state.track, state.sector);
-#endif
+	if (trs_disk_debug_flags & DISKDEBUG_VTOS3) {
+	  debug("non-IBM read: drv 0x%02x, sid %d, trk 0x%02x, sec 0x%02x\n",
+		state.curdrive, state.curside, state.track, state.sector);
+	}
 	if (d->emutype == REAL) {
 	  trs_disk_unimpl(cmd, "non-IBM read on real floppy");
 	}
 	non_ibm = 1;
       } else {
-#if DISKDEBUG2
-	if (state.sector >= 0x7c) {
-	  debug("IBM read: drv %02x, sid %d, trk %02x, sec %02x\n",
-		state.curdrive, state.curside, state.track, state.sector);
+	if (trs_disk_debug_flags & DISKDEBUG_VTOS3) {
+	  if (state.sector >= 0x7c) {
+	    debug("IBM read: drv 0x%02x, sid %d, trk 0x%02x, sec 0x%02x\n",
+		  state.curdrive, state.curside, state.track, state.sector);
+	  }
 	}
-#endif
       }
     } else {
       if (cmd & TRSDISK_CBIT) {
@@ -2505,32 +2513,32 @@ trs_disk_command_write(unsigned char cmd)
     break;
 
   case TRSDISK_WRITE:
-#if DISKDEBUG1
-      debug("%02x write drv %d ptk %d tk %d sec %d %sden\n",
+    if (trs_disk_debug_flags & DISKDEBUG_FDCCMD) {
+      debug("write 0x%02x drv %d ptk %d tk %d sec %d %sden\n",
 	    cmd, state.curdrive, d->phytrack, state.track, state.sector,
 	    state.density ? "d" : "s");
-#endif
+    }
     state.last_readadr = -1;
     state.status = 0;
     non_ibm = 0;
     goal_side = -1;
     if (state.controller == TRSDISK_P1771) {
       if (!(cmd & TRSDISK_BBIT)) {
-#if DISKDEBUG2
-	debug("non-IBM write drv %02x, sid %d, trk %02x, sec %02x\n",
-	      state.curdrive, state.curside, state.track, state.sector);
-#endif
+	if (trs_disk_debug_flags & DISKDEBUG_VTOS3) {
+	  debug("non-IBM write drv 0x%02x, sid %d, trk 0x%02x, sec 0x%02x\n",
+		state.curdrive, state.curside, state.track, state.sector);
+	}
 	if (d->emutype == REAL) {
 	  trs_disk_unimpl(cmd, "non-IBM write on real floppy");
 	}
 	non_ibm = 1;
       } else {
-#if DISKDEBUG2
-	if (state.sector >= 0x7c) {
-	  debug("IBM write: drv %02x, sid %d, trk %02x, sec %02x\n",
-		state.curdrive, state.curside, state.track, state.sector);
+	if (trs_disk_debug_flags & DISKDEBUG_VTOS3) {
+	  if (state.sector >= 0x7c) {
+	    debug("IBM write: drv 0x%02x, sid %d, trk 0x%02x, sec 0x%02x\n",
+		  state.curdrive, state.curside, state.track, state.sector);
+	  }
 	}
-#endif
       }
     } else {
       if (cmd & TRSDISK_CBIT) {
@@ -2645,10 +2653,10 @@ trs_disk_command_write(unsigned char cmd)
 	  for (i = state.sector+1; i <= 0x7f; i++) {
 	    j = search(i, -1);
 	    if (j != -1) {
-#if DISKDEBUG2
-	      debug("smashing tk %d sector %02x id_index %d\n",
-		    state.track, i, j);
-#endif
+	      if (trs_disk_debug_flags & DISKDEBUG_VTOS3) {
+		debug("smashing tk %d sector 0x%02x id_index %d\n",
+		      state.track, i, j);
+	      }
 	      jv3_free_sector(d, j);
 	      c = fflush(d->file);
 	      if (c == EOF) state.status |= TRSDISK_WRITEFLT;
@@ -2732,11 +2740,11 @@ trs_disk_command_write(unsigned char cmd)
     break;
 
   case TRSDISK_READADR:
-#if DISKDEBUG1
-      debug("%02x readadr drv %d ptk %d tk %d last %d %sden\n",
+    if (trs_disk_debug_flags & DISKDEBUG_FDCCMD) {
+      debug("readadr 0x%02x drv %d ptk %d tk %d last %d %sden\n",
 	    cmd, state.curdrive, d->phytrack, state.track,
 	    state.last_readadr, state.density ? "d" : "s");
-#endif
+    }
     state.data = 0; /* workaround for apparent SU1 bug */
     if (state.density) {
       state.crc = 0xb230;  /* CRC of a1 a1 a1 fe */
@@ -2839,10 +2847,10 @@ trs_disk_command_write(unsigned char cmd)
       state.last_readadr = i;
       state.bytecount = 6;
       trs_schedule_event(trs_disk_firstdrq, 0, ts);
-#if DISKDEBUG5
-      debug("readadr phytrack %d angle %f i %d ts %d\n",
-	    d->phytrack, a, i, ts);
-#endif
+      if (trs_disk_debug_flags & DISKDEBUG_READADR) {
+	debug("readadr phytrack %d angle %f i %d ts %d\n",
+	      d->phytrack, a, i, ts);
+      }
     } else /* d->emutype == DMK */ {
       /* Compute how far it will be to the next ID in the correct density */
       float a = angle();
@@ -2893,19 +2901,19 @@ trs_disk_command_write(unsigned char cmd)
 			    d->u.dmk.buf[idamp]);
       d->u.dmk.curbyte = idamp + dmk_incr(d);
       trs_schedule_event(trs_disk_firstdrq, 0, ts);
-#if DISKDEBUG5
-      debug("readadr phytrack %d angle %f i %d ts %d\n",
-	    d->phytrack, a, i, ts);
-#endif
+      if (trs_disk_debug_flags & DISKDEBUG_READADR) {
+	debug("readadr phytrack %d angle %f i %d ts %d\n",
+	      d->phytrack, a, i, ts);
+      }
     }
     break;
 
   case TRSDISK_READTRK:
-#if DISKDEBUG1
-      debug("%02x readtrk drv %d ptk %d tk %d %sden\n",
+    if (trs_disk_debug_flags & DISKDEBUG_FDCCMD) {
+      debug("readtrk 0x%02x drv %d ptk %d tk %d %sden\n",
 	    cmd, state.curdrive, d->phytrack, state.track,
 	    state.density ? "d" : "s");
-#endif
+    }
     state.last_readadr = -1;
     if (d->file == NULL) {
       /* Data sheet says we wait forever for an index pulse, ugh */
@@ -2946,11 +2954,11 @@ trs_disk_command_write(unsigned char cmd)
 	state.density = (state.controller == TRSDISK_P1791);
       }
     } else {
-#if DISKDEBUG1
-      debug("%02x writetrk drv %d ptk %d tk %d %sden\n",
-	    cmd, state.curdrive, d->phytrack, state.track,
-	    state.density ? "d" : "s");
-#endif
+      if (trs_disk_debug_flags & DISKDEBUG_FDCCMD) {
+	debug("writetrk 0x%02x drv %d ptk %d tk %d %sden\n",
+	      cmd, state.curdrive, d->phytrack, state.track,
+	      state.density ? "d" : "s");
+      }
       /* Yes; a real write track */
       if (d->emutype != REAL && d->writeprot) {
 	state.status = TRSDISK_WRITEPRT;
@@ -3005,9 +3013,9 @@ trs_disk_command_write(unsigned char cmd)
     break;
 
   case TRSDISK_FORCEINT:
-#if DISKDEBUG1
-      debug("%02x forceint\n", cmd);
-#endif
+    if (trs_disk_debug_flags & DISKDEBUG_FDCCMD) {
+      debug("forceint 0x%02x\n", cmd);
+    }
     /* Stop whatever is going on and forget it */
     trs_cancel_event();
     state.status = 0;
@@ -3050,9 +3058,9 @@ real_error(DiskState *d, unsigned int flags, char *msg)
     d->u.real.empty_timeout = time(NULL) + EMPTY_TIMEOUT;
     d->u.real.empty = 1;
   }
-#if DISKDEBUG7
-  debug("error on real_%s\n", msg);
-#endif
+  if (trs_disk_debug_flags & DISKDEBUG_REALERR) {
+    debug("error on real_%s\n", msg);
+  }
 }
 
 void
@@ -3234,11 +3242,11 @@ real_read()
       if (raw_cmd.reply[1] & 0x04) {
 	/* Could have been due to wrong sector size, so we'll retry
 	   internally in each other size before returning an error. */
-#if DISKDEBUG4
-	debug("real_read not fnd: side %d tk %d sec %d size 0%d phytk %d\n",
-	      state.curside, state.track, state.sector, d->u.real.size_code,
-	      d->phytrack*d->real_step);
-#endif
+	if (trs_disk_debug_flags & DISKDEBUG_REALSIZE) {
+	  debug("real_read not fnd: side %d tk %d sec %d size 0%d phytk %d\n",
+		state.curside, state.track, state.sector, d->u.real.size_code,
+		d->phytrack*d->real_step);
+	}
 #if SIZERETRY
 	d->u.real.size_code = (d->u.real.size_code + 1) % 4;
 	if (++retry < 4) {
@@ -3342,11 +3350,11 @@ real_write()
       /* Could have been due to wrong sector size.  Presumably
          the Z-80 software will do some retries, so we'll cause
          it to try the next sector size next time. */
-#if DISKDEBUG4
-      debug("real_write not found: side %d tk %d sec %d size 0%d phytk %d\n",
-	    state.curside, state.track, state.sector, d->u.real.size_code,
-	    d->phytrack*d->real_step);
-#endif
+      if (trs_disk_debug_flags & DISKDEBUG_REALSIZE) {
+	debug("real_write not found: side %d tk %d sec %d size 0%d phytk %d\n",
+	      state.curside, state.track, state.sector, d->u.real.size_code,
+	      d->phytrack*d->real_step);
+      }
 #if SIZERETRY
       d->u.real.size_code = (d->u.real.size_code + 1) % 4;
 #endif
@@ -3507,15 +3515,18 @@ real_writetrk()
   raw_cmd.cmd_count = i;
   raw_cmd.data = (void*) d->u.real.buf;
   raw_cmd.length = d->u.real.fmt_nbytes;
-#if DISKDEBUG3
-  debug("real_writetrk size 0%d secs %d gap3 %d fill 0x%02x hex data ",
-	d->u.real.size_code, d->u.real.fmt_nbytes/4, gap3, d->u.real.fmt_fill);
-  for (i=0; i<d->u.real.fmt_nbytes; i+=4) {
-    debug("%02x%02x%02x%02x ", d->u.real.buf[i], d->u.real.buf[i+1],
-	  d->u.real.buf[i+2], d->u.real.buf[i+3]);
+  
+  if (trs_disk_debug_flags & DISKDEBUG_GAPS) {
+    debug("real_writetrk size 0%d secs %d gap3 %d fill 0x%02x hex data ",
+	  d->u.real.size_code, d->u.real.fmt_nbytes/4, gap3,
+	  d->u.real.fmt_fill);
+    for (i=0; i<d->u.real.fmt_nbytes; i+=4) {
+      debug("%02x%02x%02x%02x ", d->u.real.buf[i], d->u.real.buf[i+1],
+	    d->u.real.buf[i+2], d->u.real.buf[i+3]);
+    }
+    debug("\n");
   }
-  debug("\n");
-#endif
+
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);
   sigaddset(&set, SIGIO);

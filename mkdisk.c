@@ -32,7 +32,7 @@ void Usage(char *progname)
 	  "\t%s [-3] file\n"
 	  "\t%s -k [-s sides] [-d density] [-8] [-i] file\n"
 	  "\t%s -h [-c cyl] [-s sec] [-g gran] file\n"
-	  "\t%s mkdisk {-p|-u} [-1|-3|-k|-h]\n",
+	  "\t%s {-p|-u} {-1|-3|-k|-h} file\n",
 	  progname, progname, progname, progname, progname);
   exit(2);
 }

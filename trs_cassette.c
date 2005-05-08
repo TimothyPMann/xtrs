@@ -621,7 +621,7 @@ static int assert_state(int state)
 	cassette_state = FAILED;
 	return -1;
       }
-      setbuf(cassette_file, NULL);
+      /*setbuf(cassette_file, NULL);*/ /* seems no need for this */
       cassette_sample_rate = cassette_default_sample_rate;
       if (set_audio_format(cassette_file, state) < 0) {
 	error("couldn't set audio format on %s: %s",
@@ -670,7 +670,7 @@ static int assert_state(int state)
 	cassette_state = FAILED;
 	return -1;
       }
-      setbuf(cassette_file, NULL);
+      setbuf(cassette_file, NULL); /* ??hangs on some OSS drivers */
 #if OSS_SOUND && HAVE_OSS
       if (state == SOUND || state == ORCH90) {
 	/*int arg = 0x7fff0008;*/ /* unlimited fragments of size (1 << 8) */

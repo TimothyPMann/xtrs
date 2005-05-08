@@ -91,23 +91,19 @@ MISC = \
 	README \
 	README-1.0 \
 	cassette \
-	cassette.man \
 	cassette.txt \
-	cmddump.man \
 	cmddump.txt \
 	export.bas \
 	export.cmd \
 	export.lst \
 	export.z \
 	hardfmt.txt \
-	hex2cmd.man \
 	hex2cmd.txt \
 	import.bas \
 	import.cmd \
 	import.lst \
 	import.z \
 	m1format.fix \
-	mkdisk.man \
 	mkdisk.txt \
 	settime.ccc \
 	settime.cmd \
@@ -116,7 +112,6 @@ MISC = \
 	utility.dsk \
 	utility.jcl \
 	cpmutil.dsk \
-	xtrs.man \
 	xtrs.txt \
 	xtrsemt.ccc \
 	xtrsemt.h \
@@ -130,6 +125,12 @@ MISC = \
 Z80CODE = export.cmd import.cmd settime.cmd xtrsmous.cmd \
 	xtrs8.dct xtrshard.dct \
 	fakerom.hex xtrsrom4p.hex
+
+MANSOURCES = cassette.man \
+	cmddump.man \
+	hex2cmd.man \
+	mkdisk.man \
+	xtrs.man
 
 MANPAGES = xtrs.txt mkdisk.txt cassette.txt cmddump.txt hex2cmd.txt 
 
@@ -161,7 +162,7 @@ ZMACFLAGS = -h
 .z.hex:
 	zmac $(ZMACFLAGS) $<
 .man.txt:
-	nroff -man $< > $*.txt
+	nroff -man -c -Tascii $< | colcrt - | cat -s > $*.txt
 
 xtrs:		$(OBJECTS)
 		$(CC) $(LDFLAGS) -o xtrs $(OBJECTS) $(LIBS)
@@ -192,7 +193,7 @@ saber_src:
 		#load $(LDFLAGS) $(CFLAGS) $(SOURCES) $(LIBS)
 
 tar:		$(SOURCES) $(HEADERS)
-		tar cvf xtrs.tar $(SOURCES) $(HEADERS) $(MISC)
+		tar cvf xtrs.tar $(SOURCES) $(HEADERS)  $(MANSOURCES) $(MISC)
 		rm -f xtrs.tar.Z
 		compress xtrs.tar
 
@@ -208,13 +209,17 @@ link:
 		rm -f xtrs
 		make xtrs
 
-install:
-		$(INSTALL) -c -m 755 $(PROGS) $(BINDIR)
-		$(INSTALL) -c -m 644 xtrs.man $(MANDIR)/man1/xtrs.1
-		$(INSTALL) -c -m 644 cassette.man $(MANDIR)/man1/cassette.1
-		$(INSTALL) -c -m 644 mkdisk.man $(MANDIR)/man1/mkdisk.1
-		$(INSTALL) -c -m 644 cmddump.man $(MANDIR)/man1/cmddump.1
-		$(INSTALL) -c -m 644 hex2cmd.man $(MANDIR)/man1/hex2cmd.1
+install: install-progs install-man
+
+install-progs: $(PROGS)
+	$(INSTALL) -c -m 755 $(PROGS) $(BINDIR)
+
+install-man: $(MANPAGES)
+	$(INSTALL) -c -m 644 xtrs.man $(MANDIR)/man1/xtrs.1
+	$(INSTALL) -c -m 644 cassette.man $(MANDIR)/man1/cassette.1
+	$(INSTALL) -c -m 644 mkdisk.man $(MANDIR)/man1/mkdisk.1
+	$(INSTALL) -c -m 644 cmddump.man $(MANDIR)/man1/cmddump.1
+	$(INSTALL) -c -m 644 hex2cmd.man $(MANDIR)/man1/hex2cmd.1
 
 depend:
 	makedepend -- $(CFLAGS) -- $(SOURCES)
