@@ -2990,8 +2990,11 @@ volatile int x_flush_needed = 0;
 int trs_continuous;
 
 int z80_run(int continuous)
-     /* 1= continuous, 0= singlestep,
-	-1= singlestep and disallow interrupts */
+     /*
+      * -1 = single-step and disallow interrupts
+      *  0 = single-step
+      *  1 = continuous
+      */
 {
     Uchar instruction;
     Ushort address; /* generic temps */
