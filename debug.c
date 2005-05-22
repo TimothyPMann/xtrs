@@ -118,8 +118,10 @@ Miscellaneous:\n\
         Disable/enable the emulated TRS-80 real time clock interrupt.\n\
     diskdebug <hexval>\n\
         Set floppy disk controller debug flags to hexval.\n\
-	1=FDC register I/O, 2=FDC commands, 4=VTOS 3.0 JV3 kludges, 8=Gaps,\n\
+        1=FDC register I/O, 2=FDC commands, 4=VTOS 3.0 JV3 kludges, 8=Gaps,\n\
         10=Phys sector sizes, 20=Readadr timing, 40=DMK, 80=ioctl errors.\n\
+    zbxinfo\n\
+        Display information about this debugger.\n\
     help\n\
     ?\n\
         Print this message.\n\
@@ -151,6 +153,21 @@ static char *trap_name(int flag)
       default:
 	return "unknown trap";
     }
+}
+
+static void show_zbxinfo()
+{
+    printf("zbx: Z-80 debugger by David Gingold, Alex Wolman, and Timothy"
+           " Mann\n");
+    printf("\n");
+    printf("Traps set: %d (maximum %d)\n", num_traps, MAX_TRAPS);
+    printf("Size of address space: 0x%x\n", ADDRESS_SPACE);
+    printf("Maximum length of command line: %d\n", MAXLINE);
+#ifdef READLINE
+    printf("GNU Readline library support enabled.\n");
+#else
+    printf("GNU Readline library support disabled.\n");
+#endif
 }
 
 static void clear_all_traps()
@@ -194,7 +211,7 @@ static void set_trap(int address, int flag)
 
     if(num_traps == MAX_TRAPS)
     {
-	printf("Cannot set another trap.\n");
+	printf("Cannot set more than %d traps.\n", MAX_TRAPS);
     }
     else
     {
@@ -289,6 +306,8 @@ void debug_init()
     bzero(traps, ADDRESS_SPACE * sizeof(Uchar));
 
     for(i = 0; i < MAX_TRAPS; ++i) trap_table[i].valid = 0;
+
+    printf("Type \"help\" for a list of commands.\n");
 }
 
 static void print_memory(Ushort address, int num_bytes)
@@ -444,6 +463,10 @@ void debug_shell()
 	    if(!strcmp(command, "help") || !strcmp(command, "?"))
 	    {
 		printf(help_message);
+	    }
+	    else if (!strcmp(command, "zbxinfo"))
+	    {
+		show_zbxinfo();
 	    }
 	    else if(!strcmp(command, "clear"))
 	    {
