@@ -43,11 +43,13 @@
 #define DISASSEMBLE_ON_FLAG	(0x4)
 #define DISASSEMBLE_OFF_FLAG	(0x8)
 #define BREAK_ONCE_FLAG		(0x10)
+#define WATCHPOINT_FLAG		(0x20)
 
 static Uchar *traps;
 static int num_traps;
 static int print_instructions;
 static int stop_signaled;
+static unsigned int num_watchpoints = 0;
 
 static char help_message[] =
 
@@ -109,6 +111,8 @@ Traps:\n\
         Set a trap to enable tracing at the specified hex address.\n\
     traceoff at <address>\n\
         Set a trap to disable tracing at the specified hex address.\n\
+    watch <address>\n\
+        Set a trap to watch specified hex address for changes.\n\
 Miscellaneous:\n\
     assign $<reg> = <value>\n\
     assign <addr> = <value>\n\
@@ -130,11 +134,11 @@ Miscellaneous:\n\
 
 static struct
 {
-    int valid;
-    int address;
-    int flag;
+    int   valid;
+    int   address;
+    int   flag;
+    Uchar byte; /* used only by watchpoints */
 } trap_table[MAX_TRAPS];
-
 
 static char *trap_name(int flag)
 {
@@ -150,6 +154,8 @@ static char *trap_name(int flag)
 	return "traceoff";
       case BREAK_ONCE_FLAG:
 	return "temporary breakpoint";
+      case WATCHPOINT_FLAG:
+	return "watchpoint";
       default:
 	return "unknown trap";
     }
@@ -221,6 +227,12 @@ static void set_trap(int address, int flag)
 	trap_table[i].valid = 1;
 	trap_table[i].address = address;
 	trap_table[i].flag = flag;
+	if (trap_table[i].flag == WATCHPOINT_FLAG) {
+	    /* Initialize the byte field to current memory contents. */
+	    trap_table[i].byte = mem_read(address);
+	    /* Increment number of set watchpoints. */
+	    num_watchpoints++;
+	}
 	traps[address] |= flag;
 	num_traps++;
 
@@ -238,6 +250,10 @@ static void clear_trap(int i)
     {
 	traps[trap_table[i].address] &= ~(trap_table[i].flag);
 	trap_table[i].valid = 0;
+	if (trap_table[i].flag == WATCHPOINT_FLAG) {
+	    /* Decrement number of set watchpoints. */
+	    num_watchpoints--;
+	}
 	num_traps--;
 	printf("Cleared %s [%d] at %.4x\n",
 	       trap_name(trap_table[i].flag), i, trap_table[i].address);
@@ -352,7 +368,10 @@ static void debug_run()
 {
     void (*old_signal_handler)();
     Uchar t;
+    Uchar byte;
     int continuous;
+    int i;
+    int watch_triggered = 0;
 
     /* catch control-c signal */
     old_signal_handler = signal(SIGINT, signal_handler);
@@ -396,7 +415,42 @@ static void debug_run()
 	{
 	    stop_signaled = 1;
 	    clear_trap_address(REG_PC, BREAK_ONCE_FLAG);
-        }
+	}
+
+	/*
+	 * Iterate over the trap list looking for watchpoints only if we
+	 * know there are any to be found.
+	 */
+	if (num_watchpoints)
+	{
+	    for (i = 0; i < MAX_TRAPS; ++i)
+	    {
+		if (trap_table[i].flag == WATCHPOINT_FLAG)
+		{
+		    byte = mem_read(trap_table[i].address);
+		    if (byte != trap_table[i].byte)
+		    {
+			/*
+			 * If a watched memory location has changed, report
+			 * it, update the watch entry in the trap table to
+			 * reflect the new value, and set the
+			 * watch_triggered flag so that we stop after all
+			 * watchpoints have been processed.
+			 */
+			printf("Memory location 0x%.4x changed value from"
+			       "0x%.2x to 0x%.2x.\n", trap_table[i].address,
+			       trap_table[i].byte, byte);
+			trap_table[i].byte = byte;
+			watch_triggered = 1;
+		    }
+		}
+	    }
+	    if (watch_triggered)
+	    {
+		stop_signaled = 1;
+	    }
+	}
+
     }
     signal(SIGINT, old_signal_handler);
     printf("Stopped at %.4x\n", REG_PC);
@@ -736,6 +790,16 @@ void debug_shell()
 		{
 		    print_instructions = 0;
 		    printf("Tracing disabled.\n");
+		}
+	    }
+	    else if(!strcmp(command, "watch"))
+	    {
+		int address;
+
+		if(sscanf(input, "watch %x", &address) == 1)
+		{
+		    address %= ADDRESS_SPACE;
+		    set_trap(address, WATCHPOINT_FLAG);
 		}
 	    }
 	    else if(!strcmp(command, "timeroff"))
