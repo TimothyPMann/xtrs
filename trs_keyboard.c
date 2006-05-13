@@ -30,12 +30,23 @@
 #include <X11/keysym.h>
 #include <X11/X.h>
 
+/*
+ * Key event queue
+ */
+#define KEY_QUEUE_SIZE	(32)
+static int key_queue[KEY_QUEUE_SIZE];
+static int key_queue_head;
+static int key_queue_entries;
+static int key_immediate;
+
+/*
+ * TRS-80 key matrix
+ */
 #define TK(a, b) (((a)<<4)+(b))
 #define TK_ADDR(tk) (((tk) >> 4)&0xf)
 #define TK_DATA(tk) ((tk)&0xf)
 #define TK_DOWN(tk) (((tk)&0x10000) == 0)
 
-/* TRS-80 key matrix */
 #define TK_AtSign       TK(0, 0)  /* @   */
 #define TK_A            TK(0, 1)
 #define TK_B            TK(0, 2)
@@ -930,3 +941,73 @@ int trs_kb_mem_read(int address)
     return kb_mem_value(address);
 }
 
+void clear_key_queue()
+{
+  key_queue_head = 0;
+  key_queue_entries = 0;
+#if QDEBUG
+    debug("clear_key_queue\n");
+#endif
+}
+
+void queue_key(int state)
+{
+  key_queue[(key_queue_head + key_queue_entries) % KEY_QUEUE_SIZE] = state;
+#if QDEBUG
+  debug("queue_key 0x%x\n", state);
+#endif
+  if (key_queue_entries < KEY_QUEUE_SIZE) {
+    key_queue_entries++;
+  } else {
+#if QDEBUG
+    debug("queue_key overflow\n");
+#endif
+  }
+}
+
+int dequeue_key()
+{
+  int rval = -1;
+
+  if(key_queue_entries > 0)
+    {
+      rval = key_queue[key_queue_head];
+      key_queue_head = (key_queue_head + 1) % KEY_QUEUE_SIZE;
+      key_queue_entries--;
+#if QDEBUG
+      debug("dequeue_key 0x%x\n", rval);
+#endif
+    }
+  return rval;
+}
+
+int
+trs_end_kbwait()
+{
+  key_immediate = 1;
+}
+
+int trs_next_key(int wait)
+{
+#if KBWAIT
+  if (wait) {
+    int rval;
+    for (;;) {
+      if ((rval = dequeue_key()) >= 0) break;
+      if ((z80_state.nmi && !z80_state.nmi_seen) ||
+	  (z80_state.irq && z80_state.iff1) ||
+	  trs_event_scheduled() || key_immediate) {
+	rval = -1;
+	break;
+      }
+      trs_paused = 1;
+      pause();			/* Wait for SIGALRM or SIGIO */
+      key_immediate = 0;
+      trs_get_event(0);
+    }
+    return rval;
+  }
+#endif
+  return dequeue_key();
+
+}

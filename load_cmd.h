@@ -49,7 +49,7 @@
  * If isam is not -1, search for the given isam member number and load
  * it instead of loading the whole file.
  *
- * If pds is not NULL, search for the given isam member number and
+ * If pds is not NULL, search for the given pds member name and
  * load it instead of loading the whole file.  isam and pds cannot
  * both be used.
  *

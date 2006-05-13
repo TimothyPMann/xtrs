@@ -3,22 +3,22 @@
 format :#d#(sden,sides=1,cyl=80,dir=17,name="xtrsutil",q=n,abs)
 import -n export.bas export/bas:#D#
 import export.cmd export/cmd:#D#
-import -n export.z export/z:#D#
+import -n export.z80 export/z80:#D#
 import -n import.bas import/bas:#D#
 import import.cmd import/cmd:#D#
-import -n import.z import/z:#D#
-import -n settime.z settime/z:#D#
+import -n import.z80 import/z80:#D#
+import -n settime.z80 settime/z80:#D#
 import settime.cmd settime/cmd:#D#
 import -n xtrsemt.ccc xtrsemt/ccc:#D#
 import -n xtrsemt.h xtrsemt/h:#D#
 import -n settime.ccc settime/ccc:#D#
 import -n m1format.fix m1format/fix:#D#
 import xtrshard.dct xtrshard/dct:#D#
-import -n xtrshard.z xtrshard/z:#D#
+import -n xtrshard.z80 xtrshard/z80:#D#
 import xtrs8.dct xtrs8/dct:#D#
-import -n xtrs8.z xtrs8/z:#D#
+import -n xtrs8.z80 xtrs8/z80:#D#
 import xtrsmous.cmd xtrsmous/cmd:#D#
-import -n xtrsmous.z xtrsmous/z:#D#
+import -n xtrsmous.z80 xtrsmous/z80:#D#
 import -n cd.ccc cd/ccc:#D#
 import -n pwd.ccc pwd/ccc:#D#
 import -n unix.ccc unix/ccc:#D#

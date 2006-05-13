@@ -215,81 +215,8 @@ static int hrg_enable = 0;
 static int hrg_addr = 0;
 static void hrg_update_char(int position);
 
-/*
- * Key event queueing routines
- */
-#define KEY_QUEUE_SIZE	(32)
-static int key_queue[KEY_QUEUE_SIZE];
-static int key_queue_head;
-static int key_queue_entries;
-static int key_immediate;
-
 /* dummy buffer for stat() call */
 struct stat statbuf;
-
-void clear_key_queue()
-{
-  key_queue_head = 0;
-  key_queue_entries = 0;
-#if QDEBUG
-    debug("clear_key_queue\n");
-#endif
-}
-
-void queue_key(int state)
-{
-  key_queue[(key_queue_head + key_queue_entries) % KEY_QUEUE_SIZE] = state;
-#if QDEBUG
-  debug("queue_key 0x%x\n", state);
-#endif
-  if (key_queue_entries < KEY_QUEUE_SIZE) {
-    key_queue_entries++;
-  } else {
-#if QDEBUG
-    debug("queue_key overflow\n");
-#endif
-  }
-}
-
-int dequeue_key()
-{
-  int rval = -1;
-
-  if(key_queue_entries > 0)
-    {
-      rval = key_queue[key_queue_head];
-      key_queue_head = (key_queue_head + 1) % KEY_QUEUE_SIZE;
-      key_queue_entries--;
-#if QDEBUG
-      debug("dequeue_key 0x%x\n", rval);
-#endif
-    }
-  return rval;
-}
-
-int trs_next_key(int wait)
-{
-#if KBWAIT
-  if (wait) {
-    int rval;
-    for (;;) {
-      if ((rval = dequeue_key()) >= 0) break;
-      if ((z80_state.nmi && !z80_state.nmi_seen) ||
-	  (z80_state.irq && z80_state.iff1) ||
-	  trs_event_scheduled() || key_immediate) {
-	rval = -1;
-	break;
-      }
-      trs_paused = 1;
-      pause();			/* Wait for SIGALRM or SIGIO */
-      trs_get_event(0);
-    }
-    return rval;
-  }
-#endif
-  return dequeue_key();
-
-}
 
 /* Private routines */
 void bitmap_init();
@@ -980,7 +907,6 @@ void trs_get_event(int wait)
     (void)trs_uart_check_avail();
   }
 
-  key_immediate = 0;
   do {
     if (wait) {
       XNextEvent(display, &event);
@@ -1033,22 +959,22 @@ void trs_get_event(int wait)
       case XK_F10:
 	trs_reset(0);
 	key = 0;
-	key_immediate = 1;
+	trs_end_kbwait();
 	break;
       case XK_F9:
 	trs_debug();
 	key = 0;
-	key_immediate = 1;
+	trs_end_kbwait();
 	break;
       case XK_F8:
 	trs_exit();
 	key = 0;
-	key_immediate = 1;
+	trs_end_kbwait();
 	break;
       case XK_F7:
 	trs_disk_change_all();
 	key = 0;
-	key_immediate = 1;
+	trs_end_kbwait();
 	break;
       default:
 	break;

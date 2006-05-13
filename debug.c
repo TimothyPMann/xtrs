@@ -437,7 +437,7 @@ static void debug_run()
 			 * watch_triggered flag so that we stop after all
 			 * watchpoints have been processed.
 			 */
-			printf("Memory location 0x%.4x changed value from"
+			printf("Memory location 0x%.4x changed value from "
 			       "0x%.2x to 0x%.2x.\n", trap_table[i].address,
 			       trap_table[i].byte, byte);
 			trap_table[i].byte = byte;

@@ -19,9 +19,6 @@
 #include <string.h>
 #include "load_cmd.h"
 
-#define STATE_NORMAL 0
-#define STATE_
-
 int
 load_cmd(FILE* f, unsigned char memory[1<<16],
 	 unsigned char* loadmap, int verbosity, FILE* outf,
@@ -136,6 +133,9 @@ load_cmd(FILE* f, unsigned char memory[1<<16],
 	if (v == EOF) return LOAD_CMD_EOF;
       }
       if (isam != -1) return status;
+      if (verbosity >= VERBOSITY_MAP) {
+	fprintf(outf, "seek ptr = 0x%06lx\n", ftell(f));
+      }      
       break;
 	    
     case 5: /* module header */

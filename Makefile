@@ -96,19 +96,19 @@ MISC = \
 	export.bas \
 	export.cmd \
 	export.lst \
-	export.z \
+	export.z80 \
 	hardfmt.txt \
 	hex2cmd.txt \
 	import.bas \
 	import.cmd \
 	import.lst \
-	import.z \
+	import.z80 \
 	m1format.fix \
 	mkdisk.txt \
 	settime.ccc \
 	settime.cmd \
 	settime.lst \
-	settime.z \
+	settime.z80 \
 	utility.dsk \
 	utility.jcl \
 	cpmutil.dsk \
@@ -117,10 +117,10 @@ MISC = \
 	xtrsemt.h \
 	xtrshard.dct \
 	xtrshard.lst \
-	xtrshard.z \
+	xtrshard.z80 \
 	xtrsmous.cmd \
 	xtrsmous.lst \
-	xtrsmous.z
+	xtrsmous.z80
 
 Z80CODE = export.cmd import.cmd settime.cmd xtrsmous.cmd \
 	xtrs8.dct xtrshard.dct \
@@ -150,16 +150,16 @@ CFLAGS = $(DEBUG) $(ENDIAN) $(DEFAULT_ROM) $(READLINE) $(DISKDIR) $(IFLAGS) \
 LIBS = $(XLIB) $(READLINELIBS) $(EXTRALIBS)
 
 ZMACFLAGS = -h
-.SUFFIXES:	.z .cmd .dct .man .txt .hex
-.z.cmd:
+.SUFFIXES:	.z80 .cmd .dct .man .txt .hex
+.z80.cmd:
 	zmac $(ZMACFLAGS) $<
 	hex2cmd $*.hex > $*.cmd
 	rm -f $*.hex
-.z.dct:
+.z80.dct:
 	zmac $(ZMACFLAGS) $<
 	hex2cmd $*.hex > $*.dct
 	rm -f $*.hex
-.z.hex:
+.z80.hex:
 	zmac $(ZMACFLAGS) $<
 .man.txt:
 	nroff -man -c -Tascii $< | colcrt - | cat -s > $*.txt
