@@ -35,7 +35,6 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/file.h>
-#include <malloc.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -53,6 +52,7 @@
 #include "z80.h"
 #include "trs_disk.h"
 #include "trs_uart.h"
+#include "trs_imp_exp.h"
 
 #define DEF_FONT1	"-misc-fixed-medium-r-normal--20-200-75-75-*-100-iso8859-1"
 #define DEF_WIDEFONT1	"-misc-fixed-medium-r-normal--20-200-75-75-*-200-iso8859-1"
@@ -151,6 +151,8 @@ static XrmOptionDescRec opts[] = {
 #if __linux
 {"-sb",         "*sb",          XrmoptionSepArg,        (caddr_t)NULL},
 #endif /* linux */
+{"-emtsafe",    "*emtsafe",     XrmoptionNoArg,         (caddr_t)"on"},
+{"-noemtsafe",  "*emtsafe",     XrmoptionNoArg,         (caddr_t)"off"},
 };
 
 static int num_opts = (sizeof opts / sizeof opts[0]);
@@ -302,6 +304,15 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
   }
   setuid(getuid());
 #endif /* linux */
+
+  (void) sprintf(option, "%s%s", program_name, ".emtsafe");
+  if (XrmGetResource(x_db, option, "Xtrs.Emtsafe", &type, &value)) {
+    if (strcmp(value.addr,"on") == 0) {
+      trs_emtsafe = True;
+    } else if (strcmp(value.addr,"off") == 0) {
+      trs_emtsafe = False;
+    }
+  }
 
   (void) sprintf(option, "%s%s", program_name, ".debug");
   if (XrmGetResource(x_db, option, "Xtrs.Debug", &type, &value)) {
@@ -866,7 +877,9 @@ void trs_event_init()
   sigaction(SIGIO, &sa, NULL);
 
   fd = ConnectionNumber(display);
-  (void) fcntl(fd, F_SETOWN, getpid()); /* is this needed? */
+  if (fcntl(fd, F_SETOWN, getpid()) != 0) {  /* is this needed? */
+    error("fcntl F_SETOWN error: %s", strerror(errno));
+  }
   if (fcntl(fd, F_SETFL, FASYNC) != 0) {
     error("fcntl F_SETFL async error: %s", strerror(errno));
   }

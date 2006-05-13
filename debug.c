@@ -21,7 +21,6 @@
 #include "z80.h"
 #include "trs.h"
 
-#include <malloc.h>
 #include <stdlib.h>
 #include <signal.h>
 #include <errno.h>

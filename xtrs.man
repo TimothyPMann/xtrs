@@ -468,39 +468,43 @@ and write external Unix files, discussed further at the end of this section.
 
 The emulated floppy \fIutility.dsk\fP contains some programs for
 transferring data between the emulator and ordinary Unix files.
-IMPORT/CMD, IMPORT/BAS, EXPORT/CMD, EXPORT/BAS, and SETTIME/CMD run on
+IMPORT/CMD, EXPORT/CMD, and SETTIME/CMD run on
 the emulator under Model I/III TRSDOS, Model I/III LDOS, Model I/III
 Newdos/80, and Model 4/4P TRSDOS/LS-DOS 6; they may also work under
 other TRS-80 operating systems.  Model III TRSDOS users will have to
 use TRSDOS's CONVERT command to read utility.dsk.
 
 IMPORT/CMD imports a Unix file and writes it to an emulated disk.
-Usage: \fIIMPORT [-ln] unixfile [trsfile]\fP.  The -n flag converts
+Usage: \fIIMPORT [-lne] unixfile [trsfile]\fP.  The -n flag converts
 Unix newlines (\\n) to TRS-80 newlines (\\r).  The -l flag converts
 the Unix filename to lower case, to compensate for TRS-80 operating
 systems such as Newdos/80 that convert all command line arguments to
 upper case.  When using the -l flag, you can put a [ or up-arrow in
-front of a character to keep it in upper case.  If the destination
-file is omitted, IMPORT uses the last component of the Unix pathname,
-but with any "." changed to "/" to match TRS-80 DOS file extension
-syntax.
-
-IMPORT/BAS is a much slower program that performs the same function as
-IMPORT/CMD but may work under more operating systems.  Simply run it
-under Disk Basic and answer the prompts.
+front of a character to keep it in upper case.  Give the -e flag if
+your TRS-80 operating system uses the Newdos/80 convention for
+representing the ending record number in an open file control block.
+This should be detected automatically for Newdos/80 itself and for
+TRSDOS 1.3, but you'll need to give the flag for DOSPLUS and possibly
+other non-LDOS operating systems.  If you need the flag but don't give
+it (or vice versa), imported files will come out the wrong length.  If
+the destination file is omitted, IMPORT uses the last component of the
+Unix pathname, but with any "." changed to "/" to match TRS-80 DOS
+file extension syntax.
 
 EXPORT/CMD reads a file from an emulated disk and exports it to a Unix
-file. Usage: \fIEXPORT [-ln] trsfile [unixfile]\fP.  The -n flag
+file. Usage: \fIEXPORT [-lne] trsfile [unixfile]\fP.  The -n flag
 converts TRS-80 newlines (\\r) to Unix newlines (\\n).  The -l flag
 converts the Unix filename to lower case.  When using the -l flag, you
 can put a [ or up-arrow in front of a character to keep it in upper
-case.  If the destination file is omitted, EXPORT uses the TRS-80
-filename, but with any "/" changed to "." to match Unix file extension
-syntax.
-
-EXPORT/BAS is a much slower program that performs the same function as
-EXPORT/CMD but may work under more operating systems.  Simply run it
-under Disk Basic and answer the prompts.
+case.  Give the -e flag if your TRS-80 operating system uses the
+Newdos/80 convention for representing the ending record number in an
+open file control block.  This should be detected automatically for
+Newdos/80 itself and for TRSDOS 1.3, but you'll need to give the flag
+for DOSPLUS and possibly other non-LDOS operating systems.  If you
+need the flag but don't give it (or vice versa), exported files will
+come out the wrong length.  If the destination file is omitted, EXPORT
+uses the TRS-80 filename, but with any "/" changed to "." to match
+Unix file extension syntax.
 
 SETTIME/CMD reads the date and time from Unix and sets the TRS-80
 DOS's date and time accordingly.
@@ -552,28 +556,12 @@ programs for Montezuma CP/M, written by Roland Gerlach.  It was
 formatted as a "Montezuma Micro Standard DATA disk (40T, SS, DD,
 200K)," with 512-byte sectors.  Be careful to configure your CP/M to
 the proper disk format and drive parameters (40 track, not 80), or you
-will have confusing problems reading this disk.  Source code is
-included on the floppy; please pass any improvements you make back to
-the author.  See http://www.rkga.com.au/~roland/trs-80/cpm-xtrs/,
+will have confusing problems reading this disk.  Documentation is
+included in the file cpmutil.html and source code in the file
+cpmutil.tgz (a gzipped tar archive).  
+See http://members.optusnet.com.au/~rgerlach/trs-80/cpmutil.html
 where you will sometimes find a newer version of the utilities
 than is included with xtrs.
-
-IMPORT.COM imports a Unix file and writes it to an emulated CP/M disk.
-Usage: \fIIMPORT [-n] [unixfile [cpmfile]]\fP.  The -n flag converts
-Unix newlines (\\n) to CP/M newlines (\\r\\n).  If the second filename
-is omitted, it is taken to be the same as the first. If both names are
-omitted, the program prompts for filenames.  Note that the CP/M CCP
-converts all command line arguments to upper case, which is
-inconvenient if your Unix file names are in lower case; in that case
-you'll need to let the program prompt for the filenames.
-
-EXPORT.COM reads a file from an emulated CP/M disk and exports it to a
-Unix file.  Usage: \fIEXPORT cpmfile [$[T][L]]\fP.  The cpmfile name
-can use ? and * as wildcard characters.  The $T flag converts CP/M
-newlines (\\r\\n) to Unix newlines (\\n).  The $L flag converts the
-CP/M filename to lowercase to form the Unix filename; note that the
-CP/M CCP converts all command line arguments to upper case, so you
-need $L even if you typed the CP/M name in lower case.
 
 The emulator implements a set of pseudo-instructions (emulator traps)
 that give TRS-80 programs access to Unix files.  The programs listed
@@ -582,11 +570,7 @@ the traps are documented in the file trs_imp_exp.h.  Assembler
 source code for the existing programs is supplied in xtrshard.z,
 import.z, export.z, and settime.z.  You can also write programs that
 use the traps in Misosys C, using the files xtrsemt.h and xtrsemt.ccc
-as an interface; a simple example is in settime.ccc.  The Basic
-programs import.bas and export.bas should not be used as a basis for
-further development, however; they use an old, slow mechanism in the
-emulator that may be removed in a future release rather than the
-emulator traps.
+as an interface; a simple example is in settime.ccc. 
 .SH Interrupts
 The emulator supports only interrupt mode 1.  It will complain if your
 program enables interrupts after powerup without executing an IM 1
@@ -979,7 +963,15 @@ no serial port.
 Set the sense switches on the Model I serial port card.  This option
 is meaningful only in Model I mode, and only when the -serial option
 is not set to "".  The default value is 0x6f, which Radio Shack software
-conventionally interprets as 9600 bps, 8 bits/word, no parity, 1 stop bit.
+conventionally interprets as 9600 bps, 8 bits/word, no parity, 1 stop
+bit.
+.TP
+.B \-emtsafe
+Disable emulator traps (see "Data import and export") that could write
+to host files other than disk images in the original diskdir.
+.TP
+.B \-noemtsafe
+The opposite of -emtsafe.  This setting is the default.
 .SH Additional resources
 There are many other TRS-80 resources available on the Web, including
 shareware and freeware emulators that run under MSDOS and other
@@ -1066,9 +1058,10 @@ Mueller added the -borderwidth option, improved the -scale option and
 the bitmap font scaling, ported the import, export, and settime
 utilities to Newdos/80, and contributed the HRG1B emulation.  Branden
 Robinson supplied the first version of the cassette man page, fixed
-Makefile bugs, and translated cassette to the Bourne shell.  Mark
-McDougall provided documentation for the Micro Labs Grafyx Solution
-card.  Jenz Guenther added the -title option and contributed code to
-emulate the GENIE (German Model I clone).  Joe Peterson contributed
-code to emulate the TimeDate80.  Denis Leconte contributed part of the
--scale implementation.
+Makefile bugs, translated cassette to the Bourne shell, and
+implemented watchpoints in zbx.  Mark McDougall provided documentation
+for the Micro Labs Grafyx Solution card.  Jenz Guenther added the
+-title option and contributed code to emulate the GENIE (German Model
+I clone).  Joe Peterson contributed code to emulate the TimeDate80 and
+the -emtsafe feature.  Denis Leconte contributed part of the -scale
+implementation.

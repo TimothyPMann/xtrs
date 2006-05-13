@@ -2,12 +2,24 @@
 ;; Timothy Mann, 8/24/97
 ;; $Date$
 ;;
-;; Use xtrs 1.9 emulator traps to copy a file from TRS-80 to Unix
-;; Usage: EXPORT [-ln] fromfile [unixfile]
+;;	Copyright (c) 1997, Timothy Mann
+;;
+;;	This software may be copied, modified, and used for any
+;;	purpose without fee, provided that (1) the above copyright
+;;	notice is retained, and (2) modified versions are clearly
+;;	marked as having been modified, with the modifier's name and
+;;	the date included.  
+;;
+;; Use xtrs emulator traps to copy a file from TRS-80 to Unix
+;; Usage: EXPORT [-lne] fromfile [unixfile]
 ;; Parameter -l will convert the Unix file to lower case.
 ;;  (Needed for NEWDOS/80.  They insist on uppercasing the command line.)
 ;; If the -n parameter is given, each carriage return ('\r')
 ;;  in the TRS-80 file is converted to a newline ('\n') in the Unix file.
+;; The program tries to determine what DOS it is running on and use
+;;  the correct FCB end of file convention, but this works only on
+;;  TRSDOS, LDOS, and NEWDOS/80.  For other DOSes that use the
+;;  NEWDOS/80 convention (such as DOSPLUS), give the -e paramter.
 ;; If the unixfile parameter is omitted, the fromfile parameter is used,
 ;;  with '/' changed to '.'.
 
@@ -104,6 +116,9 @@ startj6:
 	call getern6
 	ret
 
+; Nonzero for LDOS ern convention
+ernldos: db 1
+
 ; Emulator trap instructions, byte-reversed for use in defw:
 emt_open	equ 30edh
 emt_close	equ 31edh
@@ -132,6 +147,12 @@ export:
 	ldir
 	pop hl
 not4:
+	ld a, (4427h)		; system id for Newdos/80...
+	sub 82h			; ...should be 82h (v2.0)
+	jr z, gotid
+	ld a, (441fh)		; system version number for most other DOSes
+	sub 13h			; TRSDOS 1.3?
+gotid:  ld (ernldos), a
 
 flag0:	ld a, (hl)		; look for flags
 	cp ' '
@@ -144,13 +165,17 @@ flag1:	cp '-'
 	inc hl
 	ld a, (hl)
 flag3:	or 20h
-	cp 'l'
+	cp 'e'
+	jr nz, flagl
+	ld (ernldos), a
+	jr flag2
+flagl:	cp 'l'
 	jr nz, flagn		; check for next flag
 	ld a, 1
 	ld (lflag), a
 	jr flag2
 flagn:	cp 'n'
-	jp nz, usage		; only -n or -N is accepted
+	jp nz, usage		; unknown flag
 	ld a, 1
 	ld (nflag), a
 flag2:	inc hl
@@ -340,27 +365,25 @@ lconv2:	ld (de), a
 	pop hl
 	ret
 
-;; EOF handling is different for NEWDOS/80 and TRSDOS 1.3:
+;; EOF handling differs between TRS-80 DOSes:
 ;;  For TRSDOS 2.3 and LDOS, word (dcb+12) contains the number of
 ;;  256 byte records in the file, byte (dcb+8) contains the EOF
 ;;  offset in the last record (0=256).
 ;;  For NEWDOS/80 and TRSDOS 1.3, byte (dcb+8) and word (dcb+12) 
 ;;  form a 24 bit number containing the relative byte address of EOF.
 ;;  Thus (dcb+12) differs by one if the file length is not a
-;;  multiple of 256 bytes.
+;;  multiple of 256 bytes.  DOSPLUS also uses this convention,
+;;  and NEWDOS 2.1 probably does too (not checked).
 
 ; Returns number of (partial or full) records in BC, destroys A
 getern5:
 	ld bc, (dcb+12)
-	ld a, (4427h)		; system id for Newdos/80...
-	cp 82h			; ...should be 82h (v2.0)
-	jr z, adj
-	ld a, (441fh)		; system version number for most other DOSes
-	cp 13h			; TRSDOS 1.3?
-	ret nz
-adj:	ld a, (dcb+8)		; length multiple of 256 bytes?
+	ld a, (ernldos)         ; get ERN convention
 	and a
-	ret z
+	ret nz                  ; done if TRSDOS 2.3/LDOS convention
+	ld a, (dcb+8)		; length multiple of 256 bytes?
+	and a
+	ret z                   ; done if so
 	inc bc			; no, # of records = last full record + 1
 	ret	
 
@@ -373,7 +396,7 @@ lflag:	defb 0
 nflag:	defb 0
 lfname:	defw 0
 
-usager: defb 'Usage: EXPORT [-ln] fromfile [unixfile]', 0dh
+usager: defb 'Usage: EXPORT [-lne] fromfile [unixfile]', 0dh
 uopner:	defb 'Error in Unix open: ', 03h
 uwrer:	defb 'Error in Unix write: ', 03h
 uclser:	defb 'Error in Unix close: ', 03h

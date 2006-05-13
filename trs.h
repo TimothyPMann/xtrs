@@ -40,6 +40,7 @@ extern int trs_continuous; /* 1= run continuously,
 			      0= enter debugger after instruction,
 			     -1= suppress interrupt and enter debugger */
 extern int trs_disk_debug_flags;
+extern int trs_emtsafe;
 
 extern int trs_parse_command_line(int argc, char **argv, int *debug);
 
@@ -66,6 +67,7 @@ extern void trs_xlate_keysym(int keysym);
 extern void queue_key(int key);
 extern int dequeue_key(void);
 extern void clear_key_queue(void);
+extern void trs_end_kbwait(void);
 extern int stretch_amount;
 
 extern void trs_get_event(int wait);

@@ -28,7 +28,6 @@
 
 #include "z80.h"
 #include "trs.h"
-#include <malloc.h>
 #include <stdlib.h>
 #include "trs_disk.h"
 #include "trs_hard.h"

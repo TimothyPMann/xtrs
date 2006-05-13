@@ -14,8 +14,7 @@
  */
 
 /*
-   Modified by Timothy Mann, 1996
-   Last modified on Sat Feb 17 17:32:18 PST 2001 by mann
+   Modified by Timothy Mann, 1996 and following.
 */
 
 /*#define PORTDEBUG1 1*/
@@ -25,7 +24,6 @@
 
 #include "z80.h"
 #include "trs.h"
-#include "trs_imp_exp.h"
 #include "trs_disk.h"
 #include "trs_hard.h"
 #include "trs_uart.h"
@@ -54,12 +52,6 @@ void z80_out(int port, int value)
   case TRS_HARD_SDH:      /* 0xCE */
   case TRS_HARD_STATUS:   /* 0xCF */ /*=TRS_HARD_COMMAND*/
     trs_hard_out(port, value);
-    break;
-  case IMPEXP_CMD:        /* 0xD0 */
-    trs_impexp_cmd_write(value);
-    break;
-  case IMPEXP_DATA:       /* 0xD1 */
-    trs_impexp_data_write(value);
     break;
   case TRS_UART_RESET:    /* 0xE8 */
     trs_uart_reset_out(value);
@@ -331,10 +323,6 @@ int z80_in(int port)
   case TRS_HARD_SDH:      /* 0xCE */
   case TRS_HARD_STATUS:   /* 0xCF */ /*=TRS_HARD_COMMAND*/
     return trs_hard_in(port);
-  case IMPEXP_STATUS:     /* 0xD0 */
-    return trs_impexp_status_read();
-  case IMPEXP_DATA:       /* 0xD1 */
-    return trs_impexp_data_read();
   case TRS_UART_MODEM:    /* 0xE8 */
     return trs_uart_modem_in();
   case TRS_UART_SWITCHES: /* 0xE9 */
@@ -393,10 +381,6 @@ int z80_in(int port)
     case TRS_HARD_STATUS:  /* 0xCF */ /*=TRS_HARD_COMMAND*/
       return trs_hard_in(port);
       break;
-    case IMPEXP_STATUS: /* 0xD0 */
-      return trs_impexp_status_read();
-    case IMPEXP_DATA: /* 0xD1 */
-      return trs_impexp_data_read();
     case 0xE0:
       return trs_interrupt_latch_read();
     case 0xEC:

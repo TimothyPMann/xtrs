@@ -1,10 +1,8 @@
 . Note: Use TRSDOS 6.2.1 to get old-style dates and
 . thus avoid password problems with other DOSes.
 format :#d#(sden,sides=1,cyl=80,dir=17,name="xtrsutil",q=n,abs)
-import -n export.bas export/bas:#D#
 import export.cmd export/cmd:#D#
 import -n export.z80 export/z80:#D#
-import -n import.bas import/bas:#D#
 import import.cmd import/cmd:#D#
 import -n import.z80 import/z80:#D#
 import -n settime.z80 settime/z80:#D#
@@ -36,5 +34,5 @@ import unix6.cmd unix6/cmd:#D#
 import mount6.cmd mount6/cmd:#D#
 import umount6.cmd umount6/cmd:#D#
 import truedam6.cmd truedam6/cmd:#D#
-import dpexport.pat dpexport/pat:#D#
-import dpimport.pat dpimport/pat:#D#
+import -n expall.bas expall/bas:#D#
+import -n do6.jcl do6/jcl:#D#

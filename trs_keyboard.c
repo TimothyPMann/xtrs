@@ -29,6 +29,7 @@
 #include "trs.h"
 #include <X11/keysym.h>
 #include <X11/X.h>
+#include <unistd.h>
 
 /*
  * Key event queue
@@ -981,7 +982,7 @@ int dequeue_key()
   return rval;
 }
 
-int
+void
 trs_end_kbwait()
 {
   key_immediate = 1;

@@ -89,17 +89,14 @@ MISC = \
 	Makefile \
 	Makefile.local \
 	README \
-	README-1.0 \
 	cassette \
 	cassette.txt \
 	cmddump.txt \
-	export.bas \
 	export.cmd \
 	export.lst \
 	export.z80 \
 	hardfmt.txt \
 	hex2cmd.txt \
-	import.bas \
 	import.cmd \
 	import.lst \
 	import.z80 \

@@ -5,8 +5,6 @@
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
 
-/* Last modified on Fri Dec 15 15:23:50 PST 2000 by mann */
-
 /*
  * trs_imp_exp.c
  *
@@ -28,6 +26,13 @@
 #include "trs.h"
 #include "trs_disk.h"
 
+/*
+   If the following option is set, potentially dangerous emulator traps
+   will be blocked, including file writes to the host filesystem and shell
+   command execution.
+ */
+int trs_emtsafe = 0;
+
 /* New emulator traps */
 
 #define MAX_OPENDIR 32
@@ -43,6 +48,12 @@ OpenDisk od[MAX_OPENDISK];
 void do_emt_system()
 {
   int res;
+  if (trs_emtsafe) {
+    error("potentially dangerous emulator trap blocked");
+    REG_A = EACCES;
+    REG_F &= ~ZERO_MASK;
+    return;
+  }
   res = system((char *)mem_pointer(REG_HL, 0));
   if (res == -1) {
     REG_A = errno;
@@ -122,6 +133,12 @@ void do_emt_getddir()
 
 void do_emt_setddir()
 {
+  if (trs_emtsafe) {
+    error("potentially dangerous emulator trap blocked");
+    REG_A = EACCES;
+    REG_F &= ~ZERO_MASK;
+    return;
+  }
   trs_disk_dir = strdup((char *)mem_pointer(REG_HL, 0));
   if (trs_disk_dir[0] == '~' &&
       (trs_disk_dir[1] == '/' || trs_disk_dir[1] == '\0')) {
@@ -158,6 +175,12 @@ void do_emt_open()
   if (eoflag & EO_TRUNC)  oflag |= O_TRUNC;
   if (eoflag & EO_APPEND) oflag |= O_APPEND;
 
+  if (trs_emtsafe && oflag != O_RDONLY) {
+    error("potentially dangerous emulator trap blocked");
+    REG_A = EACCES;
+    REG_F &= ~ZERO_MASK;
+    return;
+  }
   fd = open((char *)mem_pointer(REG_HL, 0), oflag, REG_DE);
   if (fd >= 0) {
     REG_A = 0;
@@ -206,6 +229,12 @@ void do_emt_read()
 void do_emt_write()
 {
   int size;
+  if (trs_emtsafe) {
+    error("potentially dangerous emulator trap blocked");
+    REG_A = EACCES;
+    REG_F &= ~ZERO_MASK;
+    return;
+  }
   if (REG_HL + REG_BC > 0x10000) {
     REG_A = EFAULT;
     REG_F &= ~ZERO_MASK;
@@ -409,7 +438,14 @@ void do_emt_readdir()
 
 void do_emt_chdir()
 {
-  int ok = chdir((char *)mem_pointer(REG_HL, 0));
+  int ok;
+  if (trs_emtsafe) {
+    error("potentially dangerous emulator trap blocked");
+    REG_A = EACCES;
+    REG_F &= ~ZERO_MASK;
+    return;
+  }
+  ok = chdir((char *)mem_pointer(REG_HL, 0));
   if (ok < 0) {
     REG_A = errno;
     REG_F &= ~ZERO_MASK;
@@ -522,6 +558,12 @@ void do_emt_ftruncate()
 {
   int i, result;
   off_t offset;
+  if (trs_emtsafe) {
+    error("potentially dangerous emulator trap blocked");
+    REG_A = EACCES;
+    REG_F &= ~ZERO_MASK;
+    return;
+  }
   if (REG_HL + 8 > 0x10000) {
     REG_A = EFAULT;
     REG_F &= ~ZERO_MASK;
@@ -565,6 +607,13 @@ void do_emt_opendisk()
   if (eoflag & EO_EXCL)   oflag |= O_EXCL;
   if (eoflag & EO_TRUNC)  oflag |= O_TRUNC;
   if (eoflag & EO_APPEND) oflag |= O_APPEND;
+
+  if (trs_emtsafe && oflag != O_RDONLY) {
+    error("potentially dangerous emulator trap blocked");
+    REG_A = EACCES;
+    REG_F &= ~ZERO_MASK;
+    return;
+  }
 
   if (*name == '/' || *trs_disk_dir == '\0') {
     qname = strdup(name);
@@ -630,136 +679,4 @@ void do_emt_closedisk()
     REG_A = errno;
     REG_F &= ~ZERO_MASK;
   }
-}
-
-
-/* Old kludgey way using i/o ports */
-
-typedef struct {
-  FILE* f;
-  unsigned char cmd;
-  unsigned char status;
-  char filename[IMPEXP_MAX_CMD_LEN+1];
-  int len;
-} Channel;
-
-Channel ch;
-
-static void
-reset()
-{
-  if (ch.f) {
-    int v;
-    v = fclose(ch.f);
-    ch.f = NULL;
-    if (v == 0) {
-      ch.status = IMPEXP_EOF;
-    } else {
-      ch.status = errno;
-      if (ch.status == 0) ch.status = IMPEXP_UNKNOWN_ERROR;
-    }
-  } else {
-    ch.status = IMPEXP_EOF;
-  }
-  ch.cmd = IMPEXP_CMD_RESET;
-  ch.len = 0;
-}
-
-/* Common routine for writing file names */
-static void
-filename_write(char* dir, unsigned char data)
-{
-  if (ch.len < IMPEXP_MAX_CMD_LEN) {
-    ch.filename[ch.len++] = data;
-  }
-  if (data == 0) {
-    ch.f = fopen(ch.filename, dir);
-    if (ch.f == NULL) {
-      ch.status = errno;
-      if (ch.status == 0) {
-	/* Bogus popen, doesn't set errno */
-	ch.status = IMPEXP_UNKNOWN_ERROR;
-      }
-      ch.cmd = IMPEXP_CMD_RESET;
-    } else {
-      ch.status = IMPEXP_EOF;
-    }
-  }
-}
-
-void
-trs_impexp_cmd_write(unsigned char data)
-{
-  switch (data) {
-  case IMPEXP_CMD_RESET:
-  case IMPEXP_CMD_EOF:
-    reset();
-    break;
-  case IMPEXP_CMD_IMPORT:
-  case IMPEXP_CMD_EXPORT:
-    if (ch.cmd != IMPEXP_CMD_RESET) reset();
-    ch.cmd = data;
-    break;
-  }
-}
-
-unsigned char
-trs_impexp_status_read()
-{
-  return ch.status;
-}
-
-void
-trs_impexp_data_write(unsigned char data)
-{
-  int c;
-  switch (ch.cmd) {
-  case IMPEXP_CMD_RESET:
-  case IMPEXP_CMD_EOF:
-    /* ignore */
-    break;
-  case IMPEXP_CMD_IMPORT:
-    if (ch.f != NULL) {
-      /* error; ignore */
-    } else {
-      filename_write("r", data);
-    }
-    break;
-  case IMPEXP_CMD_EXPORT:
-    if (ch.f != NULL) {
-      c = putc(data, ch.f);
-      if (c == EOF) {
-	reset();
-      }
-    } else {
-      filename_write("w", data);
-    }
-    break;
-  }	
-}
-
-unsigned char
-trs_impexp_data_read()
-{
-  switch (ch.cmd) {
-  case IMPEXP_CMD_RESET:
-  case IMPEXP_CMD_EOF:
-    break;
-  case IMPEXP_CMD_IMPORT:
-    if (ch.f != NULL) {
-      int c = getc(ch.f);
-      if (c == EOF) {
-	reset();
-      } else {
-	ch.status = IMPEXP_MORE_DATA;
-	return c;
-      }
-    }
-    break;
-  case IMPEXP_CMD_EXPORT:
-    break;
-  }	
-  /* Return end of file or error */
-  if (ch.status == 0) ch.status = IMPEXP_EOF;
-  return IMPEXP_EOF;
 }
