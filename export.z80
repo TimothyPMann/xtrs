@@ -167,6 +167,7 @@ flag1:	cp '-'
 flag3:	or 20h
 	cp 'e'
 	jr nz, flagl
+	sub a
 	ld (ernldos), a
 	jr flag2
 flagl:	cp 'l'
