@@ -14,8 +14,8 @@
  */
 
 /*
-   Modified by Timothy Mann, 1996
-   Last modified on Thu Sep 24 16:37:40 PDT 1998 by mann
+   Modified by Timothy Mann, 1996 and later
+   $Id$
 */
 
 #ifndef _Z80_H

@@ -1,11 +1,10 @@
 /* Copyright (c) 2000, Timothy Mann */
+/* $Id$ */
 
 /* This software may be copied, modified, and used for any purpose
  * without fee, provided that (1) the above copyright notice is
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
-
-/* Last modified on Thu May 18 00:42:46 PDT 2000 by mann */
 
 /*
  * Emulation of the Radio Shack TRS-80 Model I/III/4/4P serial port.

@@ -14,8 +14,8 @@
  */
 
 /*
-   Modified by Timothy Mann, 1996
-   Last modified on Tue May  1 20:29:21 PDT 2001 by mann
+   Modified by Timothy Mann, 1996-2008
+   $Id$
 */
 
 /*
@@ -67,13 +67,12 @@ extern void trs_xlate_keysym(int keysym);
 extern void queue_key(int key);
 extern int dequeue_key(void);
 extern void clear_key_queue(void);
-extern void trs_end_kbwait(void);
+extern void trs_skip_next_kbwait(void);
 extern int stretch_amount;
 
 extern void trs_get_event(int wait);
 extern volatile int x_poll_count;
 extern void trs_x_flush(void);
-extern volatile int x_flush_needed;
 
 extern void trs_printer_write(int value);
 extern int trs_printer_read(void);

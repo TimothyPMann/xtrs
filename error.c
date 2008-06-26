@@ -13,6 +13,11 @@
  * must retain this notice.
  */
 
+/*
+   Modified by Timothy Mann, 1996 and later
+   $Id$
+*/
+
 #include "z80.h"
 #include <stdarg.h>
 #include <string.h>

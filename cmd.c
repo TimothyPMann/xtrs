@@ -1,12 +1,11 @@
 /* Routines to write a TRS-80 DOS "/cmd" file */
 /* Copyright (c) 1996, Timothy Mann */
+/* $Id$ */
 
 /* This software may be copied, modified, and used for any purpose
  * without fee, provided that (1) the above copyright notice is
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
-
-/* Last modified on Wed Aug 13 19:46:49 PDT 1997 by mann */
 
 #include <stdio.h>
 

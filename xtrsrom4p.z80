@@ -19,6 +19,8 @@
 ; freely avaliable, though Roy Soltoff holds the copyright to it,
 ; and the Model 4/4P technical reference.
 ;
+; $Id$
+;
 ; 3-19-99, Tim Mann:  Improved disk error handling.  Ruled out 
 ;   attempts to work in plain Model 4 mode. (v0.03)
 ; 4-4-99, Tim Mann:  Made read loop continue until NMI instead of
@@ -28,10 +30,6 @@
 ;
 ; TODO:
 ;   possibly write code for the RST handlers as in the real 4P rom
-;
-; Last modified on Sat Mar 25 21:33:08 PST 2000 by mann 
-;      modified on Mon Mar 15 17:25:49 CST 1999 by petec
-;
 ;------------------------------------------------------------------
 
 ;

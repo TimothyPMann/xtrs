@@ -14,9 +14,9 @@
  */
 
 /*
-   Modified by Timothy Mann, 1996
-   Last modified on Sat May  6 14:53:21 PDT 2000 by mann
-*/
+   Modified by Timothy Mann, 1996 and later
+   $Id$
+ */
 
 /*
  * This module implements cassette I/O, game sound, and Orchestra
@@ -572,7 +572,6 @@ static int assert_state(int state)
       sigset_t set, oldset;
       sigemptyset(&set);
       sigaddset(&set, SIGALRM);
-      sigaddset(&set, SIGIO);
       sigprocmask(SIG_BLOCK, &set, &oldset);
       trs_paused = 1;  /* disable speed measurement for this round */
       fclose(cassette_file);
@@ -745,7 +744,6 @@ transition_out(int value)
 
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);
-  sigaddset(&set, SIGIO);
   sigprocmask(SIG_BLOCK, &set, &oldset);
 
   ddelta_us = (z80_state.t_count - cassette_transition) / z80_state.clockMHz
@@ -951,7 +949,6 @@ transition_in()
 
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);
-  sigaddset(&set, SIGIO);
   sigprocmask(SIG_BLOCK, &set, &oldset);
 
   switch (cassette_format) {
@@ -1265,7 +1262,6 @@ trs_orch90_out(int channels, int value)
   
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);
-  sigaddset(&set, SIGIO);
   sigprocmask(SIG_BLOCK, &set, &oldset);
 
   ddelta_us = (z80_state.t_count - cassette_transition) / z80_state.clockMHz

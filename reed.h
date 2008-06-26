@@ -1,6 +1,7 @@
 /* Matthew Reed's hard drive format.  Thanks to Matthew for providing
    documentation.  The comments below are copied from his mail
    messages, with some additions. */
+/* $Id$ */
 
 typedef struct {
   Uchar id1;       /* 0: Identifier #1: 56H */

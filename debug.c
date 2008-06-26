@@ -14,8 +14,8 @@
  */
 
 /*
-   Modified by Timothy Mann, 1996
-   Last modified on Tue May  1 17:52:20 PDT 2001 by mann
+   Modified by Timothy Mann, 1996 and later
+   $Id$
 */
 
 #include "z80.h"
@@ -478,7 +478,6 @@ void debug_shell()
 
 	sigemptyset(&set);
 	sigaddset(&set, SIGALRM);
-	sigaddset(&set, SIGIO);
 	sigprocmask(SIG_BLOCK, &set, &oldset);
 
 #ifdef READLINE

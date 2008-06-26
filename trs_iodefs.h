@@ -13,6 +13,11 @@
  * must retain this notice.
  */
 
+/*
+   Modified by Timothy Mann, 1996 and later
+   $Id$
+*/
+
 #define MAXCHARS 256
 #define TRS_CHAR_WIDTH 8
 #define TRS_CHAR_HEIGHT 12

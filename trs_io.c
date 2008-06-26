@@ -15,6 +15,7 @@
 
 /*
    Modified by Timothy Mann, 1996 and following.
+   $Id$
 */
 
 /*#define PORTDEBUG1 1*/

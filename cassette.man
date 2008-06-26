@@ -146,3 +146,5 @@ The current version was revised and much extended by Timothy Mann
 An initial version of this man page, and
 the translation from C-shell (cassette) to Bourne shell (cassette.sh),
 are due to Branden Robinson.
+
+$Id$

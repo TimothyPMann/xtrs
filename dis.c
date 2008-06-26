@@ -14,6 +14,11 @@
  */
 
 /*
+   Modified by Timothy Mann, 1996 and later
+   $Id$
+*/
+
+/*
  * dis.c -- a hacked version of "zdis" which can print out instructions
  * as they are executed.
  */

@@ -13,6 +13,8 @@
  * must retain this notice.
  */
 
+/* $Id */
+
 #if defined(sun) && !defined(i386)
 #define big_endian
 #endif

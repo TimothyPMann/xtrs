@@ -1,6 +1,6 @@
-
 #
 # Makefile.local: local customizations for the xtrs Makefile
+# $Id$
 #
 
 # If your machine is not a sun, vax, or DEC MIPS, uncomment the line below
@@ -52,7 +52,7 @@ DISKDIR = -DDISKDIR='"."'
 READLINE = -DREADLINE
 READLINELIBS = -lreadline -lncurses
 
-# If you want to debug the emulator, use the -g flag instead:
+# Select debugging symbols (-g) and/or optimization (-O2, etc.)
 
 DEBUG = -O2 -g
 #DEBUG = -g -DKBDEBUG -DXDEBUG

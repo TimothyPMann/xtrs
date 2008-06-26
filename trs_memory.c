@@ -14,8 +14,8 @@
  */
 
 /*
-   Modified by Timothy Mann, 1996
-   Last modified on Fri Dec 15 15:21:10 PST 2000 by mann
+   Modified by Timothy Mann, 1996 and later
+   $Id$
 */
 
 /*

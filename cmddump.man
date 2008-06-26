@@ -50,3 +50,5 @@ source code.
 See the LDOS Quarterly, April 1, 1982 (Vol 1, No 4), for documentation of
 the TRS-80 DOS /cmd file format.  
 It is available on the Web at http://www.tim-mann.org/misosys.html.
+
+$Id$

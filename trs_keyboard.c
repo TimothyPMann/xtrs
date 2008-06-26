@@ -14,8 +14,8 @@
  */
 
 /*
-   Modified by Timothy Mann, 1996
-   Last modified on Tue May  1 20:32:35 PDT 2001 by mann
+   Modified by Timothy Mann, 1996 and later
+   $Id$
 */
 
 /*#define KBDEBUG 1*/
@@ -38,7 +38,7 @@
 static int key_queue[KEY_QUEUE_SIZE];
 static int key_queue_head;
 static int key_queue_entries;
-static int key_immediate;
+static int skip_next_kbwait;
 
 /*
  * TRS-80 key matrix
@@ -983,9 +983,9 @@ int dequeue_key()
 }
 
 void
-trs_end_kbwait()
+trs_skip_next_kbwait()
 {
-  key_immediate = 1;
+  skip_next_kbwait = 1;
 }
 
 int trs_next_key(int wait)
@@ -997,18 +997,17 @@ int trs_next_key(int wait)
       if ((rval = dequeue_key()) >= 0) break;
       if ((z80_state.nmi && !z80_state.nmi_seen) ||
 	  (z80_state.irq && z80_state.iff1) ||
-	  trs_event_scheduled() || key_immediate) {
+	  trs_event_scheduled() || skip_next_kbwait) {
+	skip_next_kbwait = 0;
 	rval = -1;
 	break;
       }
       trs_paused = 1;
-      pause();			/* Wait for SIGALRM or SIGIO */
-      key_immediate = 0;
+      pause();			/* Wait for SIGALRM */
       trs_get_event(0);
     }
     return rval;
   }
 #endif
   return dequeue_key();
-
 }

@@ -1,11 +1,10 @@
 /* Copyright (c) 2000, Timothy Mann */
+/* $Id$ */
 
 /* This software may be copied, modified, and used for any purpose
  * without fee, provided that (1) the above copyright notice is
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
-
-/* Last modified on Thu May 18 00:42:46 PDT 2000 by mann */
 
 /*
  * Emulation of the Radio Shack TRS-80 Model I/III/4/4P serial port.
@@ -135,13 +134,6 @@ trs_uart_init(int reset_button)
     error("can't open %s: %s", trs_uart_name, strerror(errno));
   } else {
     uart.fdflags = FNONBLOCK;
-#if HAVE_SIGIO
-    if (trs_model > 1) {
-      uart.fdflags |= FASYNC;
-      fcntl(uart.fd, F_SETOWN, getpid()); /* is this needed? */
-      fcntl(uart.fd, F_SETFL, uart.fdflags);
-    }
-#endif
     err = tcgetattr(uart.fd, &uart.t);
     if (err < 0) {
       error("can't get attributes of %s: %s", trs_uart_name, strerror(errno));
@@ -358,7 +350,6 @@ trs_uart_control_out(int value)
     sigset_t set, oldset;
     sigemptyset(&set);
     sigaddset(&set, SIGALRM);
-    sigaddset(&set, SIGIO);
     sigprocmask(SIG_BLOCK, &set, &oldset);
     err = tcsendbreak(uart.fd, 0);
     sigprocmask(SIG_SETMASK, &oldset, NULL);

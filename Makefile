@@ -1,6 +1,6 @@
-
 #
 # Makefile for xtrs, the TRS-80 emulator.
+# $Id$
 #
 
 OBJECTS = \
@@ -143,7 +143,7 @@ z80code: $(Z80CODE)
 include Makefile.local
 
 CFLAGS = $(DEBUG) $(ENDIAN) $(DEFAULT_ROM) $(READLINE) $(DISKDIR) $(IFLAGS) \
-       $(APPDEFAULTS) -DKBWAIT -DHAVE_SIGIO
+       $(APPDEFAULTS) -DKBWAIT
 LIBS = $(XLIB) $(READLINELIBS) $(EXTRALIBS)
 
 ZMACFLAGS = -h
@@ -184,10 +184,6 @@ hex2cmd:	$(HC_OBJECTS)
 
 cmddump:	$(CD_OBJECTS)
 		$(CC) -o cmddump $(CD_OBJECTS)
-
-saber_src:
-		#ignore SIGIO
-		#load $(LDFLAGS) $(CFLAGS) $(SOURCES) $(LIBS)
 
 tar:		$(SOURCES) $(HEADERS)
 		tar cvf xtrs.tar $(SOURCES) $(HEADERS)  $(MANSOURCES) $(MISC)

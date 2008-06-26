@@ -1,12 +1,11 @@
 /* Convert Intel Hex format to TRS-80 CMD format */
 /* Copyright (c) 1996, Timothy Mann */
+/* $Id$ */
 
 /* This software may be copied, modified, and used for any purpose
  * without fee, provided that (1) the above copyright notice is
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
-
-/* Last modified on Mon Jan 12 15:44:48 PST 1998 by mann */
 
 #include <stdio.h>
 #include <stdarg.h>

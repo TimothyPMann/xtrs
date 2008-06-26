@@ -14,8 +14,8 @@
  */
 
 /*
-   Modified by Timothy Mann, 1996
-   Last modified on Tue May  1 21:39:24 PDT 2001 by mann
+   Modified by Timothy Mann, 1996 and later
+   $Id$
 */
 
 /*#define MOUSEDEBUG 1*/
@@ -857,40 +857,7 @@ void trs_screen_init()
   bitmap_init(foreground, background);
   screen_init();
   XClearWindow(display,window);
-
-#if HAVE_SIGIO
-  trs_event_init();
-#endif
 }
-
-#if HAVE_SIGIO
-void trs_event_init()
-{
-  int fd;
-  struct sigaction sa;
-
-  /* set up event handler */
-  sa.sa_handler = trs_event;
-  sigemptyset(&sa.sa_mask);
-  sigaddset(&sa.sa_mask, SIGIO);
-  sa.sa_flags = SA_RESTART;
-  sigaction(SIGIO, &sa, NULL);
-
-  fd = ConnectionNumber(display);
-  if (fcntl(fd, F_SETOWN, getpid()) != 0) {  /* is this needed? */
-    error("fcntl F_SETOWN error: %s", strerror(errno));
-  }
-  if (fcntl(fd, F_SETFL, FASYNC) != 0) {
-    error("fcntl F_SETFL async error: %s", strerror(errno));
-  }
-}
-
-/* ARGSUSED */
-void trs_event(int signo)
-{
-  x_poll_count = 0;
-}
-#endif /*HAVE_SIGIO*/
 
 KeySym last_key[256];
 
@@ -972,22 +939,22 @@ void trs_get_event(int wait)
       case XK_F10:
 	trs_reset(0);
 	key = 0;
-	trs_end_kbwait();
+	trs_skip_next_kbwait();
 	break;
       case XK_F9:
 	trs_debug();
 	key = 0;
-	trs_end_kbwait();
+	trs_skip_next_kbwait();
 	break;
       case XK_F8:
 	trs_exit();
 	key = 0;
-	trs_end_kbwait();
+	trs_skip_next_kbwait();
 	break;
       case XK_F7:
 	trs_disk_change_all();
 	key = 0;
-	trs_end_kbwait();
+	trs_skip_next_kbwait();
 	break;
       default:
 	break;

@@ -1,4 +1,5 @@
 #!/bin/sh
+# $Id$
 
 arrayitem () {
   INDEX=$1

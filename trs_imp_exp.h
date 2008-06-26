@@ -1,4 +1,5 @@
 /* Copyright (c) 1996, Timothy Mann */
+/* $Id$ */
 
 /* This software may be copied, modified, and used for any purpose
  * without fee, provided that (1) the above copyright notice is

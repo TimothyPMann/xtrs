@@ -1,5 +1,6 @@
 /*
  * trs_chars.c
+ * $Id$
  *
  * This file contains the bitmap data for all 256 characters in the
  * TRS-80 character set, for both Model I and Model III/4.  Thanks to

@@ -1,4 +1,4 @@
-;; settime.z
+;; settime.z80
 ;;
 ;; Read date and time from xtrs 1.9 emulator trap and set
 ;; TRS-80 system date and time.
@@ -10,9 +10,9 @@
 ;; notice is retained, and (2) modified versions are clearly
 ;; marked as having been modified, with the modifier's name and
 ;; the date included.  
-;;
-;; Last modified on Fri May 19 00:38:41 PDT 2000 by mann
-;;      modified on Sun Feb 22 21:27:13 CET 1998 by ulm
+
+;; Modified on Fri May 19 00:38:41 PDT 2000 by Timothy Mann
+;; $Id$
 
 ;; Model I/III addresses
 @exit	equ 402dh

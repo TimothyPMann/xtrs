@@ -1,11 +1,10 @@
 /* Copyright (c) 1996, Timothy Mann */
+/* $Id$ */
 
 /* This software may be copied, modified, and used for any purpose
  * without fee, provided that (1) the above copyright notice is
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
-
-/* Last modified on Sat Jan  2 20:39:56 PST 1999 by mann */
 
 /*
  * Emulate Model-I or Model-III disk controller

@@ -14,8 +14,8 @@
  */
 
 /*
-   Modified by Timothy Mann, 1996
-   Last modified on Wed May 17 02:10:24 PDT 2000 by mann
+   Modified by Timothy Mann, 1996 and later
+   $Id$
 */
 
 #include <string.h>

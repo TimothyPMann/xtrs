@@ -1,11 +1,10 @@
-/* Copyright (c) 1996-97, Timothy Mann */
+/* Copyright (c) 1996, Timothy Mann */
+/* $Id$ */
 
 /* This software may be copied, modified, and used for any purpose
  * without fee, provided that (1) the above copyright notice is
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
-
-/* Last modified on Tue May  1 20:34:56 PDT 2001 by mann */
 
 /*
  * Emulate Model I or III/4 disk controller
@@ -3100,7 +3099,6 @@ real_check_empty(DiskState *d)
   raw_cmd.length = 0;
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);
-  sigaddset(&set, SIGIO);
   sigprocmask(SIG_BLOCK, &set, &oldset);
   trs_paused = 1;
   res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
@@ -3138,7 +3136,6 @@ real_restore(curdrive)
   raw_cmd.cmd_count = i;
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);
-  sigaddset(&set, SIGIO);
   sigprocmask(SIG_BLOCK, &set, &oldset);
   trs_paused = 1;
   res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
@@ -3182,7 +3179,6 @@ real_seek()
   raw_cmd.cmd_count = i;
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);
-  sigaddset(&set, SIGIO);
   sigprocmask(SIG_BLOCK, &set, &oldset);
   trs_paused = 1;
   res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
@@ -3229,7 +3225,6 @@ real_read()
     raw_cmd.length = 128 << d->u.real.size_code;
     sigemptyset(&set);
     sigaddset(&set, SIGALRM);
-    sigaddset(&set, SIGIO);
     sigprocmask(SIG_BLOCK, &set, &oldset);
     trs_paused = 1;
     res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
@@ -3335,7 +3330,6 @@ real_write()
   raw_cmd.length = 128 << d->u.real.size_code;
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);
-  sigaddset(&set, SIGIO);
   sigprocmask(SIG_BLOCK, &set, &oldset);
   trs_paused = 1;
   res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
@@ -3408,7 +3402,6 @@ real_readadr()
   raw_cmd.length = 0;
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);
-  sigaddset(&set, SIGIO);
   sigprocmask(SIG_BLOCK, &set, &oldset);
   trs_paused = 1;
   res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);
@@ -3529,7 +3522,6 @@ real_writetrk()
 
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);
-  sigaddset(&set, SIGIO);
   sigprocmask(SIG_BLOCK, &set, &oldset);
   trs_paused = 1;
   res = ioctl(fileno(d->file), FDRAWCMD, &raw_cmd);

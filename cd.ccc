@@ -1,12 +1,11 @@
 /* cd.ccc -- Misosys C program to change Unix working directory on xtrs */
 /* Copyright (c) 1998, Timothy Mann */
+/* $Id$ */
 
 /* This software may be copied, modified, and used for any purpose
  * without fee, provided that (1) the above copyright notice is
  * retained, and (2) modified versions are clearly marked as having
  * been modified, with the modifier's name and the date included.  */
-
-/* Last modified on Tue Dec 15 16:59:03 PST 1998 by mann */
 
 #option redirect 0
 #include "xtrsemt.h"

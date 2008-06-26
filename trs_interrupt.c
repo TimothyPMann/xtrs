@@ -1,4 +1,5 @@
 /* Copyright (c) 1996, Timothy Mann */
+/* $Id$ */
 
 /* This software may be copied, modified, and used for any purpose
  * without fee, provided that (1) the above copyright notice is
@@ -59,6 +60,34 @@ static int timer_hz;
 #define LDOS4_MONTH 0x0035
 #define LDOS4_DAY   0x0034
 #define LDOS4_YEAR  0x0033
+
+/* Kludge, continued: On NEWDOS/80, both date and time are stored in memory
+   across reboots, but a test is done on boot to decide whether to use the
+   stored values.  Here's how it works: NEWDOS/80 writes a special byte value
+   to the memory address right before the stored date and time.  On reboot,
+   this address is checked, and if it contains that special byte, the stored
+   date and time are considered valid and are therefore used.
+
+   By putting this info in memory on powerup, NEWDOS/80 gets initialized
+   with the system date and time.
+ */
+#define NEWDOS_DATETIME_VALID_BYTE  0xa5
+// Model 1
+#define NEWDOS_DATETIME_VALID_ADDR  0x43ab
+#define NEWDOS_MONTH                0x43b1
+#define NEWDOS_DAY                  0x43b0
+#define NEWDOS_YEAR                 0x43af
+#define NEWDOS_HOUR                 0x43ae
+#define NEWDOS_MIN                  0x43ad
+#define NEWDOS_SEC                  0x43ac
+// Model 3
+#define NEWDOS3_DATETIME_VALID_ADDR 0x42cb
+#define NEWDOS3_MONTH               0x42d1
+#define NEWDOS3_DAY                 0x42d0
+#define NEWDOS3_YEAR                0x42cf
+#define NEWDOS3_HOUR                0x42ce
+#define NEWDOS3_MIN                 0x42cd
+#define NEWDOS3_SEC                 0x42cc
 
 static int timer_on = 1;
 #ifdef IDEBUG
@@ -392,10 +421,27 @@ trs_timer_init()
       mem_write(LDOS_MONTH, (lt->tm_mon + 1) ^ 0x50);
       mem_write(LDOS_DAY, lt->tm_mday);
       mem_write(LDOS_YEAR, lt->tm_year - 80);
+
+      mem_write(NEWDOS_DATETIME_VALID_ADDR, NEWDOS_DATETIME_VALID_BYTE);
+      mem_write(NEWDOS_MONTH, lt->tm_mon + 1);
+      mem_write(NEWDOS_DAY, lt->tm_mday);
+      mem_write(NEWDOS_YEAR, lt->tm_year % 100);
+      mem_write(NEWDOS_HOUR, lt->tm_hour);
+      mem_write(NEWDOS_MIN, lt->tm_min);
+      mem_write(NEWDOS_SEC, lt->tm_sec);
   } else {
       mem_write(LDOS3_MONTH, (lt->tm_mon + 1) ^ 0x50);
       mem_write(LDOS3_DAY, lt->tm_mday);
       mem_write(LDOS3_YEAR, lt->tm_year - 80);
+
+      mem_write(NEWDOS3_DATETIME_VALID_ADDR, NEWDOS_DATETIME_VALID_BYTE);
+      mem_write(NEWDOS3_MONTH, lt->tm_mon + 1);
+      mem_write(NEWDOS3_DAY, lt->tm_mday);
+      mem_write(NEWDOS3_YEAR, lt->tm_year % 100);
+      mem_write(NEWDOS3_HOUR, lt->tm_hour);
+      mem_write(NEWDOS3_MIN, lt->tm_min);
+      mem_write(NEWDOS3_SEC, lt->tm_sec);
+
       if (trs_model >= 4) {
         extern Uchar memory[];
 	memory[LDOS4_MONTH] = lt->tm_mon + 1;

@@ -14,8 +14,8 @@
  */
 
 /*
-   Modified by Timothy Mann, 1996
-   Last modified on Sat Apr 25 00:57:31 PDT 1998 by mann
+   Modified by Timothy Mann, 1996 and later
+   $Id$
 */
 
 #include "z80.h"
