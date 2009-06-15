@@ -55,7 +55,7 @@ extern void trs_screen_refresh(void);
 extern void trs_screen_batch();
 extern void trs_screen_unbatch();
 
-extern void trs_reset(int hard);
+extern void trs_reset(int poweron);
 extern void trs_exit(void);
 
 extern void trs_kb_reset(void);

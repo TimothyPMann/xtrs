@@ -402,7 +402,7 @@ trs_sigusr1(int signo)
 }
 
 void
-trs_disk_init(int reset_button)
+trs_disk_init(int poweron)
 {
   int i;
   struct sigaction sa;
@@ -422,7 +422,7 @@ trs_disk_init(int reset_button)
   state.controller = (trs_model == 1) ? TRSDISK_P1771 : TRSDISK_P1791;
   state.last_readadr = -1;
   state.motor_timeout = 0;
-  if (!reset_button) {
+  if (poweron) {
     for (i=0; i<NDRIVES; i++) {
       disk[i].phytrack = 0;
       disk[i].emutype = NONE;
@@ -448,7 +448,7 @@ trs_disk_change_all()
     trs_disk_change(i);
   }
   trs_disk_changecount++;
-  trs_hard_init(1);
+  trs_hard_init();
 }
 
 

@@ -76,7 +76,7 @@ static int open_drive(int n);
 static void set_dir_cyl(int cyl);
 
 /* Powerup or reset button */
-void trs_hard_init(int reset_button)
+void trs_hard_init(void)
 {
   int i;
   state.control = 0;
@@ -168,7 +168,7 @@ void trs_hard_out(int port, int value)
     break;
   case TRS_HARD_CONTROL:
     if (value & TRS_HARD_SOFTWARE_RESET) {
-      trs_hard_init(1);
+      trs_hard_init();
     }
     if ((value & TRS_HARD_DEVICE_ENABLE) && state.present == 0) {
       int i;
