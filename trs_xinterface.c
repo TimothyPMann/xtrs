@@ -82,6 +82,7 @@ static Pixmap trs_box[2][64];
 static Display *display;
 static int screen;
 static Window window;
+static Window help_window;
 static GC gc;
 static GC gc_inv;
 static GC gc_xor;
@@ -625,6 +626,98 @@ void trs_screen_unbatch()
 #endif
 }
 
+/*
+ * show help
+ */
+
+void trs_show_help()
+{
+  XWindowAttributes parent_attrs;
+  unsigned int help_width = 495;
+  unsigned int help_height = 365;
+  unsigned int help_xpos, help_ypos;
+  unsigned long foreground, background;
+  GC help_gc;
+  XGCValues values;
+  char *help_font_name = "9x15";
+  XFontStruct *help_font_info;
+  int font_height;
+  int text_line;
+  int i;
+  static char *helpitems[] = {
+    "F1: Model 4/4P F1 key",
+    "F2: Model 4/4P F2 key",
+    "F3: Model 4/4P F3 key",
+    "F4: Model 4/4P caps lock key",
+    "F5: TRS-80 @ key",
+    "F6: TRS-80 0 key",
+    "F7: signal disk change in emulated floppy drive",
+    "F8: exit emulator",
+    "F9: enter zbx debugger",
+    "F10: TRS-80 reset button",
+    "",
+    "LeftArrow, Backspace, Delete: TRS-80 left arrow key",
+    "RightArrow, Tab: TRS-80 right arrow key",
+    "UpArrow: TRS-80 up arrow key",
+    "DownArrow, Linefeed: TRS-80 down arrow key",
+    "",
+    "Esc, Break: TRS-80 break key",
+    "Home, Clear, LeftAlt: TRS-80 clear key",
+    "Control: Model 4/4P control key",
+    "RightAlt: shifted TRS-80 down arrow key",
+    "",
+    "F11 toggles this help.",
+    "See the xtrs(1) manual page for more information.",
+    NULL
+  };
+
+  foreground = BlackPixel(display, screen);
+  background = WhitePixel(display, screen);
+  (void) XGetWindowAttributes(display, window, &parent_attrs);
+  if ((parent_attrs.width < help_width)
+      || (parent_attrs.height < help_height)) {
+      (void) fprintf(stderr, "%s: cannot display help window; parent window"
+		     " dimensions not large enough to contain it\n",
+		     program_name);
+    return;
+  }
+
+  help_xpos = (parent_attrs.width - help_width) / 2;
+  help_ypos = (parent_attrs.height - help_height) / 2;
+  help_window = XCreateSimpleWindow(display, window, help_xpos, help_ypos,
+				    help_width, help_height, 1, foreground,
+				    background);
+  help_font_info = XLoadQueryFont(display, help_font_name);
+  if (NULL == help_font_info) {
+      (void) fprintf(stderr, "%s: cannot display help window; cannot open"
+		     " \"%s\" font\n", program_name, help_font_name);
+    return;
+  }
+  help_gc = XCreateGC(display, help_window, 0, &values);
+  XSetFont(display, help_gc, help_font_info->fid);
+  XSetBackground(display, help_gc, WhitePixel(display,screen));
+  XSetForeground(display, help_gc, BlackPixel(display,screen));
+
+  font_height = help_font_info->ascent + help_font_info->descent;
+  text_line = font_height;
+
+  XMapWindow(display, help_window);
+
+  for (i = 0; NULL != helpitems[i]; i++) {
+    size_t len;
+    int text_width;
+
+    len = strlen(helpitems[i]);
+    text_width = XTextWidth(help_font_info, helpitems[i], len);
+
+    XDrawString(display, help_window, help_gc, 10, text_line, helpitems[i],
+		len);
+    text_line += font_height;
+  }
+
+  return;
+}
+
 /* exits if something really bad happens */
 void trs_screen_init()
 {
@@ -883,6 +976,23 @@ void trs_get_event(int wait)
   char buf[10];
   XComposeStatus status;
 
+  /*
+   * Of Enter and Leave events, track which kind we saw last.  X clients
+   * like "unclutter" will sythesize an Enter event on their own.
+   *
+   * Historically, xtrs assumed that every Enter would be preceded by a
+   * Leave.  When this was not the case, xtrs would clobber the global
+   * autorepeat state to off; it wrongly stored the off state because the
+   * xtrs window already had focus.
+   *
+   * This enum is tri-valued with the zero value being UNDEF because we
+   * don't want to fake a Leave event the first time we Enter; that would
+   * cause restore_repeat() to read from repeat_state before it has been
+   * initialized, possibly storing a bogus global autorepeat state.
+   */
+  enum enter_leave_t { UNDEF, ENTER, LEAVE };
+  static enum enter_leave_t enter_leave;
+
   if (trs_model > 1) {
     (void)trs_uart_check_avail();
   }
@@ -916,6 +1026,17 @@ void trs_get_event(int wait)
 #if XDEBUG
       debug("EnterNotify\n");
 #endif
+      if (enter_leave == ENTER) {
+	/*
+	 * The last Enter/Leave event we saw was an Enter; pretend we saw a
+	 * Leave event first.
+	 */
+#if XDEBUG
+	debug("faking a LeaveNotify event first\n");
+#endif
+	restore_repeat();
+      }
+      enter_leave = ENTER;
       save_repeat();
       trs_xlate_keysym(0x10000); /* all keys up */
       break;
@@ -924,6 +1045,7 @@ void trs_get_event(int wait)
 #if XDEBUG
       debug("LeaveNotify\n");
 #endif
+      enter_leave = LEAVE;
       restore_repeat();
       trs_xlate_keysym(0x10000); /* all keys up */
       break;
@@ -936,6 +1058,16 @@ void trs_get_event(int wait)
 #endif
       switch (key) {
 	/* Trap some function keys here */
+      case XK_F11:
+	if (!help_window) {
+	  trs_show_help();
+	} else {
+	  XUnmapWindow(display, help_window);
+	  help_window = 0;
+	}
+	key = 0;
+	trs_skip_next_kbwait();
+	break;
       case XK_F10:
 	trs_reset(0);
 	key = 0;

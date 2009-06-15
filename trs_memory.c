@@ -102,14 +102,17 @@ void trs_exit()
     exit(0);
 }
 
-/* Handle reset button if hard=0; handle hard reset if hard=1 */
-void trs_reset(int hard)
+
+/* Handle reset button if poweron=0;
+   handle hard reset or initial poweron if poweron=1 */
+void trs_reset(int poweron)
 {
     /* Reset devices (Model I SYSRES, Model III/4 RESET) */
     trs_cassette_reset();
     trs_timer_speed(0);
-    trs_disk_init(1);
+    trs_disk_init(poweron); // also inits trs_hard and trs_stringy
     /* I'm told that the hard disk controller is enabled on powerup */
+    /* XXX should trs_hard_init do this, then? */
     trs_hard_out(TRS_HARD_CONTROL,
 		 TRS_HARD_SOFTWARE_RESET|TRS_HARD_DEVICE_ENABLE);
     if (trs_model == 5) {
@@ -134,7 +137,8 @@ void trs_reset(int hard)
     trs_kb_reset();  /* Part of keyboard stretch kludge */
 
     trs_cancel_event();
-    if (hard || trs_model >= 4) {
+    trs_timer_interrupt(0);
+    if (poweron || trs_model >= 4) {
         /* Reset processor */
 	z80_reset();
     } else {
@@ -199,7 +203,7 @@ void hex_transfer_address(int address)
 
 int mem_read(int address)
 {
-    /*address &= 0xffff;   caller must guarantee this now */
+    address &= 0xffff; /* allow callers to be sloppy */
 
     switch (memory_map) {
       case 0x10: /* Model I */

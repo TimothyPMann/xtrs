@@ -768,7 +768,7 @@ int trs_joystick_in()
 #if JOYDEBUG
   debug("joy %02x ", joystate);
 #endif
-  return ~joystate;
+  return (Uchar) ~joystate;
 }
 
 void trs_xlate_keysym(int keysym)

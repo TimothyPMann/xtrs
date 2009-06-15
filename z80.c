@@ -2157,14 +2157,12 @@ static void do_indexed_instruction(Ushort *ixp)
 	/* same for FD, except uses IY */
 
       case 0x8E:	/* adc a, (ix + offset) */
-	do_adc_byte(mem_read((*ixp + (signed char) mem_read(REG_PC++))
-			     & 0xffff));
+	do_adc_byte(mem_read(*ixp + (signed char) mem_read(REG_PC++)));
 	T_COUNT(19);
 	break;
 
       case 0x86:	/* add a, (ix + offset) */
-	do_add_byte(mem_read((*ixp + (signed char) mem_read(REG_PC++))
-			     & 0xffff));
+	do_add_byte(mem_read(*ixp + (signed char) mem_read(REG_PC++)));
 	T_COUNT(19);
 	break;
 
@@ -2182,13 +2180,12 @@ static void do_indexed_instruction(Ushort *ixp)
 	break;
 
       case 0xA6:	/* and (ix + offset) */
-	do_and_byte(mem_read((*ixp + (signed char) mem_read(REG_PC++))
-			     & 0xffff));
+	do_and_byte(mem_read(*ixp + (signed char) mem_read(REG_PC++)));
 	T_COUNT(19);
 	break;
 
       case 0xBE:	/* cp (ix + offset) */
-	do_cp(mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff));
+	do_cp(mem_read(*ixp + (signed char) mem_read(REG_PC++)));
 	T_COUNT(19);
 	break;
 
@@ -2242,36 +2239,36 @@ static void do_indexed_instruction(Ushort *ixp)
 	break;
 
       case 0x7E:	/* ld a, (ix + offset) */
-	REG_A = mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff);
+	REG_A = mem_read(*ixp + (signed char) mem_read(REG_PC++));
 	T_COUNT(19);
 	break;
       case 0x46:	/* ld b, (ix + offset) */
-	REG_B = mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff);
+	REG_B = mem_read(*ixp + (signed char) mem_read(REG_PC++));
 	T_COUNT(19);
 	break;
       case 0x4E:	/* ld c, (ix + offset) */
-	REG_C = mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff);
+	REG_C = mem_read(*ixp + (signed char) mem_read(REG_PC++));
 	T_COUNT(19);
 	break;
       case 0x56:	/* ld d, (ix + offset) */
-	REG_D = mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff);
+	REG_D = mem_read(*ixp + (signed char) mem_read(REG_PC++));
 	T_COUNT(19);
 	break;
       case 0x5E:	/* ld e, (ix + offset) */
-	REG_E = mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff);
+	REG_E = mem_read(*ixp + (signed char) mem_read(REG_PC++));
 	T_COUNT(19);
 	break;
       case 0x66:	/* ld h, (ix + offset) */
-	REG_H = mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff);
+	REG_H = mem_read(*ixp + (signed char) mem_read(REG_PC++));
 	T_COUNT(19);
 	break;
       case 0x6E:	/* ld l, (ix + offset) */
-	REG_L = mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff);
+	REG_L = mem_read(*ixp + (signed char) mem_read(REG_PC++));
 	T_COUNT(19);
 	break;
 
       case 0x36:	/* ld (ix + offset), value */
-	mem_write(*ixp + (signed char) mem_read(REG_PC), mem_read((REG_PC+1)&0xffff));
+	mem_write(*ixp + (signed char) mem_read(REG_PC), mem_read(REG_PC+1));
 	REG_PC += 2;
 	T_COUNT(19);
 	break;
@@ -2329,7 +2326,7 @@ static void do_indexed_instruction(Ushort *ixp)
 	break;
 
       case 0xB6:	/* or (ix + offset) */
-	do_or_byte(mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff));
+	do_or_byte(mem_read(*ixp + (signed char) mem_read(REG_PC++)));
 	T_COUNT(19);
 	break;
 
@@ -2346,17 +2343,17 @@ static void do_indexed_instruction(Ushort *ixp)
 	break;
 
       case 0x9E:	/* sbc a, (ix + offset) */
-	do_sbc_byte(mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff));
+	do_sbc_byte(mem_read(*ixp + (signed char) mem_read(REG_PC++)));
 	T_COUNT(19);
 	break;
 
       case 0x96:	/* sub a, (ix + offset) */
-	do_sub_byte(mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff));
+	do_sub_byte(mem_read(*ixp + (signed char) mem_read(REG_PC++)));
 	T_COUNT(19);
 	break;
 
       case 0xAE:	/* xor (ix + offset) */
-	do_xor_byte(mem_read((*ixp + (signed char) mem_read(REG_PC++)) & 0xffff));
+	do_xor_byte(mem_read(*ixp + (signed char) mem_read(REG_PC++)));
 	T_COUNT(19);
 	break;
 
@@ -2373,49 +2370,49 @@ static void do_indexed_instruction(Ushort *ixp)
 	  switch(sub_instruction&0xf8)
 	  {
 	    case 0x00:	/* rlc (ix + offset) */
-	      result = rlc_byte(mem_read((*ixp + offset) & 0xffff));
+	      result = rlc_byte(mem_read(*ixp + offset));
 	      mem_write(*ixp + offset, result);
 	      T_COUNT(23);
 	      break;
 
 	    case 0x08:	/* rrc (ix + offset) */
-	      result = rrc_byte(mem_read((*ixp + offset) & 0xffff));
+	      result = rrc_byte(mem_read(*ixp + offset));
 	      mem_write(*ixp + offset, result);
 	      T_COUNT(23);
 	      break;
 
 	    case 0x10:	/* rl (ix + offset) */
-	      result = rl_byte(mem_read((*ixp + offset) & 0xffff));
+	      result = rl_byte(mem_read(*ixp + offset));
 	      mem_write(*ixp + offset, result);
 	      T_COUNT(23);
 	      break;
 
 	    case 0x18:	/* rr (ix + offset) */
-	      result = rr_byte(mem_read((*ixp + offset) & 0xffff));
+	      result = rr_byte(mem_read(*ixp + offset));
 	      mem_write(*ixp + offset, result);
 	      T_COUNT(23);
 	      break;
 
 	    case 0x20:	/* sla (ix + offset) */
-	      result = sla_byte(mem_read((*ixp + offset) & 0xffff));
+	      result = sla_byte(mem_read(*ixp + offset));
 	      mem_write(*ixp + offset, result);
 	      T_COUNT(23);
 	      break;
 
 	    case 0x28:	/* sra (ix + offset) */
-	      result = sra_byte(mem_read((*ixp + offset) & 0xffff));
+	      result = sra_byte(mem_read(*ixp + offset));
 	      mem_write(*ixp + offset, result);
 	      T_COUNT(23);
 	      break;
 
 	    case 0x30:	/* slia (ix + offset) [undocumented] */
-	      result = slia_byte(mem_read((*ixp + offset) & 0xffff));
+	      result = slia_byte(mem_read(*ixp + offset));
 	      mem_write(*ixp + offset, result);
 	      T_COUNT(23);
 	      break;
 
 	    case 0x38:	/* srl (ix + offset) */
-	      result = srl_byte(mem_read((*ixp + offset) & 0xffff));
+	      result = srl_byte(mem_read(*ixp + offset));
 	      mem_write(*ixp + offset, result);
 	      T_COUNT(23);
 	      break;
@@ -2428,7 +2425,7 @@ static void do_indexed_instruction(Ushort *ixp)
 	    case 0x68:  /* bit 5, (ix + offset) */
 	    case 0x70:  /* bit 6, (ix + offset) */
 	    case 0x78:  /* bit 7, (ix + offset) */
-	      do_test_bit(sub_instruction, mem_read((*ixp + offset) & 0xffff),
+	      do_test_bit(sub_instruction, mem_read(*ixp + offset),
 			  (sub_instruction >> 3) & 7);
 	      T_COUNT(20);
 	      break;
@@ -2441,7 +2438,7 @@ static void do_indexed_instruction(Ushort *ixp)
 	    case 0xA8:	/* res 5, (ix + offset) */
 	    case 0xB0:	/* res 6, (ix + offset) */
 	    case 0xB8:	/* res 7, (ix + offset) */
-	      result = mem_read((*ixp + offset) & 0xffff) &
+	      result = mem_read(*ixp + offset) &
 		~(1 << ((sub_instruction >> 3) & 7));
 	      mem_write(*ixp + offset, result);
 	      T_COUNT(23);
@@ -2455,7 +2452,7 @@ static void do_indexed_instruction(Ushort *ixp)
 	    case 0xE8:	/* set 5, (ix + offset) */
 	    case 0xF0:	/* set 6, (ix + offset) */
 	    case 0xF8:	/* set 7, (ix + offset) */
-	      result = mem_read((*ixp + offset) & 0xffff) |
+	      result = mem_read(*ixp + offset) |
 		(1 << ((sub_instruction >> 3) & 7));
 	      mem_write(*ixp + offset, result);
 	      T_COUNT(23);
@@ -2980,11 +2977,6 @@ static int do_ED_instruction()
 
 volatile int x_poll_count = 0;
 #define X_POLL_INTERVAL 10000
-
-/* Hack, hack, see if we can speed this up. */
-/*extern Uchar *memory;*/
-/*#define MEM_READ(a) ((a < 0x3000) ? memory[a] : mem_read(a));*/
-/* #define MEM_READ(a) (((((a) - 0x3000) & 0xffff) >= 0xc00) ? memory[a] : mem_read(a)) */
 
 int trs_continuous;
 

@@ -35,10 +35,10 @@ typedef unsigned int Uint;      /* 4 bytes */
 typedef unsigned short Ushort;  /* 2 bytes */
 typedef unsigned char Uchar;    /* 1 byte */
 
-#ifdef NOTDEF /*__GNUC__*/
+#if __WORDSIZE == 32
 typedef unsigned long long tstate_t;
 #define TSTATE_T_MID (((unsigned long long) -1LL)/2ULL)
-#define TSTATE_T_LEN "Lu"
+#define TSTATE_T_LEN "llu"
 #else
 typedef unsigned long tstate_t;
 #define TSTATE_T_MID (((unsigned long) -1L)/2UL)
@@ -227,7 +227,7 @@ extern struct z80_state_struct z80_state;
 extern void z80_reset(void);
 extern int z80_run(int continuous);
 extern void mem_init(void);
-extern int mem_read(int address);  /* 0 <= address <= 0xffff REQUIRED */
+extern int mem_read(int address);
 extern void mem_write(int address, int value);
 extern void mem_write_rom(int address, int value);
 extern int mem_read_word(int address);

@@ -51,6 +51,8 @@ stack.
 .SH Keys
 The following keys have special meanings to \fBxtrs\fP:
 
+F11 toggles onscreen help on the keyboard mappings.
+
 LeftArrow, Backspace, or Delete is the TRS-80 left arrow key.
 RightArrow or Tab is the right arrow key.  UpArrow is the up arrow
 key.  DownArrow or Linefeed is the down arrow key.  Esc or Break is
