@@ -338,7 +338,7 @@ static void print_memory(Ushort address, int num_bytes)
 	printf("%.4x:\t", address);
 	for(i = 0; i < bytes_to_print; ++i)
 	{
-	    printf("%.2x ", mem_read((address + i) & 0xffff));
+	    printf("%.2x ", mem_read(address + i));
 	}
 	for(i = bytes_to_print; i < 16; ++i)
 	{
@@ -347,7 +347,7 @@ static void print_memory(Ushort address, int num_bytes)
 	printf("    ");
 	for(i = 0; i < bytes_to_print; ++i)
 	{
-	    byte = mem_read((address + i) & 0xffff);
+	    byte = mem_read(address + i);
 	    if(isprint(byte))
 	    {
 		printf("%c", byte);

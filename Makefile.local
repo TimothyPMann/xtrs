@@ -54,7 +54,7 @@ READLINELIBS = -lreadline -lncurses
 
 # Select debugging symbols (-g) and/or optimization (-O2, etc.)
 
-DEBUG = -O2 -g
+DEBUG = -O2 -g -Wall
 #DEBUG = -g -DKBDEBUG -DXDEBUG
 #DEBUG = -g
 #DEBUG = -Wall

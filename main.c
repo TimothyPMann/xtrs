@@ -122,11 +122,10 @@ int main(int argc, char *argv[])
       exit(1);
     }
     mem_init();
-    trs_disk_init(0);
     trs_screen_init();
     trs_timer_init();
 
-    z80_reset();
+    trs_reset(1);
     if (!debug) {
       /* Run continuously until exit or request to enter debugger */
       z80_run(TRUE);

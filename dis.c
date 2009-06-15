@@ -2101,29 +2101,29 @@ int disassemble(unsigned short pc)
     }
     printf ("%04x  ", addr);
     for (i = 0; i < ((pc + arglen(code->args) - addr) & 0xffff); i++)
-	printf("%02x ", mem_read((addr + i) & 0xffff));
+        printf("%02x ", mem_read(addr + i));
     for (; i < 4; i++)
 	printf("   ");
     printf(" ");
     switch (code->args) {
       case A_16: /* 16-bit number */
-	printf (code->name, mem_read((pc + 1) & 0xffff), mem_read(pc));
+	printf (code->name, mem_read(pc + 1), mem_read(pc));
 	break;
       case A_8X2: /* Two 8-bit numbers */
-	printf (code->name, mem_read(pc), mem_read((pc + 1) & 0xffff));
+	printf (code->name, mem_read(pc), mem_read(pc + 1));
 	break;
       case A_8:  /* One 8-bit number */
 	printf (code->name, mem_read(pc));
 	break;
       case A_8P: /* One 8-bit number before last opcode byte */
-	printf (code->name, mem_read((pc - 2) & 0xffff));
+	printf (code->name, mem_read(pc - 2));
 	break;
       case A_0:  /* No args */
       case A_0B: /* No args, backskip over last opcode byte */
 	printf (code->name);
 	break;
       case A_8R: /* One 8-bit relative address */
-	printf (code->name, (pc + 1 + (char) mem_read(pc)) & 0xffff);
+	printf (code->name, (pc + 1 + (signed char) mem_read(pc)) & 0xffff);
 	break;
     }
     putchar ('\n');
