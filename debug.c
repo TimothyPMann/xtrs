@@ -514,7 +514,7 @@ void debug_shell()
 	{
 	    if(!strcmp(command, "help") || !strcmp(command, "?"))
 	    {
-	        fputs(stdout, help_message);
+	        fputs(help_message, stdout);
 	    }
 	    else if (!strcmp(command, "zbxinfo"))
 	    {
