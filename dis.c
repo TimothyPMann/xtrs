@@ -2120,7 +2120,7 @@ int disassemble(unsigned short pc)
 	break;
       case A_0:  /* No args */
       case A_0B: /* No args, backskip over last opcode byte */
-	printf (code->name);
+	fputs (stdout, code->name);
 	break;
       case A_8R: /* One 8-bit relative address */
 	printf (code->name, (pc + 1 + (signed char) mem_read(pc)) & 0xffff);

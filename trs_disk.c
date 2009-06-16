@@ -665,7 +665,8 @@ jv3_free_sector(DiskState *d, int id_index)
     while (d->u.jv3.id[d->u.jv3.last_used_id].track == JV3_FREE) {
       d->u.jv3.last_used_id--;
     }
-    fflush(d->file);
+    c = fflush(d->file);
+    if (c == EOF) state.status |= TRSDISK_WRITEFLT;
     rewind(d->file);
     if (d->u.jv3.last_used_id >= 0) {
       newlen = offset(d, d->u.jv3.last_used_id) +
@@ -673,7 +674,8 @@ jv3_free_sector(DiskState *d, int id_index)
     } else {
       newlen = offset(d, 0);
     }
-    ftruncate(fileno(d->file), newlen);
+    c = ftruncate(fileno(d->file), newlen);
+    if (c == EOF) state.status |= TRSDISK_WRITEFLT;
   }
 }
 
@@ -807,7 +809,7 @@ trs_disk_change(int drive)
 
     /* Read first block of ids */
     fseek(d->file, JV3_IDSTART, 0);
-    fread((void*)&d->u.jv3.id[0], 3, JV3_SECSPERBLK, d->file);
+    (void) fread((void*)&d->u.jv3.id[0], 3, JV3_SECSPERBLK, d->file);
 
     /* Scan to find their offsets */
     ofst = JV3_SECSTART;
