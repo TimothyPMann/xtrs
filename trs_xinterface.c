@@ -83,6 +83,7 @@ static Display *display;
 static int screen;
 static Window window;
 static Window help_window;
+static int unmap_help_window = 0;
 static GC gc;
 static GC gc_inv;
 static GC gc_xor;
@@ -1062,8 +1063,18 @@ void trs_get_event(int wait)
 	if (!help_window) {
 	  trs_show_help();
 	} else {
-	  XUnmapWindow(display, help_window);
-	  help_window = 0;
+	  /*
+	   * Work around the most painful case of
+	   * http://bugs.freedesktop.org/show_bug.cgi?id=21454.  This
+	   * bug causes infinite key repeat if a key is down when an
+	   * application disables key repeat.  When we unmap the help
+	   * window, that causes an EnterNotify event for the main
+	   * window.  In the EnterNotify event handler we disable key
+	   * repeat, which will cause F11 to repeat infinitely if it
+	   * is still down.  So we wait until F11 is released before
+	   * unmapping the window.
+	   */
+	  unmap_help_window = 1;
 	}
 	key = 0;
 	trs_skip_next_kbwait();
@@ -1110,6 +1121,12 @@ void trs_get_event(int wait)
       break;
 
     case KeyRelease:
+      if (unmap_help_window) {
+	/* See comment under KeyPress XK_F11 case above. */
+	XUnmapWindow(display, help_window);
+	help_window = 0;
+	unmap_help_window = 0;
+      }
       key = last_key[event.xkey.keycode];
       last_key[event.xkey.keycode] = 0;
       if (key != 0) {
