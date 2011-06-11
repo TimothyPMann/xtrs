@@ -95,7 +95,7 @@ Printing:\n\
         Print the state of the floppy disk controller emulation.\n\
 Traps:\n\
     status\n\
-        Show all traps (breakpoints, trace points).\n\
+        Show all traps (breakpoints, tracepoints, watchpoints).\n\
     clear\n\
         Delete the trap at the current address.\n\
     delete <n>\n\
@@ -123,6 +123,8 @@ Miscellaneous:\n\
         Set floppy disk controller debug flags to hexval.\n\
         1=FDC register I/O, 2=FDC commands, 4=VTOS 3.0 JV3 kludges, 8=Gaps,\n\
         10=Phys sector sizes, 20=Readadr timing, 40=DMK, 80=ioctl errors.\n\
+    iodebug <hexval>\n\
+        Set I/O port debug flags to hexval: 1=port input, 2=port output.\n\
     zbxinfo\n\
         Display information about this debugger.\n\
     help\n\
@@ -187,6 +189,7 @@ static void clear_all_traps()
 	}
     }
     num_traps = 0;
+    num_watchpoints = 0;
 }
 
 static void print_traps()
@@ -424,7 +427,8 @@ static void debug_run()
 	{
 	    for (i = 0; i < MAX_TRAPS; ++i)
 	    {
-		if (trap_table[i].flag == WATCHPOINT_FLAG)
+		if (trap_table[i].valid &&
+		    trap_table[i].flag == WATCHPOINT_FLAG)
 		{
 		    byte = mem_read(trap_table[i].address);
 		    if (byte != trap_table[i].byte)
@@ -818,6 +822,11 @@ void debug_shell()
 	    {
 		trs_disk_debug_flags = 0;
 		sscanf(input, "diskdebug %x", &trs_disk_debug_flags);
+	    }
+	    else if(!strcmp(command, "iodebug"))
+	    {
+		trs_io_debug_flags = 0;
+		sscanf(input, "iodebug %x", &trs_io_debug_flags);
 	    }
 	    else
 	    {

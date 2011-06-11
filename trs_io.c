@@ -18,8 +18,11 @@
    $Id$
 */
 
-/*#define PORTDEBUG1 1*/
-/*#define PORTDEBUG2 1*/
+/*
+ * Debug flags.  Update help_message in debug.c if these change.
+ */
+#define IODEBUG_IN  (1<<0)  /* IN instructions */
+#define IODEBUG_OUT (2<<0)  /* OUT instructions */
 
 #include <time.h>
 
@@ -34,12 +37,14 @@ static int modeimage = 0x8; /* Model III/4/4p */
 static int ctrlimage = 0;   /* Model 4/4p */
 static int rominimage = 0;  /* Model 4p */
 
+int trs_io_debug_flags = 0;
+
 /*ARGSUSED*/
 void z80_out(int port, int value)
 {
-#if PORTDEBUG1
-  debug("out (0x%02x), 0x%02x; pc 0x%04x\n", port, value, z80_state.pc.word);
-#endif
+  if (trs_io_debug_flags & IODEBUG_OUT) {
+    debug("out (0x%02x), 0x%02x; pc 0x%04x\n", port, value, z80_state.pc.word);
+  }
   /* First, ports common to all models */
   switch (port) {
   case TRS_HARD_WP:       /* 0xC0 */
@@ -89,6 +94,16 @@ void z80_out(int port, int value)
       break;
     case 0xB5: /* Orchestra-85 right channel */
       trs_orch90_out(2, value);
+      break;
+    case 0xF0:
+    case 0xF1:
+    case 0xF2:
+    case 0xF3:
+    case 0xF4:
+    case 0xF5:
+    case 0xF6:
+    case 0xF7:
+      stringy_out(port & 7, value);
       break;
     case 0xFD:
       /* GENIE location of printer port */
@@ -248,10 +263,9 @@ void z80_out(int port, int value)
 /*ARGSUSED*/
 int z80_in(int port)
 {
+  int value = 0xff; // value returned for nonexistent ports
+
   /* First, ports common to all models */
-#if PORTDEBUG2
-  debug("in (0x%02x); pc %04x\n", port, z80_state.pc.word);
-#endif
 
   /* Support for a special HW real-time clock (TimeDate80?)
    * I used to have.  It was a small card-edge unit with a
@@ -282,37 +296,51 @@ int z80_in(int port)
 
     switch (port & 0x0F) {
     case 0xC: /* year (high) */
-      return (time_info->tm_year / 10) % 10;
+      value = (time_info->tm_year / 10) % 10;
+      goto done;
     case 0xB: /* year (low) */
-      return (time_info->tm_year % 10);
+      value = (time_info->tm_year % 10);
+      goto done;
     case 0xA: /* month (high) */
-      return ((time_info->tm_mon + 1) / 10);
+      value = ((time_info->tm_mon + 1) / 10);
+      goto done;
     case 0x9: /* month (low) */
-      return ((time_info->tm_mon + 1) % 10);
+      value = ((time_info->tm_mon + 1) % 10);
+      goto done;
     case 0x8: /* date (high) and leap year (bit 2) */
-      return ((time_info->tm_mday / 10) | ((time_info->tm_year % 4) ? 0 : 4));
+      value = ((time_info->tm_mday / 10) | ((time_info->tm_year % 4) ? 0 : 4));
+      goto done;
     case 0x7: /* date (low) */
-      return (time_info->tm_mday % 10);
+      value = (time_info->tm_mday % 10);
+      goto done;
     case 0x6: /* day-of-week */
-      return time_info->tm_wday;
+      value = time_info->tm_wday;
+      goto done;
     case 0x5: /* hours (high) and PM (bit 2) and 24hr (bit 3) */
-      return ((time_info->tm_hour / 10) | 8);
+      value = ((time_info->tm_hour / 10) | 8);
+      goto done;
     case 0x4: /* hours (low) */
-      return (time_info->tm_hour % 10);
+      value = (time_info->tm_hour % 10);
+      goto done;
     case 0x3: /* minutes (high) */
-      return (time_info->tm_min / 10);
+      value = (time_info->tm_min / 10);
+      goto done;
     case 0x2: /* minutes (low) */
-      return (time_info->tm_min % 10);
+      value = (time_info->tm_min % 10);
+      goto done;
     case 0x1: /* seconds (high) */
-      return (time_info->tm_sec / 10);
+      value = (time_info->tm_sec / 10);
+      goto done;
     case 0x0: /* seconds (low) */
-      return (time_info->tm_sec % 10);
+      value = (time_info->tm_sec % 10);
+      goto done;
     }
   }
 
   switch (port) {
   case 0x00:
-    return trs_joystick_in();
+    value = trs_joystick_in();
+    goto done;
   case TRS_HARD_WP:       /* 0xC0 */
   case TRS_HARD_CONTROL:  /* 0xC1 */
   case TRS_HARD_DATA:     /* 0xC8 */ 
@@ -323,17 +351,20 @@ int z80_in(int port)
   case TRS_HARD_CYLHI:    /* 0xCD */
   case TRS_HARD_SDH:      /* 0xCE */
   case TRS_HARD_STATUS:   /* 0xCF */ /*=TRS_HARD_COMMAND*/
-    return trs_hard_in(port);
+    value = trs_hard_in(port);
+    goto done;
   case TRS_UART_MODEM:    /* 0xE8 */
-    return trs_uart_modem_in();
+    value = trs_uart_modem_in();
+    goto done;
   case TRS_UART_SWITCHES: /* 0xE9 */
-    return trs_uart_switches_in();
+    value = trs_uart_switches_in();
+    goto done;
   case TRS_UART_STATUS:   /* 0xEA */
-    return trs_uart_status_in();
+    value = trs_uart_status_in();
+    goto done;
   case TRS_UART_DATA:     /* 0xEB */
-    return trs_uart_data_in();
-  default:
-    break;
+    value = trs_uart_data_in();
+    goto done;
   }
 
   if (trs_model == 1) {
@@ -344,16 +375,27 @@ int z80_in(int port)
 #endif
     case 0x01: /* HRG on (undocumented) */
       hrg_onoff(port);
-      break;
+      goto done;
     case 0x04: /* HRG read data byte */
-      return hrg_read_data();
+      value = hrg_read_data();
+      goto done;
+    case 0xF0:
+    case 0xF1:
+    case 0xF2:
+    case 0xF3:
+    case 0xF4:
+    case 0xF5:
+    case 0xF6:
+    case 0xF7:
+      value = stringy_in(port & 7);
+      goto done;
     case 0xFD:
       /* GENIE location of printer port */
-      return trs_printer_read();
+      value = trs_printer_read();
+      goto done;
     case 0xFF:
-      return (modesel ? 0x7f : 0x3f) | trs_cassette_in();
-    default:
-      break;
+      value = (modesel ? 0x7f : 0x3f) | trs_cassette_in();
+      goto done;
     }
 
   } else {
@@ -361,7 +403,8 @@ int z80_in(int port)
     switch (port) {
     case 0x82:
       if (trs_model >= 3) {
-	return grafyx_read_data();
+	value = grafyx_read_data();
+	goto done;
       }
       break;
     case 0x9C: /* !!? */
@@ -369,7 +412,8 @@ int z80_in(int port)
     case 0x9E: /* !!? */
     case 0x9F: /* !!? */
       if (trs_model == 5 /*4p*/) {
-	return rominimage;
+	value = rominimage;
+	goto done;
       }
       break;
     case TRS_HARD_WP:      /* 0xC0 */
@@ -382,35 +426,47 @@ int z80_in(int port)
     case TRS_HARD_CYLHI:   /* 0xCD */
     case TRS_HARD_SDH:     /* 0xCE */
     case TRS_HARD_STATUS:  /* 0xCF */ /*=TRS_HARD_COMMAND*/
-      return trs_hard_in(port);
+      value = trs_hard_in(port);
+      goto done;
       break;
     case 0xE0:
-      return trs_interrupt_latch_read();
+      value = trs_interrupt_latch_read();
+      goto done;
     case 0xEC:
     case 0xED:
     case 0xEE:
     case 0xEF:
       trs_timer_interrupt(0); /* acknowledge */
-      return 0xFF;
+      value = 0xFF;
+      goto done;
     case TRSDISK3_INTERRUPT: /* 0xE4 */
-      return trs_nmi_latch_read();
+      value = trs_nmi_latch_read();
+      goto done;
     case TRSDISK3_STATUS: /* 0xF0 */
-      return trs_disk_status_read();
+      value = trs_disk_status_read();
+      goto done;
     case TRSDISK3_TRACK: /* 0xF1 */
-      return trs_disk_track_read();
+      value = trs_disk_track_read();
+      goto done;
     case TRSDISK3_SECTOR: /* 0xF2 */
-      return trs_disk_sector_read();
+      value = trs_disk_sector_read();
+      goto done;
     case TRSDISK3_DATA: /* 0xF3 */
-      return trs_disk_data_read();
+      value = trs_disk_data_read();
+      goto done;
     case 0xF8:
-      return trs_printer_read();
+      value = trs_printer_read();
+      goto done;
     case 0xFF:
-      return (modeimage & 0x7e) | trs_cassette_in();
-    default:
-      break;
+      value = (modeimage & 0x7e) | trs_cassette_in();
+      goto done;
     }
   }
 
-  /* other ports -- unmapped */
-  return 0xFF;
+ done:
+  if (trs_io_debug_flags & IODEBUG_IN) {
+    debug("in (0x%02x) => 0x%02x; pc %04x\n", port, value, z80_state.pc.word);
+  }
+
+  return value;
 }
