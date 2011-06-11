@@ -32,22 +32,6 @@
  *
  * OSS_SOUND  Game sound is emulated using the Open Sound System.
  *   HAVE_OSS must also be set.
- *
- * SB_SOUND  Game sound is emulated by read/writing SoundBlaster
- *   hardware registers directly.  This probably works only on Linux,
- *   and of course only with true SoundBlaster-compatible hardware.
- *   Requires root privileges and the -sb command line option.  If you
- *   define both SB_SOUND and OSS_SOUND, then SB_SOUND will be used if
- *   the -sb command line option is given, OSS_SOUND otherwise.
- *   OSS_SOUND seems to work much better than SB_SOUND now, so
- *   SB_SOUND is off by default and -sb has been removed from the
- *   man page.  In case you turn it on, here is how it works:
- *  
- * -sb portbase,vol
- *   Enable sound support using direct I/O to a SoundBlaster with I/O
- *   port base at portbase, playing sounds at vol percent of
- *   maximum volume.  A typical setting would be -sb 0x220,30.
- *   Fabio Ferrari contributed the SB_SOUND implementation.  
  */
 
 #if __linux
@@ -67,11 +51,6 @@
 #include <errno.h>
 #include <unistd.h>
 #include <stdlib.h>
-
-#if SB_SOUND
-/*#include <sys/io.h>  delete this line if it gives you a compile error */
-#include <asm/io.h>
-#endif
 
 #if HAVE_OSS
 #include <sys/ioctl.h>
@@ -236,14 +215,6 @@ static long wave_data_offset = WAVE_DATA_OFFSET;
 
 /* Orchestra 80/85/90 stuff */
 static int orch90_left = 128, orch90_right = 128;
-
-#if SB_SOUND
-/* ioport of the SoundBlaster command register. 0 means none */
-static unsigned char sb_cassette_volume[4];
-static unsigned char sb_sound_volume[2];
-#endif /*SB_SOUND*/
-static unsigned int sb_address=0;
-static int sb_volume = 0;
 
 /* Put a 2-byte quantity to a file in little-endian order */
 /* Return -1 on error, 0 otherwise */
@@ -1178,18 +1149,9 @@ void trs_cassette_out(int value)
     }
   }
 
-#if SB_SOUND
-  /* Do sound emulation by wiggling SoundBlaster output in real time */
-  if ((cassette_motor == 0) && sb_address) {
-    while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
-    outb(0x10, sb_address + 0xC);
-    while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
-    outb(sb_cassette_volume[value], sb_address + 0xC);
-  }
-#endif
 #if OSS_SOUND && HAVE_OSS
   /* Do sound emulation by sending samples to /dev/dsp */
-  if (cassette_motor == 0 && !sb_address) {
+  if (cassette_motor == 0) {
     if (cassette_state != SOUND && value == 0) return;
     if (assert_state(SOUND) < 0) return;
     trs_suspend_delay();
@@ -1203,17 +1165,8 @@ void trs_cassette_out(int value)
 void
 trs_sound_out(int value)
 {
-#if SB_SOUND
-  /* Do sound emulation */
-  if (sb_address) {
-    while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
-    outb(0x10, sb_address + 0xC);
-    while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
-    outb(sb_sound_volume[value], sb_address + 0xC);
-  }
-#endif
 #if HAVE_OSS
-  if (cassette_motor == 0 && !sb_address) {
+  if (cassette_motor == 0) {
     if (assert_state(SOUND) < 0) return;
     trs_suspend_delay();
     transition_out(value ? 1 : 2);
@@ -1228,7 +1181,6 @@ orch90_flush(int dummy)
 }
 
 /* Orchestra 85/90 */
-/* Not supported in obsolescent SB_SOUND mode */
 /* Implementation shares some global state with cassette and game
    sound implementations. */
 void
@@ -1386,90 +1338,4 @@ void
 trs_cassette_reset()
 {
   assert_state(CLOSE);
-}
-
-void trs_sound_init(int ioport, int vol)
-{
-#if SB_SOUND
-/* try to initialize SoundBlaster. Usual ioport is 0x220 */
-#define MAX_TRIES 65536
-  int tries;
-#ifdef SOUNDDEBUG
-  int major, minor;
-#endif
-
-  if (sb_address != 0) return;
-  if ((ioport & 0xFFFFFF0F) != 0x200) {
-    error("Invalid SoundBlaster I/O port");
-    return;
-  }
-  sb_address = ioport;
-  if (ioperm(ioport, 0x10, 1)) {
-    error("unable to access SoundBlaster I/O ports: %s", strerror(errno));
-    sb_address = 0;
-    return;
-  }
-
-  /* Reset SoundBlaster DSP */
-  outb(0x01, sb_address + 0x6);
-  usleep(3);
-  outb(0x00, sb_address + 0x6);
-  for (tries = 0; tries < MAX_TRIES; tries++) {
-    if ((inb(sb_address + 0xE) & 0x80) &&
-	(inb(sb_address + 0xA) == 0xAA)) break;
-  }
-  if (tries == MAX_TRIES) {
-    error("unable to detect SoundBlaster");
-    sb_address = 0;
-    return;
-  }
-
-#ifdef SOUNDDEBUG
-  /* Get DSP version number */
-  while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
-  outb(0xE1, sb_address + 0xC);
-  while ((inb(sb_address + 0xE) & 0x80) == 0) /*poll*/ ;
-  major = inb(sb_address + 0xA);
-  while ((inb(sb_address + 0xE) & 0x80) == 0) /*poll*/ ;
-  minor = inb(sb_address + 0xA);
-  debug("SoundBlaster DSP version %d.%d detected\n", major, minor);
-#endif
-
-  /* Turn on DAC speaker */
-  while (inb(sb_address + 0xC) & 0x80) /*poll*/ ;
-  outb(0xD1, sb_address + 0xC);
-
-  sb_set_volume(vol);
-#else /*!SB_SOUND*/
-  error("xtrs: -sb is obsolete; see the man page");
-#endif
-}
-
-void
-sb_set_volume(int vol)
-{
-#if SB_SOUND
-  if (sb_address == 0) return;
-  /* Set up volume values */
-  if (vol < 0) vol = 0;
-  if (vol > 100) vol = 100;
-  sb_volume = vol;
-  /* Values in comments from Model I technical manual.  Model III/4 used
-     a different value for one resistor in the network, so these
-     voltages are not exactly right.  In particular 3 and 0 are no
-     longer almost identical, but as far as I know, 3 is still unused.
-     */
-  sb_cassette_volume[0] = (vol*255)/200; /* 0.46 V */
-  sb_cassette_volume[1] = (vol*255)/100; /* 0.85 V */
-  sb_cassette_volume[2] = 0;	/* 0.00 V */
-  sb_cassette_volume[3] = (vol*255)/200; /* unused, but about 0.46 V */
-  sb_sound_volume[0] = 0;
-  sb_sound_volume[1] = (vol*255)/100;
-#endif
-}
-
-int
-sb_get_volume()
-{
-  return sb_volume;
 }
