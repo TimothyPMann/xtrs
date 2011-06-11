@@ -537,12 +537,6 @@ void do_emt_misc()
   case 17:
     trs_disk_doubler = REG_HL;
     break;
-  case 18:
-    REG_HL = sb_get_volume();
-    break;
-  case 19:
-    sb_set_volume(REG_HL);
-    break;
   case 20:
     REG_HL = trs_disk_truedam;
     break;
