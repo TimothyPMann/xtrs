@@ -15,7 +15,6 @@ OBJECTS = \
 	dis.o \
 	trs_io.o \
 	trs_cassette.o \
-	trs_xinterface.o \
 	trs_chars.o \
 	trs_printer.o \
 	trs_rom1.o \
@@ -25,7 +24,15 @@ OBJECTS = \
 	trs_interrupt.o \
 	trs_imp_exp.o \
 	trs_hard.o \
-	trs_uart.o
+	trs_uart.o \
+	trs_stringy.o
+
+X_OBJECTS = \
+	trs_xinterface.o
+
+GTK_OBJECTS = \
+	keyrepeat.o \
+	trs_gtkinterface.o
 
 CR_OBJECTS = \
 	compile_rom.o \
@@ -68,6 +75,7 @@ SOURCES = \
 	trs_keyboard.c \
 	trs_memory.c \
 	trs_printer.c \
+	trs_stringy.c \
 	trs_uart.c \
 	trs_xinterface.c \
 	z80.c
@@ -161,8 +169,13 @@ ZMACFLAGS = -h
 .man.txt:
 	nroff -man -c -Tascii $< | colcrt - | cat -s > $*.txt
 
-xtrs:		$(OBJECTS)
-		$(CC) $(LDFLAGS) -o xtrs $(OBJECTS) $(LIBS)
+xtrs:		$(OBJECTS) $(X_OBJECTS)
+		$(CC) $(LDFLAGS) -o xtrs $(OBJECTS) $(X_OBJECTS) $(LIBS)
+
+xtrs5:		$(OBJECTS) $(GTK_OBJECTS)
+		$(CC) $(LDFLAGS) -o xtrs5 -export-dynamic \
+			$(OBJECTS) $(GTK_OBJECTS) $(LIBS) \
+			`pkg-config --libs gtk+-2.0`
 
 compile_rom:	$(CR_OBJECTS)
 		$(CC) -o compile_rom $(CR_OBJECTS)
@@ -175,6 +188,12 @@ trs_rom3.c:	compile_rom $(BUILT_IN_ROM3)
 
 trs_rom4p.c:	compile_rom $(BUILT_IN_ROM4P)
 		./compile_rom 4p $(BUILT_IN_ROM4P) > trs_rom4p.c
+
+trs_gtkinterface.o: trs_gtkinterface.c
+		$(CC) -c $(CFLAGS) `pkg-config --cflags gtk+-2.0` $?
+
+keyrepeat.o: keyrepeat.c
+		$(CC) -c $(CFLAGS) `pkg-config --cflags gtk+-2.0` $?
 
 mkdisk:		$(MD_OBJECTS)
 		$(CC) -o mkdisk $(MD_OBJECTS)
@@ -191,7 +210,9 @@ tar:		$(SOURCES) $(HEADERS)
 		compress xtrs.tar
 
 clean:
-		rm -f $(OBJECTS) $(MD_OBJECTS) $(CR_OBJECTS) $(HC_OBJECTS) \
+		rm -f $(OBJECTS) $(MD_OBJECTS) \
+			$(X_OBJECTS) $(GTK_OBJECTS) \
+			$(CR_OBJECTS) $(HC_OBJECTS) \
 			$(CD_OBJECTS) trs_rom*.c *~ \
 			$(PROGS) compile_rom
 
