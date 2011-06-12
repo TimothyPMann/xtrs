@@ -97,10 +97,6 @@ void mem_bank(int command)
     }
 }
 
-void trs_exit()
-{
-    exit(0);
-}
 
 
 /* Handle reset button if poweron=0;
@@ -511,8 +507,6 @@ mem_block_transfer(Ushort dest, Ushort source, int direction, Ushort count)
     }
     else
     {
-	trs_screen_batch();
-	
 	if(direction > 0)
 	{
 	    do
@@ -532,7 +526,6 @@ mem_block_transfer(Ushort dest, Ushort source, int direction, Ushort count)
 	    while(count);
 	}
 
-	trs_screen_unbatch();
     }
     return ret;
 }
