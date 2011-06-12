@@ -19,16 +19,15 @@
 */
 
 /*#define KBDEBUG 1*/
+/*#define QDEBUG 1*/
 /*#define JOYDEBUG 1*/
 #define KP_JOYSTICK 1         /* emulate joystick with keypad */
 /*#define KPNUM_JOYSTICK 1*/  /* emulate joystick with keypad + NumLock */
-#define SHIFT_F1_IS_F13 1     /* use if X reports Shift+F1..F8 as F13..F20 */
+/*#define SHIFT_F1_IS_F13 1*/ /* use if X reports Shift+F1..F8 as F13..F20 */
 /*#define SHIFT_F1_IS_F11 1*/ /* use if X reports Shift+F1..F10 as F11..F20 */
 
 #include "z80.h"
 #include "trs.h"
-#include <X11/keysym.h>
-#include <X11/X.h>
 #include <unistd.h>
 
 /*
@@ -115,7 +114,7 @@ static int skip_next_kbwait;
 
 /* Fake keycodes with special meanings */
 #define TK_NULL                 TK(8, 0)
-#define TK_Neutral              TK(8, 1)
+#define TK_Neutral              TK(8, 1) /* don't force shift */
 #define TK_ForceShift           TK(8, 2)
 #define TK_ForceNoShift         TK(8, 3)
 #define TK_ForceShiftPersistent TK(8, 4)
@@ -1003,8 +1002,7 @@ int trs_next_key(int wait)
 	break;
       }
       trs_paused = 1;
-      pause();			/* Wait for SIGALRM */
-      trs_get_event(0);
+      trs_get_event(1);
     }
     return rval;
   }
