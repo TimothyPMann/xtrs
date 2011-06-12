@@ -150,9 +150,6 @@ static XrmOptionDescRec opts[] = {
 {"-switches",   "*switches",    XrmoptionSepArg,        (caddr_t)NULL},
 {"-shiftbracket","*shiftbracket",XrmoptionNoArg,        (caddr_t)"on"},
 {"-noshiftbracket","*shiftbracket",XrmoptionNoArg,      (caddr_t)"off"},
-#if __linux
-{"-sb",         "*sb",          XrmoptionSepArg,        (caddr_t)NULL},
-#endif /* linux */
 {"-emtsafe",    "*emtsafe",     XrmoptionNoArg,         (caddr_t)"on"},
 {"-noemtsafe",  "*emtsafe",     XrmoptionNoArg,         (caddr_t)"off"},
 };
@@ -233,6 +230,12 @@ static XrmDatabase command_db = NULL;
 extern char *program_name;
 char *title;
 
+void trs_exit()
+{
+    exit(0);
+}
+
+
 int trs_parse_command_line(int argc, char **argv, int *debug)
 {
   char option[512];
@@ -292,20 +295,6 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
   image.width *= scale_x;
   image.height = image.height * scale_y / 2;
   image.bytes_per_line *= scale_x;
-
-#if __linux
-  (void) sprintf(option, "%s%s", program_name, ".sb");
-  if (XrmGetResource(x_db, option, "Xtrs.Sb", &type, &value)) {
-    char *next; int ioport, vol;
-    ioport = strtol(value.addr, &next, 0);
-    if(*next == ',') {
-      next++;
-      vol=atoi(next);
-      trs_sound_init(ioport, vol); /* requires root privilege */
-    }
-  }
-  setuid(getuid());
-#endif /* linux */
 
   (void) sprintf(option, "%s%s", program_name, ".emtsafe");
   if (XrmGetResource(x_db, option, "Xtrs.Emtsafe", &type, &value)) {
@@ -599,33 +588,6 @@ void trs_fix_size (Window window, int width, int height)
   XSetWMNormalHints(display, window, &sizehints);
 }
 
-int trs_screen_batched = 0;
-
-void trs_screen_batch()
-{
-#if BATCH
-  /* Defer screen updates until trs_screen_unbatch, then redraw screen
-     if anything changed.  Unfortunately, this seems to slow things
-     down, so it's disabled.  Probably what we should really be doing
-     is rendering into an offscreen buffer when trs_screen_batched is
-     set, then copying to the real screen in trs_screen_unbatch.  Also
-     (and orthogonally) we should probably be keeping track of what
-     part of the screen changed and only redrawing that part. */
-  trs_screen_batched = 1;
-#endif
-}
-
-void trs_screen_unbatch()
-{
-#if BATCH
-  if (trs_screen_batched > 1) {
-    trs_screen_batched = 0;
-    trs_screen_refresh();
-  } else {
-    trs_screen_batched = 0;
-  }
-#endif
-}
 
 /*
  * show help
@@ -1395,11 +1357,6 @@ void trs_screen_refresh()
 {
   int i, srcx, srcy, dunx, duny;
 
-  if (trs_screen_batched) {
-    trs_screen_batched++;
-    return;
-  }
-
 #if XDEBUG
   debug("trs_screen_refresh\n");
 #endif
@@ -1456,10 +1413,6 @@ void trs_screen_write_char(int position, int char_index)
     return;
   }
   if (grafyx_enable && !grafyx_overlay) {
-    return;
-  }
-  if (trs_screen_batched) {
-    trs_screen_batched++;
     return;
   }
   row = position / row_chars;
@@ -1573,10 +1526,6 @@ void trs_screen_scroll()
   for (i = row_chars; i < screen_chars; i++)
     trs_screen[i-row_chars] = trs_screen[i];
 
-  if (trs_screen_batched) {
-    trs_screen_batched++;
-    return;
-  }
   if (grafyx_enable) {
     if (grafyx_overlay) {
       trs_screen_refresh();
@@ -1601,16 +1550,12 @@ void grafyx_write_byte(int x, int y, char byte)
     screen_y < col_chars*cur_char_height/scale_y;
 
   if (grafyx_enable && grafyx_overlay && on_screen) {
-    if (trs_screen_batched) {
-      trs_screen_batched++;
-    } else {
-      /* Erase old byte, preserving text */
-      XPutImage(display, window, gc_xor, &image,
-		x*cur_char_width, y*scale_y,
-		left_margin + screen_x*cur_char_width,
-		top_margin + screen_y*scale_y,
-		cur_char_width, scale_y);
-    }
+    /* Erase old byte, preserving text */
+    XPutImage(display, window, gc_xor, &image,
+	      x*cur_char_width, y*scale_y,
+	      left_margin + screen_x*cur_char_width,
+	      top_margin + screen_y*scale_y,
+	      cur_char_width, scale_y);
   }
 
   /* Save new byte in local memory */
@@ -1649,23 +1594,19 @@ void grafyx_write_byte(int x, int y, char byte)
   }
 
   if (grafyx_enable && on_screen) {
-    if (trs_screen_batched) {
-      trs_screen_batched++;
+    /* Draw new byte */
+    if (grafyx_overlay) {
+      XPutImage(display, window, gc_xor, &image,
+		x*cur_char_width, y*scale_y,
+		left_margin + screen_x*cur_char_width,
+		top_margin + screen_y*scale_y,
+		cur_char_width, scale_y);
     } else {
-      /* Draw new byte */
-      if (grafyx_overlay) {
-	XPutImage(display, window, gc_xor, &image,
-		  x*cur_char_width, y*scale_y,
-		  left_margin + screen_x*cur_char_width,
-		  top_margin + screen_y*scale_y,
-		  cur_char_width, scale_y);
-      } else {
-	XPutImage(display, window, gc, &image,
-		  x*cur_char_width, y*scale_y,
-		  left_margin + screen_x*cur_char_width,
-		  top_margin + screen_y*scale_y,
-		  cur_char_width, scale_y);
-      }
+      XPutImage(display, window, gc, &image,
+		x*cur_char_width, y*scale_y,
+		left_margin + screen_x*cur_char_width,
+		top_margin + screen_y*scale_y,
+		cur_char_width, scale_y);
     }
   }
 }
@@ -1921,11 +1862,6 @@ hrg_write_data(int data)
   if (!hrg_enable) return;
   if ((currentmode & EXPANDED) && (hrg_addr & 1)) return;
   if ((data &= 0x3f) == (old_data &= 0x3f)) return;
-
-  if (trs_screen_batched) {
-    trs_screen_batched++;
-    return;
-  }
 
   position = hrg_addr & 0x3ff;	/* bits 0-9: "PRINT @" screen position */
   line = hrg_addr >> 10;	/* vertical offset inside character cell */
