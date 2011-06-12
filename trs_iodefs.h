@@ -22,3 +22,5 @@
 #define TRS_CHAR_WIDTH 8
 #define TRS_CHAR_HEIGHT 12
 #define TRS_CHAR_HEIGHT4 10
+
+extern char trs_char_data[][MAXCHARS][TRS_CHAR_HEIGHT];
