@@ -31,6 +31,7 @@
 #define INVERSE 2
 #define ALTERNATE 4
 
+extern char *program_name;
 extern int trs_model; /* 1, 3, 4, 5(=4p) */
 extern int trs_paused;
 extern int trs_autodelay;
@@ -40,6 +41,7 @@ extern int trs_continuous; /* 1= run continuously,
 			      0= enter debugger after instruction,
 			     -1= suppress interrupt and enter debugger */
 extern int trs_disk_debug_flags;
+extern int trs_io_debug_flags;
 extern int trs_emtsafe;
 
 extern int trs_parse_command_line(int argc, char **argv, int *debug);
@@ -52,8 +54,6 @@ extern void trs_screen_80x24(int flag);
 extern void trs_screen_inverse(int flag);
 extern void trs_screen_scroll(void);
 extern void trs_screen_refresh(void);
-extern void trs_screen_batch();
-extern void trs_screen_unbatch();
 
 extern void trs_reset(int poweron);
 extern void trs_exit(void);
@@ -81,7 +81,6 @@ extern void trs_cassette_motor(int value);
 extern void trs_cassette_out(int value);
 extern int trs_cassette_in(void);
 extern void trs_sound_out(int value);
-extern void trs_sound_init(int ioport, int vol);
 
 extern int trs_joystick_in(void);
 
@@ -121,7 +120,7 @@ extern int cassette_default_sample_rate;
 extern void trs_orch90_out(int chan, int value);
 extern void trs_cassette_reset(void);
 
-extern void trs_disk_change(int drive);
+extern void trs_disk_change(int drive, char *newname);
 extern void trs_disk_change_all(void);
 extern void trs_disk_debug(void);
 extern int trs_disk_motoroff(void);
@@ -166,7 +165,8 @@ void trs_get_mouse_max(int *x, int *y, unsigned int *sens);
 void trs_set_mouse_max(int x, int y, unsigned int sens);
 int trs_get_mouse_type(void);
 
-void sb_set_volume(int vol);
-int sb_get_volume(void);
+int stringy_in(int unit);
+void stringy_out(int unit, int value);
+void stringy_reset(void);
 
 #endif /*_TRS_H*/
