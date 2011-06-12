@@ -1,4 +1,4 @@
-/* Copyright (c) 2008, Timothy Mann */
+/* Copyright (c) 2011, Timothy Mann */
 /* $Id$ */
 
 /* This software may be copied, modified, and used for any purpose
@@ -38,7 +38,7 @@
 #define STRINGY_EOT_WIDTH 24800 // seems to work; don't know how realistic it is
 #define STRINGY_MAX_UNITS 8
 
-typedef tstate_t stringy_pos_t; // XXX measure length/position in usec instead?
+typedef tstate_t stringy_pos_t;
 
 typedef struct {
   FILE *file;
@@ -69,29 +69,44 @@ stringy_state(int out_port)
 }
 
 static void
+stringy_wrap(stringy_info_t *s)
+{
+  s->in_port = /*ZZZ STRINGY_FLUX*/ 0;
+  s->pos = s->flux_change_pos = 0;
+  s->flux_change_to = 1;
+  rewind(s->file);
+  //XXX skip (or write) header
+}
+
+static void
 stringy_update_pos(stringy_info_t *s)
 {
-  if (!(s->out_port & STRINGY_MOTOR_ON)) {
-    //XXX hack; rom seems to expect motor off/on to get past the splice??
-    if (s->pos >= s->length - STRINGY_EOT_WIDTH) {
-      goto wrap;  //XXX clean this up!
-    }
+  if (stringy_state(s->out_port) == STRINGY_STOPPED) {
+    /*
+     * XXX Always start at the beginning after motor off/on.  This
+     * surely doesn't emulate real hardware accurately, but avoids
+     * situations where I'm not sure what the behavior should be.
+     * Maybe revisit later.
+     */
+    stringy_wrap(s);
+    return;
   }
 
   s->pos += z80_state.t_count - s->pos_time;
   s->pos_time = z80_state.t_count;
+
+  /*
+   * XXX Don't actually wrap when writing; instead allow the ROM to
+   * write as much as it wants, but set the EOT flag when writing past
+   * (s->length - STRINGY_EOT_WIDTH).  When reading, wrap to the
+   * beginning if trying to read beyond s->length.  This is surely not
+   * exactly right, but it makes the ROM happier than what I was doing
+   * before.
+   */
   if (s->pos >= s->length) {
-  wrap:
-#if STRINGYDEBUG_WRAP
-    debug("stringy wrap\n");
-#endif
-    //XXX probably should flush here if we were writing; could be
-    // wrapping on a status read-back
-    s->in_port = /*ZZZ STRINGY_FLUX*/ 0;
-    s->pos = s->flux_change_pos = 0;
-    s->flux_change_to = 1;
-    rewind(s->file);
-    //XXX skip header (if I decide to have one)
+    if (stringy_state(s->out_port) == STRINGY_READING) {
+      stringy_wrap(s);
+    }
   } else if (s->pos >= s->length - STRINGY_EOT_WIDTH) {
     s->in_port |= STRINGY_END_OF_TAPE;
   }
@@ -129,13 +144,15 @@ stringy_reopen(int unit)
 #endif
   }  
 
-  s->length = 2480000; //XXX get from length or header of file?
+  s->length = 2480000; //XXX get from header of file
   s->pos = 0;
   s->pos_time = z80_state.t_count;
   s->flux_change_pos = 0;
   s->flux_change_to = 1;
 
   //XXX check for magic number at start of file, fail if not there?
+
+  //XXX support MKR .esf format!
 
   return 1;
 }
@@ -158,6 +175,8 @@ static void
 stringy_flux_write(stringy_info_t *s, int flux, stringy_pos_t delta)
 {
   //XXX "debug"-style output only for the moment
+  // flux = new flux state
+  // delta = time in *previous* state
   fprintf(s->file, "%u %" TSTATE_T_LEN "\n", flux, delta);
 }
 
@@ -216,6 +235,7 @@ stringy_out(int unit, int value)
 {
   stringy_info_t *s = &stringy_info[unit];
   int old_state, new_state;
+  int ignore;
 
   if (s->in_port & STRINGY_NO_WAFER) return;
 
@@ -234,7 +254,7 @@ stringy_out(int unit, int value)
   if (old_state != STRINGY_WRITING &&
       new_state == STRINGY_WRITING) {
     fflush(s->file);
-    ftruncate(fileno(s->file), ftell(s->file));
+    ignore = ftruncate(fileno(s->file), ftell(s->file));
     fseek(s->file, 0, SEEK_CUR);
     stringy_flux_write(s, 1, 0);
   }
