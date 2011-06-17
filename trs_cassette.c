@@ -218,7 +218,7 @@ static int orch90_left = 128, orch90_right = 128;
 
 /* Put a 2-byte quantity to a file in little-endian order */
 /* Return -1 on error, 0 otherwise */
-static int
+int
 put_twobyte(Ushort n, FILE* f)
 {
   int c;
@@ -232,7 +232,7 @@ put_twobyte(Ushort n, FILE* f)
 
 /* Put a 4-byte quantity to a file in little-endian order */
 /* Return -1 on error, 0 otherwise */
-static int
+int
 put_fourbyte(Uint n, FILE* f)
 {
   int c;
@@ -250,7 +250,7 @@ put_fourbyte(Uint n, FILE* f)
 
 /* Get a 2-byte quantity from a file in little-endian order */
 /* Return -1 on error, 0 otherwise */
-static int
+int
 get_twobyte(Ushort *pp, FILE* f)
 {
   int c;
@@ -266,7 +266,7 @@ get_twobyte(Ushort *pp, FILE* f)
 
 /* Get a 4-byte quantity from a file in little-endian order */
 /* Return -1 on error, 0 otherwise */
-static int
+int
 get_fourbyte(Uint *pp, FILE* f)
 {
   int c;
