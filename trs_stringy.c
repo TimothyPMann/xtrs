@@ -9,9 +9,6 @@
 /*
  * Emulate Exatron stringy floppy.
  *
- * XXX need to (re)test whether esf output can be read by TRS32.  the
- * esf output of TRS32 could be read at last test.
- *
  * XXX @NEW does not always write exactly the same bits and the length
  * seems to vary by +/-1 byte sometimes.  May only be when overwriting
  * a wafer.  Hmm, forgetting to clear the last partial byte from an
@@ -99,8 +96,7 @@ struct {
 }
  */
 
-//XXX debug format should record leaderLength and writeProtected too
-const char stringy_debug_header[] = "xtrs stringy debug %u\n";
+const char stringy_debug_header[] = "xtrs stringy debug %ld %ld %d\n";
 
 #define STRINGY_STOPPED 0
 #define STRINGY_READING 1
@@ -125,7 +121,9 @@ stringy_write_header(stringy_info_t *s)
   case STRINGY_FMT_DEBUG:
     ires = ftruncate(fileno(s->file), 0);
     if (ires < 0) return ires;
-    ires = fprintf(s->file, stringy_debug_header, (Uint) s->length);
+    ires = fprintf(s->file, stringy_debug_header,
+		   s->length, s->eotWidth,
+		   (s->in_port & STRINGY_WRITE_PROT) != 0);
     if (ires < 0) return ires;
     break;
   case STRINGY_FMT_ESF:
@@ -189,14 +187,17 @@ static int
 stringy_read_debug_header(stringy_info_t *s)
 {
   int ires;
-  Uint len;
+  stringy_pos_t len, eotw;
+  int wprot;
   
   rewind(s->file);
-  ires = fscanf(s->file, stringy_debug_header, &len);
-  if (ires < 1) return -1;
+  ires = fscanf(s->file, stringy_debug_header, &len, &eotw, &wprot);
+  if (ires < 3) return -1;
   s->format = STRINGY_FMT_DEBUG;
   s->length = len;
-  s->eotWidth = STRINGY_EOT_DEFAULT * STRINGY_CELL_WIDTH; //XXX add to header
+  s->eotWidth = eotw;
+  s->in_port = (s->in_port & ~STRINGY_WRITE_PROT) |
+    (wprot ? STRINGY_WRITE_PROT : 0);
   fseek(s->file, 0, SEEK_CUR);
   return 0;
 }
@@ -217,25 +218,6 @@ static void
 stringy_update_pos(stringy_info_t *s)
 {
   if (stringy_state(s->out_port) == STRINGY_STOPPED) {
-#if 1
-    /*
-     * XXX Always start at the beginning after motor off/on.  This
-     * surely doesn't emulate real hardware accurately, but I am
-     * getting "tape too short" errors without it.  Maybe it is
-     * working around a bug elsewhere?  Would like to get rid of this
-     * for that reason.  Also wondering if it is causing problems.
-     *
-     * If we do need this, factor out the common code from the wrap
-     * cases.
-     */
-    s->pos = 0;
-    s->in_port &= ~STRINGY_END_OF_TAPE;
-    stringy_read_header(s);
-    //XXX this can't be quite right XXX
-    // there should not be a glitch at the wrap point
-    s->flux_change_pos = 0;
-    s->flux_change_to = 1;
-#endif
     return;
   }
 
@@ -246,7 +228,6 @@ stringy_update_pos(stringy_info_t *s)
    * XXX Wrapping this way on write still doesn't exactly duplicate
    * TRS32 output (TRS32 seems to drop one bit, while mine looks
    * worse).  Maybe I'm trying to wrap when not on a byte boundary?
-   * Maybe missing a stringy_byte_flush or doing it at the wrong spot?
    */
   if (s->pos >= s->length) {
     // Debug format can't handle overwriting
@@ -335,6 +316,7 @@ static void
 stringy_byte_flush(stringy_info_t *s)
 {
   int ires;
+  Uchar mask;
 
   if (s->format != STRINGY_FMT_ESF ||
       stringy_state(s->out_port) != STRINGY_WRITING ||
@@ -346,13 +328,16 @@ stringy_byte_flush(stringy_info_t *s)
     ires = 0;
   }
   fseek(s->file, -1, SEEK_CUR);
-  fputc((ires & (0xff << s->bitpos)) | s->bytebuf, s->file); //XXX handle errors
+  mask = 0xff << s->bitpos;
+  s->bytebuf = (ires & mask) | (s->bytebuf & ~mask);
+  fputc(s->bytebuf, s->file); //XXX handle errors
   fseek(s->file, -1, SEEK_CUR);
 }
 
 static void
 stringy_bit_write(stringy_info_t *s, int flux)
 {
+  s->bytebuf &= ~(1 << s->bitpos);
   s->bytebuf |= flux << s->bitpos;
   s->bitpos++;
   if (s->bitpos == 8) {
@@ -491,7 +476,7 @@ stringy_in(int unit)
   return ret;
 }
 
-// XXX the state change stuff is a bit suspect, and not too clean
+// XXX the state change stuff is a bit suspect, and not too clean.
 void
 stringy_out(int unit, int value)
 {
@@ -521,7 +506,7 @@ stringy_out(int unit, int value)
       ignore = ftruncate(fileno(s->file), ftell(s->file));
     }
     fseek(s->file, 0, SEEK_CUR);
-    stringy_flux_write(s, 1, 0);
+    stringy_flux_write(s, 1, 0); //XXX needed?  bad?
   }
 
   if (old_state == STRINGY_WRITING) {
@@ -532,12 +517,34 @@ stringy_out(int unit, int value)
       s->flux_change_pos = s->pos;
     }
 
-    if (old_state == STRINGY_WRITING &&
-	new_state != STRINGY_WRITING) {
+    if (new_state != STRINGY_WRITING) {
       stringy_byte_flush(s);
       fflush(s->file);
     }
   }
+
+#if 1
+  if (old_state != STRINGY_STOPPED &&
+      new_state == STRINGY_STOPPED) {
+    /*
+     * XXX Always start at the beginning after motor off/on.  This
+     * surely doesn't emulate real hardware accurately, but I am
+     * getting "tape too short" errors on @SAVE without it.  Maybe it
+     * is working around a bug elsewhere?  Would like to get rid of
+     * this for that reason.  Also wondering if it is causing
+     * problems.
+     *
+     * If we do need this, factor out the common code from the wrap
+     * cases, or maybe a common "position to start" routine.
+     */
+    s->pos = 0;
+    s->pos_time = z80_state.t_count;
+    s->in_port &= ~STRINGY_END_OF_TAPE;
+    stringy_read_header(s);
+    //XXX anything else to initialize here?
+  }
+#endif
+
   s->out_port = value;
 
 #if STRINGYDEBUG_OUT
