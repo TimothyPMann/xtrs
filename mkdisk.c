@@ -350,6 +350,7 @@ main(int argc, char *argv[])
       exit(2);
     }
 
+    memset(&rhh, 0, sizeof(rhh));
     rhh.id1 = 0x56;
     rhh.id2 = 0xcb;
     rhh.ver = 0x10;
@@ -370,7 +371,6 @@ main(int argc, char *argv[])
     rhh.gran = gran;
     rhh.dcyl = dir;
     strcpy(rhh.label, "xtrshard");
-    strcpy(rhh.filename, fname); /* note we don't limit to 8 chars */
 
     cksum = 0;
     rhhp = (Uchar *) &rhh;
