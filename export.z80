@@ -228,7 +228,6 @@ gotu:   ld hl, iobuf
         ld de, dcb
         ld b, 0
         call open               ; open the TRS-80 file
-        pop hl
         jr z, uname
 	cp lrlerr
 	jr z, uname
