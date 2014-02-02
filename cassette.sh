@@ -71,7 +71,7 @@ while [ "$DONE" != "yes" ]; do
           *)
             FORMAT=1 ;;
         esac
-        echo "$(arrayitem 2 $COMMAND) $FORMAT" > $CONTROL_FILE
+        echo "$(arrayitem 2 $COMMAND) 0 $FORMAT" > $CONTROL_FILE
       fi ;;
     type)
       if [ $(arraycount $COMMAND) -ne 2 ]; then
