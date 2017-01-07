@@ -42,5 +42,4 @@ typedef struct {
   Uchar dcyl;      /* 31: Directory cylinder [mkdisk sets to 1; xtrs ignores]*/
   char label[32];  /* 32: Volume label: 31 bytes terminated by 0 */
   Uchar res2[192]; /* 64 - 255: reserved */
-#endif
 } ReedHardHeader;
