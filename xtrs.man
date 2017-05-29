@@ -56,8 +56,8 @@ F11 toggles onscreen help on the keyboard mappings.
 LeftArrow, Backspace, or Delete is the TRS-80 left arrow key.
 RightArrow or Tab is the right arrow key.  UpArrow is the up arrow
 key.  DownArrow or Linefeed is the down arrow key.  Esc or Break is
-the Break key.  Home, Clear, or LeftAlt is the Clear key.  Control is
-the Model 4 Ctrl key (address bit 7, data bit 2).  RightAlt is
+the Break key.  Home, Clear, or LeftMeta is the Clear key.  Control is
+the Model 4 Ctrl key (address bit 7, data bit 2).  RightMeta is
 equivalent to the shifted down arrow key (used as a control key with
 some TRS-80 software).
 
@@ -569,8 +569,8 @@ The emulator implements a set of pseudo-instructions (emulator traps)
 that give TRS-80 programs access to Unix files.  The programs listed
 above use them.  If you would like to write your own such programs,
 the traps are documented in the file trs_imp_exp.h.  Assembler
-source code for the existing programs is supplied in xtrshard.z,
-import.z, export.z, and settime.z.  You can also write programs that
+source code for the existing programs is supplied in xtrshard.z80,
+import.z80, export.z80, and settime.z80.  You can also write programs that
 use the traps in Misosys C, using the files xtrsemt.h and xtrsemt.ccc
 as an interface; a simple example is in settime.ccc. 
 .SH Interrupts
@@ -583,14 +583,14 @@ The Model I has a 40 Hz heartbeat clock interrupt, while the Model
 III uses 30 Hz, and the Model 4/4P can run at either 30 Hz or 60 Hz.
 The emulator approximates this rather well even on a system where
 clock ticks come at some frequency that isn't divisible by the
-emulated frequency (e.g., 100 Hz on Intel Linux), as long as the true
+emulated frequency (e.g., 100 Hz on some Linux versions), as long as the true
 frequency is not slower than the emulated frequency.  The emulator has
 a notion of the absolute time at which each tick is supposed to occur,
 and it asks the host system to wake it up at each of those times.  The
 net result is that some ticks may be late, but there are always the
 proper number of ticks per second.  For example, running in Model I
-mode on Intel Linux you'd see this pattern: (tick, 30ms, tick,
-20ms,...) instead of seeing ticks every 25ms.
+mode on a system with 100 Hz ticks, you'd see this pattern: (tick,
+30ms, tick, 20ms,...) instead of seeing ticks every 25ms.
 .SH Processor speed selection
 A standard Model 4 has a software-controlled switch to select
 operation at either 4.05504 MHz (with heartbeat clock at 60 Hz)
@@ -842,7 +842,7 @@ Enter zbx, the z80 debugger.
 .PD
 Use the romfile specified by \fIfilename\fP in Model I mode, the
 romfile specified by \fIfilename3\fP in Model III and Model 4 mode,
-or the romfile specified by \fIfilename4p\fP in Model 4P mode,
+or the romfile specified by \fIfilename4p\fP in Model 4P mode.
 A romfile can be either a raw binary dump, Intel hex format, or
 TRS-80 cmd format (for example, a MODELA/III file).
 If you do not set this option or the corresponding X resource, a default
