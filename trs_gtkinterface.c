@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Timothy Mann */
+/* Copyright (c) 2009-2017, Timothy Mann */
 /* $Id$ */
 
 /* This software may be copied, modified, and used for any purpose
@@ -8,20 +8,26 @@
 
 /*
  * XXX TODO
- * - toolbar buttons seem broken (no labels) under Ubuntu 10.04.
  * - either reclaim F10 (how?) or redo F-key bindings
- * - keyboard help (like old F11 help)
+ * - keyboard help (like old F11 help) -- add to help menu.
  * - need a way to package up trs.glade and find at runtime
- * - design more menus, toolbar, and dialogs.  removed unused menu items.
- * - create a window for zbx instead of using the launch xterm (?).
- * - defaults from a file and/or some gtk mechanism? (to replace Xrm stuff)
+ * - design more menus, toolbar, and dialogs.  remove any unused menu items.
+ * - create a window for zbx instead of using the launch xterm.
+ * - save/load settings to a file (file selectable on command line).  useful to 
+ *    replace old way of pre-configured directories with disk?-? symlinks.
+ * - implement copy/paste.  can maybe steal some code from sdltrs.
+ * - generally, look at sdltrs for ideas and code to steal.
  * - split up this file more
  * - fix any remaining XXX's
  */
 
-#define GDK_ENABLE_BROKEN 1 // needed for gdk_image_new_bitmap
-#include <gtk/gtk.h>
-#include <gdk/gdkkeysyms.h>
+/*XXX for command line parsing, should move? */
+#define _XOPEN_SOURCE 500 /* string.h: strdup() */
+#include <getopt.h>
+#include <string.h>
+#include <strings.h>
+#include <stdlib.h>
+/*XXX end */
 
 /*XXX for ROM loading stuff, should not be here*/
 #include <sys/types.h>
@@ -29,11 +35,9 @@
 #include <unistd.h>
 /*XXX end */
 
-/*XXX for command line parsing, should move? */
-#include <getopt.h>
-#include <string.h>
-#include <stdlib.h>
-/*XXX end */
+#define GDK_ENABLE_BROKEN 1 // needed for gdk_image_new_bitmap
+#include <gtk/gtk.h>
+#include <gdk/gdkkeysyms.h>
 
 #include "trs.h"
 #include "trs_iodefs.h"
@@ -306,7 +310,7 @@ struct option options[] = {
   {"scale3",         FALSE, &scale_x,          3     },
   {"scale4",         FALSE, &scale_x,          4     },
   {"resize",	     FALSE, &resize,           TRUE  },
-  {"noresize",	     FALSE  &resize,           FALSE },
+  {"noresize",	     FALSE, &resize,           FALSE },
   {"charset",        TRUE,  NULL,              0     },
   {"microlabs",      FALSE, &grafyx_microlabs, TRUE  },
   {"nomicrolabs",    FALSE, &grafyx_microlabs, FALSE },
@@ -445,7 +449,7 @@ trs_parse_command_line(int argc, char **argv, int *debug)
       cassette_default_sample_rate = strtol(optarg, NULL, 0);
     } else if (strcmp(name, "serial") == 0) {
       trs_uart_name = strdup(optarg);
-    } else if (strcmp(name, "samplerate") == 0) {
+    } else if (strcmp(name, "switches") == 0) {
       trs_uart_switches = strtol(optarg, NULL, 0);
     }
   }
@@ -557,7 +561,7 @@ trs_parse_command_line(int argc, char **argv, int *debug)
     }
   }
 
-  return 1;  //XXX remove code from caller to check return value
+  return 1;
 }
 
 
@@ -655,7 +659,7 @@ trs_screen_init(void)
   /*
    * Work around glade-3 not letting me connect to the delete-event
    * signal for dialogs, instead leaving it with the default
-   * that destroys the dialog.
+   * that destroys the dialog.  XXX is this still a problem?
    */
   g_signal_connect(GTK_OBJECT(about_dialog), "delete-event",
 		   GTK_SIGNAL_FUNC(gtk_widget_hide_on_delete), NULL);
@@ -713,7 +717,7 @@ trs_screen_init(void)
    * here by xor'ing the fore_color and back_color pixel values, not
    * by xor'ing the RGB components and asking gdk_colormap_alloc_color
    * to allocate the closest matching color.  Similarly, the null_color
-   * simply has pixel value 0.  XXX something isn't working here though...
+   * simply has pixel value 0.
    */
   xor_color.pixel = fore_color.pixel ^ back_color.pixel;
   null_color.pixel = 0;
@@ -999,43 +1003,35 @@ void trs_screen_80x24(int flag)
 }
 
 
-//XXX we probably want to initialize the disk change dialog with
-//XXX the old filename.  see gtk_file_chooser_set_file, etc.
-const gchar *
-choose_filename(const gchar *title)
-{
-  GtkWidget *chooser;
-  const gchar *filename = NULL;
-                
-  chooser = gtk_file_chooser_dialog_new(title,
-					GTK_WINDOW(main_window),
-					GTK_FILE_CHOOSER_ACTION_OPEN,
-					GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
-					GTK_STOCK_OPEN, GTK_RESPONSE_OK,
-					NULL);
-                                               
-  if (gtk_dialog_run(GTK_DIALOG (chooser)) == GTK_RESPONSE_OK) {
-      filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(chooser));
-  }
-        
-  gtk_widget_destroy(chooser);
-  return filename;
-}
-
-
 /* 
  * Get and process GTK event(s).
- *   If wait is true, process one event, blocking until one is available.
- *   If wait is false, process as many events as are available, returning
- *     when none are left.
+ *
+ *   If wait is true, we think there's nothing to do right now and
+ *   want to give up the CPU until there is something to do.
+ *   Unfortunately we can't simply call gtk_main_iteration_do in
+ *   blocking mode, because (currently) we don't timer ticks via GTK.
+ *   Instead, trs_interrupt.c uses an itimer and gets a SIGALRM
+ *   callback, and that doesn't cause gtk_main_iteration_do to
+ *   unblock.  So instead we pause() and then call
+ *   gtk_main_iteration_do in nonblocking mode.
+ *
+ *   If wait is false we definitely don't want to block for events.
+ *
  * Handle interrupt-driven uart input here too.
+ *
  */ 
 void trs_get_event(int wait)
 {
   if (trs_model > 1) {
     (void)trs_uart_check_avail();
   }
-  gtk_main_iteration_do(wait);
+  if (wait) {
+    pause();
+    trs_paused = 1;
+  }
+  do {
+    gtk_main_iteration_do(FALSE);
+  } while (gtk_events_pending());
 }
 
 
@@ -1046,29 +1042,19 @@ on_reset_menu_item_activate(GtkMenuItem *menuitem,
   trs_reset(0);
 }
 
-
 void
-on_reset_button_clicked(GtkToolButton *toolbutton,
-			gpointer user_data)
+on_hard_reset_menu_item_activate(GtkMenuItem *menuitem,
+				 gpointer user_data)
 {
-  trs_reset(0);
+  trs_reset(1);
 }
 
-
+//XXX not used
 void
 on_disk_change_menu_item_activate(GtkMenuItem *menuitem,
 				  gpointer user_data)
 {
-  trs_disk_change_all();
-}
-
-
-//XXX Not used
-void
-on_disk_change_button_clicked(GtkToolButton *toolbutton,
-			      gpointer user_data)
-{
-  trs_disk_change_all();
+  trs_change_all();
 }
 
 
@@ -1080,33 +1066,130 @@ on_debugger_menu_item_activate(GtkMenuItem *menuitem,
 }
 
 
-void
-on_debugger_button_clicked(GtkToolButton *toolbutton,
-			   gpointer user_data)
-{
-  trs_debug();
-}
-
+typedef const char *get_name_func(int unit);
+typedef int set_name_func(int unit, const char *newname);
+typedef int create_func(const char *newname);
 
 void
-on_disk_button_clicked(GtkToolButton *toolbutton,
-		       gpointer user_data)
+choose_file(GtkMenuItem *menuitem,
+	    char *title_fmt,
+	    char *remove_lbl,
+	    char *insert_lbl,
+	    get_name_func get_name,
+	    set_name_func set_name,
+	    create_func create)
 {
   const gchar *label;
+  int unit;
+  const gchar *title;
+  const char *old_filename;
+  GtkWidget *chooser;
+  GtkResponseType response;
   const gchar *filename;
-  int disk_number;
+  int ires;
 
-  label = gtk_tool_button_get_label(toolbutton);
-  disk_number = strtoul(&label[1], NULL, 0);
-  
-  filename = choose_filename(label);
-  if (filename == NULL) return;
+  label = gtk_menu_item_get_label(menuitem);
+  unit = strtoul(&label[1], NULL, 0);
+  title = g_strdup_printf(title_fmt, unit);
+  old_filename = get_name(unit);
 
-  //XXX Ugh, copy from g_malloc to malloc domain
-  trs_disk_change(disk_number, strdup(filename));
-  g_free((gpointer)filename);
+  chooser = gtk_file_chooser_dialog_new(title,
+					GTK_WINDOW(main_window),
+					GTK_FILE_CHOOSER_ACTION_OPEN,
+					GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
+					remove_lbl, GTK_RESPONSE_REJECT,
+					insert_lbl, GTK_RESPONSE_OK,
+					NULL);
+  if (old_filename) {
+    gtk_file_chooser_set_filename(GTK_FILE_CHOOSER(chooser), old_filename);
+  }
+  if (strcmp(trs_disk_dir, ".") != 0) {
+    gtk_file_chooser_add_shortcut_folder(GTK_FILE_CHOOSER(chooser),
+					 trs_disk_dir, NULL);
+  }
+
+  response = gtk_dialog_run(GTK_DIALOG(chooser));
+  switch (response) {
+  case GTK_RESPONSE_OK:
+    filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(chooser));
+    ires = set_name(unit, filename);
+
+    if (ires == ENOENT) {
+      GtkWidget *message =
+	gtk_message_dialog_new(GTK_WINDOW(main_window),
+			       GTK_DIALOG_DESTROY_WITH_PARENT,
+			       GTK_MESSAGE_QUESTION,
+			       GTK_BUTTONS_YES_NO,
+			       "File '%s' does not exist; create it?",
+			       filename);
+      response = gtk_dialog_run(GTK_DIALOG(message));
+      if (response == GTK_RESPONSE_YES) {
+	ires = create(filename);
+	if (ires == 0) {
+	  ires = set_name(unit, filename);
+	}
+      } else {
+	ires = 0;
+      }
+      gtk_widget_destroy(message);
+    }
+
+    if (ires != 0) {
+      const gchar *msg = 
+	(ires == -1) ? "Unrecognized file format" : g_strerror(ires);
+      GtkWidget *message =
+	gtk_message_dialog_new(GTK_WINDOW(main_window),
+			       GTK_DIALOG_DESTROY_WITH_PARENT,
+			       GTK_MESSAGE_ERROR,
+			       GTK_BUTTONS_CLOSE,
+			       "Error opening file '%s': %s",
+			       filename, msg);
+      gtk_dialog_run(GTK_DIALOG(message));
+      gtk_widget_destroy(message);
+    }
+    g_free((gpointer)filename);
+    break;
+
+  case GTK_RESPONSE_REJECT:
+    set_name(unit, NULL);
+    break;
+
+  case GTK_RESPONSE_CANCEL:
+  default:
+    break;
+  }
+
+  gtk_widget_destroy(chooser); //XXX hide and reuse instead?
+  g_free((gpointer)title);
 }
 
+void
+on_floppy_menu_item_activate(GtkMenuItem *menuitem,
+			     gpointer user_data)
+{
+  choose_file(menuitem, "Floppy disk in drive %u",
+	      "Remove disk", "Insert disk",
+	      trs_disk_get_name, trs_disk_set_name, trs_disk_create);
+}
+
+
+void
+on_hard_menu_item_activate(GtkMenuItem *menuitem,
+			   gpointer user_data)
+{
+  choose_file(menuitem, "Emulated hard drive %u",
+	      "Disconnect drive", "Connect drive",
+	      trs_hard_get_name, trs_hard_set_name, trs_hard_create);
+}
+
+void
+on_stringy_menu_item_activate(GtkMenuItem *menuitem,
+			      gpointer user_data)
+{
+  choose_file(menuitem, "Stringy floppy wafer in drive %u",
+	      "Remove wafer", "Insert wafer",
+	      stringy_get_name, stringy_set_name, stringy_create);
+}
 
 void
 on_about_menu_item_activate(GtkMenuItem *menuitem,
@@ -1146,6 +1229,11 @@ on_drawing_area_focus_in_event(GtkWidget *widget,
 			       GdkEventFocus *event,
 			       gpointer user_data)
 {
+  /*
+   * These bugs were fixed in 2009, so I've #if'ed out the 22515
+   * workaround and won't worry about lacking a 21454 workaround.
+   */
+#if WORKAROUND_X_REPEAT_BUG
 #if KDEBUG
   debug("focus in\n");
 #endif
@@ -1153,13 +1241,11 @@ on_drawing_area_focus_in_event(GtkWidget *widget,
    * Disable repeat instead of relying on GDK detectable autorepeat to
    * work around https://bugs.freedesktop.org/show_bug.cgi?id=22515
    *
-   * Sadly, I haven't found a good workaround for
+   * I haven't found a good workaround for
    * https://bugs.freedesktop.org/show_bug.cgi?id=21454
-   *
-   * XXX These bugs were fixed in 2009, so I should probably ifdef the
-   * 22515 workaround and not worry about lacking a 21454 workaround.
    */
   disable_repeat(drawing_area->window);
+#endif
   return FALSE;
 }
 
@@ -1168,12 +1254,14 @@ on_drawing_area_focus_out_event(GtkWidget *widget,
 				GdkEventFocus *event,
 				gpointer user_data)
 {
+#if WORKAROUND_X_REPEAT_BUG
 #if KDEBUG
   debug("focus out\n");
 #endif
   restore_repeat(drawing_area->window);
   trs_xlate_keysym(0x10000); /* all keys up */
   memset(last_keysym, 0, sizeof(last_keysym));
+#endif
   return FALSE;
 }
 
@@ -1191,27 +1279,24 @@ on_drawing_area_key_press_event(GtkWidget *widget,
 #endif
   switch (keysym) {
     /* Trap some function keys here */
-  case GDK_F10: //XXX gtk (or metacity??) eats this key and opens the file menu
+  case GDK_F10: //XXX something eats this key and opens the file menu
   case GDK_F12:
     trs_reset(0);
     keysym = 0;
-    trs_skip_next_kbwait();
     break;
   case GDK_F9:
     trs_debug();
     keysym = 0;
-    trs_skip_next_kbwait();
     break;
   case GDK_F8:
+    //XXX This dialog gets placed badly.  Should center it over the main window.
     gtk_dialog_run(GTK_DIALOG(quit_dialog));
     gtk_widget_hide(quit_dialog);
     keysym = 0;
-    trs_skip_next_kbwait();
     break;
   case GDK_F7:
-    trs_disk_change_all();
+    trs_change_all();
     keysym = 0;
-    trs_skip_next_kbwait();
     break;
   default:
     break;

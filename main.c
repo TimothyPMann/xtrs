@@ -24,6 +24,7 @@
 #include "z80.h"
 #include "trs.h"
 #include "trs_disk.h"
+#include "trs_hard.h"
 #include "load_cmd.h"
 
 int trs_model = 1;
@@ -118,12 +119,14 @@ int main(int argc, char *argv[])
 
     argc = trs_parse_command_line(argc, argv, &debug);
     if (argc > 1) {
-      fprintf(stderr, "%s: erroneous argument %s\n", program_name, argv[1]);
-      exit(1);
+      fatal("erroneous argument %s", argv[1]);
     }
     mem_init();
     trs_screen_init();
     trs_timer_init();
+    trs_disk_init();
+    trs_hard_init();
+    stringy_init();
 
     trs_reset(1);
     if (!debug) {

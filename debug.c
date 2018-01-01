@@ -18,6 +18,8 @@
    $Id$
 */
 
+#define _POSIX_C_SOURCE 200112L /* signal.h: sigemptyset(), ... */
+
 #include "z80.h"
 #include "trs.h"
 
@@ -25,6 +27,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <string.h>
+#include <strings.h> /* strcasecmp() */
 
 #ifdef READLINE
 #include <readline/readline.h>
@@ -56,7 +59,7 @@ static char help_message[] =
 \n\
 Running:\n\
     run\n\
-        Hard reset the Z-80 and devices and commence execution.\n\
+        Hard reset the Z80 and devices and commence execution.\n\
     cont\n\
         Continue execution.\n\
     step\n\
@@ -69,14 +72,14 @@ Running:\n\
         until the return.  Interrupts are always allowed inside the call,\n\
         but only the nextint form allows an interrupt afterwards.\n\
     reset\n\
-        Hard reset the Z-80 and devices.\n\
+        Hard reset the Z80 and devices.\n\
     softreset\n\
         Press the system reset button.  On Model I/III, softreset resets the\n\
         devices and posts a nonmaskable interrupt to the CPU; on Model 4/4P,\n\
         softreset is the same as hard reset.\n\
 Printing:\n\
     dump\n\
-        Print the values of the Z-80 registers.\n\
+        Print the values of the Z80 registers.\n\
     list\n\
     list <addr>\n\
     list <start addr> , <end addr>\n\
@@ -164,7 +167,7 @@ static char *trap_name(int flag)
 
 static void show_zbxinfo()
 {
-    printf("zbx: Z-80 debugger by David Gingold, Alex Wolman, and Timothy"
+    printf("zbx: Z80 debugger by David Gingold, Alex Wolman, and Timothy"
            " Mann\n");
     printf("\n");
     printf("Traps set: %d (maximum %d)\n", num_traps, MAX_TRAPS);
@@ -308,12 +311,14 @@ static void signal_handler()
 {
     stop_signaled = 1;
     if (trs_continuous > 0) trs_continuous = 0;
+    trs_skip_next_kbwait();
 }
 
 void trs_debug()
 {
     stop_signaled = 1;
     if (trs_continuous > 0) trs_continuous = 0;
+    trs_skip_next_kbwait();
 }
 
 void debug_init()
@@ -321,7 +326,7 @@ void debug_init()
     int i;
 
     traps = (Uchar *) malloc(ADDRESS_SPACE * sizeof(Uchar));
-    bzero(traps, ADDRESS_SPACE * sizeof(Uchar));
+    memset(traps, 0, ADDRESS_SPACE * sizeof(Uchar));
 
     for(i = 0; i < MAX_TRAPS; ++i) trap_table[i].valid = 0;
 

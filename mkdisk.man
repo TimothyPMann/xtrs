@@ -1,256 +1,628 @@
-.TH mkdisk 1
+.\" This man page attempts to follow the conventions and recommendations found
+.\" in Michael Kerrisk's man-pages(7) and GNU's groff_man(7), and groff(7).
+.\"
+.\" The following macro definitions come from groff's an-ext.tmac.
+.\"
+.\" Copyright (C) 2007-2014  Free Software Foundation, Inc.
+.\"
+.\" Written by Eric S. Raymond <esr@thyrsus.com>
+.\"            Werner Lemberg <wl@gnu.org>
+.\"
+.\" You may freely use, modify and/or distribute this file.
+.\"
+.\" If _not_ GNU roff, define macros to handle synopsis and URLs.
+.if !\n[.g] \{\
+.\" Declare start of command synopsis.  Sets up hanging indentation.
+.de SY
+.  ie !\\n(mS \{\
+.    nh
+.    nr mS 1
+.    nr mA \\n(.j
+.    ad l
+.    nr mI \\n(.i
+.  \}
+.  el \{\
+.    br
+.    ns
+.  \}
+.
+.  nr mT \w'\fB\\$1\fP\ '
+.  HP \\n(mTu
+.  B "\\$1"
+..
+.
+.
+.\" End of command synopsis.  Restores adjustment.
+.de YS
+.  in \\n(mIu
+.  ad \\n(mA
+.  hy \\n(HY
+.  nr mS 0
+..
+.
+.
+.\" Declare optional option.
+.de OP
+.  ie \\n(.$-1 \
+.    RI "[\fB\\$1\fP" "\ \\$2" "]"
+.  el \
+.    RB "[" "\\$1" "]"
+..
+.
+.
+.\" Start URL.
+.de UR
+.  ds m1 \\$1\"
+.  nh
+.  if \\n(mH \{\
+.    \" Start diversion in a new environment.
+.    do ev URL-div
+.    do di URL-div
+.  \}
+..
+.
+.
+.\" End URL.
+.de UE
+.  ie \\n(mH \{\
+.    br
+.    di
+.    ev
+.
+.    \" Has there been one or more input lines for the link text?
+.    ie \\n(dn \{\
+.      do HTML-NS "<a href=""\\*(m1"">"
+.      \" Yes, strip off final newline of diversion and emit it.
+.      do chop URL-div
+.      do URL-div
+\c
+.      do HTML-NS </a>
+.    \}
+.    el \
+.      do HTML-NS "<a href=""\\*(m1"">\\*(m1</a>"
+\&\\$*\"
+.  \}
+.  el \
+\\*(la\\*(m1\\*(ra\\$*\"
+.
+.  hy \\n(HY
+..
+.
+.
+.\" Start example.
+.de EX
+.  do ds mF \\n[.fam]
+.  nr mE \\n(.f
+.  nf
+.  nh
+.  do fam C
+.  ft CW
+..
+.
+.
+.\" End example.
+.de EE
+.  do fam \\*(mF
+.  ft \\n(mE
+.  fi
+.  hy \\n(HY
+..
+.\} \" not GNU roff
+.\" End of Free Software Foundation copyrighted material.
+.\"
+.\" Define macro for references to floppy drive size requiring fractional units,
+.\" because the standard character escapes for common ("vulgar") fractions
+.\" degrade to ASCII poorly in context (e.g., 5\(14 renders as "51/4" in
+.\" mkdisk.txt).
+.\"
+.\" Usage note: This macro does _not_ have an ending word break; this is so that
+.\" the "-inch" suffix can be appended where desired.  If you require a word
+.\" break, the correct *roff way to get one is to put a single word space on a
+.\" line by itself after the macro call.
+.\"
+.\" BEGIN EXAMPLE
+.\" The drive can be eight inches or
+.\" .5-1/4
+.\"  \" ordinary space character (paddable by *roff)
+.\" inches.
+.\" END EXAMPLE
+.de 5-1/4
+5\c
+.ie '\*(.T'ascii' \&.25\c
+.el \(14\c
+..
+.\" Copyright 1998 Timothy Mann
+.\"
+.\" This software may be copied, modified, and used for any purpose
+.\" without fee, provided that (1) the above copyright notice is
+.\" retained, and (2) modified versions are clearly marked as having
+.\" been modified, with the modifier's name and the date included.
+.\"
+.TH mkdisk 1 2017-06-18 xtrs
 .SH Name
-mkdisk \- Make a blank emulated floppy or hard disk for xtrs,
-or add/remove an emulated write protect tab
-.SH Syntax
-.B mkdisk -1 filename
-.br
-.B mkdisk [-3] filename
-.br
-.B mkdisk -k [-s sides] [-d density] [-8] [-i] filename
-.br
-.B mkdisk -h [-c cyl] [-s sec] [-g gran] filename
-.br
-.B mkdisk {-p|-u} {-1|-3|-k|-h} filename
+mkdisk \- make a blank emulated floppy or hard disk for xtrs,
+or add/remove an emulated write-protect tab
+.SH Synopsis
+.SY mkdisk
+.B \-1
+.OP \-f
+.I filename
+.YS
+.PP
+.SY mkdisk
+.OP \-3
+.OP \-f
+.I filename
+.YS
+.PP
+.SY mkdisk
+.B \-k
+.OP \-s sides
+.OP \-d density
+.OP \-8
+.OP \-i
+.OP \-f
+.I filename
+.YS
+.PP
+.SY mkdisk
+.B \-h
+.OP \-c cyl
+.OP \-s sec
+.OP \-g gran
+.OP \-d dcyl
+.OP \-f
+.I filename
+.YS
+.PP
+.SY mkdisk
+.RB { \-p | \-u }
+.RB { \-1 | \-3 | \-k | \-h }
+.I filename
+.YS
 .SH Description
-The mkdisk program is part of the \fBxtrs\fP(1) package.  It has two
-distinct functions: (1) It can make a
-blank (unformatted) emulated floppy or hard drive in a file.  
-(2) With the -p or -u flag, it can
-turn the write protect flag on or off for an existing emulated floppy or hard 
-drive file.  See the xtrs man page for background information.
-
-The conventional file extensions are .dsk for emulated floppies 
-and .hdv for emulated hard drives, but \fBmkdisk\fP does not enforce this
-convention; you can use any filename.  Other extensions sometimes used
-for emulated floppies are .jv1, .jv3, .8in, and .dmk.
-.SH Making Emulated Floppies
-With the -1 flag, \fBmkdisk\fP makes an unformatted emulated floppy of
-type JV1.  No additional flags are accepted.
-
-With the -3 flag (which is the default and should normally
-be used), \fBmkdisk\fP makes an unformatted emulated floppy of type
-JV3.  No additional flags are accepted.
-
-With the -k flag, \fBmkdisk\fP makes an unformatted emulated floppy of
-type DMK.  With -k, the optional flags -s, -d, -8, and -i can be used
-to give the emulated floppy special properties.  Specifying -s1
-limits the floppy to one side; with -s2 (the default), the floppy can
-be formatted as either one- or two-sided.  Specifying -d1 limits the
-floppy to single density; with -d2 (the default), the floppy can be
-formatted in either single or double density.  Specifying -8 allows
-the floppy to be formatted in an emulated 8" drive; by default it will
-work properly only in an emulated 5" drive.  Setting -s1 or -d1
-saves space after the floppy is formatted; setting -8 consumes
-additional space.  Specifying -i activates a peculiar feature in some
-TRS-80 emulators that causes each formatted sector to appear to be
-both single and double density.
-.SH Making Emulated Hard Drives
-With the -h flag, \fBmkdisk\fP makes an unformatted emulated hard
-drive with \fIcyl\fP cylinders, \fIsec\fP sectors, and \fIgran\fP
-granules (LDOS allocation units) per cylinder.  The hard drive
-will have cylinder \fIdir\fP marked for use as its directory.
-
-You will usually want to use the default values for all these
-parameters.  The default is 202 cylinders, 256 sectors per cylinder
-(that is, 8 heads and 32 sectors per track), and 8 granules per
-cylinder.  This is the largest hard drive that can be used by all
-LDOS/LS-DOS operating systems without partitioning the drive or
-patching the FORMAT command.  The details on what nondefault values
-are possible vary, depending on which of xtrs's two hard drive
-emulations you are using and which other emulators you want to be
-compatible with, and it is probably best not to delve into these
-complexities, but read on if you really want to.
-
-For \fIcyl\fP, the number of cylinders on the drive, the default value
-is 202, the minimum is 3, and the maximum that can be represented in
-the HDV file's header is 256.  You can use 203 cylinders with LDOS and
-LS-DOS if you format the drive with Model 4 LS-DOS; a minor bug in
-Model I/III FORMAT/CMD prevents more than 202 cylinders from being
-formatted, but the system can use 203 thereafter.  203 cylinders is
-the absolute maximum for LDOS/LS-DOS drivers that do not support
-partitioning, including the emulator-specific drivers supplied with xtrs
-(XTRSHARD/DCT), with Matthew Reed's emulator (HARD/CMD), and with
-David Keil's emulator (EHARD/DCT).  
-
-In xtrs 4.1 and later, and in David Keil's emulator version 6.0 and
-later, a true emulation of Radio Shack's WD1010-based hard disk
-controller is also available, which works with the native drivers for
-the original hardware, such as RSHARDx/DCT and the hard disk drivers
-for NEWDOS and CP/M.  In xtrs, the WD1010 emulation ignores the
-maximum number of cylinders specified in the HDV file's header and
-allows the driver to format up to 65536 cylinders.  This may be useful
-if your drivers support partitioning (but why would anyone want to
-partition an emulated hard drive instead of just making two smaller
-ones?), or if your operating system supports more than 203 cylinders
-per partition.  Note that although RSHARDx/DCT allows up to 406
-cylinders per partition, if you use more than 203, the maximum number
-of sectors per cylinder is limited to 128, so you gain nothing; the
+The
+.B mkdisk
+program is part of the
+.I xtrs
+package.
+It has two
+distinct functions:
+.IP \(bu
+It can make a blank (unformatted) emulated floppy or hard drive in a file.
+.IP \(bu
+With the
+.B \-p
+or
+.B \-u
+flag, it can turn the write-protect flag on or off for an existing emulated
+floppy or hard drive file.
+See
+.BR xtrs (1)
+for background information.
+.PP
+The conventional file extensions are
+.I .dsk
+for emulated floppies and
+.I .hdv
+for \(lqHDV\(rq emulated hard drives, but
+.B mkdisk
+does not enforce this convention; you can use any filename.
+Other extensions sometimes used for emulated floppies are
+.IR .jv1 ,
+.IR .jv3 ,
+.IR .8in ,
+and
+.IR .dmk .
+.PP
+By default, when creating disk image files,
+.B mkdisk
+refuses to overwrite an existing file called
+.IR filename .
+The
+.B \-f
+(\(lqforce\(rq) option overrides this default, \(lqclobbering\(rq
+.IR filename .
+.SS Making Emulated Floppies
+With the
+.B \-1
+flag,
+.B mkdisk
+makes an unformatted emulated floppy of type JV1.
+Besides
+.BR \-f ,
+no additional flags are accepted.
+.PP
+With the
+.B \-3
+flag (which is the default and should normally be used),
+.B mkdisk
+makes an unformatted emulated floppy of type JV3.
+Besides
+.BR \-f ,
+no additional flags are accepted.
+.PP
+With the
+.B \-k
+flag,
+.B mkdisk
+makes an unformatted emulated floppy of type DMK.
+With
+.BR \-k ,
+the optional flags
+.BR \-s ,
+.BR \-d ,
+.BR \-8 ,
+and
+.B \-i
+can be used to give the emulated floppy special properties.
+Specifying
+.B \-s1
+limits the floppy to one side; with
+.B \-s2
+(the default), the floppy can be formatted as either one- or two-sided.
+Specifying
+.B \-d1
+limits the floppy to single density; with
+.B \-d2
+(the default), the floppy can be formatted in either single or double density.
+Specifying
+.B \-8
+allows the floppy to be formatted in an emulated 8" drive; by default it will
+work properly only in an emulated
+.5-1/4
+"
+drive.
+Setting
+.B \-s1
+or
+.B \-d1
+saves space after the floppy is formatted; setting
+.B \-8
+consumes additional space.
+Specifying
+.B \-i
+activates a peculiar feature in some TRS-80 emulators that causes each formatted
+sector to appear to be both single and double density.
+.SS Making Emulated Hard Drives
+With the
+.B -h
+flag,
+.B mkdisk
+makes an unformatted emulated hard drive with
+.I cyl
+cylinders,
+.I sec
+sectors, and
+.I gran
+granules
+.RI ( LDOS
+allocation units) per cylinder.
+The hard drive will have cylinder number
+.I dcyl
+marked for use as its directory.
+.PP
+You will usually want to use the default values for all these parameters.
+The default is 202 cylinders, 256 sectors per cylinder (that is, 8 heads and 32
+sectors per track), and 8 granules per cylinder.
+This is the largest hard drive that can be used by all
+.IR LDOS / LS-DOS
+operating
+systems without partitioning the drive or patching the
+.I FORMAT
+command.
+The details on what nondefault values are possible vary, depending on which of
+.IR xtrs 's
+two hard drive emulations you are using and which other emulators you want to be
+compatible with, and it is probably best not to delve into these complexities,
+but read on if you really want to.
+.PP
+For
+.IR cyl ,
+the number of cylinders on the drive, the default value is 202, the minimum is
+3, and the maximum that can be represented in the HDV file's header is 256.
+You can use 203 cylinders with
+.I LDOS
+and
+.I LS-DOS
+if you format the drive with
+Model 4
+.IR LS-DOS ;
+a minor bug in Model I/III
+.I FORMAT/CMD
+prevents more than 202 cylinders from being formatted, but the system can use
+203 thereafter.
+203 cylinders is the absolute maximum for
+.IR LDOS / LS-DOS
+drivers that do not
+support partitioning, including the emulator-specific drivers supplied with
+.I xtrs
+.RI ( XTRSHARD/DCT ),
+with Matthew Reed's emulator
+.RI ( HARD/CMD ),
+and with David Keil's emulator
+.RI ( EHARD/DCT ).
+.PP
+In
+.I xtrs
+4.1 and later, and in David Keil's emulator version 6.0 and later, a true
+emulation of Radio Shack's WD1010-based hard disk controller is also available,
+which works with the native drivers for the original hardware, such as
+.IR RSHARD x /DCT
+and the hard disk drivers for
+.I NEWDOS
+and
+.IR CP/M .
+In
+.IR xtrs ,
+the WD1010 emulation ignores the maximum number of cylinders specified in the
+HDV file's header and allows the driver to format up to 65536 cylinders.
+This may be useful if your drivers support partitioning (but why would anyone
+want to partition an emulated hard drive instead of just making two smaller
+ones?), or if your operating system supports more than 203 cylinders per
+partition.
+Note that although
+.IR RSHARD x /DCT
+allows up to 406 cylinders per partition, if you use more than 203, the maximum
+number of sectors per cylinder is limited to 128, so you gain nothing; the
 maximum size of a partition is still the same.
-
-For \fIsec\fP, the number of sectors per cylinder, the default value
-is 256, the maximum is 256, and the minimum is 4.  There are some
-restrictions on the values that will work.  For the greatest
-portability, choose a value that is divisible by 32.  With xtrs's
-XTRSHARD/DCT and David Keil's EHARD/DCT, any value is allowed that can
-be evenly divided into granules; see the next paragraph.  With Matthew
-Reed's HARD/CMD, if \fIsec\fP is greater than 32, it must be divisible
-by 32.  With the emulation of a real WD1010 in newer versions of xtrs
-(and probably David Keil's emulator too), \fIsec\fP must always be
-divisible by 32, because we always emulate a drive with 32 sectors per
-track and from 1 to 8 heads (tracks per cylinder).  The RSHARDx/DCT
+.PP
+For
+.IR sec ,
+the number of sectors per cylinder, the default value is 256, the maximum is
+256, and the minimum is 4.
+There are some restrictions on the values that will work.
+For the greatest portability, choose a value that is divisible by 32.
+With
+.IR xtrs 's
+.I XTRSHARD/DCT
+and David Keil's
+.IR EHARD/DCT ,
+any value is allowed that can be evenly divided into granules; see the next
+paragraph.
+With Matthew Reed's
+.IR HARD/CMD ,
+if
+.I sec
+is greater than 32, it must be divisible by 32.
+With the emulation of a real WD1010 in newer versions of
+.I xtrs
+(and probably David Keil's emulator too),
+.I sec
+must always be divisible by 32, because we always emulate a drive with 32
+sectors per track and from 1 to 8 heads (tracks per cylinder).
+The
+.IR RSHARD x /DCT
 driver assumes that there are always 32 sectors per track.
-
-For \fIgran\fP, the default value is 8, the maximum is 8, and the
-minimum is 1.  In addition, it is necessary that \fIsec\fP be evenly
-divisible by \fIgran\fP, and that \fIsec/gran\fP be less than or equal
-to 32.  This value is used only with the emulator-specific drivers
-listed above; it is ignored when xtrs is using native hardware drivers
-such as RSHARDx/DCT.
-
-The maximum size of a hard drive image is controlled by \fIcyl\fP and
-\fIsec\fP: it can be at most \fIcyl*sec\fP 256-byte sectors.  The
-image file starts out small and grows as you write to more cylinders.
-The allocation efficiency is controlled by the granule size: LDOS
-allocates file space in granules.  Therefore (1)
-\fIgran\fP should always be set as large as possible and (2) reducing
-\fIsec\fP, thereby making the granules smaller, reduces wasted space
-due to fragmentation but limits the maximum size of the drive.
-
-Seeing that the maximum unpartitioned drive size is less than 13 MB and
-that the maximum granule size is only 8 KB, wasted space should not be
-much of a concern for most \fBxtrs\fP users.  Therefore the default
-parameters have been chosen to give you the largest drive possible without
-partitioning.
-.SH Write Protection
-With the -p flag, \fBmkdisk\fP turns on write protection
-for an existing emulated floppy or hard drive.  It turns off all Unix
-write permission bits on the file, and (except for JV1 floppies) also sets
-a write-protected flag inside the file.
-
-With the -u flag, \fBmkdisk\fP turns off write protection
-for an existing emulated floppy or hard drive.  It turns on Unix
-write permissions to the file, masked by your current umask and
+.PP
+For
+.IR gran ,
+the default value is 8, the maximum is 8, and the minimum is 1.
+In addition, it is necessary that
+.I sec
+be evenly divisible by
+.IR gran ,
+.\" Not using \(di or \(mu because groff renders them badly in plain text
+and that sec/gran be less than or equal to 32.
+This value is used only with the emulator-specific drivers listed above; it is
+ignored when
+.I xtrs
+is using native hardware drivers such as
+.IR RSHARD x /DCT .
+.PP
+The maximum size of a hard drive image is controlled by
+.I cyl
+and
+.IR sec :
+.\" Not using \(di or \(mu because groff renders them badly in plain text
+it can be at most cyl*sec 256-byte sectors.
+The image file starts out small and grows as you write to more cylinders.
+The allocation efficiency is controlled by the granule size:
+.I LDOS
+allocates file space in granules.
+Therefore (1)
+.I gran
+should always be set as large as possible and (2) reducing
+.IR sec ,
+thereby making the granules smaller, reduces space wasted due to fragmentation
+but limits the maximum size of the drive.
+.PP
+Seeing that the maximum unpartitioned drive size is less than 13 MiB and that
+the maximum granule size is only 8 kiB, wasted space should not be much of a
+concern for most
+.I xtrs
+users.
+Therefore the default parameters have been chosen to give you the largest drive
+possible without partitioning.
+.SS Write Protection
+With the
+.B \-p
+flag,
+.B mkdisk
+turns on write protection for an existing emulated floppy or hard drive.
+It turns off all Unix write permission bits on the file, and (except for JV1
+floppies) also sets a write-protected flag inside the file.
+.PP
+With the
+.B \-u
+flag,
+.B mkdisk
+turns off write protection for an existing emulated floppy or hard drive.
+It turns on Unix write permissions to the file, masked by your current umask and
 the file's current read permissions.
-It also clears
-a write-protected flag inside the file (except on JV1 floppies, which
-don't have such a flag).
-
-\fBmkdisk\fP currently does not have code to auto-recognize file
-formats, so the -p or -u flag must be accompanied by either -1 (JV1),
--3 (JV3), -k (DMK), or -h (hard disk) to identify the file format.
-There is also no checking for the correct file format, so if you
-give the wrong flag, the wrong byte inside your file will be changed.
-
-.SH Technical data
-The JV1 format is just an array of 256-byte sectors, in the order
-(track 0 sector 0, track 0 sector 1, ... track 0 sector 9, track 1
-sector 0, ...).  It can represent only single-sided, single-density
-floppies.  The directory is assumed to be track 17.
-
-The original JV3 format is documented in the printed manual for Jeff
-Vavasour's commercial Model III/4 emulator.  The xtrs implementation
-includes some extensions.  
-
-Full documentation for both JV1 and JV3 can be found at
-http://www.tim-mann.org/trs80/dskspec.html.
-A copy of this html file is also included in the \fBxtrs\fP distribution.
-
-The DMK format is documented in a file on David Keil's web site,
-http://discover-net.net/~dmkeil/trsdoc.htm#Technical-disks; this file
-is also included with his emulator.  Some updates to the 4.00 version
-of the document: (1) If neither the single density nor ignore density
-option is set and single density data is recorded, each single density
-byte is written twice (i.e., the four bytes 12345678 would be written as
-1212343456567878).  This ensures that when single and double density
-sectors are mixed, each type occupies the correct relative amount of
-space in the track.  This update will be effective in version 4.3 of
-David's emulator; it is incompatible with previous versions. (2) Bit
-15 of an IDAM offset is 1 if the sector is double-density, 0 if single
-density.  Bit 14 is reserved; it currently must be 0.  The actual
-offset is in bits 13-0.  These offsets are relative to the start of
-the track header, they must be in ascending order (I hope!!), and an
-offset of 0 or 0xffff terminates the list.
-
-An HDV (hard disk) image has the following format.  This information
-is based on email from Matthew Reed.  There is an initial 256-byte
-header block, followed by an array of sectors.  The geometry of the
-drive is defined in the header block, which looks like this (from
-mkdisk.c):
-
-.nf
-typedef unsigned char Uchar;
+It also clears a write-protected flag inside the file (except on JV1 floppies,
+which don't have such a flag).
+.PP
+.B mkdisk
+currently does not have code to auto-recognize file formats, so the
+.B \-p
+or
+.B \-u
+flag must be accompanied by either
+.B \-1
+(JV1),
+.B \-3
+(JV3),
+.B \-k
+(DMK), or
+.B \-h
+(hard disk) to identify the file format.
+There is also no checking for the correct file format, so if you give the wrong
+flag, the wrong byte inside your file will be changed.
+.SS Technical data
+The JV1 format is just an array of 256-byte sectors, in the order (track 0
+sector 0, track 0 sector 1, ... track 0 sector 9, track 1 sector 0, ...).
+It can represent only single-sided, single-density floppies.
+The directory is assumed to be track 17.
+.PP
+The original JV3 format is documented in the printed manual for Jeff Vavasour's
+commercial Model III/4 emulator.
+The
+.I xtrs
+implementation includes some extensions.
+.PP
+Full documentation for both JV1 and JV3 can be found in
+.\" If GNU roff, use hyphenless breakpoints.
+.ie \n[.g] .UR http://\:www.tim-mann.org/\:trs80/\:dskspec.html
+.el .UR http://www.tim-mann.org/trs80/dskspec.html
+.I Common File Formats for Emulated TRS-80 Floppy Disks
+.UE
+at Tim Mann's TRS-80 site.
+A
+.\" If outputting HTML, make the filename a clickable link.
+.if '\*(.T'html' .UR file:///usr/share/doc/xtrs/dskspec.html
+copy of this HTML file
+.if '\*(.T'html' .UE
+is also included in the
+.I xtrs
+distribution.
+.PP
+The DMK format was documented in a file on David Keil's web site, now available
+from
+.\" If GNU roff, use hyphenless breakpoints.
+.ie \n[.g] .UR http://\:www.classiccmp.org/\:cpmarchives/\:trs80/\:mirrors/\:\
+www.discover-net.net/\:~dmkeil/\:trs80/\:trstech.htm#\:Technical
+.el .UR http://www.classiccmp.org/cpmarchives/trs80/mirrors/\
+www.discover-net.net/~dmkeil/trs80/trstech.htm#Technical
+.\" Turn off line adjustment due to the above elephantine URL.  We turn it off
+.\" _here_ because the URL will not be emitted until after its link text below.
+.\" Without these .na/.ad requests, expect something like the following:
+.\"     mkdisk.man:516: warning [p 4, 1.8i]: cannot adjust line
+.na
+a mirror on classiccmp.org
+.UE ;
+this file is also included with his emulator.
+.ad
+Some points are worth bearing in mind, particularly if you're attempting to work
+with copy-protected TRS-80 disks:
+.IP \(bu
+If neither the single-density nor the ignore-density option is set and
+single-density data is recorded, each single density byte is written twice
+(i.e., the four bytes 12345678 would be written as 1212343456567878).
+This ensures that when single- and double-density sectors are mixed, each type
+occupies the correct relative amount of space in the track.
+.IP \(bu
+Bit 15 of an IDAM offset is 1 if the sector is double-density, 0 if
+single-density.
+Bit 14 is reserved; it currently must be 0.
+The actual offset is in bits 13-0.
+These offsets are relative to the start of the track header, they must be in
+ascending order (or so
+.I xtrs
+assumes!), and an offset of 0 or 0xffff terminates the list.
+.PP
+An HDV (hard disk) image has the following format.
+This information is based on email from Matthew Reed.
+There is an initial 256-byte header block, followed by an array of sectors.
+The geometry of the drive is defined in the header block, which looks like this
+(from
+.IR reed.h ):
+.PP
+.\" Preserve the ident string below so we know if it's in sync with reed.h.
+.\"
+.\" The following was laid out manually to avoid overflowing 78 columns with
+.\"     MANWIDTH=80 man -l ./mkdisk.man
+.\" Changes were then propagated back to reed.h.
+.EX
+/* Matthew Reed's hard drive format.  Thanks to Matthew for providing
+   documentation.  The comments below are copied from his mail
+   messages, with some additions. */
+/* $Id$ */
+.PP
 typedef struct {
-  Uchar id1;       /* 0: Identifier #1: 56H */
-  Uchar id2;       /* 1: Identifier #2: CBH */
-  Uchar ver;       /* 2: Version of format: 10H = version 1.0 */
-  Uchar cksum;     /* 3: Simple checksum: 
-                      To calculate, add together bytes 0 to 31 of header
-                      (excepting byte 3), then XOR result with 4CH */
-  Uchar blks;      /* 4: Number of 256 byte blocks in header: should be 1 */
-  Uchar mb4;       /* 5: Not used, currently set to 4 */
-  Uchar media;     /* 6: Media type: 0 for hard disk */
-  Uchar flag1;     /* 7: Flags #1:
-                      bit 7: Write protected: 0 for no, 1 for yes 
-                             [warning: xtrs currently ignores this flag]
-                      bit 6: Must be 0
-                      bit 5 - 0: reserved */
-  Uchar flag2;     /* 8: Flags #2: reserved */
-  Uchar flag3;     /* 9: Flags #3: reserved */
-  Uchar crtr;      /* 10: Created by: 
-                      14H = HDFORMAT
-                      42H = xtrs mkdisk
-                      80H = Cervasio xtrshard port to Vavasour M4 emulator */
-  Uchar dfmt;      /* 11: Disk format: 0 = LDOS/LS-DOS */
-  Uchar mm;        /* 12: Creation month: mm */
-  Uchar dd;        /* 13: Creation day: dd */
-  Uchar yy;        /* 14: Creation year: yy (offset from 1900) */
-  Uchar res1[12];  /* 15 - 26: reserved */
-  Uchar dparm;     /* 27: Disk parameters: (unused with hard drives)
-                      bit 7: Density: 0 = double, 1 = single
-                      bit 6: Sides: 0 = one side, 1 = 2 sides
-                      bit 5: First sector: 0 if sector 0, 1 if sector 1
-                      bit 4: DAM convention: 0 if normal (LDOS),
-                      1 if reversed (TRSDOS 1.3)
-                      bit 3 - 0: reserved */
-  Uchar cyl;       /* 28: Number of cylinders per disk */
-  Uchar sec;       /* 29: Number of sectors per track (floppy); cyl (hard) */
-  Uchar gran;      /* 30: Number of granules per track (floppy); cyl (hard)*/
-  Uchar dcyl;      /* 31: Directory cylinder [mkdisk sets to 1; xtrs
-                      ignores, but value must be correct if image is
-                      to be used with Reed emulators.] */
-  char label[32];  /* 32: Volume label: 31 bytes terminated by 0 */
-  char filename[8];/* 64 - 71: 8 characters of filename (without extension)
-                      [Cervasio addition.  xtrs actually doesn't limit this 
-                       to 8 chars or strip the extension] */
-  Uchar res2[184]; /* 72 - 255: reserved */
+    Uchar id1;         /* 0: Identifier #1: 56H */
+    Uchar id2;         /* 1: Identifier #2: CBH */
+    Uchar ver;         /* 2: Version of format: 10H = version 1.0 */
+.ne 4
+    Uchar cksum;       /* 3: Simple checksum:
+                             To calculate, add together bytes 0 to 31
+                             of header (excepting byte 3), then XOR
+                             result with 4CH */
+.ne 2
+    Uchar blks;        /* 4: Number of 256 byte blocks in header:
+                             should be 1 */
+    Uchar mb4;         /* 5: Not used, but HDFORMAT sets to 4 */
+    Uchar media;       /* 6: Media type: 0 for hard disk */
+.ne 5
+    Uchar flag1;       /* 7: Flags #1:
+                             bit 7: Write protected: 0 for no, 1 for
+                                    yes [xtrshard/dct ignores for now]
+                             bit 6: Must be 0
+                             bit 5 - 0: reserved */
+    Uchar flag2;       /* 8: Flags #2: reserved */
+    Uchar flag3;       /* 9: Flags #3: reserved */
+.ne 5
+    Uchar crtr;        /* 10: Created by:
+                              14H = HDFORMAT
+                              42H = xtrs mkdisk
+                              80H = Cervasio xtrshard port to Vavasour
+                                    M4 emulator */
+    Uchar dfmt;        /* 11: Disk format: 0 = LDOS/LS-DOS */
+    Uchar mm;          /* 12: Creation month: mm */
+    Uchar dd;          /* 13: Creation day: dd */
+    Uchar yy;          /* 14: Creation year: yy (offset from 1900) */
+    Uchar res1[12];    /* 15 - 26: reserved */
+.ne 9
+    Uchar dparm;       /* 27: Disk parameters:
+                              (unused with hard drives)
+                              bit 7: Density: 0 = double, 1 = single
+                              bit 6: Sides: 0 = one side, 1 = 2 sides
+                              bit 5: First sector: 0 if sector 0,
+                                     1 if sector 1
+                              bit 4: DAM convention: 0 if normal
+                                     (LDOS), 1 if reversed (TRSDOS 1.3)
+                              bit 3 - 0: reserved */
+    Uchar cyl;         /* 28: Number of cylinders per disk */
+.ne 2
+    Uchar sec;         /* 29: Number of sectors per track (floppy);
+                              cyl (hard) */
+.ne 2
+    Uchar gran;        /* 30: Number of granules per track (floppy);
+                              gran (hard) */
+.ne 2
+    Uchar dcyl;        /* 31: Directory cylinder [mkdisk sets to 1;
+                              xtrs ignores] */
+    char label[32];    /* 32: Volume label: 31 bytes terminated by 0 */
+    Uchar res2[192];   /* 64 - 255: reserved */
 } ReedHardHeader;
-.fi
-
+.EE
 .SH See also
 .BR xtrs (1)
-
-http://www.tim-mann.org/trs80/dskspec.html
-.SH Authors
-\fBmkdisk\fP was written by Timothy Mann (see http://tim-mann.org/).
-
-The floppy file formats here called JV1 and JV3 were developed by Jeff
-Vavasour for his MSDOS-based Model I and Model III/4 emulators
-(respectively).  They have become a de facto standard in the TRS-80
-emulation community, and much TRS-80 software is available on the
-Internet in .dsk format.  Thanks to Jeff for designing and documenting
-the formats.
-
-The format here called DMK was developed by David Keil for his
-MSDOS-based Model 4 emulator.  This format has the advantage that it
-can represent essentially everything the original TRS-80 floppy disk
-controllers can write, including all forms of copy protected disk.
-Thanks to David for designing and documenting this format.
-
-The hard drive format was developed by Matthew Reed for his
-MSDOS-based Model I/III and Model 4 emulators.  I have duplicated his
-format to allow users to exchange .hdv hard drive images between
-\fBxtrs\fP and Matthew's emulators.  Thanks to Matthew for designing
-the format and providing documentation.
-
-$Id$
+.PP
+.\" If GNU roff, use hyphenless breakpoints.
+.ie \n[.g] .UR http://\:www.tim-mann.org/\:trs80/\:dskspec.html
+.el .UR http://www.tim-mann.org/trs80/dskspec.html
+.I Common File Formats for Emulated TRS-80 Floppy Disks
+.UE
+by Tim Mann;
+a copy may be locally available with your
+.I xtrs
+installation at
+.\" If outputting HTML, make the filename a clickable link.
+.ie '\*(.T'html' \{\
+.UR file:///usr/share/doc/xtrs/dskspec.html
+.UE . \}
+.el \{\
+.IR /usr/share/doc/xtrs/dskspec.html . \}
+.\" $Id$
+.\" vim:set et ft=nroff tw=80:

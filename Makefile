@@ -97,7 +97,8 @@ MISC = \
 	Makefile \
 	Makefile.local \
 	README \
-	cassette \
+	cassette.sh \
+	cassette.csh \
 	cassette.txt \
 	cmddump.txt \
 	export.cmd \
@@ -137,103 +138,140 @@ MANSOURCES = cassette.man \
 	mkdisk.man \
 	xtrs.man
 
-MANPAGES = xtrs.txt mkdisk.txt cassette.txt cmddump.txt hex2cmd.txt 
+MANPAGES = xtrs.txt mkdisk.txt cassette.txt cmddump.txt hex2cmd.txt
+
+PDFMANPAGES = cassette.man.pdf \
+	cmddump.man.pdf \
+	hex2cmd.man.pdf \
+	mkdisk.man.pdf \
+	xtrs.man.pdf
+
+HTMLSOURCES = cpmutil.html \
+	dskspec.html
+
+HTMLDOCS = cpmutil.txt \
+	dskspec.txt
 
 PROGS = xtrs mkdisk hex2cmd cmddump
 
-default: xtrs mkdisk hex2cmd cmddump manpages
+default: $(PROGS) docs
 
-manpages: $(MANPAGES)
+all: default z80code gxtrs
+
+docs: $(MANPAGES) $(PDFMANPAGES) $(HTMLDOCS)
 
 z80code: $(Z80CODE)
 
 # Local customizations for make variables are done in Makefile.local:
 include Makefile.local
 
-CFLAGS = $(DEBUG) $(ENDIAN) $(DEFAULT_ROM) $(READLINE) $(DISKDIR) $(IFLAGS) \
-       $(APPDEFAULTS) -DKBWAIT
+CFLAGS += $(DEBUG) $(ENDIAN) $(DEFAULT_ROM) $(READLINE) $(DISKDIR) $(IFLAGS) \
+	$(APPDEFAULTS) -DKBWAIT -std=c11
 LIBS = $(XLIB) $(READLINELIBS) $(EXTRALIBS)
 
 ZMACFLAGS = -h
-.SUFFIXES:	.z80 .cmd .dct .man .txt .hex
+
+.SUFFIXES: .z80 .cmd .dct .man .txt .hex .html
+
 .z80.cmd:
-	zmac $(ZMACFLAGS) $<
+	zmac $(ZMACFLAGS) -o $*.hex $<
 	hex2cmd $*.hex > $*.cmd
 	rm -f $*.hex
+
 .z80.dct:
-	zmac $(ZMACFLAGS) $<
+	zmac $(ZMACFLAGS) -o $*.hex $<
 	hex2cmd $*.hex > $*.dct
 	rm -f $*.hex
+
 .z80.hex:
-	zmac $(ZMACFLAGS) $<
+	zmac $(ZMACFLAGS) -o $*.hex $<
+
 .man.txt:
 	nroff -man -c -Tascii $< | colcrt - | cat -s > $*.txt
 
-xtrs:		$(OBJECTS) $(X_OBJECTS)
-		$(CC) $(LDFLAGS) -o xtrs $(OBJECTS) $(X_OBJECTS) $(LIBS)
+.html.txt:
+	html2text -nobs -style pretty $< >$@
 
-xtrs5:		$(OBJECTS) $(GTK_OBJECTS)
-		$(CC) $(LDFLAGS) -o xtrs5 -export-dynamic \
-			$(OBJECTS) $(GTK_OBJECTS) $(LIBS) \
-			`pkg-config --libs gtk+-2.0`
+%.man.pdf: %.man
+	groff -Tpdf -man $< > $@
 
-compile_rom:	$(CR_OBJECTS)
-		$(CC) -o compile_rom $(CR_OBJECTS)
+xtrs: $(OBJECTS) $(X_OBJECTS)
+	$(CC) $(LDFLAGS) -o xtrs $(OBJECTS) $(X_OBJECTS) $(LIBS)
 
-trs_rom1.c:	compile_rom $(BUILT_IN_ROM)
-		./compile_rom 1 $(BUILT_IN_ROM) > trs_rom1.c
+gxtrs: $(OBJECTS) $(GTK_OBJECTS)
+	$(CC) $(LDFLAGS) -o gxtrs -export-dynamic \
+		$(OBJECTS) $(GTK_OBJECTS) $(LIBS) \
+		`pkg-config --libs gtk+-2.0`
 
-trs_rom3.c:	compile_rom $(BUILT_IN_ROM3)
-		./compile_rom 3 $(BUILT_IN_ROM3) > trs_rom3.c
+compile_rom: $(CR_OBJECTS)
+	$(CC) $(LDFLAGS) -o compile_rom $(CR_OBJECTS)
 
-trs_rom4p.c:	compile_rom $(BUILT_IN_ROM4P)
-		./compile_rom 4p $(BUILT_IN_ROM4P) > trs_rom4p.c
+trs_rom1.c: compile_rom $(BUILT_IN_ROM)
+	./compile_rom 1 $(BUILT_IN_ROM) > trs_rom1.c
+
+trs_rom3.c: compile_rom $(BUILT_IN_ROM3)
+	./compile_rom 3 $(BUILT_IN_ROM3) > trs_rom3.c
+
+trs_rom4p.c: compile_rom $(BUILT_IN_ROM4P)
+	./compile_rom 4p $(BUILT_IN_ROM4P) > trs_rom4p.c
 
 trs_gtkinterface.o: trs_gtkinterface.c
-		$(CC) -c $(CFLAGS) `pkg-config --cflags gtk+-2.0` $?
+	$(CC) -c $(CFLAGS) `pkg-config --cflags gtk+-2.0` $?
 
 keyrepeat.o: keyrepeat.c
-		$(CC) -c $(CFLAGS) `pkg-config --cflags gtk+-2.0` $?
+	$(CC) -c $(CFLAGS) `pkg-config --cflags gtk+-2.0` $?
 
-mkdisk:		$(MD_OBJECTS)
-		$(CC) -o mkdisk $(MD_OBJECTS)
+mkdisk:	$(MD_OBJECTS)
+	$(CC) $(LDFLAGS) -o mkdisk $(MD_OBJECTS)
 
-hex2cmd:	$(HC_OBJECTS)
-		$(CC) -o hex2cmd $(HC_OBJECTS)
+hex2cmd: $(HC_OBJECTS)
+	$(CC) $(LDFLAGS) -o hex2cmd $(HC_OBJECTS)
 
-cmddump:	$(CD_OBJECTS)
-		$(CC) -o cmddump $(CD_OBJECTS)
+cmddump: $(CD_OBJECTS)
+	$(CC) $(LDFLAGS) -o cmddump $(CD_OBJECTS)
 
-tar:		$(SOURCES) $(HEADERS)
-		tar cvf xtrs.tar $(SOURCES) $(HEADERS)  $(MANSOURCES) $(MISC)
-		rm -f xtrs.tar.Z
-		compress xtrs.tar
+#XXX This target has not been used since xtrs-1.0.  Update or remove.
+tar: $(SOURCES) $(HEADERS)
+	tar cvf xtrs.tar $(SOURCES) $(HEADERS) $(MANSOURCES) $(MISC)
+	rm -f xtrs.tar.Z
+	compress xtrs.tar
 
 clean:
-		rm -f $(OBJECTS) $(MD_OBJECTS) \
-			$(X_OBJECTS) $(GTK_OBJECTS) \
-			$(CR_OBJECTS) $(HC_OBJECTS) \
-			$(CD_OBJECTS) trs_rom*.c *~ \
-			$(PROGS) compile_rom
+	rm -f $(OBJECTS) $(MD_OBJECTS) \
+		$(X_OBJECTS) $(GTK_OBJECTS) \
+		$(CR_OBJECTS) $(HC_OBJECTS) \
+		$(CD_OBJECTS) trs_rom*.c *~ \
+		$(PROGS) compile_rom gxtrs \
+		$(HTMLDOCS)
 
 veryclean: clean
-		rm -f $(Z80CODE) $(MANPAGES) *.lst
+	rm -f $(Z80CODE) $(MANPAGES) $(PDFMANPAGES) *.lst
 
 link:	
-		rm -f xtrs
-		make xtrs
+	rm -f xtrs
+	make xtrs
 
-install: install-progs install-man
+install: install-progs install-docs
 
-install-progs: $(PROGS)
+install-progs: $(PROGS) $(CASSETTE)
+	$(INSTALL) -d -m 755 $(BINDIR)
 	$(INSTALL) -c -m 755 $(PROGS) $(BINDIR)
+	$(INSTALL) -c -m 755 $(CASSETTE) $(BINDIR)/cassette
 
-install-man: $(MANPAGES)
+install-docs: docs
+	$(INSTALL) -d -m 755 $(MANDIR)
+	$(INSTALL) -d -m 755 $(MANDIR)/man1
 	$(INSTALL) -c -m 644 xtrs.man $(MANDIR)/man1/xtrs.1
 	$(INSTALL) -c -m 644 cassette.man $(MANDIR)/man1/cassette.1
 	$(INSTALL) -c -m 644 mkdisk.man $(MANDIR)/man1/mkdisk.1
 	$(INSTALL) -c -m 644 cmddump.man $(MANDIR)/man1/cmddump.1
 	$(INSTALL) -c -m 644 hex2cmd.man $(MANDIR)/man1/hex2cmd.1
+	$(INSTALL) -d -m 755 $(DOCDIR)
+	$(INSTALL) -c -m 644 $(PDFMANPAGES) $(DOCDIR)
+	$(INSTALL) -c -m 644 cpmutil.html $(DOCDIR)
+	$(INSTALL) -c -m 644 cpmutil.txt $(DOCDIR)
+	$(INSTALL) -c -m 644 dskspec.html $(DOCDIR)
+	$(INSTALL) -c -m 644 dskspec.txt $(DOCDIR)
 
 depend:
 	makedepend -- $(CFLAGS) -- $(SOURCES)

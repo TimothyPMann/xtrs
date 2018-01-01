@@ -44,45 +44,46 @@ extern int trs_disk_debug_flags;
 extern int trs_io_debug_flags;
 extern int trs_emtsafe;
 
-extern int trs_parse_command_line(int argc, char **argv, int *debug);
+int trs_parse_command_line(int argc, char **argv, int *debug);
 
-extern void trs_screen_init(void);
-extern void trs_screen_write_char(int position, int char_index);
-extern void trs_screen_expanded(int flag);
-extern void trs_screen_alternate(int flag);
-extern void trs_screen_80x24(int flag);
-extern void trs_screen_inverse(int flag);
-extern void trs_screen_scroll(void);
-extern void trs_screen_refresh(void);
+void trs_screen_init(void);
+void trs_screen_write_char(int position, int char_index);
+void trs_screen_expanded(int flag);
+void trs_screen_alternate(int flag);
+void trs_screen_80x24(int flag);
+void trs_screen_inverse(int flag);
+void trs_screen_scroll(void);
+void trs_screen_refresh(void);
 
-extern void trs_reset(int poweron);
-extern void trs_exit(void);
+void trs_reset(int poweron);
+void trs_exit(void);
 
-extern void trs_kb_reset(void);
-extern void trs_kb_bracket(int shifted);
-extern int trs_kb_mem_read(int address);
-extern int trs_next_key(int wait);
-extern void trs_kb_heartbeat(void);
-extern void trs_xlate_keysym(int keysym);
-extern void queue_key(int key);
-extern int dequeue_key(void);
-extern void clear_key_queue(void);
-extern void trs_skip_next_kbwait(void);
+void trs_kb_reset(void);
+void trs_kb_bracket(int shifted);
+int trs_kb_mem_read(int address);
+int trs_next_key(int wait);
+void trs_kb_heartbeat(void);
+void trs_xlate_keysym(int keysym);
+void queue_key(int key);
+int dequeue_key(void);
+void clear_key_queue(void);
+void trs_skip_next_kbwait(void);
 extern int stretch_amount;
 
-extern void trs_get_event(int wait);
+void trs_get_event(int wait);
 extern volatile int x_poll_count;
-extern void trs_x_flush(void);
+void trs_x_flush(void);
 
-extern void trs_printer_write(int value);
-extern int trs_printer_read(void);
+void trs_printer_write(int value);
+int trs_printer_read(void);
 
-extern void trs_cassette_motor(int value);
-extern void trs_cassette_out(int value);
-extern int trs_cassette_in(void);
-extern void trs_sound_out(int value);
+void trs_cassette_motor(int value);
+void trs_cassette_out(int value);
+int trs_cassette_in(void);
+void trs_cassette_select(int value);
+void trs_sound_out(int value);
 
-extern int trs_joystick_in(void);
+int trs_joystick_in(void);
 
 extern int trs_rom_size;
 extern int trs_rom1_size;
@@ -95,42 +96,46 @@ extern unsigned char trs_rom4p[];
 extern void trs_load_compiled_rom(int size, unsigned char rom[]);
 extern void trs_load_rom(char *filename);
 
-extern unsigned char trs_interrupt_latch_read(void);
-extern unsigned char trs_nmi_latch_read(void);
-extern void trs_interrupt_mask_write(unsigned char);
-extern void trs_nmi_mask_write(unsigned char);
-extern void trs_reset_button_interrupt(int state);
-extern void trs_disk_intrq_interrupt(int state);
-extern void trs_disk_drq_interrupt(int state);
-extern void trs_disk_motoroff_interrupt(int state);
-extern void trs_uart_err_interrupt(int state);
-extern void trs_uart_rcv_interrupt(int state);
-extern void trs_uart_snd_interrupt(int state);
-extern void trs_timer_interrupt(int state);
-extern void trs_timer_init(void);
-extern void trs_timer_off(void);
-extern void trs_timer_on(void);
-extern void trs_timer_speed(int flag);
-extern void trs_cassette_rise_interrupt(int dummy);
-extern void trs_cassette_fall_interrupt(int dummy);
-extern void trs_cassette_clear_interrupts(void);
-extern int trs_cassette_interrupts_enabled(void);
-extern void trs_cassette_update(int dummy);
+unsigned char trs_interrupt_latch_read(void);
+unsigned char trs_nmi_latch_read(void);
+void trs_interrupt_mask_write(unsigned char);
+void trs_nmi_mask_write(unsigned char);
+void trs_reset_button_interrupt(int state);
+void trs_disk_intrq_interrupt(int state);
+void trs_disk_drq_interrupt(int state);
+void trs_disk_motoroff_interrupt(int state);
+void trs_uart_err_interrupt(int state);
+void trs_uart_rcv_interrupt(int state);
+void trs_uart_snd_interrupt(int state);
+void trs_timer_interrupt(int state);
+void trs_timer_init(void);
+void trs_timer_off(void);
+void trs_timer_on(void);
+void trs_timer_speed(int flag);
+void trs_cassette_rise_interrupt(int dummy);
+void trs_cassette_fall_interrupt(int dummy);
+void trs_cassette_clear_interrupts(void);
+int trs_cassette_interrupts_enabled(void);
+void trs_cassette_update(int dummy);
 extern int cassette_default_sample_rate;
-extern void trs_orch90_out(int chan, int value);
-extern void trs_cassette_reset(void);
+void trs_orch90_out(int chan, int value);
+void trs_cassette_reset(void);
 
-extern void trs_disk_change(int drive, char *newname);
-extern void trs_disk_change_all(void);
-extern void trs_disk_debug(void);
-extern int trs_disk_motoroff(void);
+const char *trs_disk_get_name(int drive);
+int trs_disk_set_name(int drive, const char *newname);
+int trs_disk_create(const char *newname);
+void trs_disk_change_all(void);
+void trs_disk_debug(void);
+int trs_disk_motoroff(void);
 
-extern void mem_video_page(int which);
-extern void mem_bank(int which);
-extern void mem_map(int which);
-extern void mem_romin(int state);
+void trs_change_all(void);
 
-extern void trs_debug(void);
+void mem_video_page(int which);
+void mem_bank(int which);
+void mem_map(int which);
+void mem_romin(int state);
+
+void trs_debug(void);
 
 typedef void (*trs_event_func)(int arg);
 void trs_schedule_event(trs_event_func f, int arg, int tstates);
@@ -165,9 +170,14 @@ void trs_get_mouse_max(int *x, int *y, unsigned int *sens);
 void trs_set_mouse_max(int x, int y, unsigned int sens);
 int trs_get_mouse_type(void);
 
+void stringy_init(void);
+const char *stringy_get_name(int unit);
+int stringy_set_name(int unit, const char *name);
+int stringy_create(const char *name);
 int stringy_in(int unit);
 void stringy_out(int unit, int value);
 void stringy_reset(void);
+void stringy_change_all(void);
 
 int put_twobyte(Ushort n, FILE* f);
 int put_fourbyte(Uint n, FILE* f);

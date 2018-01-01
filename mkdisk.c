@@ -12,6 +12,8 @@
  * or write protect/unprotect an existing one.
  */
 
+#define _XOPEN_SOURCE 500 /* unistd.h: getopt(), ...; sys/stat.h: fchmod() */
+
 #include <stdio.h>
 #include <unistd.h>
 #include <time.h>
@@ -19,6 +21,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <string.h>
+#include <fcntl.h>
 
 typedef unsigned char Uchar;
 #include "reed.h"
@@ -27,13 +30,35 @@ ReedHardHeader rhh;
 void Usage(char *progname)
 {
   fprintf(stderr, 
-	  "Usage:\t%s -1 file\n"
-	  "\t%s [-3] file\n"
-	  "\t%s -k [-s sides] [-d density] [-8] [-i] file\n"
-	  "\t%s -h [-c cyl] [-s sec] [-g gran] file\n"
+	  "Usage:\t%s -1 [-f] file\n"
+	  "\t%s [-3] [-f] file\n"
+	  "\t%s -k [-s sides] [-d density] [-8] [-i] [-f] file\n"
+	  "\t%s -h [-c cyl] [-s sec] [-g gran] [-d dcyl] [-f] file\n"
 	  "\t%s {-p|-u} {-1|-3|-k|-h} file\n",
 	  progname, progname, progname, progname, progname);
   exit(2);
+}
+
+/*
+ * If overwrite, create or truncate fname and open for writing.  If
+ * !overwrite, create and open fname only if it does not already
+ * exist.  Could use fopen mode "wx" for the latter, but we're still
+ * making a faint effort to be compatible with older systems that
+ * don't have that C11 feature.
+ */
+FILE *
+fopen_w(const char *fname, int overwrite)
+{
+  if (overwrite) {
+    return fopen(fname, "w");
+  } else {
+    int fd;
+    fd = open(fname, O_WRONLY|O_CREAT|O_EXCL, 0666);
+    if (fd < 0) {
+      return NULL;
+    }
+    return fdopen(fd, "w");
+  }
 }
 
 int
@@ -42,13 +67,13 @@ main(int argc, char *argv[])
   int jv1 = 0, jv3 = 0, dmk = 0, hard = 0;
   int cyl = -1, sec = -1, gran = -1, dir = -1, eight = 0, ignden = 0;
   int writeprot = 0, unprot = 0;
-  int i, c, oumask;
+  int i, c, oumask, overwrite;
   char *fname;
   FILE *f;
 
   opterr = 0;
   for (;;) {
-    c = getopt(argc, argv, "13khc:s:g:d:8ipu");
+    c = getopt(argc, argv, "13khc:s:g:d:8ipuf");
     if (c == -1) break;
     switch (c) {
     case '1':
@@ -86,6 +111,9 @@ main(int argc, char *argv[])
       break;
     case 'u':
       unprot = 1;
+      break;
+    case 'f':
+      overwrite = 1;
       break;
     case '?':
     default:
@@ -207,7 +235,7 @@ main(int argc, char *argv[])
 
   if (jv1) {
     /* Unformatted JV1 disk - just an empty file! */
-    f = fopen(fname, "w");
+    f = fopen_w(fname, overwrite);
     if (f == NULL) {
       perror(fname);
       exit(1);
@@ -215,7 +243,7 @@ main(int argc, char *argv[])
 
   } else if (jv3) {
     /* Unformatted JV3 disk. */
-    f = fopen(fname, "w");
+    f = fopen_w(fname, overwrite);
     if (f == NULL) {
       perror(fname);
       exit(1);
@@ -241,7 +269,11 @@ main(int argc, char *argv[])
       exit(2);
     }	    
     
-    f = fopen(fname, "w");
+    f = fopen_w(fname, overwrite);
+    if (f == NULL) {
+      perror(fname);
+      exit(1);
+    }
     putc(0, f);           /* 0: not write protected */
     putc(0, f);           /* 1: initially zero tracks */
     if (eight) {
@@ -379,7 +411,7 @@ main(int argc, char *argv[])
     }
     rhh.cksum = ((Uchar) cksum) ^ 0x4c;
 
-    f = fopen(fname, "w");
+    f = fopen_w(fname, overwrite);
     if (f == NULL) {
       perror(fname);
       exit(1);

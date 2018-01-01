@@ -12,8 +12,11 @@
  * mapped at ports 0xc8-0xcf, plus control registers at 0xc0-0xc1.
  */
 
+#define _XOPEN_SOURCE 500 /* string.h: strdup() */
+
 #include <errno.h>
 #include <string.h>
+#include <stdlib.h>
 #include "trs.h"
 #include "trs_hard.h"
 #include "reed.h"
@@ -26,7 +29,8 @@
 
 /* Structure describing one drive */
 typedef struct {
-  FILE* file;
+  char *name;
+  FILE *file;
   /* Values decoded from rhh */
   int writeprot;
   int cyls;  /* cyls per drive */
@@ -72,13 +76,56 @@ static void hard_init(int cmd);
 static void hard_seek(int cmd);
 static int open_drive(int drive);
 static int find_sector(int newstatus);
-static int open_drive(int n);
 static void set_dir_cyl(int cyl);
 
-/* Powerup or reset button */
+/* xtrs one-time initialization */
 void trs_hard_init(void)
 {
   int i;
+  for (i=0; i<TRS_HARD_MAXDRIVES; i++) {
+    Drive *d = &state.d[i];
+    d->name = (char *) malloc(strlen(trs_disk_dir) + 10);
+    if (trs_model == 5) {
+      sprintf(d->name, "%s/hard4p-%d", trs_disk_dir, i);
+    } else {
+      sprintf(d->name, "%s/hard%d-%d", trs_disk_dir, trs_model, i);
+    }
+    state.d[i].file = NULL;
+    state.d[i].writeprot = 0;
+    state.d[i].cyls = 0;
+    state.d[i].heads = 0;
+    state.d[i].secs = 0;
+  }
+}
+
+const char *
+trs_hard_get_name(int drive)
+{
+  Drive *d = &state.d[drive];
+  return d->name;
+}
+
+/* Returns 0 if OK, -1 if invalid header, errno value otherwise. */
+int
+trs_hard_set_name(int drive, const char *name)
+{
+  Drive *d = &state.d[drive];
+  if (d->name) free(d->name);
+  d->name = name ? strdup(name) : NULL;
+  return open_drive(drive);
+}
+
+/* Returns 0 if OK, errno value otherwise. */
+int
+trs_hard_create(const char *name)
+{
+  error("XXX not implemented yet; use mkdisk");
+  return ENOTSUP;
+}
+
+/* Powerup or reset button */
+void trs_hard_reset(void)
+{
   state.control = 0;
   state.data = 0;
   state.error = 0;
@@ -89,15 +136,15 @@ void trs_hard_init(void)
   state.head = 0;
   state.status = 0;
   state.command = 0;
+}
+
+/* Check for media change */
+void trs_hard_change_all(void)
+{
+  int i;
+  state.present = 0; // if no drives, emulate controller not present
   for (i=0; i<TRS_HARD_MAXDRIVES; i++) {
-    if (state.d[i].file) {
-      fclose(state.d[i].file);
-      state.d[i].file = NULL;
-    }
-    state.d[i].writeprot = 0;
-    state.d[i].cyls = 0;
-    state.d[i].heads = 0;
-    state.d[i].secs = 0;
+    if (open_drive(i) == 0) state.present = 1;
   }
 }
 
@@ -167,14 +214,12 @@ void trs_hard_out(int port, int value)
   case TRS_HARD_WP:
     break;
   case TRS_HARD_CONTROL:
+    /* Do we really need to do anything here? */
     if (value & TRS_HARD_SOFTWARE_RESET) {
-      trs_hard_init();
+      trs_hard_reset();
     }
-    if ((value & TRS_HARD_DEVICE_ENABLE) && state.present == 0) {
-      int i;
-      for (i=0; i<TRS_HARD_MAXDRIVES; i++) {
-	if (open_drive(i)) state.present = 1;
-      }
+    if (value & TRS_HARD_DEVICE_ENABLE) {
+      trs_hard_change_all();
     }
     state.control = value;
     break;
@@ -203,7 +248,7 @@ void trs_hard_out(int port, int value)
     state.drive = (value & TRS_HARD_DRIVEMASK) >> TRS_HARD_DRIVESHIFT;
     state.head = (value & TRS_HARD_HEADMASK) >> TRS_HARD_HEADSHIFT;
 #if 0
-    if (!open_drive(state.drive)) state.status &= ~TRS_HARD_READY;
+    if (open_drive(state.drive) < 0) state.status &= ~TRS_HARD_READY;
 #else
     /* Ready, but perhaps not able!  This way seems to work better; it
      * avoids a long delay in the Model 4P boot ROM when there is no
@@ -336,40 +381,42 @@ static void hard_seek(int cmd)
 }
 
 /* 
- * 1) Make sure the file for the current drive is open.  If the file
- * cannot be opened, return 0 and set the controller error status.
+ * (Re)open the specified drive.
  *
- * 2) If newly opening the file, establish the hardware write protect
- * status and geometry in the Drive structure.
+ * 1) If already open, close the file for the drive.
  *
- * 3) Return 1 if all OK.
+ * 2) Open the file.  If it cannot be opened, return 0 and set the
+ * controller error status.
+ *
+ * 3) Set the hardware write protect status and geometry in the Drive
+ * structure.
+ *
+ * 4) Return 0 if OK, -1 if invalid header, errno value otherwise.
  */
 static int open_drive(int drive)
 {
   Drive *d = &state.d[drive];
-  char diskname[1024];
   ReedHardHeader rhh;
   size_t res;
+  int err = 0;
 
-  if (d->file != NULL) return 1;
-
-  /* Compute the filename */
-  if (trs_model == 5) {
-    sprintf(diskname, "%s/hard4p-%d", trs_disk_dir, drive);
-  } else {
-    sprintf(diskname, "%s/hard%d-%d", trs_disk_dir, trs_model, drive);
+  if (d->file != NULL) {
+    fclose(d->file);
+    d->file = NULL;
+  }
+  if (d->name == NULL) {
+    goto fail;
   }
 
   /* First try opening for reading and writing */
-  d->file = fopen(diskname, "r+");
+  d->file = fopen(d->name, "r+");
   if (d->file == NULL) {
-    /* No luck, try for reading only */
-    d->file = fopen(diskname, "r");
+    if (errno == EACCES || errno == EROFS) {
+      /* No luck, try for reading only */
+      d->file = fopen(d->name, "r");
+    }
     if (d->file == NULL) {
-#if HARDDEBUG3
-      error("trs_hard: could not open hard drive image %s: %s",
-	    diskname, strerror(errno));
-#endif
+      err = errno;
       goto fail;
     }
     d->writeprot = 1;
@@ -380,7 +427,7 @@ static int open_drive(int drive)
   /* Read in the Reed header and check some basic magic numbers (not all) */
   res = fread(&rhh, sizeof(rhh), 1, d->file);
   if (res != 1 || rhh.id1 != 0x56 || rhh.id2 != 0xcb || rhh.ver != 0x10) {
-    error("trs_hard: unrecognized hard drive image %s", diskname);
+    err = -1;
     goto fail;
   }
   if (rhh.flag1 & 0x80) d->writeprot = 1;
@@ -397,19 +444,20 @@ static int open_drive(int drive)
 
   if ((rhh.sec % d->secs) != 0 ||
       d->heads <= 0 || d->heads > TRS_HARD_MAXHEADS) {
-    error("trs_hard: unusable geometry in image %s", diskname);
+    error("trs_hard: unusable geometry in image %s", d->name);
+    err = -1;
     goto fail;
   }
 
   state.status = TRS_HARD_READY | TRS_HARD_SEEKDONE;
-  return 1;
+  return 0;
 
  fail:
   if (d->file) fclose(d->file);
   d->file = NULL;
   state.status = TRS_HARD_READY | TRS_HARD_SEEKDONE | TRS_HARD_ERR;
   state.error = TRS_HARD_NFERR;
-  return 0;
+  return err;
 }    
 
 /*
@@ -421,7 +469,7 @@ static int open_drive(int drive)
 static int find_sector(int newstatus)
 {
   Drive *d = &state.d[state.drive];
-  if (open_drive(state.drive) == 0) return 0;
+  if (open_drive(state.drive) < 0) return 0;
   if (/**state.cyl >= d->cyls ||**/ /* ignore this limit */
       state.head >= d->heads ||
       state.secnum > d->secs /* allow 0-origin or 1-origin */ ) {

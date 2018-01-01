@@ -27,6 +27,9 @@
  *        -p foo  select PDS entry "foo" (padded to 8 bytes with spaces)
  *        -x      ignore anything after the first xfer address
  */
+
+#define _XOPEN_SOURCE /* unistd.h: getopt(), optarg, optind, opterr */
+
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>

@@ -1,150 +1,252 @@
-.TH cassette 1
+.\" in Michael Kerrisk's man-pages(7) and GNU's groff_man(7), and groff(7).
+.\"
+.\" The following macro definitions come from groff's an-ext.tmac.
+.\"
+.\" Copyright (C) 2007-2014  Free Software Foundation, Inc.
+.\"
+.\" Written by Eric S. Raymond <esr@thyrsus.com>
+.\"            Werner Lemberg <wl@gnu.org>
+.\"
+.\" You may freely use, modify and/or distribute this file.
+.\"
+.\" If _not_ GNU roff, define UR and UE macros to handle URLs.
+.if !\n[.g] \{\
+.\" Start URL.
+.de UR
+.  ds m1 \\$1\"
+.  nh
+.  if \\n(mH \{\
+.    \" Start diversion in a new environment.
+.    do ev URL-div
+.    do di URL-div
+.  \}
+..
+.
+.
+.\" End URL.
+.de UE
+.  ie \\n(mH \{\
+.    br
+.    di
+.    ev
+.
+.    \" Has there been one or more input lines for the link text?
+.    ie \\n(dn \{\
+.      do HTML-NS "<a href=""\\*(m1"">"
+.      \" Yes, strip off final newline of diversion and emit it.
+.      do chop URL-div
+.      do URL-div
+\c
+.      do HTML-NS </a>
+.    \}
+.    el \
+.      do HTML-NS "<a href=""\\*(m1"">\\*(m1</a>"
+\&\\$*\"
+.  \}
+.  el \
+\\*(la\\*(m1\\*(ra\\$*\"
+.
+.  hy \\n(HY
+..
+.\} \" not GNU roff
+.\" End of Free Software Foundation copyrighted material.
+.\"
+.\" Copyright 1999 Timothy Mann
+.\"
+.\" This software may be copied, modified, and used for any purpose
+.\" without fee, provided that (1) the above copyright notice is
+.\" retained, and (2) modified versions are clearly marked as having
+.\" been modified, with the modifier's name and the date included.
+.\"
+.TH cassette 1 2008-06-26 xtrs
 .SH Name
 cassette \- data cassette image manipulator for xtrs TRS-80 emulator
-.SH Syntax
+.SH Synopsis
 .B cassette
 .SH Description
-To control the emulated cassette used by \fBxtrs\fP, a file called
-".cassette.ctl" in the current directory keeps track of what file is
-currently "loaded" as the cassette tape and the current position within
-that file. The \fBcassette\fP shell script provides a way to manipulate
-this file; typing "help" at its prompt shows its commands. You may use
-this script to load and position cassette tape files. The operation
-works very much like an actual tape recorder.
-
-This manual page also describes the image formats that the emulator
-supports and their limitations.
-
-In this release, two cassette programs are supplied.  The original
-\fBcassette\fP is a C-shell script; it should work with most versions
-of /bin/csh.  If you do not have /bin/csh installed, you can use
-\fBcassette.sh\fP, which is a Bourne shell script.  It requires a 
-modern version of the Bourne shell that supports user-defined functions,
-so it may not work on older Unix systems.
-
-.SH Commands
+To control the emulated cassette used by
+.BR xtrs ,
+a file called
+.I .cassette.ctl
+in the current directory keeps track of what file is currently \(lqloaded\(rq as
+the cassette tape and the current position within that file.
+The
+.B cassette
+shell script provides a way to manipulate
+this file.
+You can use this script to load and position cassette tape files.
+The operation works very much like an actual tape recorder.
+.PP
+This manual page also describes the image formats that the emulator supports and
+their limitations.
+.
+.SS Commands
+.TP
+.B help
+lists the available commands.
+.TP
 .B pos
 generates a status message including the filename being used as the
 cassette image and the current position within the image, in bytes.
-
-.B load
-.I [filename]
+.TP
+.BI load " filename"
 changes the cassette image currently being used to the file specified, and
 resets the position counter to zero.
-
-.B type
-.I typename
-tells the emulator what type of image is loaded.  Usually this is
-detected from the file extension, but you can override the detected
-value with this command.  The supported types are listed in the next section.
-
-.B rew
-.I [position]
+.TP
+.BI type " \fR[\fPformat\fR]\fP"
+tells the emulator what type of image is loaded.
+Usually
+.I format
+is detected from the file extension, but you can override the detected value
+with this command.
+Omitting
+.I format
+from the command lists the supported format types.
+.TP
+.BI rew " \fR[\fPposition\fR]\fP"
 changes the position counter to the position specified.
 If no position is given, the counter is reset to zero.
-
-.B ff
-.I [position]
+.TP
+.BI ff " \fR[\fPposition\fR]\fP"
 changes the position counter to the position specified.
 If no position is given, the counter is set to the end of the file.
-
+.TP
 .B quit
-exits the \fBcassette\fP shell script.
-.SH Types
-\fBxtrs\fP supports several different types of cassette images,
-each of which represents cassette data in a different format.
-
-.I cas
+exits
+.BR cassette .
+.SS Format Types
+.B xtrs
+supports several different types of cassette images, each of which represents
+cassette data in a different format.
+.TP
+.B cas
 format is fairly compact and is compatible with other TRS-80 emulators
-that have cassette support.  This format represents the bit stream
-that (the emulator thinks) the TRS-80 cassette routines were trying to
-save to the tape, not the actual electrical signals on the tape.  
-
+that have cassette support.
+This format represents the bit stream that (the emulator thinks) the TRS-80
+cassette routines were trying to save to the tape, not the actual electrical
+signals on the tape.
+.IP ""
 On writing, the emulator monitors the values that the TRS-80 software is
 sending to the cassette port and their timing, auto-recognizes whether
 a 250-bps, 500-bps, or 1500-bps format is being written, decodes the
 signals into a string of 0 and 1 bits, packs the bits into bytes, and
-writes them to the cas file.  On reading, the emulator auto-detects
-whether software is trying to read at 250, 500, or 1500 bps and
-encodes the 0's and 1's back into the signals that the TRS-80 software
-is expecting.  This somewhat roundabout method should work with most
-TRS-80 cassette routines that read and write signals compatible with the
-ROM cassette routines, but it may fail with custom routines that are
-too different.
-
+writes them to the
+.B cas
+file.
+On reading, the emulator auto-detects whether software is trying to read at 250,
+500, or 1500 bps and encodes the \(lq0\(rqs and \(lq1\(rqs back into the signals
+that the TRS-80 software is expecting.
+This somewhat roundabout method should work with most TRS-80 cassette routines
+that read and write signals compatible with the ROM cassette routines, but it
+may fail with custom routines that are too different.
+.IP ""
 Note that generally nothing useful will happen if you try to write a
-cas image at one speed and read it at another.  There are differences
-in the actual bit streams that standard TRS-80 software records at
-each of the three different speeds, not just differences in encoding
-the electrical signals on the tape.  Thus an incoming bit stream that
-was originally recorded at one speed will not be understood when read
-back in at a different speed.  For example, Level 2 Basic programs are
-tokenized, while Level 1 Basic programs are not, and the two Basic
-implementations record different binary information at the start of
-the program and between lines.  Also, when a file is saved at 1500
-bps, standard TRS-80 software puts an extra 0 bit after every 8 data
-bits, and these extra bits are packed into the cas file along with the
-data bits.
-
-.I cpt
-format (for "cassette pulse train") encodes the exact values and
-timing of the signals that the TRS-80 cassette routine sends to the
-cassette output port to be recorded on the tape.  Timing is to the
-nearest microsecond.  This format emulates a perfect, noise-free
-cassette, so any cassette routines that even halfway worked on real
-hardware should work with it.
-
-.I wav
-format is a standard sound file format.  The wav format is
-intermediate in emulation accuracy between cas and cpt.  It does
-represent actual signals, not decoded bits, but its timing precision
-is limited by the sample rate used.  The default rate for new wav
-files is 44,100 Hz; you can change this with the -samplerate command
-line option to \fBxtrs\fP.
-
-You can play wav files written by \fBxtrs\fP through your sound card
-and hear roughly what a real TRS-80 cassette sounds like.  A real
-TRS-80 should be able to read wav files written by \fBxtrs\fP if you
-copy them to a cassette or connect the TRS-80 directly to the sound
-card's output.  This feature has not been tested extensively, but it
-does seem to work, at least for short programs.
-
-\fBxtrs\fP can also read wav files.  It can read back the wav files
-that it writes without error.  Reading wav files sampled from real
-cassettes is more difficult because of the noise introduced, but in
-brief testing it does seem to work.  The signal processing algorithms
-used are very crude, and better ones could probably do a better job
-of reading old, noisy cassettes, but I don't have any such cassettes
-to test with (and I don't know much about signal processing!).  Help
-in this area would be welcome.
-
-The wav file parsing code has several limitations.  Samples must be
-8-bit mono, and the wav file must contain only one data chunk and no
-extra optional RIFF chunks in the header.  If you have a wav file
-whose header xtrs rejects, try using sox(1) to convert it to a more
-vanilla format.
-
-.I direct
-format is similar to wav format, except that the samples go to (or
-come from) your sound card directly, not a wav file.  Direct format
-requires the Open Sound System /dev/dsp device.  Extending the code
-to work with other sound interfaces would probably not be
-hard, but is left as an exercise for the reader.  Please send me
-the changes if you do this.
-
-.I debug
-format is the same as cpt format except that the data is written in
-human-readable ASCII.  The cassette output is assumed to be 0
-initially.  Each line of output gives a new value (0, 1, or 2), and
-the amount of time (in microseconds) to wait before changing the
-output to this value.
-
-.SH Authors
-\fBxtrs\fP 1.0 was written by David Gingold and Alec Wolman.
-The current version was revised and much extended by Timothy Mann
-(see http://tim-mann.org/).
-An initial version of this man page, and
-the translation from C-shell (cassette) to Bourne shell (cassette.sh),
-are due to Branden Robinson.
-
-$Id$
+.B cas
+image at one speed and read it at another.
+There are differences in the actual bit streams that standard TRS-80 software
+records at each of the three different speeds, not just differences in encoding
+the electrical signals on the tape.
+Thus an incoming bit stream that was originally recorded at one speed will not
+be understood when read back in at a different speed.
+For example, Level II BASIC programs are tokenized, while Level I BASIC programs
+are not, and the two BASIC implementations record different binary information
+at the start of the program and between lines.
+Also, when a file is saved at 1500 bps, standard TRS-80 software puts an extra 0
+bit after every 8 data bits, and these extra bits are packed into the
+.B cas
+file along with the data bits.
+.TP
+.B cpt
+format (for \(lqcassette pulse train\(rq) encodes the exact values and timing of
+the signals that the TRS-80 cassette routine sends to the cassette output port
+to be recorded on the tape.
+Timing is to the nearest microsecond.
+This format emulates a perfect, noise-free cassette, so any cassette routines
+that even halfway worked on real hardware should work with it.
+.TP
+.B wav
+format refers to WAVE, a standard sound file format developed by IBM and
+Microsoft.
+The
+.B wav
+format is intermediate in emulation accuracy between
+.B cas
+and
+.BR cpt .
+It does represent actual signals, not decoded bits, but its timing precision is
+limited by the sample rate used.
+The default rate for new
+.B wav
+files is 44,100 Hz; you can change this with the
+.B -samplerate
+command-line option to
+.BR xtrs .
+.IP ""
+You can play
+.B wav
+files written by
+.B xtrs
+through your sound card and hear roughly what a real TRS-80 cassette sounds
+like.
+A real TRS-80 should be able to read
+.B wav
+files written by
+.B xtrs
+if you copy them to a cassette or connect the TRS-80 directly to the sound
+card's output.
+This feature has not been tested extensively, but it does seem to work, at least
+for short programs.
+.IP ""
+.B xtrs
+can also read
+.B wav
+files.
+It can read back the
+.B wav
+files that it writes without error.
+Reading
+.B wav
+files sampled from real cassettes is more difficult because of the noise
+introduced, but in brief testing it does seem to work.
+The signal processing algorithms used are crude, and better ones could
+probably do a better job of reading old, noisy cassettes.
+Help in this area would be welcome.
+.IP ""
+The
+.B wav
+file parsing code has several limitations.
+Samples must be
+8-bit monophonic PCM, and the
+.B wav
+file must contain only one data chunk and no extra optional RIFF chunks in the
+header.
+If you have a
+.B wav
+file whose header
+.B xtrs
+rejects, try using a tool like
+.BR sox (1)
+to convert it to the required format.
+.TP
+.B direct
+format is similar to
+.B wav
+format, except that the samples go to (or come from) your sound card directly,
+not a WAVE file.
+The
+.B direct
+format requires the Open Sound System
+.I /dev/dsp
+device.
+.TP
+.B debug
+format is the same as
+.B cpt
+format except that the data is written in human-readable ASCII.
+The cassette output is assumed to be 0 initially.
+Each line of output gives a new value (0, 1, or 2), and the amount of time (in
+microseconds) to wait before changing the output to this value.
+.SH See also
+.BR xtrs (1)
+.\" $Id$
+.\" vim:set et ft=nroff tw=80:

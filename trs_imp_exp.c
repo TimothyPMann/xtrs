@@ -13,6 +13,8 @@
  *  easier.  
  */
 
+#define _XOPEN_SOURCE 500 /* ftruncate(), strdup() */
+
 #include <stdio.h>
 #include <errno.h>
 #include <signal.h>
@@ -26,13 +28,14 @@
 #include "z80.h"
 #include "trs.h"
 #include "trs_disk.h"
+#include "trs_hard.h"
 
 /*
    If the following option is set, potentially dangerous emulator traps
    will be blocked, including file writes to the host filesystem and shell
    command execution.
  */
-int trs_emtsafe = 0;
+int trs_emtsafe = TRUE;
 
 /* New emulator traps */
 
@@ -50,7 +53,7 @@ void do_emt_system()
 {
   int res;
   if (trs_emtsafe) {
-    error("potentially dangerous emulator trap blocked");
+    error("emt_system: potentially dangerous emulator trap blocked");
     REG_A = EACCES;
     REG_F &= ~ZERO_MASK;
     return;
@@ -135,7 +138,7 @@ void do_emt_getddir()
 void do_emt_setddir()
 {
   if (trs_emtsafe) {
-    error("potentially dangerous emulator trap blocked");
+    error("emt_setddir: potentially dangerous emulator trap blocked");
     REG_A = EACCES;
     REG_F &= ~ZERO_MASK;
     return;
@@ -177,7 +180,7 @@ void do_emt_open()
   if (eoflag & EO_APPEND) oflag |= O_APPEND;
 
   if (trs_emtsafe && oflag != O_RDONLY) {
-    error("potentially dangerous emulator trap blocked");
+    error("emt_open: potentially dangerous emulator trap blocked");
     REG_A = EACCES;
     REG_F &= ~ZERO_MASK;
     return;
@@ -230,12 +233,6 @@ void do_emt_read()
 void do_emt_write()
 {
   int size;
-  if (trs_emtsafe) {
-    error("potentially dangerous emulator trap blocked");
-    REG_A = EACCES;
-    REG_F &= ~ZERO_MASK;
-    return;
-  }
   if (REG_HL + REG_BC > 0x10000) {
     REG_A = EFAULT;
     REG_F &= ~ZERO_MASK;
@@ -441,7 +438,7 @@ void do_emt_chdir()
 {
   int ok;
   if (trs_emtsafe) {
-    error("potentially dangerous emulator trap blocked");
+    error("emt_chdir: potentially dangerous emulator trap blocked");
     REG_A = EACCES;
     REG_F &= ~ZERO_MASK;
     return;
@@ -481,8 +478,8 @@ void do_emt_misc()
 {
   switch (REG_A) {
   case 0:
-    trs_disk_change_all();
-    REG_HL = trs_disk_changecount;
+    trs_change_all();
+    REG_HL = trs_changecount;
     break;
   case 1:
     trs_exit();
@@ -494,7 +491,7 @@ void do_emt_misc()
     trs_reset(0);
     break;
   case 4:
-    REG_HL = trs_disk_changecount;
+    REG_HL = trs_changecount;
     break;
   case 5:
     REG_HL = trs_model;
@@ -543,6 +540,8 @@ void do_emt_misc()
   case 21:
     trs_disk_truedam = REG_HL;
     break;
+  case 18: // removed; do not reuse
+  case 19: // removed; do not reuse
   default:
     error("unsupported function code to emt_misc");
     break;
@@ -553,12 +552,6 @@ void do_emt_ftruncate()
 {
   int i, result;
   off_t offset;
-  if (trs_emtsafe) {
-    error("potentially dangerous emulator trap blocked");
-    REG_A = EACCES;
-    REG_F &= ~ZERO_MASK;
-    return;
-  }
   if (REG_HL + 8 > 0x10000) {
     REG_A = EFAULT;
     REG_F &= ~ZERO_MASK;
@@ -578,46 +571,29 @@ void do_emt_ftruncate()
   }
 }
 
+/*
+ * In xtrs 4.9d and earlier, you could open any filename through this
+ * API in any mode, with an API similar to emt_open -- filename
+ * (relative to trs_disk_dir) in HL, flags in BC, mode in DE.  Now
+ * instead we take the unit number in the three low-order bits of A
+ * and open the same filename that trs_hard.c would open.  This keeps
+ * compatibility with xtrshard, the only existing client of the API,
+ * because xtrshard conveniently happens to leave the unit number
+ * there.  The new API works better with gxtrs where the user
+ * selects the hard drive name from the xtrs File menu.  It is also
+ * safer; it does not need to be restricted by emt_safe.
+ *
+ * This API could be improved further (better integration with
+ * trs_hard.c, handle write-protect better, reduce the amount of Z80
+ * code in xtrshard, etc.), but I prefer to keep compatibility with
+ * the old xtrshard.
+ */
 void do_emt_opendisk()
 {
-  char *name = (char *)mem_pointer(REG_HL, 0);
-  char *qname;
+  int drive = REG_A % TRS_HARD_MAXDRIVES;
   int i;
-  int oflag, eoflag;
-
-  eoflag = REG_BC;
-  switch (eoflag & EO_ACCMODE) {
-  case EO_RDONLY:
-  default:
-    oflag = O_RDONLY;
-    break;
-  case EO_WRONLY:
-    oflag = O_WRONLY;
-    break;
-  case EO_RDWR:
-    oflag = O_RDWR;
-    break;
-  }
-  if (eoflag & EO_CREAT)  oflag |= O_CREAT;
-  if (eoflag & EO_EXCL)   oflag |= O_EXCL;
-  if (eoflag & EO_TRUNC)  oflag |= O_TRUNC;
-  if (eoflag & EO_APPEND) oflag |= O_APPEND;
-
-  if (trs_emtsafe && oflag != O_RDONLY) {
-    error("potentially dangerous emulator trap blocked");
-    REG_A = EACCES;
-    REG_F &= ~ZERO_MASK;
-    return;
-  }
-
-  if (*name == '/' || *trs_disk_dir == '\0') {
-    qname = strdup(name);
-  } else {
-    qname = (char *)malloc(strlen(trs_disk_dir) + 1 + strlen(name) + 1);
-    strcpy(qname, trs_disk_dir);
-    strcat(qname, "/");
-    strcat(qname, name);
-  }
+  int readonly = 0;
+  
   for (i = 0; i < MAX_OPENDISK; i++) {
     if (!od[i].inuse) break;
   }
@@ -625,11 +601,14 @@ void do_emt_opendisk()
     REG_DE = 0xffff;
     REG_A = EMFILE;
     REG_F &= ~ZERO_MASK;
-    free(qname);
     return;
   }
-  od[i].fd = open(qname, oflag, REG_DE);
-  free(qname);
+  od[i].fd = open(trs_hard_get_name(drive), O_RDWR);
+  if (od[i].fd < 0) {
+    od[i].fd = open(trs_hard_get_name(drive), O_RDONLY);
+    readonly = 1;
+  }
+
   if (od[i].fd >= 0) {
     od[i].inuse = 1;
     REG_A = 0;
@@ -639,6 +618,7 @@ void do_emt_opendisk()
     REG_F &= ~ZERO_MASK;
   }
   REG_DE = od[i].fd;
+  REG_BC = readonly;
 }
 
 void do_emt_closedisk()

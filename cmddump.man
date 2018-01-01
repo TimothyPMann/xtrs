@@ -1,54 +1,193 @@
-.TH cmddump 1 2001-02-22
+.\" This man page attempts to follow the conventions and recommendations found
+.\" in Michael Kerrisk's man-pages(7) and GNU's groff_man(7), and groff(7).
+.\"
+.\" The following macro definitions come from groff's an-ext.tmac.
+.\"
+.\" Copyright (C) 2007-2014  Free Software Foundation, Inc.
+.\"
+.\" Written by Eric S. Raymond <esr@thyrsus.com>
+.\"            Werner Lemberg <wl@gnu.org>
+.\"
+.\" You may freely use, modify and/or distribute this file.
+.\"
+.\" If _not_ GNU roff, define macros to handle synopsis and URLs.
+.if !\n[.g] \{\
+.\" Declare start of command synopsis.  Sets up hanging indentation.
+.de SY
+.  ie !\\n(mS \{\
+.    nh
+.    nr mS 1
+.    nr mA \\n(.j
+.    ad l
+.    nr mI \\n(.i
+.  \}
+.  el \{\
+.    br
+.    ns
+.  \}
+.
+.  nr mT \w'\fB\\$1\fP\ '
+.  HP \\n(mTu
+.  B "\\$1"
+..
+.
+.
+.\" End of command synopsis.  Restores adjustment.
+.de YS
+.  in \\n(mIu
+.  ad \\n(mA
+.  hy \\n(HY
+.  nr mS 0
+..
+.
+.
+.\" Declare optional option.
+.de OP
+.  ie \\n(.$-1 \
+.    RI "[\fB\\$1\fP" "\ \\$2" "]"
+.  el \
+.    RB "[" "\\$1" "]"
+..
+.
+.
+.\" Start URL.
+.de UR
+.  ds m1 \\$1\"
+.  nh
+.  if \\n(mH \{\
+.    \" Start diversion in a new environment.
+.    do ev URL-div
+.    do di URL-div
+.  \}
+..
+.
+.
+.\" End URL.
+.de UE
+.  ie \\n(mH \{\
+.    br
+.    di
+.    ev
+.
+.    \" Has there been one or more input lines for the link text?
+.    ie \\n(dn \{\
+.      do HTML-NS "<a href=""\\*(m1"">"
+.      \" Yes, strip off final newline of diversion and emit it.
+.      do chop URL-div
+.      do URL-div
+\c
+.      do HTML-NS </a>
+.    \}
+.    el \
+.      do HTML-NS "<a href=""\\*(m1"">\\*(m1</a>"
+\&\\$*\"
+.  \}
+.  el \
+\\*(la\\*(m1\\*(ra\\$*\"
+.
+.  hy \\n(HY
+..
+.\} \" not GNU roff
+.\" End of Free Software Foundation copyrighted material.
+.\"
+.\" Copyright 2001, 2017 Branden Robinson
+.\"
+.\" This software may be copied, modified, and used for any purpose
+.\" without fee, provided that (1) the above copyright notice is
+.\" retained, and (2) modified versions are clearly marked as having
+.\" been modified, with the modifier's name and the date included.
+.\"
+.TH cmddump 1 2017-04-04 xtrs
 .SH Name
 cmddump \- simulated TRS-80 CMD file loader
-.SH Syntax
-\fBcmddump\fP \fI[flags] infile [outfile startbyte nbytes]\fP
+.SH Synopsis
+.SY cmddump
+.OP \-d
+.OP \-i n
+.OP \-m
+.OP \-p entry
+.OP \-q
+.OP \-s
+.OP \-t
+.OP \-x
+.I infile
+.RI [ "outfile startbyte nbytes" ]
 .SH Description
 .B cmddump
-displays information about TRS-80 DOS binary (command) files.  It takes
-an optional set of \fIflags\fP (described below), an input /cmd file, and
-an optional \fIoutfile\fP, an optional starting offset of \fIstartbyte\fP
-into the /cmd file, and an optional \fInbytes\fP number of bytes to dump.
-Non-flag arguments must be given in the order shown.  If the optional
-arguments are given, the given byte range is dumped from the simulated
-memory after loading.
+displays information about TRS-80 DOS CMD (binary executable) files.
+It takes a mandatory input CMD file
+.IR infile,
+and an optional triplet of arguments: an output file
+.IR outfile ,
+a starting offset of
+.I startbyte
+into the CMD file
+.IR infile ,
+and a number of bytes to dump,
+.IR nbytes .
+If
+.IR "outfile, startbyte, " and " nbytes "
+are specified, the given byte range is dumped from the simulated memory after
+loading.
+.PP
+The numeric arguments, including that to the option
+.BR \-i ,
+may be given in any format recognized by
+.BR strtol (3);
+in other words, traditional C literals for decimal, octal, and hexadecimal.
 .SH Options
+The optional arguments and their parameters direct
+.B cmddump
+as follows.
 .TP
-\fB-d\fP
-print detailed map; same as -m, but don't coalesce
+.B \-d
+print detailed map; same as
+.BR \-m ,
+but do not coalesce adjacent blocks
 .TP
-\fB-i\fP \fIn\fP
-select ISAM entry \fIn\fP (0x notation OK)
+.BI "\-i " n
+select ISAM entry \fIn\fP
 .TP
-\fB-m\fP
-print running load map as file is parsed, coalescing adjacent blocks
-(implies -t) (default)
+.B \-m
+print running load map as file is parsed, coalescing adjacent blocks (implies
+.BR \-t );
+default
 .TP
-\fB-p\fP \fIfoo\fP
-select PDS entry \fIfoo\fP (padded to 8 bytes with spaces)
+.BI "\-p " entry
+select PDS entry
+.IR entry ;
+.B cmddump
+will truncate or right-pad
+.I entry
+with spaces, as needed, to the required fixed field width
 .TP
-\fB-q\fP
-quiet; turns off -t, -m, -d, -s (later flags can override)
+.B \-q
+quiet; turns off
+.BR \-d ,
+.BR \-m ,
+.BR \-s ,
+and
+.B \-t
+(later flags can override)
 .TP
-\fB-s\fP
+.B \-s
 print summary load map after file is parsed
 .TP
-\fB-t\fP
-print text of module headers, pds headers, patch names, and copyright
-notices
+.B \-t
+print text of module headers, PDS headers, patch names, and copyright notices
 .TP
-\fB-x\fP
+.B \-x
 ignore anything after the first transfer address
-.SH Author
-.B cmddump
-was written by Timothy Mann.
-This man page was generated by Branden Robinson from comments in the
-source code.
 .SH See also
-.IR xtrs (1)
+.BR xtrs (1)
 .PP
-See the LDOS Quarterly, April 1, 1982 (Vol 1, No 4), for documentation of
-the TRS-80 DOS /cmd file format.  
-It is available on the Web at http://www.tim-mann.org/misosys.html.
-
-$Id$
+The
+.\" If GNU roff, use hyphenless breakpoints.
+.ie \n[.g] .UR http://\:www.tim-mann.org/\:misosys.html
+.el .UR http://www.tim-mann.org/misosys.html
+.IR "LDOS Quarterly" ,
+April 1, 1982 (Vol 1, No 4)
+.UE ,
+has documentation of the TRS-80 DOS CMD file format.
+.\" $Id$
+.\" vim:set et ft=nroff tw=80:

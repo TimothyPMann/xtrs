@@ -11,7 +11,7 @@
  *
  * Features to make transferring files into and out of the emulator
  * (etc.) easier, using a set of emulator traps (instructions that
- * don't exist in a real Z-80).
+ * don't exist in a real Z80).
  *
  * ED20-ED21 reserved; used by Jeff Vavasour Model III/4 emulator
  *
@@ -202,10 +202,8 @@
  *         After,  HL = 0 none, 1 Percom, 2 Tandy, 3 both
  *    17 = set doubler
  *         Before, HL = 0 none, 1 Percom, 2 Tandy, 3 both
- *    18 = query SoundBlaster volume (obsolete)
- *         After,  HL = 0-100
- *    19 = set SoundBlaster volume (obsolete)
- *         Before, HL = 0-100
+ *    18 = reserved (formerly query SoundBlaster volume)
+ *    19 = reserved (formerly set SoundBlaster volume)
  *    20 = query truedam flag
  *         After,  HL = 0 or 1
  *    21 = set truedam flag
@@ -246,23 +244,23 @@
 #define EO_TRUNC  01000
 #define EO_APPEND 02000
 
-extern void do_emt_system();
-extern void do_emt_getddir();
-extern void do_emt_setddir();
-extern void do_emt_mouse();
-extern void do_emt_open();
-extern void do_emt_close();
-extern void do_emt_read();
-extern void do_emt_write();
-extern void do_emt_lseek();
-extern void do_emt_strerror();
-extern void do_emt_time();
-extern void do_emt_opendir();
-extern void do_emt_closedir();
-extern void do_emt_readdir();
-extern void do_emt_chdir();
-extern void do_emt_getcwd();
-extern void do_emt_misc();
-extern void do_emt_ftruncate();
-extern void do_emt_opendisk();
-extern void do_emt_closedisk();
+void do_emt_system();
+void do_emt_getddir();
+void do_emt_setddir();
+void do_emt_mouse();
+void do_emt_open();
+void do_emt_close();
+void do_emt_read();
+void do_emt_write();
+void do_emt_lseek();
+void do_emt_strerror();
+void do_emt_time();
+void do_emt_opendir();
+void do_emt_closedir();
+void do_emt_readdir();
+void do_emt_chdir();
+void do_emt_getcwd();
+void do_emt_misc();
+void do_emt_ftruncate();
+void do_emt_opendisk();
+void do_emt_closedisk();

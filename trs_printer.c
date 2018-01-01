@@ -18,7 +18,7 @@
 #include "z80.h"
 #include "trs.h"
 
-void trs_printer_write(value)
+void trs_printer_write(int value)
 {
     if(value == 0x0D)
     {

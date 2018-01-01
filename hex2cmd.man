@@ -1,25 +1,91 @@
-.TH hex2cmd 1
+.\" This man page attempts to follow the conventions and recommendations found
+.\" in Michael Kerrisk's man-pages(7) and GNU's groff_man(7), and groff(7).
+.\"
+.\" The following macro definitions come from groff's an-ext.tmac.
+.\"
+.\" Copyright (C) 2007-2014  Free Software Foundation, Inc.
+.\"
+.\" Written by Eric S. Raymond <esr@thyrsus.com>
+.\"            Werner Lemberg <wl@gnu.org>
+.\"
+.\" You may freely use, modify and/or distribute this file.
+.\"
+.\" If _not_ GNU roff, define UR and UE macros to handle URLs.
+.if !\n[.g] \{\
+.\" Start URL.
+.de UR
+.  ds m1 \\$1\"
+.  nh
+.  if \\n(mH \{\
+.    \" Start diversion in a new environment.
+.    do ev URL-div
+.    do di URL-div
+.  \}
+..
+.
+.
+.\" End URL.
+.de UE
+.  ie \\n(mH \{\
+.    br
+.    di
+.    ev
+.
+.    \" Has there been one or more input lines for the link text?
+.    ie \\n(dn \{\
+.      do HTML-NS "<a href=""\\*(m1"">"
+.      \" Yes, strip off final newline of diversion and emit it.
+.      do chop URL-div
+.      do URL-div
+\c
+.      do HTML-NS </a>
+.    \}
+.    el \
+.      do HTML-NS "<a href=""\\*(m1"">\\*(m1</a>"
+\&\\$*\"
+.  \}
+.  el \
+\\*(la\\*(m1\\*(ra\\$*\"
+.
+.  hy \\n(HY
+..
+.\} \" not GNU roff
+.\" End of Free Software Foundation copyrighted material.
+.\"
+.\" Copyright 2001 Branden Robinson
+.\"
+.\" This software may be copied, modified, and used for any purpose
+.\" without fee, provided that (1) the above copyright notice is
+.\" retained, and (2) modified versions are clearly marked as having
+.\" been modified, with the modifier's name and the date included.
+.\"
+.TH hex2cmd 1 2008-06-26 xtrs
 .SH Name
 hex2cmd \- convert Intel hex format to TRS-80 CMD format
-.SH Syntax
-\fBhex2cmd\fP \fI[infile]\fP
+.SH Synopsis
+.B hex2cmd
+.RI [ infile ]
 .SH Description
 .B hex2cmd
-reads the specified \fIinfile\fP (or standard input if none is given)
-in Intel hex format (also known as S-record format), and writes a
-TRS-80 CMD file to standard output.
-An S-record that asks for 0 bytes to be loaded at address A 
-sets the transfer address (entry point) of the CMD file to A; otherwise
-the CMD file is given no transfer address.
-.SH Author
-.B hex2cmd
-was written by Timothy Mann.
-This man page was created by Branden Robinson.
+reads the specified
+.I infile
+(or standard input if none is given) in Intel hex format (also known as S-record
+format), and writes a TRS-80 CMD file to standard output.
+An S-record that asks for 0 bytes to be loaded at address
+.I A
+sets the transfer address (entry point) of the CMD file to
+.IR A ;
+otherwise the CMD file is given no transfer address.
 .SH See also
-.IR xtrs (1)
+.BR xtrs (1)
 .PP
-See the LDOS Quarterly, April 1, 1982 (Vol 1, No 4), for documentation of
-the TRS-80 DOS /cmd file format.
-It is available on the Web at http://www.tim-mann.org/misosys.html.
-
-$Id$
+The
+.\" If GNU roff, use hyphenless breakpoints.
+.ie \n[.g] .UR http://\:www.tim-mann.org/\:misosys.html
+.el .UR http://www.tim-mann.org/misosys.html
+.IR "LDOS Quarterly" ,
+April 1, 1982 (Vol 1, No 4)
+.UE ,
+has documentation of the TRS-80 DOS CMD file format.
+.\" $Id$
+.\" vim:set et ft=nroff tw=80:

@@ -15,10 +15,15 @@
  * found in odd corners.  Anyone have a real WD10xx data sheet?
  */
 
-extern void trs_hard_init(void);
-extern int trs_hard_in(int port);
-extern void trs_hard_out(int port, int value);
-extern char* trs_disk_dir;
+void trs_hard_init(void);
+void trs_hard_reset(void);
+void trs_hard_change_all(void);
+const char *trs_hard_get_name(int drive);
+int trs_hard_set_name(int drive, const char *name);
+int trs_hard_create(const char *name);
+int trs_hard_in(int port);
+void trs_hard_out(int port, int value);
+extern char *trs_disk_dir;
 
 /* Sector size is always 256 for TRSDOS/LDOS/etc. */
 /* Other sizes currently not emulated */

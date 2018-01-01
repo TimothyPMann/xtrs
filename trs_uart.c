@@ -10,6 +10,8 @@
  * Emulation of the Radio Shack TRS-80 Model I/III/4/4P serial port.
  */
 
+#define _POSIX_C_SOURCE 200112L /* signal.h: sigemptyset(), ... */
+
 #include <errno.h>
 #include <termios.h>
 #include <unistd.h>

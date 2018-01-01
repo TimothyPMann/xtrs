@@ -19,11 +19,11 @@
 */
 
 /*
- * z80.c:  The guts of the Z-80 emulator.
+ * z80.c:  The guts of the Z80 emulator.
  *
- * The Z-80 emulator should be general and complete enough to be
- * easily adapted to emulate any Z-80 machine.  All of the documented
- * Z-80 flags and instructions are implemented.  The only documented
+ * The Z80 emulator should be general and complete enough to be
+ * easily adapted to emulate any Z80 machine.  All of the documented
+ * Z80 flags and instructions are implemented.  The only documented
  * features we cheat a little on are interrupt handling (modes 0 and 2
  * are not supported) and the refresh register (reading it returns a
  * random number; writing it is ignored).
@@ -33,7 +33,7 @@
  * with some minor exceptions.  There seems to be a disagreement about
  * undocumented flag handling for "bit" instructions between
  * z80undoc.txt and the ZEXALL validator from Yaze.  Since ZEXALL
- * passes on both a real Z-80 and Yaze, but fails on my attempt to
+ * passes on both a real Z80 and Yaze, but fails on my attempt to
  * implement "bit n,r" according to z80undoc.txt, I've imitated Yaze's
  * implementation.  On block in/out instructions, z80undoc.txt gives
  * some very complicated rules for undocumented flag handling that I
@@ -44,7 +44,6 @@
 #include "trs.h"
 #include "trs_imp_exp.h"
 #include <stdlib.h>  /* for rand() */
-#include <unistd.h>  /* for pause() */
 #include <time.h>    /* for time() */
 
 /*
@@ -56,7 +55,7 @@
 /*SUPPRESS 115*/
 
 /*
- * The state of our Z-80 registers is kept in this structure:
+ * The state of our Z80 registers is kept in this structure:
  */
 struct z80_state_struct z80_state;
 
@@ -596,7 +595,7 @@ static void do_test_bit(int op, int value, int bit)
    code is added to make the latter two instructions behave as in
    the version that passes ZEXALL, leading me to think that z80undoc.txt
    may be mistaken about "bit n,r".  This should be checked in detail
-   against a real Z-80, I suppose.  Ugh. */
+   against a real Z80, I suppose.  Ugh. */
 static void do_test_bit(int op, int value, int bit)
 {
     int result = value & (1 << bit);
@@ -2901,7 +2900,7 @@ static int do_ED_instruction()
 	T_COUNT(15);
 	break;
 
-      /* Emulator traps -- not real Z-80 instructions */
+      /* Emulator traps -- not real Z80 instructions */
       case 0x28:        /* emt_system */
 	do_emt_system();
 	break;
@@ -2979,6 +2978,7 @@ volatile int x_poll_count = 0;
 #define X_POLL_INTERVAL 10000
 
 int trs_continuous;
+volatile int dummy;
 
 int z80_run(int continuous)
      /*
@@ -2999,13 +2999,12 @@ int z80_run(int continuous)
 	   flushes output to the X server. */
 	if (x_poll_count <= 0) {
 	    x_poll_count = X_POLL_INTERVAL;
-	    trs_get_event(0);
+	    trs_get_event(FALSE);
 	} else {
 	    x_poll_count--;
 	}
         /* Speed control */
         if ((i = z80_state.delay)) {
-	  volatile int dummy;
 	  while (--i) dummy = i;
 	}
 
@@ -3424,13 +3423,13 @@ int z80_run(int continuous)
 	    
 	  case 0x76:	/* halt */
 	    if (trs_model == 1) {
-		/* Z-80 HALT output is tied to reset button circuit */
+		/* Z80 HALT output is tied to reset button circuit */
 		trs_reset(0);
 	    } else {
 		/* Really halt (i.e., wait for interrupt) */
 	        /* Slight kludge: we back up the PC and keep going
 		   around the main loop reexecuting the halt.  A real
-		   Z-80 does not back up and re-fetch the halt
+		   Z80 does not back up and re-fetch the halt
 		   instruction repeatedly; it just executes NOPs
 		   internally.  When an interrupt or NMI is delivered,
 		   (see below) we undo this decrement to get out of
@@ -3440,8 +3439,7 @@ int z80_run(int continuous)
 		    !(z80_state.nmi && !z80_state.nmi_seen) &&
 		    !(z80_state.irq && z80_state.iff1) &&
 		    !trs_event_scheduled()) {
-		    trs_paused = 1;
-		    pause();
+		  trs_get_event(TRUE);
 		}
 	    }
 	    T_COUNT(4);

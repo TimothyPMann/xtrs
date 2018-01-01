@@ -28,6 +28,9 @@
  * X Windows interface for TRS-80 simulator
  */
 
+#define _DEFAULT_SOURCE /* string.h: strcasecmp() */
+#define _XOPEN_SOURCE 500 /* string.h: strdup() */
+
 #include <stdio.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -222,8 +225,6 @@ struct stat statbuf;
 /* Private routines */
 void bitmap_init();
 void screen_init();
-void trs_event_init();
-void trs_event();
 
 static XrmDatabase x_db = NULL;
 static XrmDatabase command_db = NULL;
@@ -255,7 +256,7 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
   (void) XrmGetResource(command_db, option, "Xtrs.Display", &type, &value);
   /* open display */
   if ( (display = XOpenDisplay (value.addr)) == NULL) {
-    fprintf(stderr, "Unable to open display.");
+    fatal("unable to open display");
     exit(-1);
   }
 
@@ -349,7 +350,7 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
     if (XrmGetResource(x_db, option, "Xtrs.Charset", &type, &value)) {
       charset_name = (char*) value.addr;
     }
-    if (isdigit(*charset_name)) {
+    if (isdigit((unsigned char)*charset_name)) {
       trs_charset = atoi(charset_name);
       cur_char_width = 8 * scale_x;
     } else {
@@ -385,7 +386,7 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
     if (XrmGetResource(x_db, option, "Xtrs.Charset", &type, &value)) {
       charset_name = (char*) value.addr;
     }
-    if (isdigit(*charset_name)) {
+    if (isdigit((unsigned char)*charset_name)) {
       trs_charset = atoi(charset_name);
     } else {
       if (charset_name[0] == 'k'/*katakana*/) {
@@ -593,21 +594,27 @@ void trs_fix_size (Window window, int width, int height)
  * show help
  */
 
+static void show_fallback_help(char const **helpitems) {
+  for (int i = 0; NULL != helpitems[i]; i++) {
+    (void) fprintf(stderr, "%s\n", helpitems[i]);
+  }
+}
+
 void trs_show_help()
 {
   XWindowAttributes parent_attrs;
-  unsigned int help_width = 495;
-  unsigned int help_height = 365;
+  unsigned int const help_width = 495;
+  unsigned int const help_height = 365;
   unsigned int help_xpos, help_ypos;
   unsigned long foreground, background;
   GC help_gc;
   XGCValues values;
-  char *help_font_name = "9x15";
+  static char const *help_font_name = "9x15";
   XFontStruct *help_font_info;
   int font_height;
   int text_line;
   int i;
-  static char *helpitems[] = {
+  static char const *helpitems[] = {
     "F1: Model 4/4P F1 key",
     "F2: Model 4/4P F2 key",
     "F3: Model 4/4P F3 key",
@@ -625,9 +632,9 @@ void trs_show_help()
     "DownArrow, Linefeed: TRS-80 down arrow key",
     "",
     "Esc, Break: TRS-80 break key",
-    "Home, Clear, LeftAlt: TRS-80 clear key",
+    "Home, Clear, LeftMeta: TRS-80 clear key",
     "Control: Model 4/4P control key",
-    "RightAlt: shifted TRS-80 down arrow key",
+    "RightMeta: shifted TRS-80 down arrow key",
     "",
     "F11 toggles this help.",
     "See the xtrs(1) manual page for more information.",
@@ -639,9 +646,8 @@ void trs_show_help()
   (void) XGetWindowAttributes(display, window, &parent_attrs);
   if ((parent_attrs.width < help_width)
       || (parent_attrs.height < help_height)) {
-      (void) fprintf(stderr, "%s: cannot display help window; parent window"
-		     " dimensions not large enough to contain it\n",
-		     program_name);
+    error("cannot display help window; parent window too small to contain it");
+    show_fallback_help(helpitems);
     return;
   }
 
@@ -651,11 +657,17 @@ void trs_show_help()
 				    help_width, help_height, 1, foreground,
 				    background);
   help_font_info = XLoadQueryFont(display, help_font_name);
+
   if (NULL == help_font_info) {
-      (void) fprintf(stderr, "%s: cannot display help window; cannot open"
-		     " \"%s\" font\n", program_name, help_font_name);
+    size_t const errbufsize = 256;
+    char errbuf[errbufsize];
+    (void) snprintf(errbuf, errbufsize, "cannot display help window; cannot"
+                    " open font \"%s\"", help_font_name);
+    error(errbuf);
+    show_fallback_help(helpitems);
     return;
   }
+
   help_gc = XCreateGC(display, help_window, 0, &values);
   XSetFont(display, help_gc, help_font_info->fid);
   XSetBackground(display, help_gc, WhitePixel(display,screen));
@@ -668,11 +680,8 @@ void trs_show_help()
 
   for (i = 0; NULL != helpitems[i]; i++) {
     size_t len;
-    int text_width;
 
     len = strlen(helpitems[i]);
-    text_width = XTextWidth(help_font_info, helpitems[i], len);
-
     XDrawString(display, help_window, help_gc, 10, text_line, helpitems[i],
 		len);
     text_line += font_height;
@@ -927,11 +936,14 @@ inline void trs_x_flush()
 
 /* 
  * Get and process X event(s).
- *   If wait is true, process one event, blocking until one is available.
- *   If wait is false, process as many events as are available, returning
- *     when none are left.
+ *
+ *   If wait is true, we think there's nothing to do right now and
+ *   want to give up the CPU until there is something to do.
+ *
+ *   If wait is false we definitely don't want to block for events.
+ *
  * Handle interrupt-driven uart input here too.
- */ 
+ */
 void trs_get_event(int wait)
 {
   XEvent event;
@@ -960,12 +972,13 @@ void trs_get_event(int wait)
     (void)trs_uart_check_avail();
   }
 
+  if (wait) {
+    pause();
+    trs_paused = 1;
+  }
+
   do {
-    if (wait) {
-      XNextEvent(display, &event);
-    } else {
-      if (!XCheckMaskEvent(display, ~0, &event)) return;
-    }
+    if (!XCheckMaskEvent(display, ~0, &event)) return;
 
     switch(event.type) {
     case Expose:
@@ -1057,7 +1070,7 @@ void trs_get_event(int wait)
 	trs_skip_next_kbwait();
 	break;
       case XK_F7:
-	trs_disk_change_all();
+	trs_change_all();
 	key = 0;
 	trs_skip_next_kbwait();
 	break;

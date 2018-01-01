@@ -42,6 +42,7 @@
 #define MORE_IO_START	(0x3c00)
 #define VIDEO_START	(0x3c00)
 #define RAM_START	(0x4000)
+#define CASSETTE_SELECT	(0x37E4)
 #define PRINTER_ADDRESS	(0x37E8)
 
 /* Interrupt latch register in EI (Model 1) */
@@ -59,6 +60,7 @@ int bank_offset[2];
 #define VIDEO_PAGE_1 1024
 int video_offset = (-VIDEO_START + VIDEO_PAGE_0);
 int romin = 0; /* Model 4p */
+unsigned short trs_changecount = 0;
 
 /*SUPPRESS 53*/
 /*SUPPRESS 112*/
@@ -97,7 +99,15 @@ void mem_bank(int command)
     }
 }
 
-
+/* Check for changes in all floppy, hard, and stringy drives. */
+void
+trs_change_all()
+{
+  trs_disk_change_all();
+  trs_hard_change_all();
+  stringy_change_all();
+  trs_changecount++;
+}
 
 /* Handle reset button if poweron=0;
    handle hard reset or initial poweron if poweron=1 */
@@ -106,11 +116,11 @@ void trs_reset(int poweron)
     /* Reset devices (Model I SYSRES, Model III/4 RESET) */
     trs_cassette_reset();
     trs_timer_speed(0);
-    trs_disk_init(poweron); // also inits trs_hard and trs_stringy
-    /* I'm told that the hard disk controller is enabled on powerup */
-    /* XXX should trs_hard_init do this, then? */
-    trs_hard_out(TRS_HARD_CONTROL,
-		 TRS_HARD_SOFTWARE_RESET|TRS_HARD_DEVICE_ENABLE);
+    trs_disk_reset();
+    trs_hard_reset();
+    stringy_reset();
+    trs_change_all();
+
     if (trs_model == 5) {
         /* Switch in boot ROM */
 	z80_out(0x9C, 1);
@@ -142,6 +152,18 @@ void trs_reset(int poweron)
 	trs_reset_button_interrupt(1);
 	trs_schedule_event(trs_reset_button_interrupt, 0, 2000);
     }
+
+    /*
+     * Need to skip kbwait twice.  The first gets us out of the kbwait
+     * loop if we were reset from inside it.  The second works around
+     * the fact that z80 reset does not reset the stack pointer, so if
+     * we are reset from inside a kbwait and ROM code polls the
+     * keyboard before reloading the stack pointer, we will see a
+     * stale keyboard wait signature on the stack and incorrectly wait
+     * again.
+     */
+    trs_skip_next_kbwait();
+    trs_skip_next_kbwait();
 }
 
 void mem_map(int which)
@@ -149,7 +171,7 @@ void mem_map(int which)
     memory_map = which + (trs_model << 4) + (romin << 2);
 }
 
-void mem_romin(state)
+void mem_romin(int state)
 {
     romin = (state & 1);
     memory_map = (memory_map & ~4) + (romin << 2);
@@ -298,6 +320,8 @@ void mem_write(int address, int value)
 	    }
 	} else if (address == PRINTER_ADDRESS) {
 	    trs_printer_write(value);
+	} else if (address == CASSETTE_SELECT) {
+	    trs_cassette_select(value);
 	} else if (address == TRSDISK_DATA) {
 	    trs_disk_data_write(value);
 	} else if (address == TRSDISK_STATUS) {
@@ -529,4 +553,3 @@ mem_block_transfer(Ushort dest, Ushort source, int direction, Ushort count)
     }
     return ret;
 }
-

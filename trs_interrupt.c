@@ -10,6 +10,8 @@
  * Emulate interrupts
  */
 
+#define _XOPEN_SOURCE 500 /* signal.h: SA_RESTART */
+
 #include "z80.h"
 #include "trs.h"
 #include <stdio.h>
@@ -297,13 +299,20 @@ trs_nmi_mask_write(unsigned char value)
   if (!z80_state.nmi) z80_state.nmi_seen = 0;
 }
 
+#if SUSPEND_DELAY
 static int saved_delay;
-
 /* Temporarily reduce the delay, until trs_restore_delay is called.
    Useful if we know we're about to do something that's emulated more
    slowly than most instructions, such as video or real-time sound.
    In case the boost is too big or too small, we allow the normal
-   autodelay algorithm to continue to run and adjust the new delay. */
+   autodelay algorithm to continue to run and adjust the new delay.
+
+   XXX This heuristic seems to have been doing more harm than good, at
+   least on modern fast systems.  Disabled for now.  Would be nice to
+   find a better way to do something like this.  Note: despite the
+   above comment, the code is called only from sound start/stop, not
+   anything to do with video.
+ */
 void
 trs_suspend_delay()
 {
@@ -323,6 +332,10 @@ trs_restore_delay()
     trs_paused = 1;
   }
 }
+#else
+void trs_suspend_delay() { }
+void trs_restore_delay() { }
+#endif
 
 #define UP_F   1.50
 #define DOWN_F 0.50 
@@ -343,7 +356,7 @@ trs_timer_event(int signo)
 #else
       static unsigned long oldtcount;
 #endif
-      if (!trs_paused /*&& !saved_delay*/) {
+      if (!trs_paused) {
 	int toofast = (z80_state.t_count - oldtcount) >
 	  ((tv.tv_sec*1000000 + tv.tv_usec) -
 	   (oldtv.tv_sec*1000000 + oldtv.tv_usec))*z80_state.clockMHz;

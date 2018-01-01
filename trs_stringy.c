@@ -9,13 +9,14 @@
 /*
  * Emulate Exatron stringy floppy.
  *
- * XXX @NEW does not always write exactly the same bits and the length
- * seems to vary by +/-1 byte sometimes.  May only be when overwriting
- * a wafer.  Hmm, forgetting to clear the last partial byte from an
- * old write?
+ * Still needs more work; see XXX comments below.
  *
- * XXX also see other XXX comments below.
+ * XXX Check if I am exactly duplicating TRS32 output now.  However,
+ * TRS32 seems to drop one bit on wrap, which might be a bug in
+ * TRS32 that I don't need to duplicate.
  */
+
+#define _XOPEN_SOURCE 500 /* string.h: strdup() */
 
 #include "z80.h"
 #include "trs.h"
@@ -24,10 +25,12 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <stdlib.h>
+#include <assert.h>
 
 #define STRINGYDEBUG_IN 0
 #define STRINGYDEBUG_OUT 0
-#define STRINGYDEBUG_OPEN 0
+#define STRINGYDEBUG_STATE 1
 
 /* Input port bits */
 #define STRINGY_WRITE_PROT  0x01
@@ -44,20 +47,19 @@
 #define STRINGY_MAX_UNITS 8
 
 #define STRINGY_CELL_WIDTH 124 // in t-states
-//#define STRINGY_CELLS_DEFAULT (48 * 1024 * 2 / 8 * 9) // 48K incl. gaps/leaders
-#define STRINGY_CELLS_DEFAULT 20000 // make super short while debugging XXX
+#define STRINGY_LEN_DEFAULT (64 * 1024 * 2 * 9 / 8) // 64K + gaps/leaders XXX?
 #define STRINGY_EOT_DEFAULT 60 // a good value per MKR
 
 #define STRINGY_FMT_DEBUG 1
 #define STRINGY_FMT_ESF 2
 
-/*#define STRINGY_FMT_DEFAULT STRINGY_FMT_DEBUG*/
 #define STRINGY_FMT_DEFAULT STRINGY_FMT_ESF
 
 
 typedef long stringy_pos_t;
 
 typedef struct {
+  char *name;
   FILE *file;
   stringy_pos_t length;
   stringy_pos_t eotWidth;
@@ -68,8 +70,11 @@ typedef struct {
   Uchar in_port;
   Uchar out_port;
   Uchar format;
-  Uchar bytebuf; // for esf format
-  Uchar bitpos;  // for esf format
+  // for esf format:
+  long esf_bytelen;
+  long esf_bytepos;
+  Uchar esf_bytebuf;
+  Uchar esf_bitpos;
 #if STRINGYDEBUG_IN
   int prev_in_port;
 #endif
@@ -78,9 +83,7 @@ typedef struct {
 stringy_info_t stringy_info[STRINGY_MAX_UNITS];
 
 /*
- * .esf file format used by TRS32.  The exact definition is unknown at
- * this time.  In particular, the 4 bytes after "magic" might be
- * part of the magic number rather than parameters of unknown meaning.
+ * .esf file format used by TRS32.
  */
 const char stringy_esf_magic[4] = "ESF\x1a";
 const Uchar stringy_esf_header_length = 12;
@@ -110,41 +113,74 @@ stringy_state(int out_port)
   return STRINGY_READING;
 }
 
-static int
-stringy_write_header(stringy_info_t *s)
+/*
+ * Create a blank virtual stringy floppy wafer with specified parameters.
+ * Returns 0 if OK, errno value otherwise.
+ */
+int
+stringy_create_with(const char *name,
+		    int format,
+		    Uint lengthBytes, // data length in bytes
+		    Uint eotCells,    // leader length in bit cells
+		    int writeProt)
 {
+  FILE *f;
   int ires;
   size_t sres;
 
-  rewind(s->file);
-  switch (s->format) {
+  f = fopen(name, "w");
+  if (f == NULL) {
+      return errno;
+  }
+
+  switch (format) {
   case STRINGY_FMT_DEBUG:
-    ires = ftruncate(fileno(s->file), 0);
-    if (ires < 0) return ires;
-    ires = fprintf(s->file, stringy_debug_header,
-		   s->length, s->eotWidth,
-		   (s->in_port & STRINGY_WRITE_PROT) != 0);
-    if (ires < 0) return ires;
+    ires = fprintf(f, stringy_debug_header,
+		   (stringy_pos_t)lengthBytes * STRINGY_CELL_WIDTH * 8,
+		   (stringy_pos_t)eotCells * STRINGY_CELL_WIDTH,
+		   writeProt);
+    if (ires < 0) return errno;
     break;
+
   case STRINGY_FMT_ESF:
-    sres = fwrite(stringy_esf_magic, sizeof(stringy_esf_magic), 1, s->file);
-    if (sres < 1) return -1;
-    ires = fputc(stringy_esf_header_length, s->file);
-    if (ires < 0) return ires;
-    ires = fputc((s->in_port & STRINGY_WRITE_PROT) ?
-		 stringy_esf_write_protected : 0, s->file);
-    if (ires < 0) return ires;
-    ires = put_twobyte(s->eotWidth / STRINGY_CELL_WIDTH, s->file);
-    if (ires < 0) return ires;
-    ires = put_fourbyte(s->length / (STRINGY_CELL_WIDTH * 8), s->file);
-    if (ires < 0) return ires;
+    sres = fwrite(stringy_esf_magic, sizeof(stringy_esf_magic), 1, f);
+    if (sres < 1) return errno;
+    ires = fputc(stringy_esf_header_length, f);
+    if (ires < 0) return errno;
+    ires = fputc(writeProt ? stringy_esf_write_protected : 0, f);
+    if (ires < 0) return errno;
+    ires = put_twobyte(eotCells, f);
+    if (ires < 0) return errno;
+    ires = put_fourbyte(lengthBytes, f);
+    if (ires < 0) return errno;
     break;
+
   default:
     error("unknown wafer image type on write");
     return -1;
   }
-  fseek(s->file, 0, SEEK_CUR);
+
+  ires = fclose(f);
+  if (ires < 0) return errno;
+
   return 0;
+}
+
+/*
+ * Create a blank virtual stringy floppy wafer with default parameters.
+ * Returns 0 if OK, errno value otherwise.
+ */
+int
+stringy_create(const char *name)
+{
+  /*
+   * Default parameters
+   */
+  return stringy_create_with(name,
+			     STRINGY_FMT_DEFAULT,
+			     STRINGY_LEN_DEFAULT,
+			     STRINGY_EOT_DEFAULT,
+			     FALSE);
 }
 
 static int
@@ -180,6 +216,10 @@ stringy_read_esf_header(stringy_info_t *s)
   s->in_port = (s->in_port & ~STRINGY_WRITE_PROT) |
     ((flags & stringy_esf_write_protected) ? STRINGY_WRITE_PROT : 0);
   fseek(s->file, 0, SEEK_CUR);
+  s->esf_bytelen = len;
+  s->esf_bytepos = 0;
+  s->esf_bytebuf = 0;
+  s->esf_bitpos = 0;
   return 0;
 }
 
@@ -214,84 +254,42 @@ stringy_read_header(stringy_info_t *s)
   return ires;
 }
 
-static void
-stringy_update_pos(stringy_info_t *s)
-{
-  if (stringy_state(s->out_port) == STRINGY_STOPPED) {
-    return;
-  }
-
-  s->pos += z80_state.t_count - s->pos_time;
-  s->pos_time = z80_state.t_count;
-
-  /*
-   * XXX Wrapping this way on write still doesn't exactly duplicate
-   * TRS32 output (TRS32 seems to drop one bit, while mine looks
-   * worse).  Maybe I'm trying to wrap when not on a byte boundary?
-   */
-  if (s->pos >= s->length) {
-    // Debug format can't handle overwriting
-    if (s->format != STRINGY_FMT_DEBUG ||
-	stringy_state(s->out_port) == STRINGY_READING) {
-      s->pos = 0;
-      s->in_port &= ~STRINGY_END_OF_TAPE;
-      stringy_read_header(s);
-      //XXX this can't be quite right XXX
-      // there should not be a glitch at the wrap point
-      s->flux_change_pos = 0;
-      s->flux_change_to = 1;
-    }
-  } else if (s->pos >= s->length - s->eotWidth) {
-    s->in_port |= STRINGY_END_OF_TAPE;
-  }
-}
-
+/* Returns 0 if OK, -1 if invalid header, errno value otherwise. */
 static int
-stringy_reopen(int unit)
+stringy_change(int unit)
 {
   stringy_info_t *s = &stringy_info[unit];
-  char name[1024]; //XXX buffer overflow?
   int ires;
 
   if (s->file) {
     fclose(s->file);
+    s->file = NULL;
+  }
+  if (s->name == NULL) {
+    s->in_port = STRINGY_NO_WAFER;
+    return 0;
   }
 
-  sprintf(name, "%s/stringy%d-%d", trs_disk_dir, trs_model, unit);
-  s->file = fopen(name, "r+");
+  s->file = fopen(s->name, "r+");
   if (s->file == NULL) {
-    s->file = fopen(name, "r");
+    if (errno == EACCES || errno == EROFS) {
+      s->file = fopen(s->name, "r");
+    }
     if (s->file == NULL) {
-#if STRINGYDEBUG_OPEN
-      error("could not open wafer image %s: %s", name, strerror(errno));
-#endif
-      s->in_port = STRINGY_NO_WAFER; //XXX or STRINGY_NO_UNIT?
-      return -1;
+      s->in_port = STRINGY_NO_WAFER;
+      return errno;
     }
     s->in_port = STRINGY_WRITE_PROT;
-#if STRINGYDEBUG_OPEN
-    debug("opened write protected wafer image %s\n");
-#endif
   } else {
     s->in_port = 0;
-#if STRINGYDEBUG_OPEN
-    debug("opened writeable wafer image %s\n", name);
-#endif
   }  
+  s->out_port = 0;
 
   ires = stringy_read_header(s);
-  if (ires == -1) {
-    // If the file exists but has no header, write one.
-    // This lets you create a blank wafer with "touch"
-    // XXX Have a better way to create a stringy and set the parameters.
-    s->format = STRINGY_FMT_DEFAULT;
-    s->length = STRINGY_CELLS_DEFAULT * STRINGY_CELL_WIDTH;
-    s->eotWidth = STRINGY_EOT_DEFAULT * STRINGY_CELL_WIDTH;
-    ires = stringy_write_header(s);
-  }
 
   s->pos = 0;
   s->pos_time = z80_state.t_count;
+  //XXX is the following right?
   s->flux_change_pos = 0;
   s->flux_change_to = 1;
 
@@ -299,17 +297,55 @@ stringy_reopen(int unit)
 }
 
 void
-stringy_reset(void)
+stringy_change_all(void)
 {
   int i;
   for (i = 0; i < STRINGY_MAX_UNITS; i++) {
-    stringy_info_t *s = &stringy_info[i];
-    stringy_reopen(i);
-    s->out_port = 0;
-#if STRINGYDEBUG_IN
-    s->prev_in_port = -1;
-#endif
+    stringy_change(i);
   }
+}
+
+const char *
+stringy_get_name(int drive)
+{
+  return stringy_info[drive].name;
+}
+
+/* Returns 0 if OK, -1 if invalid header, errno value otherwise. */
+int
+stringy_set_name(int drive, const char *name)
+{
+  stringy_info_t *s = &stringy_info[drive];  
+  if (s->name) free(s->name);
+  s->name = name ? strdup(name) : NULL;
+  return stringy_change(drive);
+}
+
+/* One-time initialization */
+void
+stringy_init(void)
+{
+  int i;
+  for (i = 0; i < STRINGY_MAX_UNITS; i++) {
+    stringy_info[i].name = (char *) malloc(strlen(trs_disk_dir) + 13);
+    /*
+     * Stringy really only works for Model I, but I'm keeping the
+     * generality for now anyway.
+     */
+    if (trs_model == 5) {
+      sprintf(stringy_info[i].name, "%s/stringy4p-%d", trs_disk_dir, i);
+    } else {
+      sprintf(stringy_info[i].name, "%s/stringy%d-%d",
+	      trs_disk_dir, trs_model, i);
+    }
+  }
+}
+
+/* Stringy controller hardware reset */
+void
+stringy_reset(void)
+{
+  /* Nothing to do (?) */
 }
 
 static void
@@ -320,7 +356,7 @@ stringy_byte_flush(stringy_info_t *s)
 
   if (s->format != STRINGY_FMT_ESF ||
       stringy_state(s->out_port) != STRINGY_WRITING ||
-      s->bitpos == 0) return;
+      s->esf_bitpos == 0) return;
 
   fseek(s->file, 0, SEEK_CUR);
   ires = fgetc(s->file);
@@ -328,22 +364,26 @@ stringy_byte_flush(stringy_info_t *s)
     ires = 0;
   }
   fseek(s->file, -1, SEEK_CUR);
-  mask = 0xff << s->bitpos;
-  s->bytebuf = (ires & mask) | (s->bytebuf & ~mask);
-  fputc(s->bytebuf, s->file); //XXX handle errors
+  mask = 0xff << s->esf_bitpos;
+  s->esf_bytebuf = (ires & mask) | (s->esf_bytebuf & ~mask);
+  fputc(s->esf_bytebuf, s->file); //XXX handle errors
   fseek(s->file, -1, SEEK_CUR);
 }
 
 static void
 stringy_bit_write(stringy_info_t *s, int flux)
 {
-  s->bytebuf &= ~(1 << s->bitpos);
-  s->bytebuf |= flux << s->bitpos;
-  s->bitpos++;
-  if (s->bitpos == 8) {
-    fputc(s->bytebuf, s->file); //XXX handle errors
-    s->bitpos = 0;
-    s->bytebuf = 0;
+  s->esf_bytebuf &= ~(1 << s->esf_bitpos);
+  s->esf_bytebuf |= flux << s->esf_bitpos;
+  s->esf_bitpos++;
+  if (s->esf_bitpos == 8) {
+    fputc(s->esf_bytebuf, s->file); //XXX handle errors
+    if (++s->esf_bytepos >= s->esf_bytelen) {
+      fseek(s->file, stringy_esf_header_length, SEEK_SET);
+      s->esf_bytepos = 0;
+    }
+    s->esf_bitpos = 0;
+    s->esf_bytebuf = 0;
   }
 }
 
@@ -394,13 +434,19 @@ stringy_bit_read(stringy_info_t *s, int *bit)
 {
   int ires;
 
-  if (s->bitpos == 0) {
-    ires = fgetc(s->file); //XXX handle errors differently from EOF
-    if (ires < 0) return FALSE;
-    s->bytebuf = ires;
+  if (s->esf_bitpos == 0) {
+    if (s->esf_bytepos++ >= s->esf_bytelen) {
+      fseek(s->file, stringy_esf_header_length, SEEK_SET);
+      s->esf_bytepos = 0;
+    }
+    ires = fgetc(s->file); //XXX handle errors (but do ignore EOF)
+    if (ires < 0) {
+      ires = 0;
+    }
+    s->esf_bytebuf = ires;
   }
-  *bit = (s->bytebuf & (1 << s->bitpos)) != 0;
-  s->bitpos = (s->bitpos + 1) % 8;
+  *bit = (s->esf_bytebuf & (1 << s->esf_bitpos)) != 0;
+  s->esf_bitpos = (s->esf_bitpos + 1) % 8;
   return TRUE;
 }
 
@@ -412,7 +458,15 @@ stringy_flux_read(stringy_info_t *s, int *flux, stringy_pos_t *delta)
 
   switch(s->format) {
   case STRINGY_FMT_DEBUG:
-    return (fscanf(s->file, "%u %" TSTATE_T_LEN "\n", flux, delta) == 2);
+    bres = fscanf(s->file, "%u %" TSTATE_T_LEN "\n", flux, delta);
+    if (bres == EOF) {
+      if (ferror(s->file)) return FALSE;
+      stringy_read_debug_header(s);
+      bres = fscanf(s->file, "%u %" TSTATE_T_LEN "\n", flux, delta);
+      if (bres == EOF && ferror(s->file)) return FALSE;
+    }
+    return TRUE;
+
   case STRINGY_FMT_ESF:
     bres = stringy_bit_read(s, &bit);
     if (!bres) return bres;
@@ -431,7 +485,29 @@ stringy_flux_read(stringy_info_t *s, int *flux, stringy_pos_t *delta)
     *delta = STRINGY_CELL_WIDTH;
     return TRUE;
   }
+
   return FALSE;
+}
+
+static void
+stringy_update_pos(stringy_info_t *s)
+{
+  if (stringy_state(s->out_port) == STRINGY_STOPPED) {
+    return;
+  }
+
+  s->pos += z80_state.t_count - s->pos_time;
+  s->pos_time = z80_state.t_count;
+
+  if (s->pos >= s->length) {
+    s->pos -= s->length;
+    s->flux_change_pos -= s->length;
+  }
+  if (s->pos >= s->length - s->eotWidth) {
+    s->in_port |= STRINGY_END_OF_TAPE;
+  } else {
+    s->in_port &= ~STRINGY_END_OF_TAPE;
+  }
 }
 
 int
@@ -476,13 +552,12 @@ stringy_in(int unit)
   return ret;
 }
 
-// XXX the state change stuff is a bit suspect, and not too clean.
 void
 stringy_out(int unit, int value)
 {
   stringy_info_t *s = &stringy_info[unit];
   int old_state, new_state;
-  int ignore;
+  int res;
 
   if (s->in_port & STRINGY_NO_WAFER) return;
 
@@ -490,9 +565,38 @@ stringy_out(int unit, int value)
   new_state = stringy_state(value);
   stringy_update_pos(s);
 
+#if STRINGYDEBUG_STATE
+  if (old_state != new_state) {
+    debug("stringy state %d -> %d, new pos %ld\n",
+	  old_state, new_state, s->pos);
+  }
+#endif  
+
   if (old_state == STRINGY_STOPPED &&
       new_state != STRINGY_STOPPED) {
+
+    if (1 /*s->in_port & STRINGY_END_OF_TAPE*/) {
+      /*
+       * Start at the beginning after motor off/on.  This surely
+       * doesn't emulate real hardware accurately, but I get "tape
+       * too short" errors on @SAVE unless I do it at least in the
+       * case where STRINGY_END_OF_TAPE is currently set.  Maybe the
+       * ROM does its "rewind" thing, shuts off the motor, and relies
+       * on tape coasting past the EOT marker during the off/on
+       * transition.  XXX Read ROM code to try to understand this.  As
+       * long as I'm doing this sometimes, doing it always is no
+       * greater compromise.  And doing it always makes the state
+       * change positions more reproducible, which is better for
+       * regression testing and such.
+       * 
+       */
+      s->pos = 0;
+      s->in_port &= ~STRINGY_END_OF_TAPE;
+      stringy_read_header(s);
+    }
+
     s->pos_time = z80_state.t_count;
+    // XXX Is the following right?
     s->in_port &= ~STRINGY_FLUX;
     s->flux_change_pos = s->pos;
     s->flux_change_to = 1;
@@ -500,10 +604,11 @@ stringy_out(int unit, int value)
 
   if (old_state != STRINGY_WRITING &&
       new_state == STRINGY_WRITING) {
-    fflush(s->file);
     if (s->format == STRINGY_FMT_DEBUG) {
       // Debug format can't handle overwriting
-      ignore = ftruncate(fileno(s->file), ftell(s->file));
+      fflush(s->file);
+      res = ftruncate(fileno(s->file), ftell(s->file));
+      assert(res == 0);
     }
     fseek(s->file, 0, SEEK_CUR);
     stringy_flux_write(s, 1, 0); //XXX needed?  bad?
@@ -522,28 +627,6 @@ stringy_out(int unit, int value)
       fflush(s->file);
     }
   }
-
-#if 1
-  if (old_state != STRINGY_STOPPED &&
-      new_state == STRINGY_STOPPED) {
-    /*
-     * XXX Always start at the beginning after motor off/on.  This
-     * surely doesn't emulate real hardware accurately, but I am
-     * getting "tape too short" errors on @SAVE without it.  Maybe it
-     * is working around a bug elsewhere?  Would like to get rid of
-     * this for that reason.  Also wondering if it is causing
-     * problems.
-     *
-     * If we do need this, factor out the common code from the wrap
-     * cases, or maybe a common "position to start" routine.
-     */
-    s->pos = 0;
-    s->pos_time = z80_state.t_count;
-    s->in_port &= ~STRINGY_END_OF_TAPE;
-    stringy_read_header(s);
-    //XXX anything else to initialize here?
-  }
-#endif
 
   s->out_port = value;
 

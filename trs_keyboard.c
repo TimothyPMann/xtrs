@@ -684,8 +684,8 @@ KeyTable function_key_table[] = {
 /* 0xffe6   XK_Shift_Lock  */    { TK_NULL, TK_Neutral },
 /* 0xffe7   XK_Meta_L      */    { TK_Clear, TK_Neutral },
 /* 0xffe8   XK_Meta_R      */    { TK_Down, TK_ForceShiftPersistent },
-/* 0xffe9   XK_Alt_L       */    { TK_Clear, TK_Neutral },
-/* 0xffea   XK_Alt_R       */    { TK_Down, TK_ForceShiftPersistent },
+/* 0xffe9   XK_Alt_L       */    { TK_NULL, TK_Neutral },
+/* 0xffea   XK_Alt_R       */    { TK_NULL, TK_Neutral },
 /* 0xffeb   XK_Super_L     */    { TK_NULL, TK_Neutral },
 /* 0xffec   XK_Super_R     */    { TK_NULL, TK_Neutral },
 /* 0xffed   XK_Hyper_L     */    { TK_NULL, TK_Neutral },
@@ -899,7 +899,7 @@ int trs_kb_mem_read(int address)
     }
 
     /* After each key state change, impose a timeout before the next one
-       so that the Z-80 program doesn't miss any by polling too rarely,
+       so that the Z80 program doesn't miss any by polling too rarely,
        and so that we don't tickle the bugs in some common TRS-80 keyboard
        drivers that strike if two keys change simultaneously */
     if (key_stretch_timeout - z80_state.t_count > TSTATE_T_MID) {
@@ -984,7 +984,7 @@ int dequeue_key()
 void
 trs_skip_next_kbwait()
 {
-  skip_next_kbwait = 1;
+  skip_next_kbwait++;
 }
 
 int trs_next_key(int wait)
@@ -997,12 +997,11 @@ int trs_next_key(int wait)
       if ((z80_state.nmi && !z80_state.nmi_seen) ||
 	  (z80_state.irq && z80_state.iff1) ||
 	  trs_event_scheduled() || skip_next_kbwait) {
-	skip_next_kbwait = 0;
+	if (skip_next_kbwait) skip_next_kbwait--;
 	rval = -1;
 	break;
       }
-      trs_paused = 1;
-      trs_get_event(1);
+      trs_get_event(TRUE);
     }
     return rval;
   }

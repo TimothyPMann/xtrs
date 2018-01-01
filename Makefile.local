@@ -3,11 +3,24 @@
 # $Id$
 #
 
+# Set these to where you want installed stuff to go, if you install
+
+PREFIX = $(DESTDIR)/usr
+BINDIR = $(PREFIX)/bin
+MANDIR = $(PREFIX)/share/man
+DOCDIR = $(PREFIX)/share/doc/xtrs
+SHAREDIR = $(PREFIX)/share/xtrs
+
 # If your machine is not a sun, vax, or DEC MIPS, uncomment the line below
 # if the processor has big-endian byte ordering.  If you're not sure what
 # to do, don't worry -- the program will complain if it's not right.
 
 # ENDIAN = -Dbig_endian
+
+# If you want the C-shell version of the cassette script:
+#CASSETTE = cassette.csh
+# If you want the POSIX-shell version of the cassette script:
+CASSETTE = cassette.sh
 
 # If you would like the TRS-80 ROM to be built into the application,
 # use the following lines (with the appropriate file names).  You can
@@ -36,9 +49,9 @@ BUILT_IN_ROM4P = xtrsrom4p.hex
 # time, use these lines (with the appropriate file names).  The default file
 # name is ignored and can be omitted if the ROM for that model is built in.
 
-DEFAULT_ROM = -DDEFAULT_ROM='"/usr/local/lib/xtrs/level2rom.hex"' \
-              -DDEFAULT_ROM3='"/usr/local/lib/xtrs/romimage.m3"' \
-              -DDEFAULT_ROM4P='"/usr/local/lib/xtrs/romimage.m4p"'
+DEFAULT_ROM = -DDEFAULT_ROM='"$(SHAREDIR)/level2rom.hex"' \
+              -DDEFAULT_ROM3='"$(SHAREDIR)/romimage.m3"' \
+              -DDEFAULT_ROM4P='"$(SHAREDIR)/romimage.m4p"'
 
 # If you would like to change where xtrs looks for disk?-? files, edit
 # this line.  "." of course means the current working directory.
@@ -46,15 +59,15 @@ DEFAULT_ROM = -DDEFAULT_ROM='"/usr/local/lib/xtrs/level2rom.hex"' \
 DISKDIR = -DDISKDIR='"."'
 
 # If you have the GNU readline package (the README file tells you where to
-# get it) and would like to use it with the built-in Z-80 debugger, use
-# these lines.  As of xtrs 2.7, it is now OK to use this feature again.
+# get it) and would like to use it with the built-in Z80 debugger, use
+# these lines.
 
 READLINE = -DREADLINE
-READLINELIBS = -lreadline -lncurses
+READLINELIBS = -lreadline
 
 # Select debugging symbols (-g) and/or optimization (-O2, etc.)
 
-DEBUG = -O2 -g -Wall
+DEBUG = -O2 -g -Wall -Wextra -Wno-sign-compare -Wno-unused-parameter
 #DEBUG = -g -DKBDEBUG -DXDEBUG
 #DEBUG = -g
 #DEBUG = -Wall
@@ -65,7 +78,7 @@ DEBUG = -O2 -g -Wall
 
 # If you need a different path for libraries:
 
-LDFLAGS = -L/usr/X11R6/lib
+LDFLAGS += -L/usr/lib/X11
 #LDFLAGS = -non_shared -L/usr/X11/lib
 
 # If you need a different path for include files:
@@ -85,17 +98,7 @@ XLIB = -lX11
 # If you want xtrs to look for a global app-defaults file
 # at runtime in $APPDEFAULTS/Xtrs:
 
-APPDEFAULTS = -DAPPDEFAULTS='"/usr/X11/lib/X11/app-defaults"'
-
-# prefix directory
-
-PREFIX=/usr/local
-#If included in distribution: PREFIX=/usr
-
-# Set these to where you want installed stuff to go, if you install them.
-
-BINDIR = $(PREFIX)/bin
-MANDIR = $(PREFIX)/share/man
+APPDEFAULTS = -DAPPDEFAULTS='"/etc/X11/app-defaults"'
 
 # Change this if you have a BSD-compatible install program that is
 # not the first program named "install" on your $PATH
@@ -106,5 +109,5 @@ INSTALL = install
 #vpath %.c ..
 #vpath %.h ..
 #vpath %.man ..
-#old way:
-#VPATH = ..
+#vpath %.html ..
+#vpath %.z80 ..

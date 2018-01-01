@@ -270,7 +270,7 @@ int z80_in(int port)
   /* Support for a special HW real-time clock (TimeDate80?)
    * I used to have.  It was a small card-edge unit with a
    * battery that held the time/date with power off.
-   * - Joe Peterson (joe@skyrush.com)
+   * - Joe Peterson
    *
    * According to the LDOS Quarterly 1-6, TChron1, TRSWatch, and
    * TimeDate80 are accessible at high ports 0xB0-0xBC, while

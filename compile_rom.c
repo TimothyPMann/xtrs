@@ -129,7 +129,7 @@ int main(int argc, char *argv[])
     }
   else if(argc != 3)
     {
-      fprintf(stderr, "Usage: %s model hexfile", program_name);
+      fprintf(stderr, "Usage: %s model hexfile\n", program_name);
     }
   else
     {

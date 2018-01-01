@@ -24,19 +24,32 @@
  *  port when the cassette motor is off, or output to the Model III/4
  *  sound option card (a 1-bit DAC).
  * 
- * Compile time options:
+ * Compile time option:
  *
- * HAVE_OSS  You have the Open Sound System.  If this is set, cassettes
- *   can be read/written directly from/to /dev/dsp.  This should work on
- *   Linux and other systems with OSS.
+ * HAVE_OSS - Set this if you have the Open Sound System (OSS) or an
+ * OSS compatibility layer that provides /dev/dsp.  Older Linux
+ * systems use OSS as their primary sound API, and some other
+ * Unix-like systems have it as well.  Newer Linux systems use ALSA
+ * instead, but generally have an OSS compatibility layer.  On Linux
+ * systems that use the PulseAudio sound server, use the padsp wrapper
+ * program to run xtrs with /dev/dsp support.
  *
- * OSS_SOUND  Game sound is emulated using the Open Sound System.
- *   HAVE_OSS must also be set.
+ * Regardless of whether HAVE_OSS is set, cassettes can be
+ * read/written from files in various formats, including WAV.
+ * 
+ * When HAVE_OSS is set, cassettes can be also read/written directly
+ * through your sound input/output device, and both game sound and
+ * Orchestra 85/90 sound are sent to the sound output device.  
+ *
+ * Game sound and Orchestra 85/90 sound are disabled if HAVE_OSS is
+ * not set.
  */
 
+#define _POSIX_C_SOURCE 200112L /* signal.h: sigemptyset(), ...
+                                   stdio.h: fileno() */
+
 #if __linux
-#define HAVE_OSS 1
-#define OSS_SOUND 1
+//XXX #define HAVE_OSS 1
 #endif
 
 /*#define CASSDEBUG 1*/
@@ -61,8 +74,8 @@
 #define CLOSE		0
 #define READ		1
 #define WRITE		2
-#define SOUND           3  /* used for OSS_SOUND only */
-#define ORCH90          4  /* used for OSS_SOUND only */
+#define SOUND           3
+#define ORCH90          4
 #define FAILED          5
 
 #define CAS_FORMAT         1  /* recovered bit/byte stream */
@@ -72,7 +85,7 @@
 #define DEBUG_FORMAT       5  /* like cpt but in ASCII */
 static char *format_name[] = {
   NULL, "cas", "cpt", "wav", "direct", "debug" };
-#define DEFAULT_SAMPLE_RATE 44100  /* samples/sec to use for .wav files */
+#define DEFAULT_SAMPLE_RATE 11025 /* samples/sec for .wav and /dev/dsp output */
 #define NOISE_FLOOR 64
 
 #define CONTROL_FILENAME	".cassette.ctl"
@@ -213,8 +226,22 @@ static long wave_dataid_offset = WAVE_DATAID_OFFSET;
 static long wave_datasize_offset = WAVE_DATASIZE_OFFSET;
 static long wave_data_offset = WAVE_DATA_OFFSET;
 
+#if HAVE_OSS
 /* Orchestra 80/85/90 stuff */
 static int orch90_left = 128, orch90_right = 128;
+#endif
+
+#if !HAVE_OSS
+static void
+no_sound(void)
+{
+  static int warned = 0;
+  if (!warned) {
+    error("sound support is not compiled in");
+    warned = 1;
+  }
+}
+#endif
 
 /* Put a 2-byte quantity to a file in little-endian order */
 /* Return -1 on error, 0 otherwise */
@@ -442,7 +469,6 @@ parse_wav_header(FILE *f)
   return 0;
 }  
 
-#if !USESOX
 static int
 set_audio_format(FILE *f, int state)
 {
@@ -476,12 +502,9 @@ set_audio_format(FILE *f, int state)
     errno = EINVAL;
     return -1;
   }
-#else
-  /* Hope for the best.  Might work on Suns with /dev/audio (mu-law). */
 #endif
   return 0;
 }
-#endif
 
 static void get_control()
 {
@@ -537,9 +560,6 @@ static int assert_state(int state)
 
   if (cassette_state != CLOSE && cassette_state != FAILED) {
     if (cassette_format == DIRECT_FORMAT) {
-#if USESOX
-      pclose(cassette_file);
-#else
       sigset_t set, oldset;
       sigemptyset(&set);
       sigaddset(&set, SIGALRM);
@@ -547,7 +567,6 @@ static int assert_state(int state)
       trs_paused = 1;  /* disable speed measurement for this round */
       fclose(cassette_file);
       sigprocmask(SIG_SETMASK, &oldset, NULL);
-#endif
       cassette_position = 0;
     } else {
       cassette_position = ftell(cassette_file);
@@ -572,19 +591,6 @@ static int assert_state(int state)
   case READ:
     get_control();
     if (cassette_format == DIRECT_FORMAT) {
-#if USESOX
-      char command[256];
-      cassette_sample_rate = cassette_default_sample_rate;
-      sprintf(command,
-	      "sox -t ossdsp -r %d -u -b /dev/dsp -t raw -r %d -u -b -",
-	      cassette_sample_rate, cassette_sample_rate);
-      cassette_file = popen(command, "r");
-      if (cassette_file == NULL) {
-	error("couldn't read from sound card: %s", strerror(errno));
-	cassette_state = FAILED;
-	return -1;
-      }
-#else
       cassette_file = fopen(cassette_filename, "r");
       if (cassette_file == NULL) {
 	error("couldn't read %s: %s", cassette_filename, strerror(errno));
@@ -600,7 +606,6 @@ static int assert_state(int state)
 	cassette_state = FAILED;
 	return -1;
       }
-#endif
     } else {
       cassette_file = fopen(cassette_filename, "r");
       if (cassette_format == WAV_FORMAT &&
@@ -626,13 +631,10 @@ static int assert_state(int state)
       get_control(state);
     }
     if (cassette_format == DIRECT_FORMAT) {
-#if USESOX
-      char command[256];
-      cassette_sample_rate = cassette_default_sample_rate;
-      sprintf(command, "sox -t raw -r %d -u -b -c %d - -t ossdsp /dev/dsp",
-	      cassette_sample_rate, (state == ORCH90) ? 2 : 1);
-      cassette_file = popen(command, "w");
-#else
+#if !HAVE_OSS
+      no_sound();
+      return -1;
+#endif
       cassette_sample_rate = cassette_default_sample_rate;
       cassette_file = fopen(cassette_filename, "w");
       if (cassette_file == NULL) {
@@ -641,7 +643,7 @@ static int assert_state(int state)
 	return -1;
       }
       setbuf(cassette_file, NULL); /* ??hangs on some OSS drivers */
-#if OSS_SOUND && HAVE_OSS
+#if HAVE_OSS
       if (state == SOUND || state == ORCH90) {
 	/*int arg = 0x7fff0008;*/ /* unlimited fragments of size (1 << 8) */
 	int arg = 0x00200008; /* 32 fragments of size (1 << 8) */
@@ -658,7 +660,6 @@ static int assert_state(int state)
 	cassette_state = FAILED;
 	return -1;
       }	
-#endif
     } else if (cassette_format == WAV_FORMAT) {
       cassette_file = fopen(cassette_filename, "r+");
       if (cassette_file == NULL) {
@@ -750,7 +751,7 @@ transition_out(int value)
 
   case WAV_FORMAT:
   case DIRECT_FORMAT:
-#if OSS_SOUND && HAVE_OSS
+#if HAVE_OSS
     if (cassette_state == SOUND) {
       if (ddelta_us > 20000.0) {
 	/* Truncate silent periods */
@@ -785,7 +786,7 @@ transition_out(int value)
     }
     if (value == FLUSH) {
       value = cassette_value;
-#if OSS_SOUND && HAVE_OSS
+#if HAVE_OSS
       if (cassette_format == DIRECT_FORMAT) {
 	ioctl(fileno(cassette_file), SNDCTL_DSP_POST, 0);
       }
@@ -1002,7 +1003,7 @@ transition_in()
       }
       nsamples++;
       /* Allow reset button */
-      trs_get_event(0);
+      trs_get_event(FALSE);
       if (z80_state.nmi) break;
     } while (next == cassette_value && maxsamples-- > 0);
     cassette_next = next;
@@ -1072,7 +1073,7 @@ transition_in()
 }
 
 /* If the motor has been on for 1 second (emulated time), the i/o port
-   has been neither read nor written, and the Z-80 program has 1500
+   has been neither read nor written, and the Z80 program has 1500
    bps rise or fall interrupts enabled, then give it one of each just
    to get things going. */
 void
@@ -1087,7 +1088,7 @@ trs_cassette_kickoff(int dummy)
   }
 }
 
-/* Z-80 program is turning motor on or off */
+/* Z80 program is turning motor on or off */
 void trs_cassette_motor(int value)
 {
   if (value) {
@@ -1149,40 +1150,52 @@ void trs_cassette_out(int value)
     }
   }
 
-#if OSS_SOUND && HAVE_OSS
-  /* Do sound emulation by sending samples to /dev/dsp */
+  /* Do sound emulation by sending samples to /dev/dsp if available */
   if (cassette_motor == 0) {
     if (cassette_state != SOUND && value == 0) return;
     if (assert_state(SOUND) < 0) return;
     trs_suspend_delay();
     transition_out(value);
   }
-#endif
 }
 
+/* Cassette #-1 vs. #-2 selection port */
+void
+trs_cassette_select(int value)
+{
+  value &= 1;
+  if (value != 0) {
+    error("XXX cassette 2 not implemented yet");
+  }
+}
 
 /* Model 4 sound port */
 void
 trs_sound_out(int value)
 {
-#if HAVE_OSS
   if (cassette_motor == 0) {
     if (assert_state(SOUND) < 0) return;
     trs_suspend_delay();
     transition_out(value ? 1 : 2);
   }
-#endif
 }
 
+#if HAVE_OSS
+/*
+ * Wrapper for trs_orch90_out(0, FLUSH) so that it can be scheduled as
+ * a future event via trs_schedule_event().
+ */
 static void
 orch90_flush(int dummy)
 {
   trs_orch90_out(0, FLUSH);
 }
+#endif
 
 /* Orchestra 85/90 */
 /* Implementation shares some global state with cassette and game
-   sound implementations. */
+   sound implementations.  As a non-obvious side effect, it can play
+   sound only when the virtual cassette motor is stopped. */
 void
 trs_orch90_out(int channels, int value)
 {
@@ -1249,6 +1262,8 @@ trs_orch90_out(int channels, int value)
   cassette_transition = z80_state.t_count;
   orch90_left = new_left;
   orch90_right = new_right;
+#else
+  no_sound();
 #endif
 }
 
@@ -1276,7 +1291,7 @@ trs_cassette_update(int dummy)
 	newtrans = transition_in();
 
 	/* Allow reset button */
-	trs_get_event(0);
+	trs_get_event(FALSE);
 	if (z80_state.nmi) return;
     }
     /* Schedule an interrupt on the 1500-bps cassette input if needed */

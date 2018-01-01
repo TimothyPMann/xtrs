@@ -10,27 +10,28 @@
  * Emulate Model-I or Model-III disk controller
  */
 
-extern void trs_disk_init(int reset_button);
-extern void trs_disk_select_write(unsigned char data);
-extern unsigned char trs_disk_track_read(void);
-extern void trs_disk_track_write(unsigned char data);
-extern unsigned char trs_disk_sector_read(void);
-extern void trs_disk_sector_write(unsigned char data);
-extern unsigned char trs_disk_data_read(void);
-extern void trs_disk_data_write(unsigned char data);
-extern unsigned char trs_disk_status_read(void);
-extern void trs_disk_command_write(unsigned char cmd);
-extern unsigned char trs_disk_interrupt_read(void); /* M3 only */
-extern void trs_disk_interrupt_write(unsigned char mask); /* M3 only */
+void trs_disk_init(void);
+void trs_disk_reset(void);
+void trs_disk_select_write(unsigned char data);
+unsigned char trs_disk_track_read(void);
+void trs_disk_track_write(unsigned char data);
+unsigned char trs_disk_sector_read(void);
+void trs_disk_sector_write(unsigned char data);
+unsigned char trs_disk_data_read(void);
+void trs_disk_data_write(unsigned char data);
+unsigned char trs_disk_status_read(void);
+void trs_disk_command_write(unsigned char cmd);
+unsigned char trs_disk_interrupt_read(void); /* M3 only */
+void trs_disk_interrupt_write(unsigned char mask); /* M3 only */
 
-extern void trs_disk_setstep(int unit, int value);
-extern int trs_disk_getstep(int unit);
-extern void trs_disk_setsize(int unit, int value);
-extern int trs_disk_getsize(int unit);
+void trs_disk_setstep(int unit, int value);
+int trs_disk_getstep(int unit);
+void trs_disk_setsize(int unit, int value);
+int trs_disk_getsize(int unit);
 
 extern int trs_disk_doubler;
 extern char* trs_disk_dir;
-extern unsigned short trs_disk_changecount;
+extern unsigned short trs_changecount;
 extern int trs_disk_truedam;
 
 /* Values for trs_disk_doubler flag word */

@@ -26,6 +26,8 @@
 #define SIZERETRY 1       /* Retry in different sizes on real_read */
 #define DMK_MARK_IAM 0    /* Mark IAMs in track header; poor idea */
 
+#define _XOPEN_SOURCE 500 /* signal.h: SA_RESTART */
+
 #include "z80.h"
 #include "trs.h"
 #include "trs_disk.h"
@@ -55,12 +57,13 @@
 int trs_disk_nocontroller = 0;
 int trs_disk_doubler = TRSDISK_BOTH;
 char *trs_disk_dir = DISKDIR;
-unsigned short trs_disk_changecount = 0;
 static int trs_disk_needchange = 0;
 float trs_disk_holewidth = 0.01;
 int trs_disk_truedam = 0;
 int trs_disk_debug_flags = 0;
 char *trs_disk_name[NDRIVES];
+
+static int trs_disk_change(int drive);
 
 typedef struct {
   /* Registers */
@@ -215,7 +218,6 @@ typedef struct {
 #define JV3 3 /* compatible with Vavasour Model III/4 emulator */
 #define DMK 4 /* compatible with Keil Model III/4 emulator */
 #define REAL 100 /* real floppy drive, PC controller */
-#define CATW 101 /* real floppy drive, Catweasel controller (future) */
 #define NONE 0
 
 typedef struct {
@@ -404,11 +406,34 @@ trs_sigusr1(int signo)
 }
 
 void
-trs_disk_init(int poweron)
+trs_disk_init(void)
 {
   int i;
   struct sigaction sa;
 
+  for (i=0; i<NDRIVES; i++) {
+    disk[i].phytrack = 0;
+    disk[i].emutype = NONE;
+
+    disk[i].name = (char *) malloc(strlen(trs_disk_dir) + 10);
+    if (trs_model == 5) {
+      sprintf(disk[i].name, "%s/disk4p-%d", trs_disk_dir, i);
+    } else {
+      sprintf(disk[i].name, "%s/disk%d-%d", trs_disk_dir, trs_model, i);
+    }
+  }
+
+  sa.sa_handler = trs_sigusr1;
+  sigemptyset(&sa.sa_mask);
+  sigaddset(&sa.sa_mask, SIGUSR1);
+  sa.sa_flags = SA_RESTART;
+  sigaction(SIGUSR1, &sa, NULL);
+}
+
+/* Reset floppy controller hardware */
+void
+trs_disk_reset(void)
+{
   state.status = TRSDISK_NOTRDY|TRSDISK_TRKZERO;
   state.track = 0;
   state.sector = 0;
@@ -424,42 +449,15 @@ trs_disk_init(int poweron)
   state.controller = (trs_model == 1) ? TRSDISK_P1771 : TRSDISK_P1791;
   state.last_readadr = -1;
   state.motor_timeout = 0;
-  if (poweron) {
-    for (i=0; i<NDRIVES; i++) {
-      disk[i].phytrack = 0;
-      disk[i].emutype = NONE;
-      disk[i].name = (char *) malloc(9);
-      if (trs_model == 5) {
-	sprintf(disk[i].name, "disk4p-%d", i);
-      } else {
-	sprintf(disk[i].name, "disk%d-%d", trs_model, i);
-      }
-    }
-  }
-  trs_disk_change_all();
   trs_cancel_event();
 
-  trs_disk_nocontroller = (trs_model < 5 && disk[0].file == NULL);
-
-  sa.sa_handler = trs_sigusr1;
-  sigemptyset(&sa.sa_mask);
-  sigaddset(&sa.sa_mask, SIGUSR1);
-  sa.sa_flags = SA_RESTART;
-  sigaction(SIGUSR1, &sa, NULL);
+  /*
+   * Emulate no controller if there is no disk in drive 0 at reset time,
+   * except for model 4.
+   */
+  trs_disk_nocontroller = (trs_model < 5 && 
+			   trs_disk_change(0) != 0);
 }
-
-void
-trs_disk_change_all()
-{
-  int i;
-  for (i=0; i<NDRIVES; i++) {
-    trs_disk_change(i, NULL);
-  }
-  trs_disk_changecount++;
-  trs_hard_init();
-  stringy_reset();
-}
-
 
 /* trs_event_func used for delayed command completion.  Clears BUSY,
    sets any additional bits specified, and generates a command
@@ -745,11 +743,10 @@ trs_disk_emutype(DiskState *d)
   d->emutype = JV1;
 }
 
-void
-trs_disk_change(int drive, char *newname)
+/* Returns 0 if OK, -1 if invalid header, errno value otherwise. */
+static int
+trs_disk_change(int drive)
 {
-  char *diskname;
-  char namebuf[1024]; //XXX buffer overflow?
   DiskState *d = &disk[drive];  
   struct stat st;
   int c, res;
@@ -757,21 +754,14 @@ trs_disk_change(int drive, char *newname)
   if (d->file != NULL) {
     c = fclose(d->file);
     if (c == EOF) state.status |= TRSDISK_WRITEFLT;
-  }
-  if (newname) {
-    free(d->name);
-    d->name = newname;
-  }
-  if (d->name[0] == '/') {
-    diskname = d->name;
-  } else {
-    sprintf(namebuf, "%s/%s", trs_disk_dir, d->name);
-    diskname = namebuf;
-  }
-  res = stat(diskname, &st);
-  if (res == -1) {
     d->file = NULL;
-    return;
+  }
+  if (d->name == NULL) {
+    return 0;
+  }
+  res = stat(d->name, &st);
+  if (res < 0) {
+    return errno;
   }
 #if __linux
   if (S_ISBLK(st.st_mode)) {
@@ -779,18 +769,15 @@ trs_disk_change(int drive, char *newname)
     int fd;
     int reset_now = 0;
     struct floppy_drive_params fdp;
-    fd = open(diskname, O_ACCMODE|O_NDELAY);
-    if (fd == -1) {
-      error("%s: %s", diskname, strerror(errno));
-      d->file = NULL;
+    fd = open(d->name, O_ACCMODE|O_NDELAY);
+    if (fd < 0) {
       d->emutype = JV3;
-      return;
+      return errno;
     }
     d->file = fdopen(fd, "r+");
     if (d->file == NULL) {
-      error("%s: %s", diskname, strerror(errno));
       d->emutype = JV3;
-      return;
+      return errno;
     }
     d->writeprot = 0;
     ioctl(fileno(d->file), FDRESET, &reset_now);
@@ -806,10 +793,12 @@ trs_disk_change(int drive, char *newname)
   } else
 #endif
   {
-    d->file = fopen(diskname, "r+");
+    d->file = fopen(d->name, "r+");
     if (d->file == NULL) {
-      d->file = fopen(diskname, "r");
-      if (d->file == NULL) return;
+      if (errno == EACCES || errno == EROFS) {
+	d->file = fopen(d->name, "r");
+      }
+      if (d->file == NULL) return errno;
       d->writeprot = 1;
     } else {
       d->writeprot = 0;
@@ -851,7 +840,7 @@ trs_disk_change(int drive, char *newname)
     }
     d->u.jv3.last_used_id = -1;
     for (id_index=0; id_index<JV3_SECSMAX; id_index++) {
-      if (d->u.jv3.id[id_index].track == JV3_FREE) {
+     if (d->u.jv3.id[id_index].track == JV3_FREE) {
 	int size_code = id_index_to_size_code(d, id_index);
 	if (d->u.jv3.free_id[size_code] == JV3_SECSMAX) {
 	  d->u.jv3.free_id[size_code] = id_index;
@@ -864,8 +853,8 @@ trs_disk_change(int drive, char *newname)
   } else if (d->emutype == DMK) {
     fseek(d->file, DMK_NTRACKS, 0);
     d->u.dmk.ntracks = (unsigned char) getc(d->file);
-    d->u.dmk.tracklen = (unsigned char) getc(d->file) +
-      (((unsigned char) getc(d->file)) << 8);
+    d->u.dmk.tracklen = (unsigned char) getc(d->file);
+    d->u.dmk.tracklen += ((unsigned char) getc(d->file)) << 8;
     c = getc(d->file);
     d->u.dmk.nsides = (c & DMK_SSIDE_OPT) ? 1 : 2;
     d->u.dmk.sden = (c & DMK_SDEN_OPT) != 0;
@@ -877,7 +866,43 @@ trs_disk_change(int drive, char *newname)
 	    drive, d->writeprot, d->u.dmk.ntracks, d->u.dmk.tracklen,
 	    d->u.dmk.nsides, d->u.dmk.sden, d->u.dmk.ignden);
     }
+  } else if (d->emutype == NONE) {
+    return -1;
   }
+  return 0;
+}
+
+void
+trs_disk_change_all(void)
+{
+  int i;
+  for (i=0; i<NDRIVES; i++) {
+    trs_disk_change(i);
+  }
+}
+
+const char *
+trs_disk_get_name(int drive)
+{
+  return disk[drive].name;
+}
+
+/* Returns 0 if OK, -1 if invalid header, errno value otherwise. */
+int
+trs_disk_set_name(int drive, const char *name)
+{
+  DiskState *d = &disk[drive];  
+  if (d->name) free(d->name);
+  d->name = name ? strdup(name) : NULL;
+  return trs_disk_change(drive);
+}
+
+/* Returns 0 if OK, errno value otherwise. */
+int
+trs_disk_create(const char *name)
+{
+  error("XXX not implemented yet; use mkdisk");
+  return ENOTSUP;
 }
 
 static int
@@ -1286,6 +1311,9 @@ trs_disk_select_write(unsigned char data)
     trs_disk_motoroff_interrupt(0);
 
     /* If a SIGUSR1 disk change is pending, accept it here */
+    /* XXX Delete the SIGUSR1 stuff?  If not, probably should
+       expand it to call trs_change_all() -- and should accept
+       it somewhere better than here! */
     if (trs_disk_needchange) {
       trs_disk_change_all();
       trs_disk_needchange = 0;
@@ -3139,7 +3167,7 @@ real_verify()
 }
 
 void
-real_restore(curdrive)
+real_restore(int curdrive)
 {
 #if __linux
   DiskState *d = &disk[curdrive];
@@ -3359,7 +3387,7 @@ real_write()
     if (raw_cmd.reply[1] & 0x04) {
       state.status |= TRSDISK_NOTFOUND;
       /* Could have been due to wrong sector size.  Presumably
-         the Z-80 software will do some retries, so we'll cause
+         the Z80 software will do some retries, so we'll cause
          it to try the next sector size next time. */
       if (trs_disk_debug_flags & DISKDEBUG_REALSIZE) {
 	debug("real_write not found: side %d tk %d sec %d size 0%d phytk %d\n",

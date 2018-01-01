@@ -9,7 +9,6 @@
     <child>
       <object class="GtkVBox" id="vbox1">
         <property name="visible">True</property>
-        <property name="orientation">vertical</property>
         <child>
           <object class="GtkMenuBar" id="menu_bar">
             <property name="visible">True</property>
@@ -22,35 +21,285 @@
                   <object class="GtkMenu" id="menu1">
                     <property name="visible">True</property>
                     <child>
-                      <object class="GtkImageMenuItem" id="imagemenuitem1">
-                        <property name="label">gtk-new</property>
+                      <object class="GtkMenuItem" id="menuitem9">
                         <property name="visible">True</property>
+                        <property name="label" translatable="yes">_Floppy</property>
                         <property name="use_underline">True</property>
-                        <property name="use_stock">True</property>
+                        <child type="submenu">
+                          <object class="GtkMenu" id="menu5">
+                            <property name="visible">True</property>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem10">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_0</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_floppy_menu_item_activate"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem11">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_1</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_floppy_menu_item_activate"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem12">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_2</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_floppy_menu_item_activate"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem13">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_3</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_floppy_menu_item_activate"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem18">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_4</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_floppy_menu_item_activate"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem19">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_5</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_floppy_menu_item_activate"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem20">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_6</property>
+                                <property name="use_underline">True</property>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem21">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_7</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_floppy_menu_item_activate"/>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
                       </object>
                     </child>
                     <child>
-                      <object class="GtkImageMenuItem" id="imagemenuitem2">
-                        <property name="label">gtk-open</property>
+                      <object class="GtkMenuItem" id="menuitem8">
                         <property name="visible">True</property>
+                        <property name="label" translatable="yes">_Hard drive</property>
                         <property name="use_underline">True</property>
-                        <property name="use_stock">True</property>
+                        <child type="submenu">
+                          <object class="GtkMenu" id="menu4">
+                            <property name="visible">True</property>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem14">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_0</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_hard_menu_item_activate"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem15">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_1</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_hard_menu_item_activate"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem16">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_2</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_hard_menu_item_activate"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem17">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_3</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_hard_menu_item_activate"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem22">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_4</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_hard_menu_item_activate"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem23">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_5</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_hard_menu_item_activate"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem24">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_6</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_hard_menu_item_activate"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem25">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_7</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_hard_menu_item_activate"/>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
                       </object>
                     </child>
                     <child>
-                      <object class="GtkImageMenuItem" id="imagemenuitem3">
-                        <property name="label">gtk-save</property>
+                      <object class="GtkMenuItem" id="menuitem26">
                         <property name="visible">True</property>
+                        <property name="label" translatable="yes">_Stringy floppy</property>
                         <property name="use_underline">True</property>
-                        <property name="use_stock">True</property>
+                        <child type="submenu">
+                          <object class="GtkMenu" id="menu6">
+                            <property name="visible">True</property>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem27">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_0</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_stringy_menu_item_activate"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem28">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_1</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_stringy_menu_item_activate"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem29">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_2</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_stringy_menu_item_activate"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem30">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_3</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_stringy_menu_item_activate"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem31">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_4</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_stringy_menu_item_activate"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem32">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_5</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_stringy_menu_item_activate"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem33">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_6</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_stringy_menu_item_activate"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem34">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_7</property>
+                                <property name="use_underline">True</property>
+                                <signal name="activate" handler="on_stringy_menu_item_activate"/>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
                       </object>
                     </child>
                     <child>
-                      <object class="GtkImageMenuItem" id="imagemenuitem4">
-                        <property name="label">gtk-save-as</property>
+                      <object class="GtkMenuItem" id="menuitem35">
                         <property name="visible">True</property>
+                        <property name="label" translatable="yes">_Cassette</property>
                         <property name="use_underline">True</property>
-                        <property name="use_stock">True</property>
+                        <child type="submenu">
+                          <object class="GtkMenu" id="menu7">
+                            <property name="visible">True</property>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem36">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_1</property>
+                                <property name="use_underline">True</property>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="menuitem37">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">_2</property>
+                                <property name="use_underline">True</property>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkSeparatorMenuItem" id="&lt;separator&gt;">
+                        <property name="visible">True</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="menuitem5">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">S_oft reset</property>
+                        <property name="use_underline">True</property>
+                        <signal name="activate" handler="on_reset_menu_item_activate"/>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="menuitem6">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">Hard _reset</property>
+                        <property name="use_underline">True</property>
+                        <signal name="activate" handler="on_hard_reset_menu_item_activate"/>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="menuitem7">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">Enter _debugger</property>
+                        <property name="use_underline">True</property>
+                        <signal name="activate" handler="on_debugger_menu_item_activate"/>
                       </object>
                     </child>
                     <child>
@@ -80,14 +329,6 @@
                   <object class="GtkMenu" id="menu2">
                     <property name="visible">True</property>
                     <child>
-                      <object class="GtkImageMenuItem" id="imagemenuitem6">
-                        <property name="label">gtk-cut</property>
-                        <property name="visible">True</property>
-                        <property name="use_underline">True</property>
-                        <property name="use_stock">True</property>
-                      </object>
-                    </child>
-                    <child>
                       <object class="GtkImageMenuItem" id="imagemenuitem7">
                         <property name="label">gtk-copy</property>
                         <property name="visible">True</property>
@@ -98,14 +339,6 @@
                     <child>
                       <object class="GtkImageMenuItem" id="imagemenuitem8">
                         <property name="label">gtk-paste</property>
-                        <property name="visible">True</property>
-                        <property name="use_underline">True</property>
-                        <property name="use_stock">True</property>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkImageMenuItem" id="imagemenuitem9">
-                        <property name="label">gtk-delete</property>
                         <property name="visible">True</property>
                         <property name="use_underline">True</property>
                         <property name="use_stock">True</property>
@@ -150,86 +383,6 @@
           </packing>
         </child>
         <child>
-          <object class="GtkToolbar" id="tool_bar">
-            <property name="visible">True</property>
-            <child>
-              <object class="GtkToolButton" id="reset_button">
-                <property name="visible">True</property>
-                <property name="label" translatable="yes">Reset</property>
-                <property name="use_underline">True</property>
-                <signal name="clicked" handler="on_reset_button_clicked"/>
-              </object>
-              <packing>
-                <property name="expand">False</property>
-                <property name="homogeneous">True</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkToolButton" id="debugger_button">
-                <property name="visible">True</property>
-                <property name="label" translatable="yes">Debugger</property>
-                <property name="use_underline">True</property>
-                <signal name="clicked" handler="on_debugger_button_clicked"/>
-              </object>
-              <packing>
-                <property name="expand">False</property>
-                <property name="homogeneous">True</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkToolButton" id="disk0">
-                <property name="visible">True</property>
-                <property name="label" translatable="yes">:0</property>
-                <property name="use_underline">True</property>
-                <signal name="clicked" handler="on_disk_button_clicked"/>
-              </object>
-              <packing>
-                <property name="expand">False</property>
-                <property name="homogeneous">True</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkToolButton" id="disk1">
-                <property name="visible">True</property>
-                <property name="label" translatable="yes">:1</property>
-                <property name="use_underline">True</property>
-                <signal name="clicked" handler="on_disk_button_clicked"/>
-              </object>
-              <packing>
-                <property name="expand">False</property>
-                <property name="homogeneous">True</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkToolButton" id="disk2">
-                <property name="visible">True</property>
-                <property name="label" translatable="yes">:2</property>
-                <property name="use_underline">True</property>
-              </object>
-              <packing>
-                <property name="expand">False</property>
-                <property name="homogeneous">True</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkToolButton" id="disk3">
-                <property name="visible">True</property>
-                <property name="label" translatable="yes">:3</property>
-                <property name="use_underline">True</property>
-                <signal name="clicked" handler="on_disk_button_clicked"/>
-              </object>
-              <packing>
-                <property name="expand">False</property>
-                <property name="homogeneous">True</property>
-              </packing>
-            </child>
-          </object>
-          <packing>
-            <property name="expand">False</property>
-            <property name="position">1</property>
-          </packing>
-        </child>
-        <child>
           <object class="GtkDrawingArea" id="drawing_area">
             <property name="width_request">512</property>
             <property name="height_request">384</property>
@@ -244,7 +397,7 @@
             <signal name="key_release_event" handler="on_drawing_area_key_release_event"/>
           </object>
           <packing>
-            <property name="position">2</property>
+            <property name="position">1</property>
           </packing>
         </child>
       </object>
@@ -287,7 +440,6 @@ and the date included.
     <child internal-child="vbox">
       <object class="GtkVBox" id="dialog-vbox1">
         <property name="visible">True</property>
-        <property name="orientation">vertical</property>
         <property name="spacing">2</property>
         <child internal-child="action_area">
           <object class="GtkHButtonBox" id="dialog-action_area1">
@@ -312,7 +464,6 @@ and the date included.
     <child internal-child="vbox">
       <object class="GtkVBox" id="dialog-vbox3">
         <property name="visible">True</property>
-        <property name="orientation">vertical</property>
         <property name="spacing">2</property>
         <child>
           <object class="GtkLabel" id="label1">
@@ -332,7 +483,7 @@ and the date included.
             <property name="layout_style">end</property>
             <child>
               <object class="GtkButton" id="yes_quit_button">
-                <property name="label" translatable="yes">gtk-quit</property>
+                <property name="label">gtk-quit</property>
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
@@ -348,7 +499,7 @@ and the date included.
             </child>
             <child>
               <object class="GtkButton" id="no_quit_button">
-                <property name="label" translatable="yes">gtk-cancel</property>
+                <property name="label">gtk-cancel</property>
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
