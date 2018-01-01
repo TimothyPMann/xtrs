@@ -57,6 +57,7 @@ SOURCES = \
 	cmd.c \
 	cmddump.c \
 	compile_rom.c \
+	crc.c \
 	debug.c \
 	dis.c \
 	error.c \
@@ -68,6 +69,7 @@ SOURCES = \
 	trs_cassette.c \
 	trs_chars.c \
 	trs_disk.c \
+	trs_gtkinterface.c \
 	trs_hard.c \
 	trs_imp_exp.c \
 	trs_interrupt.c \
@@ -291,6 +293,8 @@ mkdisk.o: reed.h
 trs_cassette.o: trs.h z80.h config.h
 trs_chars.o: trs_iodefs.h
 trs_disk.o: z80.h config.h trs.h trs_disk.h trs_hard.h crc.c
+trs_gtkinterface.o: trs.h z80.h config.h trs_iodefs.h trs_disk.h trs_uart.h
+trs_gtkinterface.o: trs_hard.h keyrepeat.h
 trs_hard.o: trs.h z80.h config.h trs_hard.h reed.h
 trs_imp_exp.o: trs_imp_exp.h z80.h config.h trs.h trs_disk.h trs_hard.h
 trs_interrupt.o: z80.h config.h trs.h
