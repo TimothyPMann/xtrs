@@ -25,4 +25,5 @@ _$*
 *.elc
 *.ln
 core
+cscope.*
 # CVS default ignores end

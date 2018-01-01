@@ -1,0 +1,44 @@
+Authors of xtrs 1.0
+===================
+David Gingold
+Alec Wolman
+
+Main author of later versions
+=============================
+Timothy Mann
+
+Other contributors
+==================
+Pete Cervasio
+Todd P. Cromwell III
+Fabio Ferrari
+Roland Gerlach
+Jenz Guenther
+Jean-Marc Le Peuvedic
+Denis Leconte
+Ulrich Mueller
+Joe Peterson
+Al Petrofsky
+Branden Robinson
+Knut Roll-Lund
+Ignatios Souvatzis
+Frederic Vecoven
+Marcelo Fernandes Vianna
+Joseph Wang
+
+Additonal thanks to the following
+=================================
+Jeff Vavasour for the JV1 and JV3 floppy disk file formats.
+
+David Keil for the DMK floppy disk file format.
+
+Matthew Reed for the HDV hard disk file format and the ESF Stringy
+Floppy file format.
+
+Mark McDougall for documentation on the Micro Labs Grafyx Solution
+card.
+
+Bruce Norskog, who is thought to be the original author of the public
+domain Z80 disassembler zdis, from which xtrs's dis.c is derived.
+zdis was a part of the zmac package as early as 12-Mar-1987 when the
+package was posted to mod.sources by Colin Kelley.

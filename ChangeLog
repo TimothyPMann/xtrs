@@ -1,0 +1,1233 @@
+5.0 -- ? -- Tim Mann
+
+* Disabled trs_suspend_delay heuristic.
+
+* Applied lots of code and documentation patches from Branden
+  Robinson.  Thanks!
+
+* Changed -samplerate default to 11025 instead of 44100.  With this
+  change, xtrs sound works pretty well on my Ubuntu 16.04 system with
+  "padsp xtrs -autodelay".  At the old default samplerate xtrs was
+  unusable when run under padsp.  I don't really understand why.
+
+* Restricted emt_opendisk to open only emulated hard disks.  This made
+  emt_write and emt_ftruncate safe to allow in -emtsafe mode, as they
+  will be able to modify only an emulated hard disk; did so.  This
+  makes xtrshard work in -emtsafe mode.  Turned on -emtsafe mode by
+  default.
+
+* A few other documentation updates.
+
+* Removed mkdisk feature that copies the original filename into the
+  image.  The feature wasn't really useful, and the implementation had
+  a (partly intentional) buffer overflow.
+
+* Fixed bug in cassette.sh.
+
+* Deleted an excess "pop hl" in export.z80 that (by sheer luck) wasn't
+  causing any apparent problem.
+
+* Fixed zbx bugs in removing watchpoints.
+
+* Added iodebug feature to zbx.
+
+* Started GTK port.  Do "make gxtrs" to build it.  Work in progress,
+  incomplete.
+
+* Exatron Stringy Floppy emulation, Model I only.  Needs more work
+  before it can be enabled in a release.  XXX Not documented yet!  XXX
+  Need a better way to load the ESF ROM -- right now it must be catted
+  onto the end of the level2rom.  See notes and files in
+  ~/trs80/exatron, in particular level2+esf.bin.  XXX Fix wafer
+  creation.  Currently takes no parameters (should take the length)
+  and is available only from gxtrs.  Maybe move wafer creation into
+  mkdisk (at least for now) and later rethink how to handle media
+  creation within xtrs -- it does need to be able to take parameters!
+
+* Deleted "#if BATCH" code.  It didn't speed things up and had been
+  disabled for years.
+
+* Deleted obsolete sound code that poked SoundBlaster hardware
+  directly.  Deleted old sound code that could pipe samples through
+  sox on the way to /dev/dsp.  Merged OSS_SOUND into HAVE_OSS.
+  Updated sound comments.
+
+* Small code cleanups.
+
+4.9d -- Mon Jun 15 16:46:34 PDT 2009 -- Tim Mann
+
+* Fixed gcc warnings.
+
+* Some small cleanups to reset and power-on.
+
+* Added a workaround to a current X bug that made F11 repeat
+infinitely.  See http://bugs.freedesktop.org/show_bug.cgi?id=21454.
+
+* Added a keybinding help window contributed by Branden Robinson.
+Press F11 to see the help.
+
+* Fixed one more spot that was assuming "char" is signed by default.
+
+* Changed mem_read() to automatically mod the address by 0xffff.
+Requiring callers to take care of that was ugly and error prone.
+A bug report from Kevin P. Rauch alerted me to the fact that at least
+one caller to mem_read_word() wasn't doing it, causing segfaults.
+
+* Added patch from Branden Robinson so that extra Enter events
+synthesized by the X unclutter app (or potentially other X apps, I
+guess) don't cause xtrs to lose track of whether to reenble X key
+repeat when the cursor leaves the xtrs window.
+
+* Added patch from Joe Peterson and Ulrich Mueller that makes
+NEWDOS/80 boot up knowing the date and time, similar to the existing
+feature for LDOS.
+
+* Added assignment to a volatile to the delay/autodelay loop.  Without
+this some compilers will optimize the loop into nothingness, so it
+fails to delay.  Thanks to Ulrich Mueller and Joe Peterson.
+
+* Fixed a bug I introduced in 4.9b, where the KBWAIT feature would
+stop working after F7, F9, or F10 was pressed.  Thanks to Joe Peterson
+for a bug report and analysis.
+
+* Deleted all SIGIO code.  The code was a kludge to begin with and it
+no longer worked with current X libraries and Linux kernels, causing
+xtrs to hang.  It was also reported to cause hangs when xtrs was
+compiled for Windows using Cygwin.  Thanks to Howard Pepper, Dennis
+Lovelady, Arumin Nueckel, Christopher Currie, and Joe Peterson for bug
+reports.
+
+* Replaced "Last modified" lines in source files with RCS $Id$
+keywords.  It's been years since I've had the DEC SRC macros that
+update these lines loaded in my emacs, so they don't stay up to date.
+And I've kept the file history in RCS for even more years.
+
+4.9c -- Sun May 14 17:54:25 PDT 2006 -- Tim Mann
+
+* Fixed the new -e flag on import/cmd and export/cmd to actually
+work.  Oops.  Tested on Model I DOSPLUS 3.5.
+
+4.9b -- Sat May 13 11:54:26 PDT 2006 -- Tim Mann
+
+* Bundled in the latest version of Roland Gerlach's CP/M utilties for
+xtrs and their documentation (as of 5/13/2006).
+
+* Added -emtsafe feature to turn off ability for emts to write to
+unexpected places in the host filesystem.  Thanks to Joe Peterson.
+
+* Added -e flag to import/cmd and export/cmd.  Dropped DOSPLUS patches
+for those programs, which were outdated anyway.
+
+* Dropped old method of importing/exporting files using fake I/O
+ports and deleted import/bas and export/bas.
+
+* Small cleanups in load_cmd.c.
+
+* Renamed Z-80 source files to .z80 instead of .z to prevent Linux
+utilities from thinking they're compressed files.
+
+* Moved key queuing code from trs_interface.c to trs_keyboard.c and
+cleaned it up a little.
+
+* Applied patches from Branden Robinson to add watchpoints and the
+zbxinfo command to the debugger and clean up a few things.  Thanks!
+
+* Added some signed/unsigned type casts; thanks to Andreas Jochens.
+
+4.9a -- Mon Apr 25 22:35:51 PDT 2005 -- Tim Mann
+
+* Changed the DISKDEBUG options in trs_disk.c to be runtime flag bits
+instead of #ifdefs.  Added diskdebug command in zbx to set the bits,
+with terse documentation in zbx's help command.  2 (FDC commands) is
+the most useful.  1 (FDC register I/O) is extremely verbose but
+sometimes useful.
+
+* Added code to export.cmd and import.cmd to ignore the TRSDOS/LDOS 6
+advisory error code when we open a file with the "wrong" LRL.
+
+* Fixed a typo in the usage message for mkdisk.
+
+* Increased the maximum accepted track length for DMK to the hard
+limit of 0x4000.  Previously it had been 0x2940, but cw2dmk is writing
+longer tracks than that by default for 8" disks now!  Oops.
+
+* Small cleanup patches from Branden Robinson for cassette.sh.
+
+4.9 -- Sat May 11 13:42:06 PDT 2002  Tim Mann
+
+This release has various bug fixes and tiny features that have
+accumulated since the last one.
+
+* Added a hint about floppy drive BIOS settings to the man page.
+
+* Fixed a bug in the cassette shell script.  The cassette image type
+wasn't being determined from the file extension due to a shell
+programming error.
+
+* Got rid of #ifdef HRG1B" and just put all the code for that in-line.
+Moved documentation to where most of the implementation is.
+
+* Added -iconic option.  Thanks to Jean-Marc Le Peuvedic.
+
+* Bugfix: check_endian would crash if it failed; it was calling
+fatal() before program_name was set.  Thanks to Sot Aliadis for the
+bug report.
+
+* Bugfix: the SIGUSR1 feature wasn't turning off the needchange flag
+after doing the disk change, so it would do the change over and over.
+Thanks to Jean-Marc Le Peuvedic for the bug report.
+
+* Bugfix: The change that was made in version 4.6 to get the 500bps
+loader that came on a 250bps tape to work turned out to break writing
+1500bps tapes.  The tape-based 500bps loader needed a special
+heuristic, because it does a write just after turning on the motor but
+before its first read.  But the 1500bps writer does a read after all
+its writes but before turning off the motor.  This was erroneously
+activating the heuristic for the loader case, causing us to switch to
+read mode without flushing the last transition from the write.  The
+heuristic is now changed so that it won't activate if more than one
+write has been done since the motor was turned on.  This makes both
+cases work.
+
+* Changed the sound code to be less picky about sample format on
+/dev/dsp.  Needed because some hardware doesn't do the 8-bit formats.
+We still prefer to use 8-bit mono for game sound and 8-bit stereo for
+Orchestra-85/90, but we can also use 16-bit signed little endian for
+either, and stereo when we want mono (but not vice versa).
+
+* Fixed a bug in FDC emulation that was stopping CopyCat from booting.
+After starting a read, the CopyCat boot loader reads from the data
+register once immediately, before DRQ has come high.  This read must
+not capture the first byte of data from the sector.
+
+* Fixed a bug in FDC emulation that was keeping CopyCat from seeing
+sectors on a track other than the first.  When client software used
+the Model III/4/4P feature that lets you put the Z-80 into a wait
+state until the FDC raises DRQ, the amount of time waited was not
+being added to the T-state counter.  Thus repeated Read Address
+commands that used the wait state feature would read the same sector
+ID over and over instead of rotating to the next one.
+
+* The change in version 4.2 to wait a few T-states after a floppy Read
+or Read Address command before raising DRQ was only implemented for
+floppy image files.  It's now implemented for real floppies too.
+
+* The change in version 4.2 to set the track and sector registers on a
+Read Address to the track and sector numbers read from the ID field
+was implemented only for real floppies.  It's now implemented for
+floppy image files too.
+
+* A few minor cleanups to floppy emulation code.
+
+* Bugfix: When a real Z-80 takes an interrupt or NMI from a halt
+instruction, it pushes the address of the next instruction after the
+halt as the return address (and later returns there, thus breaking out
+of the halt).  Previously xtrs was erroneously pushing the address of
+the halt instruction instead.  If no interrupt or NMI is taken, xtrs
+still repeatedly executes the halt instruction; you can see this if
+you use zbx to single-step or trace a halt.  A real Z-80 supposedly
+executes nops internally instead of re-executing the halt, but the
+difference is not visible to Z-80 programs running in xtrs.
+
+4.8 -- Fri Aug 31 11:39:49 PDT 2001  Tim Mann
+
+* This release has quick fixes for some troublesome bugs.  Better
+fixes may be forthcoming in a later version.  Thanks to Jean-Marc Le
+Peuvedic and Frederic Vecoven for problem reports and suggestions.
+
+* Changed my email address, as I have left Compaq.
+
+* Bug fix: Output to the X server was not always being flushed in a
+timely manner.  It is now flushed at the frequency of the timer
+interrupt on the machine being emulated (30 to 60 times per second).
+This fixes problems with the display not being updated when it should
+have been in certain games and operating systems.
+
+* Added a heuristic to flush the key transition queue if the Z-80
+program does not poll the keyboard often enough.  Right now this is
+set to go off if more than 2 timer interrupt ticks go by without a
+poll.  This change should get rid of the unwanted typeahead effect
+previously seen in certain situations, such as when a game does some
+screen flashing or sound effects between levels without polling the
+keyboard.
+
+* Fixed a compile error on non-Linux platforms.
+
+4.7 -- Sun Jul  8 16:37:14 PDT 2001  Tim Mann
+
+* Fixed a silly bug that caused a crash if no -diskdir was specified.
+I had inadvertently deleted the initialization.
+
+4.6 -- Sat Jul  7 13:56:33 PDT 2001  Tim Mann
+
+* The value of -diskdir can now begin with "~/" (or just be "~") to
+make it relative to the user's home directory.  Suggested by Jean-Marc
+Le Peuvedic.
+
+* Fixed the heuristic that decides whether the TRS-80 is loading or
+saving to tape to work with the 500bps loader that came on a 250bps
+cassette with the tape Editor/Assembler.  This code does an OUT to the
+cassette port first thing after turning on the motor, which was
+confusing us.  Now if the TRS-80 does an IN from the cassette port
+with the motor on, we switch to reading even if we initially saw an
+OUT and guessed it was writing.
+
+* Added feature: sending SIGUSR1 to xtrs causes a disk change (as if
+F7 were pressed).  This is for use by external disk-manipulating
+programs.  Suggested by Jean-Marc Le Peuvedic.
+
+* Changed to a new keystretch algorithm that stretches for a fixed
+number of T-states instead of a fixed number of keyboard matrix reads.
+This should hopefully eliminate the need to tweak the keystretch
+setting to different values for games.  Inspired by suggestions from
+Jean-Marc Le Peuvedic.  To make this work, also had to change the
+KBWAIT algorithm to wait only after the ROM wait-for-key routine has
+been called several times with no keyboard state change.
+
+* I noticed that the X server on my development machine is now
+reporting Shift+F1 as F13 instead of F11, so I changed the table in
+trs_keyboard.c to match, but I left an #if setting that can
+accommodate the old behavior.  It looks like newer versions of XFree86
+don't do either translation, thankfully.
+
+4.5a -- Fri May  4 23:17:46 PDT 2001  Tim Mann
+
+* Corrected some typos in xtrs.man and Makefile.  Thanks to Branden
+Robinson.
+
+4.5 -- Wed May  2 20:48:10 PDT 2001  Tim Mann
+
+* All undocumented instructions and almost all undocumented flag
+settings from http://www.msxnet.org/tech/Z80/z80undoc.txt are now
+emulated.
+
+* Added code to parse resources from $HOME/.Xdefaults, $HOME/Xtrs, and
+/usr/X11/lib/X11/app-defaults/Xtrs.  Normally Xt would handle this,
+but xtrs doesn't use Xt.  Branden Robinson noted the absence of this
+feature back in 1998; it's finally fixed.
+
+* Added -shiftbracket command line option, inspired by mail from
+Jean-Marc Le Peuvedic.  Defaults to true on Model 4/4P.
+
+* Added man pages for hex2cmd and cmddump; thanks to Branden Robinson.
+
+* Raised JV1/JV3 cylinder limit from 96 to 255 after someone sent me a
+JV1 with 143 cylinders.  I wonder which DOS that was made with!
+
+* Fixed syntax errors in debug.c that gcc had been allowing through.
+
+* Corrected some man page errors and unclear passages.
+
+4.4 -- Fri Feb 16 23:52:32 PST 2001  Tim Mann
+
+* Added some DOSPLUS patches for import/cmd and export/cmd from
+Knut Roll-Lund.
+
+* Removed kludge from MSM5832 clock chip emulation; now it provides a
+plain 2-digit year (i.e., "01" for 2001) as the real hardware did.
+
+* Cleaned up a bit and eliminated C compiler warnings.
+
+* Added break command to debugger as a synonym for "stop at".
+
+* Modified the debugger's reset and run commands, and added softreset.
+Now reset does a powerup initialization of the Z-80 and all devices,
+while softreset just pushes the TRS-80's reset button.  The run
+command does a hard reset and starts execution at address 0000.  On
+the Model I and III, softreset resets external devices and gives the
+Z-80 a nonmaskable interrupt, but on the Model 4 and 4P, it is the
+same as reset.
+
+* Added emulation of the Alpha Products joystick, mapped at port 0
+only.  For the moment it doesn't work with a real joystick; instead,
+it uses the numeric keypad keys with NumLock off.  Keys 2, 4, 6, 8
+(KP_Down, KP_Left, KP_Right, KP_Up) are the main directions; keys 1,
+3, 7, and 9 (KP_End, KP_Page_Down, KP_Home, KP_Page_Up) work as
+diagonal directions by activating two main directions at once; and key
+0 (KP_Insert) or 5 (KP_Begin) is the fire button.  At some point I may
+acquire a real PC joystick, read about the X input extension, and make
+that work too.
+
+4.3 -- Fri Jul 21 20:44:48 PDT 2000  Tim Mann
+
+* Added emulation of the serial port for all models.  Note: Model I
+LDOS 5.3.1 has a bug in the RS232 driver (RS232R/DVR).  You must set
+the break parameter to a nonzero value for it to work.  Try "SET *CL
+RS232R (BREAK=1)", for example.
+
+* Added emulation of the Radio Shack graphics card for Model III.
+This is just like the Model 4 card, except that there is no overlay
+mode, there are no scrolling registers, and the graphics are always
+640x240 (never 512x192).  Changed default graphics card from
+-microlabs to -nomicrolabs.  Changed the -resize flag to be meaningful
+in Model III mode, and changed the default to be off for Model III
+mode, but still on for Model 4/4P mode.
+
+* Added emulation of the Micro Labs graphics card for Model III.  This
+is quite different from the Model 4 card.  I deduced how it works by
+looking at what the software for it was trying to do, so there could
+be bugs in the emulation.
+
+* Enable the hard disk controller at powerup.  NEWDOS is said to need this.
+
+* Minor changes to compile on Solaris.  Thanks to Frederic Vecoven.
+
+* Bugfix: The MSM5832 clock chip returns a leap year indication in
+bit 2 of port base+8.
+
+* Bugfix: When running an emulated model 4/4P in model 3 mode, characters
+were being drawn only 10 scaled pixels high instead of 12.
+
+* Added a unified debug() routine to print all debugging messages.
+
+* Patch to fix zbx listing up to 0xffff, from Ulrich Mueller.
+
+* Patch to correct disassembly of DD and FD prefixes that have no effect,
+from Ulrich Mueller.
+
+* Patches to remove unneeded cast and fix indentation, from Ulrich Mueller.
+
+4.2 -- Sat Jun 24 01:05:13 PDT 2000  Tim Mann
+
+* Emulation of the Model I HRG1B 384*192 graphics card, sold in
+Germany for Model I and Video Genie by RB-Elektronik.  Contributed by
+Ulrich Mueller.
+
+* Fixed a bug that would crash xtrs if the Z-80 SP pointed into
+keyboard memory.  Contributed by Ulrich Mueller.
+
+* The -scale command line option now allows independent scaling in the
+X and Y dimensions.  The scaling mechanism is also used to eliminate
+the need for the bitmaps in trs_chars.c to be double-height, and to
+eliminate the need for the separate double-width bitmaps formerly in
+trs_wide_chars.c.  The German characters in trs_chars.c were corrected
+to make this work.  Contributed by Ulrich Mueller.
+
+* Fixed an obscure bug in the heuristic to identify whether a disk
+image is JV1, JV3, or DMK.
+
+* In trs_disk.c, reading a sector now waits a while before raising
+DRQ.  The old behavior broke the boot loader for self-booting Zork.
+
+* In trs_disk.c, Read Address now sets the track register to the track
+number read and the sector register to the sector number read.  The
+1771 data sheet says that Read Address sets the sector register to the
+sector number, but nothing about the track register.  The 179x data
+sheet says that Read Address sets the sector register to the track
+number, and nothing about the track register, which seems wrong.  "The
+Institute" game loader assumes that Read Address will set the track
+register to the track number on a 1771.
+
+* Minor accuracy tweaks to trs_hard.[ch].
+
+4.1 -- Fri May 19 00:40:29 PDT 2000  Tim Mann
+
+* Fixed a Y2K problem in settime/cmd (as assembled from settime.z).
+For some random reason, Model I/III LDOS 5.3.1 stores a 2-digit year,
+so 2000 => 0, but Model 4 LS-DOS 6.3.1 stores an offset from 1900,
+so 2000 => 100.  Previously we were getting it right for 5.3.1 but
+wrong for 6.3.1.
+
+* Fixed a bug in the floppy drive motor timeout interrupt.  It was not
+being cancelled immediately when a drive was reselected.  This
+sometimes made the floppy driver in the Montezuma CP/M boot sector
+fail, and could have caused problems in other software too.
+
+* Now only Models I/III/4, not Model 4P, are emulated as having no
+floppy controller when they have no disks mounted.  A Model 4P always
+has an FDC, and it can boot off the hard drive with suitable software
+(such as Montezuma CP/M), so it is possible to boot an operating
+system with no floppies mounted, then mount and access some later.
+This isn't possible on the other models.
+
+* Bugfix: If a JV3 or DMK floppy was not writable, but did not have
+its internal write-protected flag set, we were not emulating a write
+protect tab as intended.
+
+* F9 will now get you into the debugger (zbx) even if you didn't start
+xtrs with the -debug flag.  Also, starting with -debug no longer
+causes the emulator to run more slowly; it runs at full speed as long
+as no traps are set.
+
+* Formerly, executing a halt instruction caused entry into the
+debugger (zbx) if xtrs had been started with the -debug flag.  This
+feature has been removed.  As a replacement, executing the new
+emt_debug emulator trap (ed2f) always causes the program to enter the
+debugger.
+
+* Fixed the debugger reset and run commands to reset the whole
+machine, not just the processor.
+
+* Installed a small patch that makes the emulator control its window
+size in the correct way, by passing a size hint to the window manager
+instead of noticing when its size has changed and changing it back.
+Thanks to Joseph Wang.
+
+* Added emulation of real Radio Shack hard drive controllers (WD1010).
+
+* Changed xtrshard/dct to set the directory cylinder field in the Reed
+header automagically.  (Heuristic: when a byte is written to cylinder
+0, sector 0, byte 2, assume that's the right value.)  The WD1010
+emulation does this too.  There is now no need for mkdisk to have a
+flag to set this field, or for the user to remember to use the right
+value with FORMAT, so that stuff is deleted from the man pages.
+
+* Deleted references to cassette "autodetect" format, since I'm not
+going to get around to implementing it.  The current autodetection
+in the cassette shell script based on file extension works well
+enough.  Rephrased the caveats about reading and writing real
+cassettes, since I just tried it again and got fairly good results
+this time.
+
+4.0 -- Sat Apr  1 20:52:53 PST 2000  Tim Mann
+
+* Fixed bugs in switching between 80x24 and 64x16 screen sizes in
+-usefont mode.  Thanks to Al Petrofsky for noticing back in 1998 that
+the code looked wrong; I finally got around to cleaning it up for 4.0
+and found the bugs.
+
+* Worked around an X problem.  If you start xtrs with the -resize flag
+and a Model 4 operating system is already mounted, the window gets
+resized very soon after being created.  This was triggering some
+sort of X race condition that would make the window get confused about
+how big it was.
+
+* Fixed obscure bugs in the Model 4 hi-res graphics card emulation.
+
+* Added -scale option.  Thanks to Denis Leconte for some of the code.
+
+* Emulate software-switchable 3.54Mhz clock speedup kit on Model I.
+Useful with Orchestra-85 emulation.
+
+* Changed -samplerate default to 44,100 for better sound.
+
+* Added emulation of Orchestra-85 and Orchestra-90.  Thanks to David
+Keil for some information on how Orchestra-90 works.
+
+* Fixed a bug that sometimes caused the F10 reboot key to hang the
+emulator until the next X event.
+
+* Added emulation of TimeDate80, TChron1, TRSWatch, and T-Timer, based
+on code from Joe Peterson and information in LDOS Quarterly 1-6.  I'm
+not sure it's completely right; see the comments in trs_io.c.  If you
+have software that uses these devices, let me know how well it works,
+especially with regard to the Y2K issue.
+
+* Added support for Level 1 Basic .cas files.
+
+* Worked around a problem that kept Model I Level 2 Basic from being
+able to read .cas files.  When Basic records a 500bps cassette, it
+puts an extra delay after the initial 0xA5 sync byte.  This delay is
+required when reading a cassette because Basic executes quite a bit of
+code right after reading the sync byte.  As a kludge, I put in an extra
+delay whenever a 0xA5 is read from a 500bps cassette; ugly, but it
+works.
+
+* Updated documentation for EXPORT.COM in xtrs.man; this change should
+have been in 3.9.
+
+3.9a -- Sun Nov 28 14:17:49 PST 1999  Tim Mann
+
+* Fixed a bug in the GENIE support and added one more GENIE feature:
+printer interface at port 0xFD.
+
+3.9 -- Fri Nov 26 11:07:24 PST 1999  Tim Mann
+
+* Fixed a problem in the sound support which (for reasons I don't
+fully understand) was making xtrs hang when playing sound on Linux
+kernel 2.2.12.  Thanks to Roland Gerlach for the bug report.  Version
+3.8 of xtrs worked on kernel 2.2.5, but not 2.2.12.  Also fixed a bug
+where too many samples could be generated if the Z-80 program
+repeatedly wrote the same value to the sound/cassette port; this makes
+the CP/M bell sound much better, and also seems to fix the remaining
+problem with the Talking Adventure 1 title screen.
+
+* Corrected a small error in emulating Model I floppy disk controller
+interrupts (a feature that's unused by any known software anyway!).
+
+* Installed a pile of changes from Branden Robinson, which he says are
+"mostly to satisfy the vagaries of Debian's packaging policy."  They
+are as follows:
+
+  * main.c: canonicalize program_name here, not in trs_xinterface.c, so
+    that error messages are consistent
+  * Makefile:
+    - clean rule deletes compile_rom binary, and keeps deroffed manpages
+    - veryclean rule deletes deroffed manpages
+    - use Debian-canonical file modes when installing
+    - install cmddump, hex2cmd, and mkdisk
+  * Makefile.local:
+    - compile-in expected paths for ROM files
+    - build using readline and ncurses (for zbx internal debugger)
+    - Debian-canonical flags to cc
+    - LDFLAGS and IFLAGS that make sense with our X directories
+    - create a PREFIX variable that gets prepended to BINDIR and MANDIR
+  * trs_xinterface.c:
+    - remove canonicalization of program_name, this is now in main.c
+    - change logic for finding romfiles; check command line options, X
+      resources, compiled-in path to rom files, then finally fall back on a
+      built-in ROM image
+  * cassette.sh: rewrote csh cassette script in Bourne
+
+I undid or modified a few of Branden's changes: I left the old
+cassette script as the default since I'm not confident that every Unix
+system has a new enough version of /bin/sh to support cassette.sh.  I
+left -Wall out of the C flags, since I see no reason to worry users
+with the small number of harmless warnings I've left in the code.  I
+put the default installation locations back to places that are
+appropriate for add-on code in most non-Debian systems: /usr/local/bin
+and /usr/local/man.
+
+* Merged in support for the GENIE, a German Model I clone, from Jenz
+Guenther.  I simplified it a bit along the way; I hope I haven't left
+out anything essential.
+
+* Fetched updated cpmutil.dsk from Roland Gerlach's Web page,
+http://www.rkga.com.au/~roland/trs-80/cpm-xtrs/.
+
+3.8 -- Sat Jul 17 19:25:57 PDT 1999  Tim Mann
+
+* Made several tweaks to the sound support.  The title screen of
+"Talking Adventure 1: Forbidden Planet" for Model III now works
+somewhat better, at least at -samplerate 44100, but there still seems
+to be a problem.  Also, it still looks like the speed boost when a
+sound begins (trs_suspend_delay) may be making games run too fast when
+a sound plays.
+
+* Lost Data is now set if a read or write is not completed in 500ms.
+This is not an exact emulation, but is enough to make DOSPLUS 3.3 and
+Floppy Doctor work.
+
+* Seeking and stepping slowed down a little to make Floppy Doctor
+notice that the Busy bit does get set.
+
+* Head Engaged bit emulated correctly now.  Was needed for Talking
+Adventure loader (!).
+
+* DMK writing emulation more accurate, handles case of writing to a
+sector that was formatted with no DAM.  Thanks to David Keil.
+
+* zbx "dump" command prints T-state counter and delay value.
+"diskdump" prints T-states to next motor timeout, not T-state counter
+value at timeout.
+
+3.7 -- Sat Jul  3 15:57:04 PDT 1999  Tim Mann
+
+* Completely rewrote the cassette support.  Instead of trapping the
+Model I ROM routines, it now observes I/O requests to the cassette
+port and uses xtrs's T-state counter to measure (or generate) the
+correct signal timing.  Real cassettes can even be read/written using
+the OSS sound driver or .wav files, though this could use some work.
+
+* Completely rewrote the sound support to use the OSS sound driver.
+Most code is shared with the cassette support.  The old code is still
+there too, but #if'ed out.
+
+* Modified import/cmd and export/cmd to work on Model III TRSDOS 1.3.
+Tested and verified that setdate/cmd works there too.
+
+* Recompiled cd/ccc, mount/ccc, pwd/ccc, truedam/ccc, umount/ccc, and
+unix/ccc with the LDOS I/O redirection option turned off.  This makes
+them work on Model I/III TRSDOS and NEWDOS too.
+
+* Added -l (force lowercase) to cd/cmd, mount/cmd, and unix/cmd.
+Useful with Model I/III TRSDOS and NEWDOS.
+
+* Fixed a bug in printing exit status from unix/cmd.
+
+* Added -p/-u flags to mkdisk for turning write protection on/off.
+
+* Added display of IFF1, IFF2, IM, and undocumented F register bits to
+the zbx dump command.
+
+* Fixed a 1-byte memory smash in emt_opendisk.
+
+* Fixed a bug that could crash xtrs when accessing an empty real
+floppy drive.
+
+* Made error() and fatal() more capable and cleaned up some stray
+places where fprintf(stderr, ...) was being used instead.
+
+3.6 -- Sun Jun 20 16:13:05 PDT 1999  Tim Mann
+
+* Implemented the DMK emulated floppy format.  This format supports
+essentially everything the original hardware could do, including
+"protected" disk formats, non-IBM sectors on the Model I, partially
+reformatting a track to achieve mixed density, Read Track, and more.
+It is compatible with David Keil's Model 4 emulator; thanks to David
+for designing and documenting it.
+
+* Added support for the Motor Off NMI on Model III/4.
+
+* Added emulated CRCs on Read Address.
+
+* Added diskdump command to zbx; dumps the state of the emulated
+floppy disk controller and drives.
+
+3.5 -- Sun May 16 21:55:38 PDT 1999  Tim Mann
+
+* Changed physical disk handling to report the correct WD17xx error
+bits upon reading (or writing) a sector with a CRC error in the ID
+field.  In this case both CRC and RNF bits should be set.  Fixing this
+lets us boot physical Scott Adams Adventure disks that use the Kim
+Watt loader.  Unfortunately, the WD17xx behavior with "read address"
+on such a sector cannot be emulated, because a 765-style FDC's "read
+id" command ignores IDs with CRC errors rather than returning an error
+when it sees one.  Also, of course, .DSK format has no way to
+represent a sector with a CRC error in the ID field.
+
+* Always use a recalibrate if seeking a real disk to track 0.  This
+should help us recover from confusion about what track the disk is
+really on.  Such confusion should not arise unless two copies of xtrs
+are both seeking the disk, or the disk is mapped twice to the same
+xtrs and both virtual drives seek -- but there are sometimes reasons
+for doing that.
+
+* Updated xtrsrom4p.README file with material inadvertently left out
+in 3.4 release.
+
+3.4 -- Sun Apr  4 22:27:46 PDT 1999  Tim Mann
+
+* Corrected the Model 4 reset switch to send RESET instead of NMI.
+Thanks to Lamar Owen for pointing out the error.
+
+* Corrected the default charset for Model III to be katakana.  Thanks
+to Gary Shanafelt and others for pointing out the error.
+
+* Fixed minor bugs in cassette support.  F10 (Reset button) now gets
+you out of cloading something that isn't there, even if you aren't
+using the SIGIO support.  Also, autodelay measurement is turned off
+while cloading.
+
+* Added a free minimal Model 4P ROM, written by Pete Cervasio (with a
+few hacks of my own).  Thanks, Pete!  The free ROM can boot only Model
+4 mode operating systems; it doesn't know how to load MODELA/III.
+
+3.3 -- Sat Jan 23 15:42:36 PST 1999  Tim Mann
+
+* Added an emt_misc code to query/set the -truedam flag, and added a
+Misosys C program to invoke it.  Made -truedam more rigorous for real
+floppies, and clarified (I hope) DAM documentation in the man page.
+
+* Much improved behavior when accessing a real floppy drive with no
+disk in it.  Previously this would generate a raft of error messages
+to stderr, subsequent accessses to the drive would not work until the
+user pressed F7 to reset the error condition, and the TRS-80 program
+would always see the problem as a sector not found or a write fault
+instead of an empty drive.  Now we check whether a disk is present
+whenever the drive is selected, unless we have already checked in the
+last T seconds (including the implicit check that occurs when you read
+or write to the drive).  If the drive is empty, the TRS-80 program
+sees this correctly, there are no stderr messages, and F7 is not
+needed.  F7 will still force a check before the timeout T.  T is
+currently set to 3 seconds.
+
+* Drive motor timeout is now emulated.  Formerly drive motors were
+emulated as never timing out; now they time out after two seconds
+(measured in T-states).  This is useful for a few programs that fail
+to handle error cases properly unless the motor eventually times out
+and causes Not Ready to be asserted.  Model I SuperUtility has been
+observed to do this, at least in some unusual cases.  Minor bug: the
+T-state counter doesn't run during HALT instructions or when the
+emulator has detected that the TRS-80 program is blocked waiting for
+keyboard input (but it does run while the TRS-80 program is handling
+timer interrupts out of those states).  
+
+* Fixed bugs in maintaining the track position on real floppies.  Part
+of the fix causes a restore (recalibrate) on each real floppy drive
+when xtrs is first started, and when an emulated drive is changed from
+a .dsk file to a real drive and F7 is pressed.  The other part avoids
+forgetting the head positions when F7 is pressed.
+
+* Detect attempts to format a track with a sector ID that is not
+followed by any sector data (i.e., no data address mark).  We can't
+represent this on either a .dsk file or a real floppy, so we print an
+error message.  In the JV3 .dsk file case, we record it as an
+intentional CRC error instead, even though that is not the same thing.
+
+* Made -truedam affect reading real floppies.  Without -truedam,
+single density F8 is translated to FA upon reading; with it, F8 reads
+as F8.  On writing to real floppies, it is still the case that all
+non-FB DAMs are written as F8, but with -truedam you now get an
+non-fatal error message for F9 and FA.
+
+* Changed delayed event scheduler to work in terms of T-states, not
+instructions.
+
+* Used delayed events to emulate semi-correct timing for the Read
+Address command on emulated floppies.  Unfortunately, there were so
+many problems making this work with real floppies that I had to give
+up.  The timing emulation does make the HyperZap "A" command produce
+reasonable-looking results on emulated floppies, for what that's worth.
+
+* Tweaked the FDC emulation so that the method for formatting mixed
+density tracks that Model III and 4 Super Utility uses will work on
+emulated floppies (but not real floppies) -- they toggle the MFM input
+to the FDC during formatting.  I had no idea that would work on real
+hardware, but evidently it does.  The method that Model I SU and
+HyperZap use still does not work -- they format the track first in one
+density with a very large gap at the beginning, then reformat over the
+gap in the other density, aborting the format in the middle using the
+Force Interrupt command to avoid overwriting the first set of sectors.
+It's hard to see how to do this reliably with a .DSK file, which
+carries no information about gaps; how do you decide which sectors (if
+any) from the old track should remain valid?  It also would be a pain
+to implement.  Neither method works on real floppies; it does not seem
+feasible to implement mixed density formatting on a PC-style FDC,
+especially not working at arm's length through the Linux driver.
+
+* Fixed a few small problems with FDC emulation that were revealed by
+HyperZap.  I still can't really say that xtrs supports HyperZap well
+enough to be useful.
+
+3.2 -- Sat Jan  2 20:43:42 PST 1999  Tim Mann
+
+* Reworked JV3 DAM support to be more accurate by default, or fully
+accurate with the new -truedam flag.
+
+3.1 -- Tue Dec 15 19:37:30 PST 1998  Tim Mann
+
+* Added cd/cmd, pwd/cmd, unix/cmd, mount/cmd, and umount/cmd.  They
+are compiled with Misosys C and therefore probably work only on LDOS
+and LS-DOS.  (They definitely don't work on Model I TRSDOS 2.3 or
+Model I Newdos/80.)
+
+* Changed import/cmd and export/cmd to default the destination
+filename.
+
+* Added emt_getddir and emt_setddir.  Changed MC names of some emts in
+xtrsemt.h because MC's linker requires names to be unique in the first
+seven characters.  Fixed several bugs in xtrsemt.h and xtrsemt.ccc.
+
+3.0 -- Sat Dec 12 11:19:58 PST 1998  Tim Mann
+
+* Fixed a bug in the retry loop that's used to read real floppies with
+sector sizes other than 256.  It would screw up if the sector could
+not be read at all.
+
+* Fixed a bug in reflecting CRC errors on real floppies to the
+emulated controller.  Formerly this was done in an incorrect way that
+would typically hang the floppy driver in the Z-80 DOS.
+
+* Minor portability changes.
+
+2.9 -- Fri Nov  6 23:14:20 PST 1998  Tim Mann
+
+* Fixed a nasty bug in formatting emulated floppies with sector sizes
+other than 256 bytes.  Sector data would be written to the wrong
+offset in the file during the format and during any subsequent writes,
+until the next F7 disk change or the next time the emulator was run.
+
+* New version of cpmutil.dsk from Roland Gerlach with a bug fix.
+IMPORT.COM would crash if the CP/M filename you specified already
+existed and you gave a different name in response to the error
+message.
+
+2.8 -- Sat Oct 31 15:00:52 PST 1998  Tim Mann
+
+* The default XFree86 keymap reports the shifted F1-F10 keys as
+keysyms F11-F20, so I changed xtrs's mapping from keysym to TRS-80 key
+to compensate.  Shift+F6 now works as TRS-80 Shift+0, as documented.
+The remapping entailed some small user-visible changes to seldom used
+keys: (1) F11-F14 no longer have distinct functions of their own. (2)
+Home is no longer a synonym for Clear; instead it takes over the
+obscure duty of letting you activate the Model III/4 RightShift
+position even if you're in Model I mode.
+
+* Replaced the incorrect DAA implementation with a correct one, fixed
+a few obscure bugs in documented Z-80 flag settings, and implemented
+all the undocumented flag settings.  I used a test program included
+with the yaze CP/M emulator to check for errors, and I read the yaze
+code for guidance on fixing them.  Thanks to the author of yaze for
+checking his implementation so carefully and making his code available
+to others under the GPL.
+
+* Bug fix: due to a race condition between the main thread and the
+SIGALRM handler, autodelay could cause xtrs to hang when the delay
+changed from nonzero to zero.
+
+* Bug fix: trying to do a Write Track on an emulated drive with no
+disk in it could crash xtrs. Some other operations also failed to
+check for an empty drive, but with less dire consequences.
+
+* We now compute a reasonable gap3 size on real floppies instead of
+using a small constant value (0x0c). The small gap3 seemed to cause
+problems at times. The formulas might still need tweaking.
+
+* Added code to measure the gap sizes that Z-80 software is trying to
+format. These are not actually used for anything, but can be printed
+if debugging is turned on. It's not possible to feed them directly to
+a PC FDC due to interface differences.
+
+* Formatting a real floppy now tries to use the fill data byte given
+by the Z-80 program. Since the WD17xx let you fill with (almost) any
+data, but PC FDCs let you choose only one byte, we can't fully emulate
+this. We just pick the last fill byte given in the last sector and use
+that throughout. This is needed for CP/M, which looks for its E5 fill
+byte to find free directory space!
+
+* Changed the real floppy sector-not-found error handling heuristic
+for reads to try each possible sector size once internally before
+returning an error to the Z-80 program.  Of necessity, however, a
+sector-not-found error on write is still returned immediately to the
+Z-80 program; on the retry with a different sector size, we will
+need to run around the Z-80 program's loop more or fewer times to pick
+up the number of bytes we are trying with.
+
+* Fixed a bug in reading/writing 1024-byte sectors on real floppies:
+the error handling heuristic was not trying that size.
+
+* Minor bug fix: executing a HALT instruction would pause the emulator
+even if a disk interrupt was scheduled to happen a few cycles
+later. We now check the event schedule before pausing.
+
+* Fixed a bug in doing inverse video with -usefont.
+
+* Changed the default font for -usefont to have fewer *'s, to eliminate
+problems where the wide version didn't scale the intended font.
+
+2.7 -- Sat Oct 24 16:21:17 PDT 1998  Tim Mann
+
+* Fixed a bug that would have prevented the Z-80 emulation from working
+on machines where char is unsigned by default.
+
+* Implemented the alternate characters for Model III/4, corrected all the
+character generator fonts and added several options.  Decommissioned the
+.bdf fonts; they are inaccurate and (for unknown reasons) they don't work
+with the font scaler in XFree86.  Decommissioned the -trsfont feature;
+now graphics blocks are always generated at runtime, not taken from the
+font. Thanks to Todd Cromwell III for supplying real Model III character
+generator ROM data obtained using a ROM reader.
+
+* Added a fake boot ROM to use as a default. It just prints a message that
+you don't have a ROM installed for this TRS-80 model. Maybe in the future
+it could be beefed up to do more: the Model 4 (when not in Model III mode)
+and the Model 4P don't require a great deal from the ROM.
+
+* Updated xtrsemt.h and xtrsemt.ccc.
+
+* Added a bunch more functions to emt_misc. 
+
+* Cleaned up code to remove most warnings.
+
+* Added -sizemap and -stepmap.
+
+* Added signal blocking around calls to readline in debug.c, allowing it
+to work again.  See Makefile for details.
+
+2.6 -- Wed Oct 14 23:05:01 PDT 1998  Tim Mann
+
+* Sector sizes other than 256 are now supported! 128, 256, 512, and
+1024 all work, on both JV3 floppy images and real floppies. This
+feature uses a backward compatible extension to the JV3 format; xtrs
+JV3 floppy images that use only 256-byte sectors will still work with
+other emulators. I could find very little TRS-80 software to test this
+feature with. Super Utility crashes when reading sectors larger than
+256 bytes. Trakcess works well, though.
+
+* Fixed a bug in delivering FDC completion INTRQs. Previously an
+interrupt could be lost if Z-80 software read the status register just
+at the moment the interrupt was to be delivered.
+
+* Fixed bugs in the FDC "read address" command on real floppy drives.
+
+* Added the -doubler option, and added a more accurate emulation of
+having two separate FDC chips in Model I mode.  Super Utility now
+works properly with double density if -doubler is set to either
+"percom" or "radioshack" (not the default value "both").
+
+* Bug fix: The floppy controller's BUSY bit was not set while the FDC
+completion INTRQ was being delayed.  That was the real reason why
+increasing the delay caused problems (as noted under 2.5 below).
+
+2.5 -- Mon Oct 12 14:59:14 PDT 1998  Tim Mann
+
+* Fixed a bug in graphics-only mode. When there is no text overlay,
+graphics should always be 640x240. Graphics should be 512x192 only
+when 64x16 text is actually overlayed. Thanks to Mark McDougall for
+the bug report.
+
+* In the fix for CP/M described under 2.3 below, I increased the delay
+for disk INTRQ in too many cases. The increased delay for seek
+commands was causing Model III NEWDOS/80 to fail to boot. For now, I
+reduced the delay on seek (and related commands) back to the pre-2.3
+level, while leaving the increased delay for reads on a blank track
+(and related commands) in place. Thanks to Mark McDougall for the bug
+report.
+
+2.4 -- Sun Oct 11 08:14:36 PDT 1998  Tim Mann
+
+* Oops. The fixes for Montezuma CP/M mentioned below were inadvertently
+left out. They are included in this version.
+
+2.3 -- Sun Oct 11 01:05:17 PDT 1998  Tim Mann
+
+* Added import and export utilities for Montezuma CP/M, written by Roland
+Gerlach. Thanks!
+
+* Fixed bugs in 512x192 graphics mode, reported by Mark McDougall.
+
+* Fixed a problem that prevented Montezuma CP/M from formatting
+diskettes.  The number of instructions of delay between trying to read
+a sector on a blank track and getting a disk INTRQ interrupt was too
+short.  Also, reading the disk status register would cancel a pending
+interrupt even if it was still being delayed (i.e., had not yet
+actually happened).
+
+* Fixed bug in Model 4 @ICNFG chaining in xtrshard/dct. If you have
+the old version of xtrshard sysgened, you should remove your
+config.sys and re-sysgen with the new version.  The bug could prevent
+other sysgened drivers from initializing at boot time, and could even
+cause crashes while booting due to an address being executed as
+instructions.
+
+* Fixed Expose event support to do fewer redraws. This reduces the
+problem of xtrs hanging for a long time (doing repeated redraws) after
+the window is moved, which shows up on window managers that display
+the coordinates on top of the window while it's moving.
+
+* Fixed bugs in -borderwidth, and changed default to 2.
+
+* Added emulation of the Radio Shack hi-res graphics card, including
+undocumented ports. This card is similar to the Micro Labs card but
+not identical.
+
+* Added mouse support and a mouse driver.
+
+2.2 -- Sun Sep 27 19:59:00 PDT 1998  Tim Mann
+
+* Added hints on configuring for games to the man page.
+
+* Improved the -autodelay algorithm.  It now finds the correct speed
+much faster.
+
+2.1 -- Sat Sep 26 14:06:49 PDT 1998  Tim Mann
+
+* Added emulation of the Micro Labs Grafyx Solution Model 4 hi-res
+graphics card. Thanks to Mark McDougall for typing up a summary of the
+documentation for me!  I checked the behavior on doubtful points
+against Matthew Reed's emulator -- thanks to Matthew for pioneering
+here.
+
+* Added -autodelay. This dynamically adjusts the -delay setting to try
+to make programs run at about the speed they would have on a real
+machine.  It works by monitoring how many T-states are executed during
+each heartbeat clock period and adjusting the delay value up or down
+by one on each tick.  It doesn't track very precisely, but is good
+enough to make realtime games a lot more playable.
+
+* Deleted the -spinfast option, which is no longer needed.
+
+* Disk index holes are now emulated in virtual time, locked to the
+rate at which T-states would be executed by a real TRS-80. Thus
+programs that measure the disk rotational speed with timing loops will
+get the answers they expect. In particular, this will correct problems
+with the FORMAT programs in TRSDOS 2.3, VTOS 3.0, and at least some
+NEWDOS versions.
+
+* Added a T-state counter.
+
+* Keyboard repeat is automatically turned off when focus enters the
+window and restored to the previous state when it leaves.  Thanks to
+Marcelo Fernandes Vianna for the idea and an initial version of the
+code.
+
+* Partial support for 16-byte non-IBM sectors in the 1771 FDC
+emulation, just enough to support VTOS 3.0's copy protection
+scheme. Bit position 0x04 in the JV3 sector flags field is now used to
+indicate a non-IBM sector.  Thanks to D. J. Dubay for inspiration.
+
+* Parameters to the keystretch algorithm can now be controlled from
+the command line. Tweaking them might be of help in getting games or
+other software that polls the keyboard in unusual ways to work well.
+
+* Bugfix: in Model 4 mode, we could try to access the SoundBlaster
+hardware even when the -sb switch was not given, typically resulting
+in a crash.  Thanks to Roland Gerlach for the bug report.
+
+2.0 -- Sun May 24 18:14:52 PDT 1998  Tim Mann
+
+* Added -delay flag, a crude speed control.
+
+* Added Model 4P emulation.  Please don't pirate Model 4P ROMs.  Frank
+Durda IV has expressed interest in creating a freely redistributable,
+simplified 4P ROM for use in emulators, but it is not yet available.
+
+* Added a somewhat more general mechanism for scheduling events to happen
+several instructions in the future.  This supports software that sometimes
+starts an I/O operation that will trigger a completion interrupt in the
+near future, but relies on the fact that the real I/O device could not
+interrupt until the CPU had had time to execute a few more instructions.
+Previously I had a more kludgey case-by-case solution for this problem,
+but that method didn't work for the Model 4P ROM.
+
+* The cmddump program (a TRS-80 DOS load module analyzer) is now included
+in the release, but there is no man page.  See the top of cmddump.c for
+brief documentation.
+
+* Added ability to use a TRS-80 load module file directly as the ROM.
+In particular, the MODELA/III file is in this format.
+
+* mkdisk now puts the original filename in the header of a .hdv file.
+
+* Added missing code to initialize the SoundBlaster DSP and turn on the
+DAC speaker.  This was required to make sound work properly on my machine,
+which has the ESS1688 AudioDrive sound chip, a SoundBlaster clone.  It's
+probably needed for older true SoundBlaster models too.
+
+* Changed sound resource to have same name ("sb") as command line option.
+
+* Moved sound init code to fix bug I introduced in 1.10.
+
+* Older Linux kernels don't have <sys/io.h>; 2.0.29 does not, 2.0.32 does.
+Added comment saying to delete the include if it causes an error.
+
+* Fixed bugs in assembly version of settime: it did not work on an
+emulated Model III/4/4P in Model III mode using MODELA/III as its ROM, and
+it caused JCLs to abort on Model 4 LDOS. 
+
+* Fixed bug in emulating the SLA instruction: the Z flag was not getting
+set when 0x80 was shifted left to yield zero.  The bug was affecting the
+MultiDOS 4 keyboard driver, causing problems with key repeat.
+
+1.10 -- Thu Apr 16 19:20:30 PDT 1998  Tim Mann
+
+* Fixed bug in setting data rate for real floppy drives that spin at 300
+RPM (3.5-inch and 360KB 5-inch).  This bug caused disks written by xtrs in
+such drives to be unreadable on a real TRS-80 (and vice versa).  Disks
+written by old xtrs versions in 1.2MB 5-inch drives (which spin at 360
+RPM) are OK.
+
+* Finished implementing emulation of 8-inch floppy drives.  Added
+xtrs8/dct, an LDOS/LS-DOS driver for the emulated 8-inch floppy hardware.
+Corrected index hole emulation for 8-inch drives to run at 360 RPM.  Added
+support for real 8-inch drives (untested) and emulation of 8-inch drives
+by real 5.25-inch and 3.5-inch drives (tested and working).
+
+* Added emt_system.  Updated xtrsemt.ccc.
+
+* Added sound emulation based on code from Fabio Ferrari.  Linux with
+SoundBlaster only.
+
+* Fixed bug in returning error (or success) code from emt_strerror.
+Reported by Roland Gerlach.
+
+* Give an error message and don't crash if diskM-U is linked to a floppy
+device that we don't have read/write permission for.
+
+* Undocumented equivalents for documented instructions are now commented
+in disassemblies.
+
+* import.z and export.z modified to also work with Newdos/80.  settime.ccc
+rewritten in assembly language and made to also work on Newdos/80.  Thanks
+to Ulrich Mueller for this code!
+
+* Corrected disassembly of ld a,r.  Added borderwidth resource.  Minor fix
+to import.bas for Newdos/80.  Thanks to Ulrich Mueller for this code!
+
+1.9 -- Thu Feb 12 20:44:02 PST 1998  Tim Mann
+
+* Added a hard disk emulation driver, xtrshard/dct.  It basically uses the
+plain file I/O emts, but I added minor variants of open and close to allow
+the names to be relative to -diskdir and keep rebooting from causing file
+descriptor leaks.  Renamed mkfloppy to mkdisk and added support for making
+an empty hard disk.  Hard disk format is compatible with Matthew Reed's
+emulators; thanks to Matthew for supplying documentation on his format.
+
+* Distinguished between fatal and nonfatal errors.  Now an unimplemented
+opcode is a nonfatal error.  It's treated as a no-op.
+
+* Added the raw code bytes to disassembler printout. Fixed bugs in
+disassembling ld (ix+dd),nn and ld (iy+dd),nn.  Corrected disassembly
+of rlca and rrca.
+
+* Fixed a fatal bug in emt_lseek.  Added emt_ftruncate.  Fixed portability
+bug in emt_open that affected import/cmd and export/cmd.  Added disk
+change count on emt_misc.
+
+* "next" in debugger now will step over RSTs.  Note this won't work
+right with the funny RST 8 calling convention in the Model I/III Basic 
+ROM, which puts a 1-byte argument after the instruction.
+
+* Added import, export, and settime for Model 4 TRSDOS/LDOS 6.
+
+* Fixed problems compiling trs_disk.c on some Linux versions.
+
+1.8 -- Mon Dec  1 16:00:52 PST 1997  Tim Mann
+
+* Moved queueing of keys to after the translation from X keysyms to
+TRS-80 keyboard transitions.  This lets shift transitions that are
+forced by other keystrokes (where X and TRS-80 keyboards have opposite
+shift states to get the same character) be queued separately and thus
+separated in time from the basic key transitions.  This separation is
+required by the Montezuma CP/M keyboard driver, which sometimes misses
+a shift transition if another transition occurs at exactly the same instant.
+
+* Bug fix: an FDC restore command was erroneously zeroing the sector
+register instead of just the track register.  Montezuma CP/M tickled this
+bug.
+
+* Bug fix to mem_bank from Roland Gerlach.  Switching banks in the
+low-order half of the address space was switching in the wrong memory.
+Montezuma CP/M tickled this bug and crashed.
+
+* Removed use of pre-POSIX signal code; thanks to Al Petrofsky.
+
+* Added the delayed_intrq_kludge in more cases in trs_disk.c.  This fixes
+additional problems with SuperUtility and Trakcess that I didn't notice
+earlier.  Also fixed some problems with error handling on real floppies.
+
+1.0.tpm1 to 1.7 -- Tim Mann
+
+* Added floppy disk emulation, timer interrupt emulation, a kludge to
+import and export data to the host system, Model III mode, Model 4 mode, a
+rewrite of the keyboard handling, support for most of the undocumented
+Z-80 instructions, and a bunch of bug fixes and minor improvements.
+
+* Fixed bugs in the instructions rrc, inc ix, inc iy, sra, and neg.  I
+didn't notice the sra bug until I tried to get Model III mode working;
+the Model III LDOS disk driver uses it.  The neg bug was keeping the
+break key from working right under LDOS in xtrs-1.3 and earlier.
+
+* Got the emulator running on both Linux and Digital Unix.  Now it
+might have minor problems elsewhere, on less ANSI- and POSIX-compliant
+systems.
+
+* Fixed two bugs in the disassembler.  The ld (bc),a instruction was
+erroneously disassembled as ld bc,a, and instructions that start "dd
+cb" or "fd cb" were not disassembled; for example: bit 7,(iy+03h).
+
+* Fixed some bugs in emulated cassettes.  Formerly if you tried to
+append more stuff to an emulated cassette, it would smash whatever was
+already there.  If you tried to read from a cassette with nothing on
+it, it would lock up so hard that even the emulated boot button
+wouldn't work.  Now at least the boot button works.
+
+* SIGIO is now used in a much safer way than before, and the emulator
+will work without it if needed.
+
+* Reworked the keyboard support substantially.  A full state vector is
+now kept, including all 64 possible TRS-80 keys.  Key queueing is now
+always used, and a "stretching" feature prevents the emulated keyboard
+state from changing too often, to avoid losing keystrokes.  Keyboard
+response is quite snappy and reliable now.  I added enough key
+mappings that it should be possible to do about everything you could
+do with a real TRS-80 keyboard (and more than on a Model I, because
+modern keyboards have N-key rollover).  More key mappings are easily
+added by changing tables; there is very little special-case code.
+
+* Did some work on the KBWAIT feature, which tries to avoid burning
+host CPU cycles when the emulated program is sitting in a loop polling
+the keyboard.  It now works in a lot more cases.
+
+* More accurate character bitmaps are now used, contributed by Al
+Petrofsky.  The Model I bitmaps are still not the real ones, which
+used a 5x7 matrix, not 7x8.
+
+* The halt instruction is now emulated correctly.  Formerly it caused xtrs
+to exit.
+
+1.0 -- David Gingold and Alec Wolman
+
+* Initial release.  Emulated a TRS-80 Model I with 48K of RAM, cassette
+drive, and uppercase-only screen.  See README.
