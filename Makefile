@@ -274,6 +274,32 @@ install-docs: docs
 	$(INSTALL) -c -m 644 dskspec.txt $(DOCDIR)
 
 depend:
-	makedepend -- $(CFLAGS) -- $(SOURCES)
+	makedepend -Y -- $(CFLAGS) -- $(SOURCES)
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.
+
+cmddump.o: load_cmd.h
+compile_rom.o: z80.h config.h load_cmd.h
+debug.o: z80.h config.h trs.h
+dis.o: z80.h config.h
+error.o: z80.h config.h
+hex2cmd.o: cmd.h z80.h config.h
+load_cmd.o: load_cmd.h
+load_hex.o: z80.h config.h
+main.o: z80.h config.h trs.h trs_disk.h trs_hard.h load_cmd.h
+mkdisk.o: reed.h
+trs_cassette.o: trs.h z80.h config.h
+trs_chars.o: trs_iodefs.h
+trs_disk.o: z80.h config.h trs.h trs_disk.h trs_hard.h crc.c
+trs_hard.o: trs.h z80.h config.h trs_hard.h reed.h
+trs_imp_exp.o: trs_imp_exp.h z80.h config.h trs.h trs_disk.h trs_hard.h
+trs_interrupt.o: z80.h config.h trs.h
+trs_io.o: z80.h config.h trs.h trs_disk.h trs_hard.h trs_uart.h
+trs_keyboard.o: z80.h config.h trs.h
+trs_memory.o: z80.h config.h trs.h trs_disk.h trs_hard.h
+trs_printer.o: z80.h config.h trs.h
+trs_stringy.o: z80.h config.h trs.h trs_disk.h
+trs_uart.o: trs.h z80.h config.h trs_uart.h trs_hard.h
+trs_xinterface.o: trs_iodefs.h trs.h z80.h config.h trs_disk.h trs_uart.h
+trs_xinterface.o: trs_hard.h trs_imp_exp.h
+z80.o: z80.h config.h trs.h trs_imp_exp.h
