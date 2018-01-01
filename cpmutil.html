@@ -1,0 +1,224 @@
+<html><head><title>Roland Gerlach : TRS-80 : CP/M Utilities for the xtrs Emulator</title>
+
+
+  
+  <meta name="Author" content="Roland Gerlach">
+  <link href="cpmutil_files/style.css" title="compact" rel="stylesheet" type="text/css">
+  <meta name="description" content="Roland Gerlachs's CP/M Utilities for xtrs">
+  <meta name="keywords" content="TRS-80, TRS80, CP/M, Montezuma, UNIX, xtrs"></head><body>
+<!-- navigation begin -->
+<script language="JavaScript"><!--
+if (document.images) {
+  home1 = new Image(19,19); home1.src = "../home.png"; home2 = new Image(19,19); home2.src = "../home-on.png";
+  up1 = new Image(19,19); up1.src = "../up.png"; up2 = new Image(19,19); up2.src = "../up-on.png";
+}
+function hiLite(imgName,imgObjName) {
+if (document.images) {
+  document.images[imgName].src = eval(imgObjName + ".src");
+}}
+//--></script>
+<table align="right"><tbody><tr><td>
+<a href="http://members.optusnet.com.au/%7Ergerlach/trs-80/" onmouseover="hiLite('up','up2')" onmouseout="hiLite('up','up1')"><img src="cpmutil_files/up.png" alt="UP" name="up" border="0" height="19" width="19"></a>
+<a href="http://members.optusnet.com.au/%7Ergerlach/" onmouseover="hiLite('home','home2')" onmouseout="hiLite('home','home1')"><img src="cpmutil_files/home.png" alt="HOME" name="home" border="0" height="19" width="19"></a>
+</td></tr></tbody></table>
+<!-- navigation end -->
+
+<h1>CP/M Utilities for the xtrs Emulator<hr></h1>
+
+<!-- toc begin -->
+<h2>Contents</h2>
+<dl>
+  <dt><a href="#programs">Programs</a>
+  </dt><dl>
+    <dt><a href="#export">EXPORT</a>
+    </dt><dt><a href="#import">IMPORT</a>
+    </dt><dt><a href="#xtrs">XTRS</a>
+  </dt></dl>
+  <dt><a href="#bugs">Bug Reports</a>
+  </dt><dt><a href="#download">Download</a>
+</dt></dl>
+<!-- toc end -->
+
+<h2><a name="programs">Programs</a></h2>
+
+<p>These programs were written for CP/M and make use of the emulator traps in
+<a href="http://www.tim-mann.org/xtrs.html">Tim Mann's xtrs Emulator</a>.
+</p>
+
+<p>IMPORT and EXPORT also work (with the exception of the -H option) when running CP/M on
+<a href="http://www.discover-net.net/%7Edmkeil/trs80/model4.htm">David Keil's Model 4/4P Emulator</a>.
+</p>
+
+
+<h3><a name="export">EXPORT</a></h3>
+
+<p>Export CP/M file(s) to the host operating system.</p>
+
+<h4>Usage</h4>
+<pre>Usage:	EXPORT [-H][-L][-T][-V] cpmfileref [hostfilename]
+
+Where:	cpmfileref is the local file to export
+	   (use "?" and "*" to specify multiple files)
+	hostfilename is the name of the file to create on the host
+	   (converted to uppercase by default), use -L to convert
+	   to lowercase and [ to toggle case of next character.
+	-H switches emulator to high speed and restores speed when done.
+	-L converts hostfilename to lowercase.
+	-T export text file (CR LF becomes LF, stop at SUB character).
+	-V (verbose) display "r" for block read, "w" for block written.
+</pre>
+
+<h4>Notes</h4>
+
+<p>CP/M does not keep an accurate file size.  Binary files are always
+multiples of 128 byte blocks; text files end at the first sub
+character.
+
+</p><p>The CP/M CCP converts all command line parameters to uppercase,
+hence the need of the -L option and the use of [ to toggle the case of
+the next character within the hostfilename.
+
+</p><h4>Examples</h4>
+<dl>
+<dt><code>EXPORT -LT HELPFILE.TXT README.TXT</code>
+</dt><dd>Export local file "HELPFILE.TXT" as a text file to "readme.txt" on the host.
+<p>
+</p></dd><dt><code>EXPORT RUNME.COM</code>
+</dt><dd>Export local file "RUNME.COM" as a binary file to "RUNME.COM" on the host.
+</dd></dl>
+
+
+<h3><a name="import">IMPORT</a></h3>
+
+<p>Imports a file from the host operating system to CP/M.</p>
+
+<h4>Usage</h4>
+<pre>Usage:	IMPORT [-F][-H][-L][-T][-V] hostfilename [cpmfilename]
+
+Where:	hostfilename is the name of the file on the host
+	   (converted to uppercase by default), use -L to convert
+	   to lowercase and [ to toggle case of next character.
+	cpmfilename is the name of the CP/M file to create,
+	   existing files will not be overwritten unless -F is used.
+	-F overwrite existing files.
+	-H switches emulator to high speed and restores speed when done.
+	-L convert hostfilename to lowercase.
+	-T import text file (LF becomes CR LF, add SUB at end of file).
+	-V (verbose) display "r" for block read, "w" for block written.
+</pre>
+
+<h4>Notes</h4>
+
+<p>CP/M does not keep an accurate file size, both binary and text
+files will be padded to multiples of 128 byte blocks.
+
+</p><p>The CP/M CCP converts all command line parameters to uppercase,
+hence the need of the -L option and the use of [ to toggle the case of
+the next character within the hostfilename.
+
+</p><h4>Examples</h4>
+<dl>
+<dt><code>IMPORT -LT README.TXT HELPFILE.TXT</code>
+</dt><dd>Import "readme.txt" from the host as a text file to "HELPFILE.TXT".
+<p>
+</p></dd><dt><code>IMPORT RUNME.COM</code>
+</dt><dd>Import "RUNME.COM" from the host as a binary file to "RUNME.COM".
+</dd></dl>
+
+
+<h3><a name="xtrs">XTRS</a></h3>
+
+<p>Controls miscellaneous functions of the xtrs emulator.</p>
+
+<h4>Usage</h4>
+<pre>Usage:	XTRS action [parameters]
+
+Where:	action is one of the following:
+	   BOOT - reboot emulator
+	   CHANGE - signal disk change
+	   DEBUG - enter debugger
+	   EXIT - end emulator
+	   HIGHSPEED - high speed (autodelay off)
+	   MOUNT [-L] hostfilename disknum - mount disk
+	   NORMALSPEED - normal speed (autodelay on)
+	   REPORT - report status
+	   SYSTEM command - execute command on host
+	   UMOUNT disknum - umount disk
+	hostfilename is the name of the virtual disk file on the host
+	   (converted to uppercase by default), use -L to convert to
+	   lowercase and [ to toggle case of next character.
+	command is the command (and parameters) to execute on the host
+	   (converted to lowercase by default), use [ to toggle case.
+	   Note output from command is NOT displayed in the XTRS window.
+	disknum is disk drive number (between 0 and 3 inclusive).
+	-L converts hostfilename to lowercase.
+</pre>
+
+
+<h4>Warning</h4>
+
+<p>The XTRS program assumes that the emulator's virtual disk files -
+diskM-U (where M is the TRS-80 model and U is the drive number) - are
+symbolic links.  For example:
+</p><pre>$ ls -l
+-rw-r--r--    1 user  group    213504 Mar 21 15:24 cpmutil.dsk
+lrwxrwxrwx    1 user  group        10 Mar  5 12:40 disk4p-0 -&gt; system.dsk
+lrwxrwxrwx    1 user  group        11 Mar  7 13:49 disk4p-3 -&gt; cpmutil.dsk
+-rw-r--r--    1 user  group    745984 Mar 24 17:38 system.dsk
+</pre>
+
+
+<p>The MOUNT action deletes the diskM-U file, replaces it with a
+symbolic link to the given filename and signals a disk change (as if
+F7 had been pressed).
+
+</p><p>The UMOUNT action deletes the diskM-U file and signals a disk
+change.
+
+</p><h4>Notes</h4>
+
+<p>When changing disks, remember that CP/M must also be told of the
+disk change.  This is usually done by pressing ctrl-C at the prompt.
+
+</p><h4>Examples</h4>
+<dl>
+<dt><code>XTRS MOUNT -L DATA.DSK 1</code>
+</dt><dd>Mount the virtual disk file "data.dsk" on drive 1.
+The actual command that would be executed on the host is:<br>
+<code>rm&nbsp;-f&nbsp;disk4p-1;test&nbsp;-f&nbsp;data.dsk&nbsp;&amp;&amp;&nbsp;ln&nbsp;-s&nbsp;data.disk&nbsp;disk4p-1</code>
+<p>
+</p></dd><dt><code>XTRS UMOUNT 1</code>
+</dt><dd>Unmount the virtual disk file associated with drive 1.
+The actual command that would be executed on the host is:<br>
+<code>rm&nbsp;-f&nbsp;disk4p-1</code>
+
+</dd></dl>
+
+<h2><a name="bugs">Bug Reports</a></h2>
+
+<p>Send Bug Reports and comments to
+<a href="http://members.optusnet.com.au/%7Ergerlach/contact.html">Roland Gerlach</a>.</p>
+
+<h2><a name="download">Download</a></h2>
+
+<dl>
+
+<dt><a href="http://members.optusnet.com.au/%7Ergerlach/trs-80/mine/cpmutil.tgz">cpmutil.tgz</a>
+</dt><dd>Source code and programs in a gzipped tar file.
+
+<p>
+</p></dd><dt><a href="http://members.optusnet.com.au/%7Ergerlach/trs-80/mine/cpmutil.dsk.gz">cpmutil.dsk.gz</a>
+</dt><dd>All of these programs (including source code) on a virtual disk
+formatted as a "Montezuma Micro Standard DATA disk (40T, SS, DD,
+200K)" with 512-byte sectors.  Be careful to configure CP/M with the
+proper disk format and drive parameters (40 tracks, not 80 tracks), or
+you will have problems reading this disk.
+
+</dd></dl>
+
+<center>
+<p></p><hr>Comments and suggestions are welcome, send them to
+<a href="http://members.optusnet.com.au/%7Ergerlach/contact.html">Roland Gerlach</a>.<p></p>
+</center>
+
+</body></html>
