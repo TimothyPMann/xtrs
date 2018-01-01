@@ -174,17 +174,17 @@ ZMACFLAGS = -h
 .SUFFIXES: .z80 .cmd .dct .man .txt .hex .html
 
 .z80.cmd:
-	zmac $(ZMACFLAGS) -o $*.hex $<
+	zmac $(ZMACFLAGS) -o $*.hex -x $*.lst $<
 	hex2cmd $*.hex > $*.cmd
 	rm -f $*.hex
 
 .z80.dct:
-	zmac $(ZMACFLAGS) -o $*.hex $<
+	zmac $(ZMACFLAGS) -o $*.hex -x $*.lst $<
 	hex2cmd $*.hex > $*.dct
 	rm -f $*.hex
 
 .z80.hex:
-	zmac $(ZMACFLAGS) -o $*.hex $<
+	zmac $(ZMACFLAGS) -o $*.hex -x $*.lst $<
 
 .man.txt:
 	nroff -man -c -Tascii $< | colcrt - | cat -s > $*.txt
