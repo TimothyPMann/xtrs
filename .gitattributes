@@ -1,2 +1,3 @@
 *.dsk binary
 *.tgz binary
+*.cmd binary
