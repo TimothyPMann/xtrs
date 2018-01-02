@@ -53,92 +53,9 @@ CD_OBJECTS = \
 	cmddump.o \
 	load_cmd.o
 
-SOURCES = \
-	cmd.c \
-	cmddump.c \
-	compile_rom.c \
-	crc.c \
-	debug.c \
-	dis.c \
-	error.c \
-	hex2cmd.c \
-	load_cmd.c \
-	load_hex.c \
-	main.c \
-	mkdisk.c \
-	trs_cassette.c \
-	trs_chars.c \
-	trs_disk.c \
-	trs_gtkinterface.c \
-	trs_hard.c \
-	trs_imp_exp.c \
-	trs_interrupt.c \
-	trs_io.c \
-	trs_keyboard.c \
-	trs_memory.c \
-	trs_printer.c \
-	trs_stringy.c \
-	trs_uart.c \
-	trs_xinterface.c \
-	z80.c
-
-HEADERS = \
-	cmd.h \
-	config.h \
-	reed.h \
-	trs.h \
-	trs_disk.h \
-	trs_hard.h \
-	trs_imp_exp.h \
-	trs_iodefs.h \
-	trs_uart.h \
-	z80.h
-
-MISC = \
-	ChangeLog \
-	Makefile \
-	Makefile.local \
-	README \
-	cassette.sh \
-	cassette.csh \
-	cassette.txt \
-	cmddump.txt \
-	export.cmd \
-	export.lst \
-	export.z80 \
-	hardfmt.txt \
-	hex2cmd.txt \
-	import.cmd \
-	import.lst \
-	import.z80 \
-	m1format.fix \
-	mkdisk.txt \
-	settime.ccc \
-	settime.cmd \
-	settime.lst \
-	settime.z80 \
-	utility.dsk \
-	utility.jcl \
-	cpmutil.dsk \
-	xtrs.txt \
-	xtrsemt.ccc \
-	xtrsemt.h \
-	xtrshard.dct \
-	xtrshard.lst \
-	xtrshard.z80 \
-	xtrsmous.cmd \
-	xtrsmous.lst \
-	xtrsmous.z80
-
 Z80CODE = export.cmd import.cmd settime.cmd xtrsmous.cmd \
 	xtrs8.dct xtrshard.dct \
-	fakerom.hex xtrsrom4p.hex
-
-MANSOURCES = cassette.man \
-	cmddump.man \
-	hex2cmd.man \
-	mkdisk.man \
-	xtrs.man
+	fakerom.hex xtrsrom4p.hex esfrom.hex
 
 MANPAGES = xtrs.txt mkdisk.txt cassette.txt cmddump.txt hex2cmd.txt
 
@@ -147,9 +64,6 @@ PDFMANPAGES = cassette.man.pdf \
 	hex2cmd.man.pdf \
 	mkdisk.man.pdf \
 	xtrs.man.pdf
-
-HTMLSOURCES = cpmutil.html \
-	dskspec.html
 
 HTMLDOCS = cpmutil.txt \
 	dskspec.txt
@@ -218,10 +132,10 @@ trs_rom4p.c: compile_rom $(BUILT_IN_ROM4P)
 	./compile_rom 4p $(BUILT_IN_ROM4P) > trs_rom4p.c
 
 trs_gtkinterface.o: trs_gtkinterface.c
-	$(CC) -c $(CFLAGS) `pkg-config --cflags gtk+-2.0` $?
+	$(CC) -c $(CFLAGS) `pkg-config --cflags gtk+-2.0` $<
 
 keyrepeat.o: keyrepeat.c
-	$(CC) -c $(CFLAGS) `pkg-config --cflags gtk+-2.0` $?
+	$(CC) -c $(CFLAGS) `pkg-config --cflags gtk+-2.0` $<
 
 mkdisk:	$(MD_OBJECTS)
 	$(CC) $(LDFLAGS) -o mkdisk $(MD_OBJECTS)
@@ -231,12 +145,6 @@ hex2cmd: $(HC_OBJECTS)
 
 cmddump: $(CD_OBJECTS)
 	$(CC) $(LDFLAGS) -o cmddump $(CD_OBJECTS)
-
-#XXX This target has not been used since xtrs-1.0.  Update or remove.
-tar: $(SOURCES) $(HEADERS)
-	tar cvf xtrs.tar $(SOURCES) $(HEADERS) $(MANSOURCES) $(MISC)
-	rm -f xtrs.tar.Z
-	compress xtrs.tar
 
 clean:
 	rm -f $(OBJECTS) $(MD_OBJECTS) \
@@ -276,7 +184,8 @@ install-docs: docs
 	$(INSTALL) -c -m 644 dskspec.txt $(DOCDIR)
 
 depend:
-	makedepend -Y -- $(CFLAGS) -- $(SOURCES)
+	makedepend -Y -- $(CFLAGS) -- *.c 2>&1 | \
+		(egrep -v 'cannot find|not in' || true)
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 
