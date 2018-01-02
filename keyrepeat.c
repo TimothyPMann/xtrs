@@ -23,7 +23,6 @@
  * under the covers and invoke them.
  */
 
-#include <gdk/gdkx.h>
 #include "keyrepeat.h"
 
 /*#define REPEAT_DEBUG 1*/
