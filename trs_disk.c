@@ -1454,29 +1454,15 @@ trs_disk_data_read(void)
     break;
 
   case TRSDISK_READADR:
-    if (state.bytecount <= 0 || !(state.status & TRSDISK_DRQ)) break;
+    if (state.bytecount <= 0 || !(state.status & TRSDISK_DRQ)) {
+      break;
+    }
+
     if (d->emutype == REAL) {
-#if 0
-      state.sector = d->u.real.buf[0]; /*179x data sheet says this*/
-#else
-      state.track = d->u.real.buf[0]; /*let's guess it meant this*/
-      state.sector = d->u.real.buf[2]; /*1771 data sheet says this*/
-#endif
       state.data = d->u.real.buf[6 - state.bytecount];
 
     } else if (d->emutype == DMK) {
       state.data = d->u.dmk.buf[d->u.dmk.curbyte];
-#if 0
-      if (state.bytecount == 6) {
-	state.sector = state.data; /*179x data sheet says this*/
-      }
-#else
-      if (state.bytecount == 6) {
-	state.track = state.data; /*let's guess it meant this!!*/
-      } else if (state.bytecount == 4) {
-	state.sector = state.data;  /*1771 data sheet says this*/
-      }
-#endif
       d->u.dmk.curbyte += dmk_incr(d);
 
     } else if (state.last_readadr >= 0) {
@@ -1484,18 +1470,12 @@ trs_disk_data_read(void)
 	switch (state.bytecount) {
 	case 6:
 	  state.data = d->phytrack;
-#if 0
-	  state.sector = d->phytrack; /*179x data sheet says this*/
-#else
-	  state.track = d->phytrack; /*let's guess it meant this*/
-#endif
 	  break;
 	case 5:
 	  state.data = 0;
 	  break;
 	case 4:
 	  state.data = jv1_interleave[state.last_readadr % JV1_SECPERTRK];
-	  state.sector = state.data;  /*1771 data sheet says this*/
 	  break;
 	case 3:
 	  state.data = 0x01;  /* 256 bytes always */
@@ -1510,18 +1490,12 @@ trs_disk_data_read(void)
 	switch (state.bytecount) {
 	case 6:
 	  state.data = sid->track;
-#if 0
-	  state.sector = sid->track; /*179x data sheet says this*/
-#else
-	  state.track = sid->track; /*let's guess it meant this*/
-#endif
 	  break;
 	case 5:
 	  state.data = (sid->flags & JV3_SIDE) != 0;
 	  break;
 	case 4:
 	  state.data = sid->sector;
-	  state.sector = sid->sector;  /*1771 data sheet says this*/
 	  break;
 	case 3:
 	  state.data =
@@ -1534,6 +1508,29 @@ trs_disk_data_read(void)
 	}
       }
     }
+
+    /*
+     * The 1771 data sheet says that Read Address writes the sector
+     * address of the ID field into the sector register.  The 179x
+     * data sheet says that Read Address writes the track address into
+     * the sector register.  xtrs 4.9d and earlier assumed the 1771
+     * data sheet was right and the 179x data sheet was wrong, so it
+     * wrote the sector address into the sector register and the track
+     * address into the track register.  This apparently was wrong:
+     * Eric Dittman tells me that the 179x data sheet was correct, and
+     * that his CP/M Plus, CP/M 2.2, and TurboDOS failed to boot in
+     * xtrs because of the emulation error.  XXX I want to test this
+     * on real hardware to verify the behavior, but right now I have
+     * only a Model 4P, so I can't test 1771 behavior.  For now I am
+     * changing the code to exactly match the data sheets, though I
+     * now worry that maybe the actual 1771 behavior may match the
+     * 179x data sheet.
+     */
+    if (state.bytecount ==
+	(state.controller == TRSDISK_P1771 ? 4 /*sec*/ : 6 /*trk*/ )) {
+      state.sector = state.data;
+    }
+
     state.crc = calc_crc1(state.crc, state.data);
     state.bytecount--;
     if (state.bytecount <= 0) {
