@@ -1,5 +1,5 @@
 ;------------------------------------------------------------------
-; Free Model 4P mode boot ROM for xtrs - Version 0.05
+; Free Model 4P mode boot ROM for xtrs - Version 0.06
 ; Copyright 1999, Peter W. Cervasio (cervasio@airmail.net)
 ;------------------------------------------------------------------
 ; This software may be copied, modified, and used for any purpose
@@ -19,14 +19,13 @@
 ; freely avaliable, though Roy Soltoff holds the copyright to it,
 ; and the Model 4/4P technical reference.
 ;
-; $Id$
-;
-; 3-19-99, Tim Mann:  Improved disk error handling.  Ruled out 
+; 3-19-1999, Tim Mann:  Improved disk error handling.  Ruled out 
 ;   attempts to work in plain Model 4 mode. (v0.03)
-; 4-4-99, Tim Mann:  Made read loop continue until NMI instead of
+; 4-4-1999, Tim Mann:  Made read loop continue until NMI instead of
 ;   counting 256 bytes; this should let boot sectors of other than
 ;   256 bytes work. (v0.04)  Fixed bug in sending fdc read command;
 ;   don't use fdcmd, since that waits for completion. (v0.05)
+; 1-28-2018, Tim Mann: Fixed detection of no disk image loaded (v0.06)
 ;
 ; TODO:
 ;   possibly write code for the RST handlers as in the real 4P rom
@@ -199,7 +198,16 @@ rstdrv:	ld	a,81h		; drive 0, dden (no nmi)
 	djnz	$		; wait a bit
 	ld	a,0ch		; restore w/verify
 	call	fdcmd		;
-	and	99h		; mask error bits
+
+	ld	b,0
+ckidx:	bit	1,a             ; index set?
+	jr      z,imgok         ; if not, a disk is loaded; okay
+	in	a,(fdcstat)     ; if so, recheck up to 256 times
+	djnz	ckidx
+	and     02h            	; index always set; no disk       
+	jr	dskerr
+
+imgok:	and	99h		; mask error bits
 	ret	z		; return if okay
 	jr	dskerr
 ;
@@ -275,7 +283,7 @@ fdst:	in	a,(fdcstat)
 rommsg:	db	'This ROM code does NOT work when emulating Model '
 romlen	equ	$-rommsg
 ;
-errtab:	dw	dskmsg,ecant,elost,ecrc,ernf,ecant,ecant,dskmsg,ecant
+errtab:	dw	dskmsg,dskmsg,elost,ecrc,ernf,ecant,ecant,dskmsg,ecant
 elost:
 ecant:	db	'Emulator or ROM bug',0
 ecrc:	db	'Boot sector CRC error',0

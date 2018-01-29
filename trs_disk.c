@@ -1516,15 +1516,11 @@ trs_disk_data_read(void)
      * the sector register.  xtrs 4.9d and earlier assumed the 1771
      * data sheet was right and the 179x data sheet was wrong, so it
      * wrote the sector address into the sector register and the track
-     * address into the track register.  This apparently was wrong:
-     * Eric Dittman tells me that the 179x data sheet was correct, and
-     * that his CP/M Plus, CP/M 2.2, and TurboDOS failed to boot in
-     * xtrs because of the emulation error.  XXX I want to test this
-     * on real hardware to verify the behavior, but right now I have
-     * only a Model 4P, so I can't test 1771 behavior.  For now I am
-     * changing the code to exactly match the data sheets, though I
-     * now worry that maybe the actual 1771 behavior may match the
-     * 179x data sheet.
+     * address into the track register.  This was wrong; thanks to
+     * Eric Dittman for the correction.  For now I have changed the
+     * code to exactly match the data sheets, though I now worry that
+     * maybe the actual 1771 behavior may match the 179x data sheet too.
+     * I don't have a Model I or other 1771-based machine to test on.
      */
     if (state.bytecount ==
 	(state.controller == TRSDISK_P1771 ? 4 /*sec*/ : 6 /*trk*/ )) {
