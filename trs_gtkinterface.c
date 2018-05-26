@@ -8,7 +8,6 @@
 
 /*
  * XXX TODO
- * - either reclaim F10 (how?) or redo F-key bindings
  * - keyboard help (like old F11 help) -- add to help menu.
  * - need a way to package up trs.glade and find at runtime
  * - design more menus, toolbar, and dialogs.  remove any unused menu items.
@@ -761,6 +760,9 @@ trs_screen_init(void)
 
   grafyx_init();
 
+  gtk_settings_set_string_property (gtk_settings_get_default (),
+				    "gtk-menu-bar-accel", "F12", NULL);
+
   gtk_widget_show(main_window);
 
   trs_load_romfile(); //XXX should call this from main() or mem_init()
@@ -1279,8 +1281,7 @@ on_drawing_area_key_press_event(GtkWidget *widget,
 #endif
   switch (keysym) {
     /* Trap some function keys here */
-  case GDK_F10: //XXX something eats this key and opens the file menu
-  case GDK_F12:
+  case GDK_F10:
     trs_reset(0);
     keysym = 0;
     break;
