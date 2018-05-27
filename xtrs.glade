@@ -284,6 +284,7 @@
                         <property name="label" translatable="yes">S_oft reset</property>
                         <property name="use_underline">True</property>
                         <signal name="activate" handler="on_reset_menu_item_activate"/>
+                        <accelerator key="F10" signal="activate"/>
                       </object>
                     </child>
                     <child>
@@ -300,6 +301,7 @@
                         <property name="label" translatable="yes">Enter _debugger</property>
                         <property name="use_underline">True</property>
                         <signal name="activate" handler="on_debugger_menu_item_activate"/>
+                        <accelerator key="F9" signal="activate"/>
                       </object>
                     </child>
                     <child>
@@ -314,6 +316,7 @@
                         <property name="use_underline">True</property>
                         <property name="use_stock">True</property>
                         <signal name="activate" handler="trs_exit"/>
+                        <accelerator key="F8" signal="activate"/>
                       </object>
                     </child>
                   </object>

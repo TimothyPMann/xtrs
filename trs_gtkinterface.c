@@ -1279,21 +1279,6 @@ on_drawing_area_key_press_event(GtkWidget *widget,
 #endif
   switch (keysym) {
     /* Trap some function keys here */
-  case GDK_F10: //XXX something eats this key and opens the file menu
-  case GDK_F12:
-    trs_reset(0);
-    keysym = 0;
-    break;
-  case GDK_F9:
-    trs_debug();
-    keysym = 0;
-    break;
-  case GDK_F8:
-    //XXX This dialog gets placed badly.  Should center it over the main window.
-    gtk_dialog_run(GTK_DIALOG(quit_dialog));
-    gtk_widget_hide(quit_dialog);
-    keysym = 0;
-    break;
   case GDK_F7:
     trs_change_all();
     keysym = 0;
