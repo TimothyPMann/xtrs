@@ -405,6 +405,8 @@
   </object>
   <object class="GtkAboutDialog" id="about_dialog">
     <property name="border_width">5</property>
+    <property name="window_position">center-on-parent</property>
+    <property name="transient_for">main_window</property>
     <property name="destroy_with_parent">True</property>
     <property name="type_hint">normal</property>
     <property name="program_name">xtrs</property>
@@ -458,6 +460,7 @@ and the date included.
   <object class="GtkDialog" id="quit_dialog">
     <property name="border_width">5</property>
     <property name="window_position">center-on-parent</property>
+    <property name="transient_for">main_window</property>
     <property name="type_hint">normal</property>
     <property name="has_separator">False</property>
     <signal name="response" handler="gtk_widget_hide"/>

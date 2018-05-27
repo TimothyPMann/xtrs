@@ -1289,7 +1289,6 @@ on_drawing_area_key_press_event(GtkWidget *widget,
     keysym = 0;
     break;
   case GDK_F8:
-    //XXX This dialog gets placed badly.  Should center it over the main window.
     gtk_dialog_run(GTK_DIALOG(quit_dialog));
     gtk_widget_hide(quit_dialog);
     keysym = 0;
