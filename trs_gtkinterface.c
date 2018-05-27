@@ -1065,6 +1065,21 @@ on_debugger_menu_item_activate(GtkMenuItem *menuitem,
   trs_debug();
 }
 
+void
+on_quit_menu_item_activate(GtkMenuItem *menuitem,
+			   gpointer user_data)
+{
+  gtk_widget_show(quit_dialog);
+}
+
+void
+on_quit_dialog_response(GtkMenuItem *dialog,
+			gint response_id,
+			gpointer user_data)
+{
+  gtk_widget_hide(quit_dialog);
+}
+
 
 typedef const char *get_name_func(int unit);
 typedef int set_name_func(int unit, const char *newname);
