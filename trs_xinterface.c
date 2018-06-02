@@ -603,10 +603,10 @@ static void show_fallback_help(char const **helpitems) {
 void trs_show_help()
 {
   XWindowAttributes parent_attrs;
-  unsigned int const help_width = 495;
-  unsigned int const help_height = 365;
-  unsigned int help_xpos, help_ypos;
-  unsigned long foreground, background;
+  int const help_width = 495;
+  int const help_height = 365;
+  int help_xpos, help_ypos;
+  long foreground, background;
   GC help_gc;
   XGCValues values;
   static char const *help_font_name = "9x15";
@@ -1214,7 +1214,7 @@ void trs_screen_80x24(int flag)
 
 void screen_init()
 {
-  int i;
+  unsigned int i;
 
   /* initially, screen is blank (i.e. full of spaces) */
   for (i = 0; i < sizeof(trs_screen); i++)
@@ -1272,10 +1272,10 @@ boxes_init(int foreground, int background, int width, int height, int expanded)
  * as a drop-in replacement for XCreateBitmapFromData. 
  */
 Pixmap XCreateBitmapFromDataScale(Display *display, Drawable window,
-			             char *data, unsigned int width, 
-				     unsigned int height,
-				     unsigned int scale_x,
-				     unsigned int scale_y)
+			             char *data, int width, 
+				     int height,
+				     int scale_x,
+				     int scale_y)
 {
   static unsigned char *mydata;
   static unsigned char *mypixels;

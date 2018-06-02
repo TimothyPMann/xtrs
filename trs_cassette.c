@@ -97,7 +97,7 @@ static char *format_name[] = {
 
 static char cassette_filename[256];
 static int cassette_position;
-static int cassette_format;
+static unsigned int cassette_format;
 static int cassette_state = CLOSE;
 static int cassette_motor = 0;
 static FILE *cassette_file;

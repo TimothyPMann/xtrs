@@ -143,7 +143,7 @@ main(int argc, char* argv[])
     /* Print load map */
     int lastaddr = -1;
     int lastcount = -1;
-    int addr;
+    unsigned int addr;
     for (addr = 0; addr < sizeof(memory); addr++) {
       if (loadmap[addr] != lastcount) {
 	if (lastcount == 1) {
