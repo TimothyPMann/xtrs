@@ -625,6 +625,7 @@ void trs_show_help()
     "F8: exit emulator",
     "F9: enter zbx debugger",
     "F10: TRS-80 reset button",
+    "Shift F10: hard reset emulator",
     "",
     "LeftArrow, Backspace, Delete: TRS-80 left arrow key",
     "RightArrow, Tab: TRS-80 right arrow key",
@@ -1055,7 +1056,10 @@ void trs_get_event(int wait)
 	trs_skip_next_kbwait();
 	break;
       case XK_F10:
-	trs_reset(0);
+	if ((event.xkey.state & ShiftMask) == ShiftMask)
+	  trs_reset(1);
+	else
+	  trs_reset(0);
 	key = 0;
 	trs_skip_next_kbwait();
 	break;

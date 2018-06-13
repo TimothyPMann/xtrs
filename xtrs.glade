@@ -292,6 +292,7 @@
                         <property name="label" translatable="yes">Hard _reset</property>
                         <property name="use_underline">True</property>
                         <signal name="activate" handler="on_hard_reset_menu_item_activate"/>
+                        <accelerator key="F10" modifiers="GDK_SHIFT_MASK" signal="activate"/>
                       </object>
                     </child>
                     <child>
