@@ -34,10 +34,6 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <signal.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <sys/file.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -704,7 +700,6 @@ void trs_screen_init()
   char *fontname = NULL;
   char *widefontname = NULL;
   int len;
-  char *romfile = NULL;
 
   screen = DefaultScreen(display);
   color_map = DefaultColormap(display,screen);
@@ -775,58 +770,19 @@ void trs_screen_init()
   case 1:
     (void) sprintf(option, "%s%s", program_name, ".romfile");
     if (XrmGetResource(x_db, option, "Xtrs.Romfile", &type, &value)) {
-      if ((stat(value.addr, &statbuf)) == 0) { /* romfile exists */
         romfile = value.addr;
-      }
-#ifdef DEFAULT_ROM
-    } else if ((stat(DEFAULT_ROM, &statbuf)) == 0) {
-      romfile = DEFAULT_ROM;
-#endif
-    }
-    if (romfile != NULL) {
-      trs_load_rom(romfile);
-    } else if (trs_rom1_size > 0) {
-      trs_load_compiled_rom(trs_rom1_size, trs_rom1);
-    } else {
-      fatal("ROM file not specified!");
     }
     break;
   case 3: case 4:
     (void) sprintf(option, "%s%s", program_name, ".romfile3");
     if (XrmGetResource(x_db, option, "Xtrs.Romfile3", &type, &value)) {
-      if ((stat(value.addr, &statbuf)) == 0) { /* romfile exists */
-        romfile = value.addr;
-      }
-#ifdef DEFAULT_ROM3
-    } else if ((stat(DEFAULT_ROM3, &statbuf)) == 0) {
-      romfile = DEFAULT_ROM3;
-#endif
-    }
-    if (romfile != NULL) {
-      trs_load_rom(romfile);
-    } else if (trs_rom3_size > 0) {
-      trs_load_compiled_rom(trs_rom3_size, trs_rom3);
-    } else {
-      fatal("ROM file not specified!");
+        romfile3 = value.addr;
     }
     break;
   default: /* 4P */
     (void) sprintf(option, "%s%s", program_name, ".romfile4p");
     if (XrmGetResource(x_db, option, "Xtrs.Romfile4p", &type, &value)) {
-      if ((stat(value.addr, &statbuf)) == 0) { /* romfile exists */
-        romfile = value.addr;
-      }
-#ifdef DEFAULT_ROM4P
-    } else if ((stat(DEFAULT_ROM4P, &statbuf)) == 0) {
-      romfile = DEFAULT_ROM4P;
-#endif
-    }
-    if (romfile != NULL) {
-      trs_load_rom(romfile);
-    } else if (trs_rom4p_size > 0) {
-      trs_load_compiled_rom(trs_rom4p_size, trs_rom4p);
-    } else {
-      fatal("ROM file not specified!");
+        romfile4p = value.addr;
     }
     break;
   }

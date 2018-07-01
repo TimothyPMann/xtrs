@@ -29,12 +29,6 @@
 #include <stdlib.h>
 /*XXX end */
 
-/*XXX for ROM loading stuff, should not be here*/
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-/*XXX end */
-
 #define GDK_ENABLE_BROKEN 1 // needed for gdk_image_new_bitmap
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
@@ -287,9 +281,6 @@ char *opt_title;
 int opt_shiftbracket = -1;
 char *opt_charset = NULL;
 char *opt_scale = NULL;
-char *opt_romfile = NULL;
-char *opt_romfile3 = NULL;
-char *opt_romfile4p = NULL;
 int opt_stepdefault = 1;
 char *opt_stepmap = NULL;
 char *opt_sizemap = NULL;
@@ -382,11 +373,11 @@ trs_parse_command_line(int argc, char **argv, int *debug)
     } else if (strcmp(name, "charset") == 0) {
       opt_charset = optarg;
     } else if (strcmp(name, "romfile") == 0) {
-      opt_romfile = optarg;
+      romfile = optarg;
     } else if (strcmp(name, "romfile3") == 0) {
-      opt_romfile3 = optarg;
+      romfile3 = optarg;
     } else if (strcmp(name, "romfile4p") == 0) {
-      opt_romfile4p = optarg;
+      romfile4p = optarg;
     } else if (strcmp(name, "model") == 0) {
       if (strcmp(optarg, "1") == 0 ||
 	  strcasecmp(optarg, "I") == 0) {
@@ -565,71 +556,6 @@ trs_parse_command_line(int argc, char **argv, int *debug)
 }
 
 
-/*
- * XXX This really does not belong in trs_gtkinterface.  Need to
- * communicate the opt_romfile* values, though.
- */
-void
-trs_load_romfile()
-{
-  char *romfile = NULL;
-  struct stat statbuf;
-
-  switch (trs_model) {
-  case 1:
-    if (opt_romfile) {
-      romfile = opt_romfile;
-#ifdef DEFAULT_ROM
-    } else if (stat(DEFAULT_ROM, &statbuf) == 0) {
-      romfile = DEFAULT_ROM;
-#endif
-    }
-    if (romfile != NULL) {
-      trs_load_rom(romfile);
-    } else if (trs_rom1_size > 0) {
-      trs_load_compiled_rom(trs_rom1_size, trs_rom1);
-    } else {
-      fatal("ROM file not specified!");
-    }
-    break;
-
-  case 3: case 4:
-    if (opt_romfile3) {
-      romfile = opt_romfile3;
-#ifdef DEFAULT_ROM3
-    } else if (stat(DEFAULT_ROM3, &statbuf) == 0) {
-      romfile = DEFAULT_ROM3;
-#endif
-    }
-    if (romfile != NULL) {
-      trs_load_rom(romfile);
-    } else if (trs_rom3_size > 0) {
-      trs_load_compiled_rom(trs_rom3_size, trs_rom3);
-    } else {
-      fatal("ROM file not specified!");
-    }
-    break;
-
-  default: /* 4P */
-    if (opt_romfile4p) {
-      romfile = opt_romfile4p;
-#ifdef DEFAULT_ROM4P
-    } else if (stat(DEFAULT_ROM4P, &statbuf) == 0) {
-      romfile = DEFAULT_ROM4P;
-#endif
-    }
-    if (romfile != NULL) {
-      trs_load_rom(romfile);
-    } else if (trs_rom4p_size > 0) {
-      trs_load_compiled_rom(trs_rom4p_size, trs_rom4p);
-    } else {
-      fatal("ROM file not specified!");
-    }
-    break;
-  }
-}
-
-
 void trs_exit()
 {
   gtk_exit(0);
@@ -762,8 +688,6 @@ trs_screen_init(void)
   grafyx_init();
 
   gtk_widget_show(main_window);
-
-  trs_load_romfile(); //XXX should call this from main() or mem_init()
 }
 
 
