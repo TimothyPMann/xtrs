@@ -17,6 +17,10 @@ SHAREDIR = $(PREFIX)/share/xtrs
 
 # ENDIAN = -Dbig_endian
 
+# Define this if you would like to use the old "mem_block_transfer"-method
+# for LDIR/LDDR-opcodes: faster, but not how it works on the real Z80-CPU!
+# FASTMEM = -DFASTMEM
+
 # If you want the C-shell version of the cassette script:
 #CASSETTE = cassette.csh
 # If you want the POSIX-shell version of the cassette script:

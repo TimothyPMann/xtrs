@@ -960,6 +960,7 @@ static void do_ldi()
 
 static void do_ldir()
 {
+#ifdef FASTMEM
     /* repeating block load with increment */
     int moved, undoc;
 
@@ -975,10 +976,18 @@ static void do_ldir()
     undoc = REG_A + moved;
     REG_F = (REG_F & (CARRY_MASK | ZERO_MASK | SIGN_MASK)) 
       | (undoc & UNDOC3_MASK) | ((undoc & 2) ? UNDOC5_MASK : 0);
+#else
+    do_ldi();
+    if(OVERFLOW_FLAG) {
+      REG_PC -= 2;
+      T_COUNT(5);
+    }
+#endif
 }
 
 static void do_lddr()
 {
+#ifdef FASTMEM
     /* repeating block load with decrement */
     int moved, undoc;
 
@@ -994,6 +1003,13 @@ static void do_lddr()
     undoc = REG_A + moved;
     REG_F = (REG_F & (CARRY_MASK | ZERO_MASK | SIGN_MASK)) 
       | (undoc & UNDOC3_MASK) | ((undoc & 2) ? UNDOC5_MASK : 0);
+#else
+    do_ldd();
+    if(OVERFLOW_FLAG) {
+      REG_PC -= 2;
+      T_COUNT(5);
+    }
+#endif
 }
 
 static void do_ld_a_i()
