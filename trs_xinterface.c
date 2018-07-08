@@ -926,14 +926,6 @@ void trs_screen_init()
 
 KeySym last_key[256];
 
-/*
- * Flush output to X server
- */
-inline void trs_x_flush()
-{
-  XFlush(display);
-}
-
 /* 
  * Get and process X event(s).
  *
