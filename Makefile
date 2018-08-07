@@ -115,7 +115,7 @@ xtrs: $(OBJECTS) $(X_OBJECTS)
 	$(CC) $(LDFLAGS) -o xtrs $(OBJECTS) $(X_OBJECTS) $(LIBS)
 
 gxtrs: $(OBJECTS) $(GTK_OBJECTS)
-	$(CC) $(LDFLAGS) -o gxtrs -export-dynamic \
+	$(CC) $(LDFLAGS) -o gxtrs -rdynamic \
 		$(OBJECTS) $(GTK_OBJECTS) $(LIBS) \
 		`pkg-config --libs gtk+-2.0`
 
