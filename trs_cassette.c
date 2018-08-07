@@ -628,7 +628,7 @@ static int assert_state(int state)
       cassette_format = DIRECT_FORMAT;
       strcpy(cassette_filename, DSP_FILENAME);
     } else {
-      get_control(state);
+      get_control();
     }
     if (cassette_format == DIRECT_FORMAT) {
 #if !HAVE_OSS
