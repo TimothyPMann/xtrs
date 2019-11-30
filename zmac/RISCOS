@@ -1,0 +1,19 @@
+Notes for compilation under RISC OS
+===================================
+
+zmac 1.2 has been compiled and tested on RISC OS 3.71, using
+Acorn C/C++ Release 5.  It has not been compiled with gcc, lcc
+or Easy C.
+
+To compile with Acorn C/C++ you will need to rename the five
+source and header files to place them in directories called
+"c" and "h" and create the object directory "o".  Ignore
+the supplied Makefile -- it is very easy to build a RISC OS
+one using Acorn !Make.  Do not forget to link in C:o.stubs.
+
+A full RISC OS binary distribution, with desktop front end,
+is available for download from
+
+   http://users.ox.ac.uk/~chri0264/software/
+
+Matthew Phillips, <matthew.phillips@chch.ox.ac.uk>, 2000-03-12
