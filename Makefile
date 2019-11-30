@@ -70,9 +70,9 @@ HTMLDOCS = cpmutil.txt \
 
 PROGS = xtrs mkdisk hex2cmd cmddump
 
-default: $(PROGS) docs
+default: $(PROGS)
 
-all: default z80code gxtrs
+all: default docs z80code gxtrs
 
 docs: $(MANPAGES) $(PDFMANPAGES) $(HTMLDOCS)
 
