@@ -32,6 +32,9 @@
 #define ALTERNATE 4
 
 extern char *program_name;
+extern char *romfile;
+extern char *romfile3;
+extern char *romfile4p;
 extern int trs_model; /* 1, 3, 4, 5(=4p) */
 extern int trs_paused;
 extern int trs_autodelay;

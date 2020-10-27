@@ -20,6 +20,9 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include "z80.h"
 #include "trs.h"
@@ -31,6 +34,9 @@ int trs_model = 1;
 int trs_paused = 1;
 int trs_autodelay = 0;
 char *program_name;
+char *romfile = NULL;
+char *romfile3 = NULL;
+char *romfile4p = NULL;
 
 static void check_endian()
 {
@@ -102,6 +108,59 @@ void trs_load_compiled_rom(int size, unsigned char rom[])
     }
 }
 
+void
+trs_load_romfile()
+{
+  struct stat statbuf;
+
+  switch (trs_model) {
+  case 1:
+#ifdef DEFAULT_ROM
+    if (!romfile) {
+      romfile = DEFAULT_ROM;
+    }
+#endif
+    if (romfile != NULL && stat(romfile, &statbuf) == 0) {
+      trs_load_rom(romfile);
+    } else if (trs_rom1_size > 0) {
+      trs_load_compiled_rom(trs_rom1_size, trs_rom1);
+    } else {
+      fatal("ROM file not specified!");
+    }
+    break;
+
+  case 3: case 4:
+#ifdef DEFAULT_ROM3
+    if (!romfile3) {
+      romfile3 = DEFAULT_ROM3;
+    }
+#endif
+    if (romfile3 != NULL && stat(romfile3, &statbuf) == 0) {
+      trs_load_rom(romfile3);
+    } else if (trs_rom3_size > 0) {
+      trs_load_compiled_rom(trs_rom3_size, trs_rom3);
+    } else {
+      fatal("ROM file not specified!");
+    }
+    break;
+
+  default: /* 4P */
+#ifdef DEFAULT_ROM4P
+    if (!romfile4p) {
+      romfile = DEFAULT_ROM4P;
+    }
+#endif
+    if (romfile4p != NULL && stat(romfile4p, &statbuf) == 0) {
+      trs_load_rom(romfile4p);
+    } else if (trs_rom4p_size > 0) {
+      trs_load_compiled_rom(trs_rom4p_size, trs_rom4p);
+    } else {
+      fatal("ROM file not specified!");
+    }
+    break;
+  }
+}
+
 int main(int argc, char *argv[])
 {
     int debug = FALSE;
@@ -128,6 +187,7 @@ int main(int argc, char *argv[])
     trs_hard_init();
     stringy_init();
 
+    trs_load_romfile();
     trs_reset(1);
     if (!debug) {
       /* Run continuously until exit or request to enter debugger */
