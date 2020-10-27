@@ -315,7 +315,7 @@
                         <property name="visible">True</property>
                         <property name="use_underline">True</property>
                         <property name="use_stock">True</property>
-                        <signal name="activate" handler="trs_exit"/>
+                        <signal name="activate" handler="on_quit_menu_item_activate"/>
                         <accelerator key="F8" signal="activate"/>
                       </object>
                     </child>
