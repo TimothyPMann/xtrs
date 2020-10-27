@@ -342,8 +342,8 @@ enters the
 debugger.
 .B F10
 is the reset button.
-.B Shift-F10
-is hard reset.
+.B Shift+F10
+is hard reset (on 4/4P, this is the same as the reset button).
 .PP
 In Model III, 4, and 4P modes, the left and right
 .B Shift

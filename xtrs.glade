@@ -550,10 +550,11 @@ and the date included.
   F4: Model 4/4P caps lock key
   F5: TRS-80 @ key
   F6: TRS-80 0 key
-  F7: signal disk change in emulated floppy drive
-  F8: exit emulator
-  F9: enter zbx debugger
+  F7: Signal disk change in emulated floppy drive
+  F8: Exit emulator
+  F9: Enter zbx debugger
   F10: TRS-80 reset button
+  Shift+F10: Hard reset
 
   LeftArrow, Backspace, Delete: TRS-80 left arrow key  
   RightArrow, Tab: TRS-80 right arrow key
@@ -563,7 +564,7 @@ and the date included.
   Esc, Break: TRS-80 break key
   Home, Clear, LeftMeta: TRS-80 clear key
   Control: Model 4/4P control key
-  RightMeta: shifted TRS-80 down arrow key
+  RightMeta: Shifted TRS-80 down arrow key
 
   F11 toggles this help.
   See the xtrs(1) manual page for more information.
