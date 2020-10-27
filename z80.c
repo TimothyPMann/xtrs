@@ -1341,6 +1341,7 @@ static void do_int()
       break;
     case 1:
       REG_PC = 0x38;
+      T_COUNT(13);
       break;
     case 2:
       /* REG_PC = REG_I << 8 + get_irq_vector(); */
@@ -1356,6 +1357,7 @@ static void do_nmi()
     mem_write_word(REG_SP, REG_PC);
     z80_state.iff1 = 0;
     REG_PC = 0x66;
+    T_COUNT(11);
 }
 
 /*
