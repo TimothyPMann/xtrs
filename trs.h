@@ -75,7 +75,6 @@ extern int stretch_amount;
 
 void trs_get_event(int wait);
 extern volatile int x_poll_count;
-void trs_x_flush(void);
 
 void trs_printer_write(int value);
 int trs_printer_read(void);
