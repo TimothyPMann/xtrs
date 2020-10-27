@@ -8,7 +8,6 @@
 
 /*
  * XXX TODO
- * - keyboard help (like old F11 help) -- add to help menu.
  * - need a way to package up trs.glade and find at runtime
  * - design more menus, toolbar, and dialogs.  remove any unused menu items.
  * - create a window for zbx instead of using the launch xterm.
@@ -74,6 +73,7 @@ static int scale_y = 0;
 
 GtkWidget *main_window;
 GtkWidget *about_dialog;
+GtkWidget *keys_window;
 GtkWidget *quit_dialog;
 GtkWidget *drawing_area;
 GdkPixmap *trs_screen_pixmap;
@@ -652,6 +652,8 @@ trs_screen_init(void)
 						   "drawing_area"));
   about_dialog = GTK_WIDGET(gtk_builder_get_object(builder,
 						   "about_dialog"));
+  keys_window = GTK_WIDGET(gtk_builder_get_object(builder,
+						  "keys_window"));
   quit_dialog = GTK_WIDGET(gtk_builder_get_object(builder,
 						  "quit_dialog"));
 
@@ -661,6 +663,8 @@ trs_screen_init(void)
    * that destroys the dialog.  XXX is this still a problem?
    */
   g_signal_connect(GTK_OBJECT(about_dialog), "delete-event",
+		   GTK_SIGNAL_FUNC(gtk_widget_hide_on_delete), NULL);
+  g_signal_connect(GTK_OBJECT(keys_window), "delete-event",
 		   GTK_SIGNAL_FUNC(gtk_widget_hide_on_delete), NULL);
   g_signal_connect(GTK_OBJECT(quit_dialog), "delete-event",
 		   GTK_SIGNAL_FUNC(gtk_widget_hide_on_delete), NULL);
@@ -1224,6 +1228,23 @@ on_about_dialog_response(GtkMenuItem *dialog,
   gtk_widget_hide(about_dialog);
 }
 
+void
+on_keys_menu_item_activate(GtkMenuItem *menuitem,
+			   gpointer user_data)
+{
+  if (gtk_widget_get_visible(keys_window))
+    gtk_widget_hide(keys_window);
+  else
+    gtk_widget_show(keys_window);
+}
+
+void
+on_keys_window_response(GtkMenuItem *menuitem,
+			gint response_id,
+			gpointer user_data)
+{
+  gtk_widget_hide(keys_window);
+}
 
 gboolean
 on_drawing_area_expose_event(GtkWidget *widget,

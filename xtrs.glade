@@ -375,6 +375,16 @@
                         <signal name="activate" handler="on_about_menu_item_activate"/>
                       </object>
                     </child>
+                    <child>
+                      <object class="GtkImageMenuItem" id="keys_menu_item">
+                        <property name="label" translatable="yes">_Keys</property>
+                        <property name="visible">True</property>
+                        <property name="use_underline">True</property>
+                        <property name="use_stock">True</property>
+                        <signal name="activate" handler="on_keys_menu_item_activate"/>
+                        <accelerator key="F11" signal="activate"/>
+                      </object>
+                    </child> 
                   </object>
                 </child>
               </object>
@@ -530,5 +540,48 @@ and the date included.
       <action-widget response="1">yes_quit_button</action-widget>
       <action-widget response="0">no_quit_button</action-widget>
     </action-widgets>
+  </object>
+  <object class="GtkTextBuffer" id="keys_text">
+    <property name="text" translatable="yes">
+  F1: Model 4/4P F1 key
+  F2: Model 4/4P F2 key
+  F3: Model 4/4P F3 key
+  F4: Model 4/4P caps lock key
+  F5: TRS-80 @ key
+  F6: TRS-80 0 key
+  F7: signal disk change in emulated floppy drive
+  F8: exit emulator
+  F9: enter zbx debugger
+  F10: TRS-80 reset button
+
+  LeftArrow, Backspace, Delete: TRS-80 left arrow key  
+  RightArrow, Tab: TRS-80 right arrow key
+  UpArrow: TRS-80 up arrow key
+  DownArrow, Linefeed: TRS-80 down arrow key
+
+  Esc, Break: TRS-80 break key
+  Home, Clear, LeftMeta: TRS-80 clear key
+  Control: Model 4/4P control key
+  RightMeta: shifted TRS-80 down arrow key
+
+  F11 toggles this help.
+  See the xtrs(1) manual page for more information.
+    </property>
+  </object>
+  <object class="GtkWindow" id="keys_window">
+    <property name="accept_focus">False</property>
+    <property name="can_focus">False</property>
+    <property name="destroy_with_parent">True</property>
+    <property name="focus_on_map">False</property>
+    <property name="title" translatable="yes">Keys</property>
+    <child>
+      <object class="GtkTextView" id="keys_view">
+        <property name="buffer">keys_text</property>
+        <property name="can_focus">False</property>
+        <property name="cursor_visible">False</property>
+        <property name="editable">False</property>
+        <property name="visible">True</property>
+      </object>
+    </child>
   </object>
 </interface>
