@@ -399,7 +399,7 @@ stringy_flux_write(stringy_info_t *s, int flux, stringy_pos_t delta)
 
   switch (s->format) {
   case STRINGY_FMT_DEBUG:
-    fprintf(s->file, "%u %" TSTATE_T_LEN "\n", flux, delta);
+    fprintf(s->file, "%u %lu\n", flux, delta);
     break;
   case STRINGY_FMT_ESF:
     cells = (delta + 1) / STRINGY_CELL_WIDTH;
@@ -458,11 +458,11 @@ stringy_flux_read(stringy_info_t *s, int *flux, stringy_pos_t *delta)
 
   switch(s->format) {
   case STRINGY_FMT_DEBUG:
-    bres = fscanf(s->file, "%u %" TSTATE_T_LEN "\n", flux, delta);
+    bres = fscanf(s->file, "%u %lu\n", flux, delta);
     if (bres == EOF) {
       if (ferror(s->file)) return FALSE;
       stringy_read_debug_header(s);
-      bres = fscanf(s->file, "%u %" TSTATE_T_LEN "\n", flux, delta);
+      bres = fscanf(s->file, "%u %lu\n", flux, delta);
       if (bres == EOF && ferror(s->file)) return FALSE;
     }
     return TRUE;
