@@ -28,6 +28,7 @@
  * X Windows interface for TRS-80 simulator
  */
 
+#define _BSD_SOURCE /* for glibc version < 2.19 */
 #define _DEFAULT_SOURCE /* string.h: strcasecmp() */
 #define _XOPEN_SOURCE 500 /* string.h: strdup() */
 
