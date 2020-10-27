@@ -117,10 +117,14 @@ Traps:\n\
         Set a trap to watch specified hex address for changes.\n\
 Miscellaneous:\n\
     assign $<reg> = <value>\n\
-    assign <addr> = <value>\n\
     set $<reg> = <value>\n\
+    assign <addr> = <value>\n\
     set <addr> = <value>\n\
         Change the value of a register, register pair, or memory byte.\n\
+    in <port>\n\
+        Input from the given I/O port.\n\
+    out <port> = <value>\n\
+        Output to the given I/O port.\n\
     timeroff\n\
     timeron\n\
         Disable/enable the emulated TRS-80 real time clock interrupt.\n\
@@ -598,6 +602,25 @@ void debug_shell(void)
 		    }
 		}
 	    }
+	    else if(!strcmp(command, "in"))
+	    {
+		int port;
+
+		if(sscanf(input, "in %x", &port) == 1)
+			printf("in %x = %x\n", port, z80_in(port));
+		else
+			printf("A port must be specified.\n");
+	    }
+	    else if(!strcmp(command, "out"))
+	    {
+		int port, value;
+
+		if(sscanf(input, "out %x = %x", &port, &value) == 2)
+			z80_out(port, value);
+		else
+			printf("A port and a value must be specified.\n");
+	    }
+
 	    else if(!strcmp(command, "next") || !strcmp(command, "nextint"))
 	    {
 		int is_call = 0, is_rst = 0;
@@ -725,6 +748,8 @@ void debug_shell(void)
 			REG_IY = value;
 		    } else if(!strcasecmp(regname, "i")) {
 			REG_I = value;
+		    } else if(!strcasecmp(regname, "r")) {
+			REG_R = value;
 		    } else {
 			printf("Unrecognized register name %s.\n", regname);
 		    }
@@ -771,7 +796,7 @@ void debug_shell(void)
 	    }
 	    else if(!strcmp(command, "untrace"))
 	    {
-		printf("Untrace not implemented.\n");
+		printf("Untrace not implemented; use delete.\n");
 	    }
 	    else if(!strcmp(command, "traceon"))
 	    {
