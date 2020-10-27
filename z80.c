@@ -1333,7 +1333,7 @@ static void do_int(void)
     /* handle a maskable interrupt */
     REG_SP -= 2;
     mem_write_word(REG_SP, REG_PC);
-    z80_state.iff1 = 0;
+    z80_state.iff1 = z80_state.iff2 = 0;
     switch (z80_state.interrupt_mode) {
     case 0:
       /* REG_PC = get_irq_vector() & 0x38; */
@@ -2849,6 +2849,7 @@ static int do_ED_instruction(void)
 	T_COUNT(12);
 	break;
       case 0x71:	/* out (c), 0 [undocumented] */
+        /* Note: on a CMOS part this outputs 0xFF */
 	z80_out(REG_C, 0);
 	T_COUNT(12);
 	break;
