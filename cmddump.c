@@ -144,7 +144,7 @@ main(int argc, char* argv[])
     int lastaddr = -1;
     int lastcount = -1;
     int addr;
-    for (addr = 0; addr < sizeof(memory); addr++) {
+    for (addr = 0; addr < (int)sizeof(memory); addr++) {
       if (loadmap[addr] != lastcount) {
 	if (lastcount == 1) {
 	  printf("loaded 0x%04x - 0x%04x\n",

@@ -894,7 +894,7 @@ transition_out(int value)
 
   default:
     error("output format %s not implemented",
-	  cassette_format < (sizeof(format_name)/sizeof(char *)) ?
+	  cassette_format < (int)(sizeof(format_name)/sizeof(char *)) ?
 	  format_name[cassette_format] : "out of range;");
     break;
   }
@@ -1060,7 +1060,7 @@ transition_in()
 
   default:
     error("input format %s not implemented",
-	  cassette_format < (sizeof(format_name)/sizeof(char *)) ?
+	  cassette_format < (int)(sizeof(format_name)/sizeof(char *)) ?
 	  format_name[cassette_format] : "out of range;");
     break;
   }

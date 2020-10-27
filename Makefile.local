@@ -67,7 +67,7 @@ READLINELIBS = -lreadline
 
 # Select debugging symbols (-g) and/or optimization (-O2, etc.)
 
-DEBUG = -O2 -g -Wall -Wextra -Wno-sign-compare -Wno-unused-parameter
+DEBUG = -O2 -g -Wall -Wextra -Wno-unused-parameter
 #DEBUG = -g -DKBDEBUG -DXDEBUG
 #DEBUG = -g
 #DEBUG = -Wall

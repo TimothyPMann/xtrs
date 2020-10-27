@@ -81,9 +81,9 @@ typedef struct {
   int format_gapcnt;            /* measure requested gaps */
   int format_gap[5];
   unsigned short crc;
-  unsigned curdrive;
-  unsigned curside;
-  unsigned density;		/* sden=0, dden=1 */
+  int curdrive;
+  int curside;
+  int density;			/* sden=0, dden=1 */
   unsigned char controller;	/* TRSDISK_P1771 or TRSDISK_P1791 */
   int last_readadr;             /* id index found by last readadr */
   tstate_t motor_timeout;       /* 0 if stopped, else time when it stops */
@@ -1879,7 +1879,7 @@ trs_disk_data_write(unsigned char data)
       break;
     case FMT_TRACKID:
       if (d->emutype == REAL) {
-	if (d->u.real.fmt_nbytes >= sizeof(d->u.real.buf)) {
+	if (d->u.real.fmt_nbytes >= (int)sizeof(d->u.real.buf)) {
 	  /* Data structure full */
 	  state.status |= TRSDISK_WRITEFLT;
 	  state.bytecount = 0;
