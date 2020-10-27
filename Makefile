@@ -70,6 +70,9 @@ HTMLDOCS = cpmutil.txt \
 
 PROGS = xtrs mkdisk hex2cmd cmddump
 
+GXTRS = gxtrs
+GLADE = '"$(SHAREDIR)/xtrs.glade"'
+
 default: $(PROGS) docs
 
 all: default z80code gxtrs
@@ -132,7 +135,7 @@ trs_rom4p.c: compile_rom $(BUILT_IN_ROM4P)
 	./compile_rom 4p $(BUILT_IN_ROM4P) > trs_rom4p.c
 
 trs_gtkinterface.o: trs_gtkinterface.c
-	$(CC) -c $(CFLAGS) `pkg-config --cflags gtk+-2.0` $<
+	$(CC) -c $(CFLAGS) -DGLADE_FILE=$(GLADE) `pkg-config --cflags gtk+-2.0` $<
 
 keyrepeat.o: keyrepeat.c
 	$(CC) -c $(CFLAGS) `pkg-config --cflags gtk+-2.0` $<
@@ -163,6 +166,8 @@ link:
 
 install: install-progs install-docs
 
+install-all: install install-gxtrs
+
 install-progs: $(PROGS) $(CASSETTE)
 	$(INSTALL) -d -m 755 $(BINDIR)
 	$(INSTALL) -c -m 755 $(PROGS) $(BINDIR)
@@ -182,6 +187,12 @@ install-docs: docs
 	$(INSTALL) -c -m 644 cpmutil.txt $(DOCDIR)
 	$(INSTALL) -c -m 644 dskspec.html $(DOCDIR)
 	$(INSTALL) -c -m 644 dskspec.txt $(DOCDIR)
+
+install-gxtrs: $(GXTRS)
+	$(INSTALL) -d -m 755 $(BINDIR)
+	$(INSTALL) -c -m 755 $(GXTRS) $(BINDIR)
+	$(INSTALL) -d -m 755 $(SHAREDIR)
+	$(INSTALL) -c -m 755 xtrs.glade $(SHAREDIR)
 
 depend:
 	makedepend -Y -- $(CFLAGS) -- *.c 2>&1 | \

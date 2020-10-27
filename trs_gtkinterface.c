@@ -8,7 +8,6 @@
 
 /*
  * XXX TODO
- * - need a way to package up trs.glade and find at runtime
  * - design more menus, toolbar, and dialogs.  remove any unused menu items.
  * - create a window for zbx instead of using the launch xterm.
  * - save/load settings to a file (file selectable on command line).  useful to 
@@ -564,11 +563,12 @@ void trs_exit()
 void
 trs_screen_init(void)
 {
+  const char *glade_file = GLADE_FILE;
   GtkBuilder *builder;
   GError *err = NULL;      
 
   builder = gtk_builder_new();
-  if (gtk_builder_add_from_file(builder, "xtrs.glade", &err) == 0) {
+  if (gtk_builder_add_from_file(builder, glade_file, &err) == 0) {
     fatal(err->message);
   }
    
