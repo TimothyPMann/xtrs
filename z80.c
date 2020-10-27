@@ -2867,7 +2867,7 @@ static int do_ED_instruction(void)
 	break;
 
       case 0x4D:	/* reti */
-	/* no support for alerting peripherals, just like ret */
+	/* xtrs doesn't support alerting Z-80 peripheral chips on reti */
 	REG_PC = mem_read_word(REG_SP);
 	REG_SP += 2;
 	/* Yes RETI does this, it's not mentioned in the documentation but
