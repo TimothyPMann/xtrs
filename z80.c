@@ -4356,6 +4356,9 @@ int z80_run(int continuous)
 void z80_reset(void)
 {
     REG_PC = 0;
+    REG_A = 0xFF;
+    REG_F = 0xFF;
+    REG_SP = 0xFFFF;
     z80_state.i = 0;
     z80_state.iff1 = 0;
     z80_state.iff2 = 0;
