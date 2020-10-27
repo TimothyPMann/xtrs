@@ -595,7 +595,8 @@ void trs_fix_size (Window window, int width, int height)
  */
 
 static void show_fallback_help(char const **helpitems) {
-  for (int i = 0; NULL != helpitems[i]; i++) {
+  int i;
+  for (i = 0; NULL != helpitems[i]; i++) {
     (void) fprintf(stderr, "%s\n", helpitems[i]);
   }
 }
