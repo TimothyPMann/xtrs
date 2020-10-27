@@ -1037,8 +1037,10 @@ static void do_ld_a_r(void)
 
     set = 0;
 
-    /* Fetch a random value. */
-    REG_A = (rand() >> 8) & 0xFF;
+    /* xtrs doesn't keep an M1 cycle count, so cheat by setting the low
+       7 bits to a random value. */
+    REG_R = (REG_R & 0x80) + ((rand() >> 8) & 0x7F);
+    REG_A = REG_R;
 
     if(REG_A & 0x80)
       set |= SIGN_MASK;
@@ -2747,8 +2749,7 @@ static int do_ED_instruction(void)
 	do_ld_a_r();  T_COUNT(9);
 	break;
       case 0x4F:	/* ld r, a */
-	/* unimplemented; ignore */
-	T_COUNT(9);
+	REG_R = REG_A;  T_COUNT(9);
 	break;
 
       case 0x4B:	/* ld bc, (address) */
@@ -4360,13 +4361,13 @@ void z80_reset(void)
     REG_F = 0xFF;
     REG_SP = 0xFFFF;
     z80_state.i = 0;
+    z80_state.r = 0;
     z80_state.iff1 = 0;
     z80_state.iff2 = 0;
     z80_state.interrupt_mode = 0;
     z80_state.irq = z80_state.nmi = FALSE;
     z80_state.sched = 0;
 
-    /* z80_state.r = 0; */
     srand(time(NULL));  /* Seed the RNG, for reading the refresh register */
 }
 
