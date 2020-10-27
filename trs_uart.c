@@ -169,7 +169,7 @@ trs_uart_init(int reset_button)
 }
 
 int
-trs_uart_modem_in()
+trs_uart_modem_in(void)
 {
   /* should poll hardware here, if we could */
   if (initialized == 0) trs_uart_init(0);
@@ -194,7 +194,7 @@ trs_uart_reset_out(int value)
 }
 
 int
-trs_uart_switches_in()
+trs_uart_switches_in(void)
 {
   if (initialized == 0) trs_uart_init(0);
   if (initialized == -1) return 0xff;
@@ -253,7 +253,7 @@ trs_uart_set_empty(int dummy)
 }
 
 int
-trs_uart_check_avail()
+trs_uart_check_avail(void)
 {
   if (initialized == 1 && uart.bufleft == 0 && uart.fd != -1) {
     /* check for data available */
@@ -294,7 +294,7 @@ trs_uart_check_avail()
 }
 
 int
-trs_uart_status_in()
+trs_uart_status_in(void)
 {
 #if UARTDEBUG
   static int oldstatus = -1;
@@ -362,7 +362,7 @@ trs_uart_control_out(int value)
 }
 
 int
-trs_uart_data_in()
+trs_uart_data_in(void)
 {
   if (initialized == 0) trs_uart_init(0);
   if (initialized == -1) return 0xff;

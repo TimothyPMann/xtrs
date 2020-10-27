@@ -506,7 +506,7 @@ set_audio_format(FILE *f, int state)
   return 0;
 }
 
-static void get_control()
+static void get_control(void)
 {
   FILE *f;
 
@@ -526,7 +526,7 @@ static void get_control()
   }
 }
 
-static void put_control()
+static void put_control(void)
 {
   FILE *f;
 
@@ -628,7 +628,7 @@ static int assert_state(int state)
       cassette_format = DIRECT_FORMAT;
       strcpy(cassette_filename, DSP_FILENAME);
     } else {
-      get_control(state);
+      get_control();
     }
     if (cassette_format == DIRECT_FORMAT) {
 #if !HAVE_OSS
@@ -909,7 +909,7 @@ transition_out(int value)
    If file read fails (perhaps due to eof), return 0, else 1.
    Set cassette_delta to (unsigned long) -1 on failure. */
 static int
-transition_in()
+transition_in(void)
 {
   unsigned long delta_us, nsamples, maxsamples;
   Ushort code;
@@ -1315,7 +1315,7 @@ trs_cassette_update(int dummy)
 
 
 int
-trs_cassette_in()
+trs_cassette_in(void)
 {
 #if CASSDEBUG3
   debug("in  %ld\n", z80_state.t_count);
@@ -1350,7 +1350,7 @@ trs_cassette_in()
 }
 
 void
-trs_cassette_reset()
+trs_cassette_reset(void)
 {
   assert_state(CLOSE);
 }

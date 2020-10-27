@@ -220,15 +220,15 @@ static void hrg_update_char(int position);
 struct stat statbuf;
 
 /* Private routines */
-void bitmap_init();
-void screen_init();
+void bitmap_init(unsigned long foreground, unsigned long background);
+void screen_init(void);
 
 static XrmDatabase x_db = NULL;
 static XrmDatabase command_db = NULL;
 extern char *program_name;
 char *title;
 
-void trs_exit()
+void trs_exit(void)
 {
     exit(0);
 }
@@ -554,7 +554,7 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
 }
 
 static void
-save_repeat()
+save_repeat(void)
 {
   XGetKeyboardControl(display, &repeat_state);
   XAutoRepeatOff(display);
@@ -562,7 +562,7 @@ save_repeat()
 }
 
 static void
-restore_repeat()
+restore_repeat(void)
 {
   if (repeat_state.global_auto_repeat == AutoRepeatModeOn) {
     XAutoRepeatOn(display);
@@ -598,7 +598,7 @@ static void show_fallback_help(char const **helpitems) {
   }
 }
 
-void trs_show_help()
+void trs_show_help(void)
 {
   XWindowAttributes parent_attrs;
   int const help_width = 495;
@@ -690,7 +690,7 @@ void trs_show_help()
 }
 
 /* exits if something really bad happens */
-void trs_screen_init()
+void trs_screen_init(void)
 {
   Window root_window;
   unsigned long fore_pixel, back_pixel, foreground, background;
@@ -1166,7 +1166,7 @@ void trs_screen_80x24(int flag)
   text80x24 = flag;
 }
 
-void screen_init()
+void screen_init(void)
 {
   unsigned i;
 
@@ -1320,7 +1320,7 @@ void bitmap_init(unsigned long foreground, unsigned long background)
   }
 }
 
-void trs_screen_refresh()
+void trs_screen_refresh(void)
 {
   int i, srcx, srcy, dunx, duny;
 
@@ -1486,7 +1486,7 @@ void trs_screen_write_char(int position, int char_index)
 
  /* Copy lines 1 through col_chars-1 to lines 0 through col_chars-2.
     Doesn't need to clear line col_chars-1. */
-void trs_screen_scroll()
+void trs_screen_scroll(void)
 {
   int i = 0;
 
@@ -1607,7 +1607,7 @@ void grafyx_write_data(int value)
   }
 }
 
-int grafyx_read_data()
+int grafyx_read_data(void)
 {
   int value = grafyx_unscaled[grafyx_y][grafyx_x % G_XSIZE];
   if (!(grafyx_mode & G_XNOCLKR)) {
@@ -1673,7 +1673,7 @@ void grafyx_write_overlay(int value)
   }
 }
 
-int grafyx_get_microlabs()
+int grafyx_get_microlabs(void)
 {
   return grafyx_microlabs;
 }
@@ -1684,7 +1684,7 @@ void grafyx_set_microlabs(int on_off)
 }
 
 /* Model III MicroLabs support */
-void grafyx_m3_reset()
+void grafyx_m3_reset(void)
 {
   if (grafyx_microlabs) grafyx_m3_write_mode(0);
 }
@@ -1723,7 +1723,7 @@ unsigned char grafyx_m3_read_byte(int position)
   }
 }
 
-int grafyx_m3_active()
+int grafyx_m3_active(void)
 {
   return (trs_model == 3 && grafyx_microlabs && (grafyx_mode & G3_COORD));
 }
@@ -1768,7 +1768,7 @@ int grafyx_m3_active()
 
 /* Initialize HRG. */
 static void
-hrg_init()
+hrg_init(void)
 {
   int i;
 
@@ -1903,7 +1903,7 @@ hrg_write_data(int data)
 
 /* Read byte from HRG memory. */
 int
-hrg_read_data()
+hrg_read_data(void)
 {
   if (hrg_addr >= HRG_MEMSIZE) return 0xff; /* nonexistent address */
   return hrg_screen[hrg_addr];
@@ -2046,7 +2046,7 @@ void trs_set_mouse_max(int x, int y, unsigned int sens)
   mouse_sens = sens;
 }
 
-int trs_get_mouse_type()
+int trs_get_mouse_type(void)
 {
   /* !!Note: assuming 3-button mouse */
   return 1;

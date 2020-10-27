@@ -554,7 +554,7 @@ trs_parse_command_line(int argc, char **argv, int *debug)
 }
 
 
-void trs_exit()
+void trs_exit(void)
 {
   gtk_exit(0);
 }
@@ -776,7 +776,7 @@ trs_screen_write_char(int position, int char_index)
 
 
 void
-trs_screen_refresh()
+trs_screen_refresh(void)
 {
   int i;
   int srcx, srcy, dunx, duny;
@@ -828,7 +828,7 @@ trs_screen_refresh()
  * Copies lines 1 to col_chars - 1 to lines 0 to col_chars - 2.
  * Does not clear line col_chars - 1.
  */
-void trs_screen_scroll()
+void trs_screen_scroll(void)
 {
   int i = 0;
 
@@ -1410,7 +1410,7 @@ void grafyx_write_data(int value)
   }
 }
 
-int grafyx_read_data()
+int grafyx_read_data(void)
 {
   int value = grafyx_unscaled[grafyx_y][grafyx_x % G_XSIZE];
   if (!(grafyx_mode & G_XNOCLKR)) {
@@ -1476,7 +1476,7 @@ void grafyx_write_overlay(int value)
   }
 }
 
-int grafyx_get_microlabs()
+int grafyx_get_microlabs(void)
 {
   return grafyx_microlabs;
 }
@@ -1487,7 +1487,7 @@ void grafyx_set_microlabs(int on_off)
 }
 
 /* Model III MicroLabs support */
-void grafyx_m3_reset()
+void grafyx_m3_reset(void)
 {
   if (grafyx_microlabs) grafyx_m3_write_mode(0);
 }
@@ -1526,7 +1526,7 @@ unsigned char grafyx_m3_read_byte(int position)
   }
 }
 
-int grafyx_m3_active()
+int grafyx_m3_active(void)
 {
   return (trs_model == 3 && grafyx_microlabs && (grafyx_mode & G3_COORD));
 }
@@ -1587,7 +1587,7 @@ fill_rectangles(GdkGC *gc,
 
 /* Initialize HRG. */
 static void
-hrg_init()
+hrg_init(void)
 {
   int i;
 
@@ -1726,7 +1726,7 @@ hrg_write_data(int data)
 
 /* Read byte from HRG memory. */
 int
-hrg_read_data()
+hrg_read_data(void)
 {
   if (hrg_addr >= HRG_MEMSIZE) return 0xff; /* nonexistent address */
   return hrg_screen[hrg_addr];
@@ -1889,7 +1889,7 @@ void trs_set_mouse_max(int x, int y, unsigned int sens)
   mouse_sens = sens;
 }
 
-int trs_get_mouse_type()
+int trs_get_mouse_type(void)
 {
   /* Assume 3-button mouse */
   return 1;

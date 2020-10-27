@@ -101,7 +101,7 @@ void mem_bank(int command)
 
 /* Check for changes in all floppy, hard, and stringy drives. */
 void
-trs_change_all()
+trs_change_all(void)
 {
   trs_disk_change_all();
   trs_hard_change_all();
@@ -177,7 +177,7 @@ void mem_romin(int state)
     memory_map = (memory_map & ~4) + (romin << 2);
 }
 
-void mem_init()
+void mem_init(void)
 {
     if (trs_model <= 3) {
 	rom = &memory[ROM_START];

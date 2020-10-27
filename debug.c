@@ -165,7 +165,7 @@ static char *trap_name(int flag)
     }
 }
 
-static void show_zbxinfo()
+static void show_zbxinfo(void)
 {
     printf("zbx: Z80 debugger by David Gingold, Alex Wolman, and Timothy"
            " Mann\n");
@@ -180,7 +180,7 @@ static void show_zbxinfo()
 #endif
 }
 
-static void clear_all_traps()
+static void clear_all_traps(void)
 {
     int i;
     for(i = 0; i < MAX_TRAPS; ++i)
@@ -195,7 +195,7 @@ static void clear_all_traps()
     num_watchpoints = 0;
 }
 
-static void print_traps()
+static void print_traps(void)
 {
     int i;
 
@@ -278,7 +278,7 @@ static void clear_trap_address(int address, int flag)
     }
 }
 
-void debug_print_registers()
+void debug_print_registers(void)
 {
     printf("\n       S Z - H - PV N C   IFF1 IFF2 IM\n");
     printf("Flags: %d %d %d %d %d  %d %d %d     %d    %d   %d\n\n",
@@ -307,21 +307,21 @@ void debug_print_registers()
 }
 
 
-static void signal_handler()
+static void signal_handler(int sig)
 {
     stop_signaled = 1;
     if (trs_continuous > 0) trs_continuous = 0;
     trs_skip_next_kbwait();
 }
 
-void trs_debug()
+void trs_debug(void)
 {
     stop_signaled = 1;
     if (trs_continuous > 0) trs_continuous = 0;
     trs_skip_next_kbwait();
 }
 
-void debug_init()
+void debug_init(void)
 {
     int i;
 
@@ -371,7 +371,7 @@ static void print_memory(Ushort address, int num_bytes)
     }
 }
 
-static void debug_run()
+static void debug_run(void)
 {
     void (*old_signal_handler)();
     Uchar t;
@@ -464,7 +464,7 @@ static void debug_run()
     printf("Stopped at %.4x\n", REG_PC);
 }
 
-void debug_shell()
+void debug_shell(void)
 {
     char input[MAXLINE];
     char command[MAXLINE];
@@ -860,97 +860,3 @@ void debug_shell()
     write_history(history_file);
 #endif
 }
-
-#ifdef NEVER
-
-/*
- * Test code:
- */
-
-carry_in(a, b, r)
-{
-    return (a ^ b ^ r);
-}
-
-carry_out(a, b, r)
-{
-    return (a & b) | ((a | b) & ~r);
-}
-
-overflow(a, b, r)
-{
-    return carry_in(a, b, r) ^ carry_out(a, b, r);
-}
-
-test_add(int a, int b)
-{
-    Uchar result;
-    Uchar flags;
-
-    result = a + b;
-
-    flags = 0;
-
-    if(result & 0x80) flags |= SIGN_MASK;
-
-    if(result == 0) flags |= ZERO_MASK;
-
-    if(carry_out(a, b, result) & 0x8) flags |= HALF_CARRY_MASK;
-
-    if(overflow(a, b, result) & 0x80) flags |= OVERFLOW_MASK;
-
-    if(carry_out(a, b, result) & 0x80) flags |= CARRY_MASK;
-
-    do_add_flags(a, b, result);
-    if(REG_F != flags)
-    {
-	printf("error: %d + %d = %d, expected %.2x, got %.2x\n",
-	       a, b, result, flags, REG_F);
-    }
-}
-
-test_sub(int a, int b)
-{
-    Uchar result;
-    Uchar flags;
-
-    result = a - b;
-    
-    flags = 0;
-
-    if(result & 0x80) flags |= SIGN_MASK;
-
-    if(result == 0) flags |= ZERO_MASK;
-
-    if(carry_out(a, - b, result) & 0x8) flags |= HALF_CARRY_MASK;
-
-    if(overflow(a, - b, result) & 0x80) flags |= OVERFLOW_MASK;
-
-    flags |= SUBTRACT_MASK;
-
-    if(carry_out(a, - b, result) & 0x80) flags |= CARRY_MASK;
-
-    do_sub_flags(a, b, result);
-
-    if(REG_F != flags)
-    {
-	printf("error: %d - %d = %d, expected %.2x, got %.2x\n",
-	       a, b, result, flags, REG_F);
-    }
-}
-
-test_all()
-{
-    int a, b;
-
-    for(a = 0; a < 256; ++a)
-    {
-	for(b = 0; b < 256; ++b)
-	{
-	    test_add(a, b);
-	    test_sub(a, b);
-	}
-    }
-}
-
-#endif

@@ -38,7 +38,7 @@ char *romfile = NULL;
 char *romfile3 = NULL;
 char *romfile4p = NULL;
 
-static void check_endian()
+static void check_endian(void)
 {
     wordregister x;
     x.byte.low = 1;
@@ -109,7 +109,7 @@ void trs_load_compiled_rom(int size, unsigned char rom[])
 }
 
 void
-trs_load_romfile()
+trs_load_romfile(void)
 {
   struct stat statbuf;
 

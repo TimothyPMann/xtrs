@@ -70,7 +70,7 @@ cmd_transfer_address(int address)
 }
 
 void
-cmd_end_of_file()
+cmd_end_of_file(void)
 {
     if (!got_transfer) cmd_data(0, -3);
 }

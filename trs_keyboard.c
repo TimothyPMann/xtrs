@@ -718,13 +718,13 @@ static int joystate = 0;
 static tstate_t key_stretch_timeout;
 int stretch_amount = STRETCH_AMOUNT;
 
-void trs_kb_reset()
+void trs_kb_reset(void)
 {
   key_stretch_timeout = z80_state.t_count;
 }
 
 int key_heartbeat = 0;
-void trs_kb_heartbeat()
+void trs_kb_heartbeat(void)
 {
   /* Don't hold keys in queue too long */
   key_heartbeat++;
@@ -762,7 +762,7 @@ int trs_emulate_joystick(int key_down, int bit_action)
   return 1;
 }
 
-int trs_joystick_in()
+int trs_joystick_in(void)
 {
 #if JOYDEBUG
   debug("joy %02x ", joystate);
@@ -941,7 +941,7 @@ int trs_kb_mem_read(int address)
     return kb_mem_value(address);
 }
 
-void clear_key_queue()
+void clear_key_queue(void)
 {
   key_queue_head = 0;
   key_queue_entries = 0;
@@ -965,7 +965,7 @@ void queue_key(int state)
   }
 }
 
-int dequeue_key()
+int dequeue_key(void)
 {
   int rval = -1;
 
@@ -982,7 +982,7 @@ int dequeue_key()
 }
 
 void
-trs_skip_next_kbwait()
+trs_skip_next_kbwait(void)
 {
   skip_next_kbwait++;
 }

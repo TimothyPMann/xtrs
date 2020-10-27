@@ -30,7 +30,7 @@ void trs_printer_write(int value)
     }
 }
 
-int trs_printer_read()
+int trs_printer_read(void)
 {
     return 0x30;	/* printer selected, ready, with paper, not busy */
 }
