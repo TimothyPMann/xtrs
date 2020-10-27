@@ -166,6 +166,8 @@ link:
 
 install: install-progs install-docs
 
+install-all: install install-gxtrs
+
 install-progs: $(PROGS) $(CASSETTE)
 	$(INSTALL) -d -m 755 $(BINDIR)
 	$(INSTALL) -c -m 755 $(PROGS) $(BINDIR)
