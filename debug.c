@@ -118,6 +118,8 @@ Traps:\n\
 Miscellaneous:\n\
     assign $<reg> = <value>\n\
     assign <addr> = <value>\n\
+    set $<reg> = <value>\n\
+    set <addr> = <value>\n\
         Change the value of a register, register pair, or memory byte.\n\
     timeroff\n\
     timeron\n\
