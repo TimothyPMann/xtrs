@@ -1831,7 +1831,6 @@ were 6 pixels wide.
 .B lcmod
 is the character set in the replacement character generator that was supplied
 with the Radio Shack lowercase modification.
-(It was reconstructed partly from memory and may have some minor bit errors.)
 .B stock
 is the character set in the stock character generator supplied with most
 uppercase-only machines.
