@@ -169,24 +169,24 @@ install: install-progs install-docs
 
 install-all: install install-gxtrs
 
-install-progs: $(PROGS) $(CASSETTE)
+install-progs: $(PROGS) $(SRCDIR)$(CASSETTE)
 	$(INSTALL) -d -m 755 $(BINDIR)
 	$(INSTALL) -c -m 755 $(PROGS) $(BINDIR)
-	$(INSTALL) -c -m 755 $(CASSETTE) $(BINDIR)/cassette
+	$(INSTALL) -c -m 755 $(SRCDIR)$(CASSETTE) $(BINDIR)/cassette
 
 install-docs: docs
 	$(INSTALL) -d -m 755 $(MANDIR)
 	$(INSTALL) -d -m 755 $(MANDIR)/man1
-	$(INSTALL) -c -m 644 xtrs.man $(MANDIR)/man1/xtrs.1
-	$(INSTALL) -c -m 644 cassette.man $(MANDIR)/man1/cassette.1
-	$(INSTALL) -c -m 644 mkdisk.man $(MANDIR)/man1/mkdisk.1
-	$(INSTALL) -c -m 644 cmddump.man $(MANDIR)/man1/cmddump.1
-	$(INSTALL) -c -m 644 hex2cmd.man $(MANDIR)/man1/hex2cmd.1
+	$(INSTALL) -c -m 644 $(SRCDIR)xtrs.man $(MANDIR)/man1/xtrs.1
+	$(INSTALL) -c -m 644 $(SRCDIR)cassette.man $(MANDIR)/man1/cassette.1
+	$(INSTALL) -c -m 644 $(SRCDIR)mkdisk.man $(MANDIR)/man1/mkdisk.1
+	$(INSTALL) -c -m 644 $(SRCDIR)cmddump.man $(MANDIR)/man1/cmddump.1
+	$(INSTALL) -c -m 644 $(SRCDIR)hex2cmd.man $(MANDIR)/man1/hex2cmd.1
 	$(INSTALL) -d -m 755 $(DOCDIR)
 	$(INSTALL) -c -m 644 $(PDFMANPAGES) $(DOCDIR)
-	$(INSTALL) -c -m 644 cpmutil.html $(DOCDIR)
+	$(INSTALL) -c -m 644 $(SRCDIR)cpmutil.html $(DOCDIR)
 	$(INSTALL) -c -m 644 cpmutil.txt $(DOCDIR)
-	$(INSTALL) -c -m 644 dskspec.html $(DOCDIR)
+	$(INSTALL) -c -m 644 $(SRCDIR)dskspec.html $(DOCDIR)
 	$(INSTALL) -c -m 644 dskspec.txt $(DOCDIR)
 
 install-gxtrs: $(GXTRS)

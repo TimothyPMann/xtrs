@@ -110,6 +110,7 @@ APPDEFAULTS = -DAPPDEFAULTS='"/etc/X11/app-defaults"'
 INSTALL = install
 
 # If you are building in a subdirectory:
+#SRCDIR=../
 #vpath %.c ..
 #vpath %.h ..
 #vpath %.man ..
