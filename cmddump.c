@@ -76,9 +76,7 @@ main(int argc, char* argv[])
       isam = strtol(optarg, NULL, 0);
       break;
     case 'p':
-      strncpy(pdsbuf, optarg, 8);
-      pdsbuf[8] = '\000';
-      strncat(pdsbuf, "        ", 8 - strlen(pdsbuf));
+      snprintf(pdsbuf, sizeof(pdsbuf), "%s%8s", optarg, "");
       pds = pdsbuf;
       break;
     case 'x':
