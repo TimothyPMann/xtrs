@@ -1233,7 +1233,7 @@ Pixmap XCreateBitmapFromDataScale(Display *display, Drawable window,
 {
   static unsigned char *mydata;
   static unsigned char *mypixels;
-  unsigned i, j, k;
+  int i, j, k;
 
   if (mydata == NULL)
   {
@@ -1249,7 +1249,7 @@ Pixmap XCreateBitmapFromDataScale(Display *display, Drawable window,
   }
   
   /* Read the character data */ 
-  for (j= 0; j< width * height; j += 8)
+  for (j= 0; j< (int)(width * height); j += 8)
   {
     for (i= j + 7; i >= j; i--)
     {
@@ -1258,16 +1258,16 @@ Pixmap XCreateBitmapFromDataScale(Display *display, Drawable window,
   }
 
   /* Clear out the rescaled character array */
-  for (i= 0; i< width / 8 * height * scale_x * scale_y * 4; i++)
+  for (i= 0; i< (int)(width / 8 * height * scale_x * scale_y * 4); i++)
   {
     *(mydata + i)= 0;
   }
   
   /* And prepare our rescaled character. */
   k= 0;
-  for (j= 0; j< height * scale_y; j++)
+  for (j= 0; j< (int)(height * scale_y); j++)
   {
-    for (i= 0; i< width * scale_x; i++)
+    for (i= 0; i< (int)(width * scale_x); i++)
     {
        *(mydata + (k >> 3)) = *(mydata + (k >> 3)) |
 	 (*(mypixels + ((int)(j / scale_y) * width) +
