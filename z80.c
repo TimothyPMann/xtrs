@@ -2870,6 +2870,9 @@ static int do_ED_instruction(void)
 	/* no support for alerting peripherals, just like ret */
 	REG_PC = mem_read_word(REG_SP);
 	REG_SP += 2;
+	/* Yes RETI does this, it's not mentioned in the documentation but
+	   it happens on real silicon */
+	z80_state.iff1 = z80_state.iff2;  /* restore the iff state */
 	T_COUNT(14);
 	break;
 
