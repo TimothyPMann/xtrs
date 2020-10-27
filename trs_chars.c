@@ -297,7 +297,8 @@ char trs_char_data[][MAXCHARS][TRS_CHAR_HEIGHT] = {
 
 {
   /* CG 2 - for Model I */
-  /* Source: MCM6674 Data Sheet, modified by mann (from memory). */
+  /* Source: MCM6674 Data Sheet, modified by mann (from memory),
+     checked and corrected by Ulrich Müller from a real Model I. */
   /* This is the replacement Model I character generator you got with
      the Radio Shack lowercase modification. Positions 0-31 are a copy
      of the uppercase letters, to work around a bug (?) in the Level
