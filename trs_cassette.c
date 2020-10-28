@@ -68,7 +68,7 @@
                                    stdio.h: fileno() */
 
 #if __linux
-//XXX #define HAVE_OSS 1
+#define HAVE_OSS 1
 #endif
 
 /*#define CASSDEBUG 1*/
