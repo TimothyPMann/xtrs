@@ -1,4 +1,6 @@
-5.0 -- ? -- Tim Mann
+This change log is no longer maintained.  See the git history for changes.
+
+Changes up to Mon Jan 1 13:33:02 2018:
 
 * Disabled trs_suspend_delay heuristic.
 
@@ -37,12 +39,11 @@
 * Exatron Stringy Floppy emulation, Model I only.  Needs more work
   before it can be enabled in a release.  XXX Not documented yet!  XXX
   Need a better way to load the ESF ROM -- right now it must be catted
-  onto the end of the level2rom.  See notes and files in
-  ~/trs80/exatron, in particular level2+esf.bin.  XXX Fix wafer
-  creation.  Currently takes no parameters (should take the length)
-  and is available only from gxtrs.  Maybe move wafer creation into
-  mkdisk (at least for now) and later rethink how to handle media
-  creation within xtrs -- it does need to be able to take parameters!
+  onto the end of the level2rom.  XXX Fix wafer creation.  Currently
+  takes no parameters (should take the length) and is available only
+  from gxtrs.  Maybe move wafer creation into mkdisk (at least for
+  now) and later rethink how to handle media creation within xtrs --
+  it does need to be able to take parameters!
 
 * Deleted "#if BATCH" code.  It didn't speed things up and had been
   disabled for years.

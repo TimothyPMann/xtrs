@@ -1,6 +1,5 @@
 ;
 ; Fake ROM for xtrs, initial hack
-; $Id$
 ;
 
 video	equ	3c00h+7*64

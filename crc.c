@@ -1,6 +1,5 @@
 /* crc.c
    Compute CCITT CRC-16 using the correct bit order for floppy disks.
-   $Id$
 */
 
 /* Accelerator table to compute the CRC eight bits at a time */

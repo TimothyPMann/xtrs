@@ -12,7 +12,6 @@
 ;; the date included.  
 
 ;; Modified on Fri May 19 00:38:41 PDT 2000 by Timothy Mann
-;; $Id$
 
 ;; Model I/III addresses
 @exit	equ 402dh
