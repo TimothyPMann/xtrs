@@ -207,6 +207,7 @@ depend:
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 
 cmddump.o: load_cmd.h
+common.o: z80.h config.h trs_stringy.h
 compile_rom.o: z80.h config.h load_cmd.h
 debug.o: z80.h config.h trs.h
 dis.o: z80.h config.h
@@ -215,7 +216,7 @@ hex2cmd.o: cmd.h z80.h config.h
 load_cmd.o: load_cmd.h
 load_hex.o: z80.h config.h
 main.o: z80.h config.h trs.h trs_disk.h trs_hard.h load_cmd.h
-mkdisk.o: reed.h
+mkdisk.o: trs_stringy.h z80.h config.h reed.h
 trs_cassette.o: trs.h z80.h config.h
 trs_chars.o: trs_iodefs.h
 trs_disk.o: z80.h config.h trs.h trs_disk.h trs_hard.h crc.c
@@ -228,7 +229,7 @@ trs_io.o: z80.h config.h trs.h trs_disk.h trs_hard.h trs_uart.h
 trs_keyboard.o: z80.h config.h trs.h
 trs_memory.o: z80.h config.h trs.h trs_disk.h trs_hard.h
 trs_printer.o: z80.h config.h trs.h
-trs_stringy.o: z80.h config.h trs.h trs_disk.h
+trs_stringy.o: z80.h config.h trs.h trs_disk.h trs_stringy.h
 trs_uart.o: trs.h z80.h config.h trs_uart.h trs_hard.h
 trs_xinterface.o: trs_iodefs.h trs.h z80.h config.h trs_disk.h trs_uart.h
 trs_xinterface.o: trs_hard.h trs_imp_exp.h
