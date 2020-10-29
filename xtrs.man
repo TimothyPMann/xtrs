@@ -1545,6 +1545,29 @@ as an interface; a simple example is in
 All of these files are available in the
 .B xtrs
 source distribution.
+.SS Emulated Exatron Stringy Floppy
+In Model I mode,
+.B xtrs
+emulates up to eight Exatron Stringy Floppy units.
+Emulated wafers are in files named
+.IR stringy1 \- U,
+where
+.I U
+is the drive unit number
+.RB ( 0 \- 7 ).
+If a file of the required name does not exist,
+.B xtrs
+emulates an empty drive.
+Use the program
+.BR mkdisk (1)
+with the
+.B \-w
+flag to make blank emulated wafers.
+The virtual wafer file format is intended to be compatible with Matthew Reed's
+TRS-80 emulator for Windows,
+.BR TRS32 ;
+see http://www.trs-80.org/exatron-stringy-floppy-primer/.
+As with floppy and hard drives, use the F7 key to signal a wafer change.
 .SS Interrupts
 The emulator supports only interrupt mode 1 of the Z80.
 It will complain if your program enables interrupts after powerup without
@@ -1923,25 +1946,27 @@ Enter
 .IR zbx ,
 the Z80 debugger.
 .TP
-.B \-romfile \fIfilename\fP
+.B \-romfile1 \fIfilename1\fP
+.TQ
+.B \-romfile1x \fIfilename1x\fP
 .TQ
 .B \-romfile3 \fIfilename3\fP
 .TQ
 .B \-romfile4p \fIfilename4p\fP
-Use the ROM image file specified by
-.I filename
-in Model I mode,
-by
-.I filename3
-in Model III and Model 4 mode,
-or by
-.I filename4p
-in Model 4P mode.
-A ROM image file can be either a raw binary dump in Intel hex format, or
+In Model I mode, load the ROM image file specified by
+.I filename1
+at address 0, and load the optional extended ROM image file
+.I filename1x
+at address 0x3000. The latter is typically the Exatron Stringy Floppy ROM.
+In Model III or Model 4 mode, load
+.I filename3.
+In Model 4P mode, load
+.I filename4p.
+A ROM image file can be either a raw binary dump, in Intel hex format, or in
 TRS-80 CMD format (for example, a
 .I MODELA/III
 file).
-If you do not set this option or the corresponding X resource, a default
+If you do not set these options or the corresponding X resources, a default
 established at compile time is used (if any); see
 .I Makefile.local
 in the

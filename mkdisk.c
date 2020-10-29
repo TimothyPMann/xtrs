@@ -1,5 +1,5 @@
-/* 
- * Portions copyright (c) 1996-2018, Timothy P. Mann
+/*
+ * Copyright (c) 1996-2020, Timothy P. Mann
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -38,6 +38,7 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <fcntl.h>
+#include "trs_stringy.h"
 
 typedef unsigned char Uchar;
 #include "reed.h"
@@ -45,13 +46,14 @@ ReedHardHeader rhh;
 
 void Usage(char *progname)
 {
-  fprintf(stderr, 
+  fprintf(stderr,
 	  "Usage:\t%s -1 [-f] file\n"
 	  "\t%s [-3] [-f] file\n"
 	  "\t%s -k [-s sides] [-d density] [-8] [-i] [-f] file\n"
 	  "\t%s -h [-c cyl] [-s sec] [-g gran] [-d dcyl] [-f] file\n"
-	  "\t%s {-p|-u} {-1|-3|-k|-h} file\n",
-	  progname, progname, progname, progname, progname);
+	  "\t%s -w [-s size] [-f] file\n"
+	  "\t%s {-p|-u} {-1|-3|-k|-h|-w} file\n",
+	  progname, progname, progname, progname, progname, progname);
   exit(2);
 }
 
@@ -80,7 +82,7 @@ fopen_w(const char *fname, int overwrite)
 int
 main(int argc, char *argv[])
 {
-  int jv1 = 0, jv3 = 0, dmk = 0, hard = 0;
+  int jv1 = 0, jv3 = 0, dmk = 0, hard = 0, wafer = 0;
   int cyl = -1, sec = -1, gran = -1, dir = -1, eight = 0, ignden = 0;
   int writeprot = 0, unprot = 0;
   int i, c, oumask, overwrite;
@@ -89,7 +91,7 @@ main(int argc, char *argv[])
 
   opterr = 0;
   for (;;) {
-    c = getopt(argc, argv, "13khc:s:g:d:8ipuf");
+    c = getopt(argc, argv, "13khwc:s:g:d:8ipuf");
     if (c == -1) break;
     switch (c) {
     case '1':
@@ -104,17 +106,20 @@ main(int argc, char *argv[])
     case 'h':
       hard = 1;
       break;
+    case 'w':
+      wafer = 1;
+      break;
     case 'c':
       cyl = atoi(optarg);
       break;
     case 's':
-      sec = atoi(optarg);
+      sec = atoi(optarg); // or sides or size
       break;
     case 'g':
       gran = atoi(optarg);
       break;
     case 'd':
-      dir = atoi(optarg);
+      dir = atoi(optarg); // or density
       break;
     case '8':
       eight = 1;
@@ -151,11 +156,11 @@ main(int argc, char *argv[])
       fprintf(stderr,
 	      "%s: -p and -u are mutually exclusive\n", argv[0]);
       exit(2);
-    }    
+    }
 
-    if (jv1 + jv3 + dmk + hard != 1) {
+    if (jv1 + jv3 + dmk + hard + wafer != 1) {
       fprintf(stderr,
-	      "%s: %s requires exactly one of -1, -3, -k, or -h\n",
+	      "%s: %s requires exactly one of -1, -3, -k, -h, or -w\n",
 	      argv[0], writeprot ? "-p" : "-u");
       exit(2);
     }
@@ -202,6 +207,13 @@ main(int argc, char *argv[])
       fseek(f, 7, 0);
       putc(newmode, f);
 
+    } else if (wafer) {
+      /* Set the magic bit */
+      newmode = stringy_set_write_prot(f, STRINGY_FMT_ESF, writeprot);
+      if (newmode < 0) {
+	perror(fname);
+	exit(1);
+      }
     }
 
     /* Finish by chmoding the file appropriately */
@@ -221,7 +233,7 @@ main(int argc, char *argv[])
     exit(0);
   }
 
-  switch (jv1 + jv3 + dmk + hard) {
+  switch (jv1 + jv3 + dmk + hard + wafer) {
   case 0:
     jv3 = 1;
     break;
@@ -229,7 +241,7 @@ main(int argc, char *argv[])
     break;
   default:
     fprintf(stderr,
-	    "%s: -1, -3, -k, and -h are mutually exclusive\n", argv[0]);
+	    "%s: -1, -3, -k, -h, and -w are mutually exclusive\n", argv[0]);
     exit(2);
   }
 
@@ -247,7 +259,7 @@ main(int argc, char *argv[])
   if (!dmk && (eight || ignden)) {
     fprintf(stderr, "%s: -8 and -i are only meaningful with -k\n", argv[0]);
     exit(2);
-  }    
+  }
 
   if (jv1) {
     /* Unformatted JV1 disk - just an empty file! */
@@ -279,12 +291,12 @@ main(int argc, char *argv[])
     if (sides != 1 && sides != 2) {
       fprintf(stderr, "%s error: sides must be 1 or 2\n", argv[0]);
       exit(2);
-    }	    
+    }
     if (density < 1 || density > 2) {
       fprintf(stderr, "%s error: density must be 1 or 2\n", argv[0]);
       exit(2);
-    }	    
-    
+    }
+
     f = fopen_w(fname, overwrite);
     if (f == NULL) {
       perror(fname);
@@ -322,7 +334,7 @@ main(int argc, char *argv[])
     putc(0, f);           /* e: MBZ */
     putc(0, f);           /* f: MBZ */
 
-  } else /* hard */ {
+  } else if (hard) {
     /* Unformatted hard disk */
     /* We don't care about most of this header, but we generate
        it just in case some user wants to exchange hard drives with
@@ -433,10 +445,25 @@ main(int argc, char *argv[])
       exit(1);
     }
     fwrite(&rhh, sizeof(rhh), 1, f);
+
+  } else /* wafer */ {
+    /* Reuse flag letter s */
+#define size sec
+    if (size == -1) {
+      size = STRINGY_LEN_DEFAULT;
+    } else {
+      size = stringy_len_from_kb(size);
+    }
+
+    f = fopen_w(fname, overwrite);
+    if (f == NULL) {
+      perror(fname);
+      exit(1);
+    }
+    stringy_init_with(f, STRINGY_FMT_DEFAULT, size,
+		      STRINGY_EOT_DEFAULT, FALSE);
   }
+
   fclose(f);
   return 0;
 }
-
-
-

@@ -52,7 +52,8 @@
 #define ALTERNATE 4
 
 extern char *program_name;
-extern char *romfile;
+extern char *romfile1;
+extern char *romfile1x;
 extern char *romfile3;
 extern char *romfile4p;
 extern int trs_model; /* 1, 3, 4, 5(=4p) */
@@ -109,14 +110,13 @@ int trs_joystick_in(void);
 
 extern int trs_rom_size;
 extern int trs_rom1_size;
+extern int trs_rom1x_size;
 extern int trs_rom3_size;
 extern int trs_rom4p_size;
 extern unsigned char trs_rom1[];
+extern unsigned char trs_rom1x[];
 extern unsigned char trs_rom3[];
 extern unsigned char trs_rom4p[];
-
-extern void trs_load_compiled_rom(int size, unsigned char rom[]);
-extern void trs_load_rom(char *filename);
 
 unsigned char trs_interrupt_latch_read(void);
 unsigned char trs_nmi_latch_read(void);

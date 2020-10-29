@@ -133,7 +133,8 @@ static XrmOptionDescRec opts[] = {
 {"-display",	"*display",	XrmoptionSepArg,	(caddr_t)NULL},
 {"-debug",	"*debug",	XrmoptionNoArg,		(caddr_t)"on"},
 {"-nodebug",	"*debug",	XrmoptionNoArg,		(caddr_t)"off"},
-{"-romfile",	"*romfile",	XrmoptionSepArg,	(caddr_t)NULL},
+{"-romfile1",	"*romfile1",	XrmoptionSepArg,	(caddr_t)NULL},
+{"-romfile1x",	"*romfile1x",	XrmoptionSepArg,	(caddr_t)NULL},
 {"-romfile3",	"*romfile3",	XrmoptionSepArg,	(caddr_t)NULL},
 {"-romfile4p",	"*romfile4p",	XrmoptionSepArg,	(caddr_t)NULL},
 {"-resize",	"*resize",	XrmoptionNoArg,		(caddr_t)"on"},
@@ -790,9 +791,13 @@ void trs_screen_init(void)
 
   switch (trs_model) {
   case 1:
-    (void) sprintf(option, "%s%s", program_name, ".romfile");
-    if (XrmGetResource(x_db, option, "Xtrs.Romfile", &type, &value)) {
-        romfile = value.addr;
+    (void) sprintf(option, "%s%s", program_name, ".romfile1");
+    if (XrmGetResource(x_db, option, "Xtrs.Romfile1", &type, &value)) {
+        romfile1 = value.addr;
+    }
+    (void) sprintf(option, "%s%s", program_name, ".romfile1x");
+    if (XrmGetResource(x_db, option, "Xtrs.Romfile1x", &type, &value)) {
+        romfile1x = value.addr;
     }
     break;
   case 3: case 4:

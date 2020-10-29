@@ -155,7 +155,7 @@
 .\"
 .TH mkdisk 1 2017-06-18 xtrs
 .SH Name
-mkdisk \- make a blank emulated floppy or hard disk for xtrs,
+mkdisk \- make a blank emulated floppy disk, hard disk, or Exatron Stringy Floppy wafer for xtrs,
 or add/remove an emulated write-protect tab
 .SH Synopsis
 .SY mkdisk
@@ -191,8 +191,15 @@ or add/remove an emulated write-protect tab
 .YS
 .PP
 .SY mkdisk
+.B \-w
+.OP \-s size
+.OP \-f
+.I filename
+.YS
+.PP
+.SY mkdisk
 .RB { \-p | \-u }
-.RB { \-1 | \-3 | \-k | \-h }
+.RB { \-1 | \-3 | \-k | \-h | \-w }
 .I filename
 .YS
 .SH Description
@@ -204,23 +211,25 @@ package.
 It has two
 distinct functions:
 .IP \(bu
-It can make a blank (unformatted) emulated floppy or hard drive in a file.
+It can make a blank (unformatted) emulated floppy, hard drive, or Exatron Stringy Floppy wafer in a file.
 .IP \(bu
 With the
 .B \-p
 or
 .B \-u
 flag, it can turn the write-protect flag on or off for an existing emulated
-floppy or hard drive file.
+floppy, hard drive, or wafer file.
 See
 .BR xtrs (1)
 for background information.
 .PP
 The conventional file extensions are
 .I .dsk
-for emulated floppies and
+for emulated floppies,
 .I .hdv
-for \(lqHDV\(rq emulated hard drives, but
+for \(lqHDV\(rq emulated hard drives, and
+.I .esf
+for emulated Exatron Stringy Floppy wafers, but
 .B mkdisk
 does not enforce this convention; you can use any filename.
 Other extensions sometimes used for emulated floppies are
@@ -230,7 +239,7 @@ Other extensions sometimes used for emulated floppies are
 and
 .IR .dmk .
 .PP
-By default, when creating disk image files,
+By default, when creating image files,
 .B mkdisk
 refuses to overwrite an existing file called
 .IR filename .
@@ -449,12 +458,24 @@ concern for most
 users.
 Therefore the default parameters have been chosen to give you the largest drive
 possible without partitioning.
+.SS Making Emulated Exatron Stringy Floppy wafers
+With the
+.B \-w
+flag,
+.B mkdisk
+makes an unformatted emulated wafer long enough to hold
+.I size
+kiB of data.  If
+.I size
+is not given, it defaults to 64 kiB.  The ESF @NEW command has been observed
+to report at most 65413 bytes no matter how long the wafer is, so 64 kiB may be
+the maximum usable length (?).
 .SS Write Protection
 With the
 .B \-p
 flag,
 .B mkdisk
-turns on write protection for an existing emulated floppy or hard drive.
+turns on write protection for an existing emulated floppy, hard drive, or wafer.
 It turns off all Unix write permission bits on the file, and (except for JV1
 floppies) also sets a write-protected flag inside the file.
 .PP
@@ -462,7 +483,7 @@ With the
 .B \-u
 flag,
 .B mkdisk
-turns off write protection for an existing emulated floppy or hard drive.
+turns off write protection for an existing emulated floppy, hard drive, or wafer.
 It turns on Unix write permissions to the file, masked by your current umask and
 the file's current read permissions.
 It also clears a write-protected flag inside the file (except on JV1 floppies,
@@ -479,9 +500,11 @@ flag must be accompanied by either
 .B \-3
 (JV3),
 .B \-k
-(DMK), or
+(DMK),
 .B \-h
-(hard disk) to identify the file format.
+(hard disk), or
+.B \-w
+to identify the file format.
 There is also no checking for the correct file format, so if you give the wrong
 flag, the wrong byte inside your file will be changed.
 .SS Technical data

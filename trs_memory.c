@@ -179,7 +179,8 @@ void trs_reset(int poweron)
      * we are reset from inside a kbwait and ROM code polls the
      * keyboard before reloading the stack pointer, we will see a
      * stale keyboard wait signature on the stack and incorrectly wait
-     * again.
+     * again.  (Update: z80_reset() does reset the stack pointer now,
+     * so maybe the second skip isn't needed anymore.)
      */
     trs_skip_next_kbwait();
     trs_skip_next_kbwait();

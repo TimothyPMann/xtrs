@@ -25,7 +25,7 @@
 /*
  * Emulate Exatron stringy floppy.
  *
- * Still needs more work; see XXX comments below.
+ * Still needs some cleanup; see XXX comments below.
  *
  * XXX Check if I am exactly duplicating TRS32 output now.  However,
  * TRS32 seems to drop one bit on wrap, which might be a bug in
@@ -37,6 +37,7 @@
 #include "z80.h"
 #include "trs.h"
 #include "trs_disk.h"
+#include "trs_stringy.h"
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
@@ -46,7 +47,7 @@
 
 #define STRINGYDEBUG_IN 0
 #define STRINGYDEBUG_OUT 0
-#define STRINGYDEBUG_STATE 1
+#define STRINGYDEBUG_STATE 0
 
 /* Input port bits */
 #define STRINGY_WRITE_PROT  0x01
@@ -61,18 +62,6 @@
 /*#define STRINGY_FLUX      0x80*/
 
 #define STRINGY_MAX_UNITS 8
-
-#define STRINGY_CELL_WIDTH 124 // in t-states
-#define STRINGY_LEN_DEFAULT (64 * 1024 * 2 * 9 / 8) // 64K + gaps/leaders XXX?
-#define STRINGY_EOT_DEFAULT 60 // a good value per MKR
-
-#define STRINGY_FMT_DEBUG 1
-#define STRINGY_FMT_ESF 2
-
-#define STRINGY_FMT_DEFAULT STRINGY_FMT_ESF
-
-
-typedef long stringy_pos_t;
 
 typedef struct {
   char *name;
@@ -98,25 +87,6 @@ typedef struct {
 
 stringy_info_t stringy_info[STRINGY_MAX_UNITS];
 
-/*
- * .esf file format used by TRS32.
- */
-const char stringy_esf_magic[4] = "ESF\x1a";
-const Uchar stringy_esf_header_length = 12;
-const Uchar stringy_esf_write_protected = 1;
-/*
-struct {
-  char magic[4] = stringy_esf_magic;
-  Uchar headerLength = 12;  // length of this header, in bytes
-  Uchar flags;              // bit 0: write protected; others reserved
-  Ushort leaderLength = 60; // little endian, in bit cells
-  Uint length;              // little endian, in bytes
-  Uchar data[length];
-}
- */
-
-const char stringy_debug_header[] = "xtrs stringy debug %ld %ld %d\n";
-
 #define STRINGY_STOPPED 0
 #define STRINGY_READING 1
 #define STRINGY_WRITING 2
@@ -130,73 +100,33 @@ stringy_state(int out_port)
 }
 
 /*
- * Create a blank virtual stringy floppy wafer with specified parameters.
- * Returns 0 if OK, errno value otherwise.
- */
-int
-stringy_create_with(const char *name,
-		    int format,
-		    Uint lengthBytes, // data length in bytes
-		    Uint eotCells,    // leader length in bit cells
-		    int writeProt)
-{
-  FILE *f;
-  int ires;
-  size_t sres;
-
-  f = fopen(name, "w");
-  if (f == NULL) {
-      return errno;
-  }
-
-  switch (format) {
-  case STRINGY_FMT_DEBUG:
-    ires = fprintf(f, stringy_debug_header,
-		   (stringy_pos_t)lengthBytes * STRINGY_CELL_WIDTH * 8,
-		   (stringy_pos_t)eotCells * STRINGY_CELL_WIDTH,
-		   writeProt);
-    if (ires < 0) return errno;
-    break;
-
-  case STRINGY_FMT_ESF:
-    sres = fwrite(stringy_esf_magic, sizeof(stringy_esf_magic), 1, f);
-    if (sres < 1) return errno;
-    ires = fputc(stringy_esf_header_length, f);
-    if (ires < 0) return errno;
-    ires = fputc(writeProt ? stringy_esf_write_protected : 0, f);
-    if (ires < 0) return errno;
-    ires = put_twobyte(eotCells, f);
-    if (ires < 0) return errno;
-    ires = put_fourbyte(lengthBytes, f);
-    if (ires < 0) return errno;
-    break;
-
-  default:
-    error("unknown wafer image type on write");
-    return -1;
-  }
-
-  ires = fclose(f);
-  if (ires < 0) return errno;
-
-  return 0;
-}
-
-/*
  * Create a blank virtual stringy floppy wafer with default parameters.
  * Returns 0 if OK, errno value otherwise.
  */
 int
 stringy_create(const char *name)
 {
+  FILE *f;
+  int ires;
+
+  f = fopen(name, "w");
+  if (f == NULL) {
+      return errno;
+  }
+
   /*
    * Default parameters
    */
-  return stringy_create_with(name,
-			     STRINGY_FMT_DEFAULT,
-			     STRINGY_LEN_DEFAULT,
-			     STRINGY_EOT_DEFAULT,
-			     FALSE);
+  ires = stringy_init_with(f,
+			   STRINGY_FMT_DEFAULT,
+			   STRINGY_LEN_DEFAULT,
+			   STRINGY_EOT_DEFAULT,
+			   FALSE);
+
+  if (ires < 0) return errno;
+  ires = fclose(f);
+  if (ires < 0) return errno;
+  return 0;
 }
 
 static int

@@ -1,6 +1,5 @@
 #
 # Makefile.local: local customizations for the xtrs Makefile
-# $Id$
 #
 
 # Set these to where you want installed stuff to go, if you install
@@ -43,17 +42,20 @@ CASSETTE = cassette.sh
 # operating system.
 
 # for -model I
-BUILT_IN_ROM = fakerom.hex
+BUILT_IN_ROM1 = fakerom.hex
+BUILT_IN_ROM1X = esfrom.hex
 # for -model III and -model 4
 BUILT_IN_ROM3 = fakerom.hex
 # for -model 4P
 BUILT_IN_ROM4P = xtrsrom4p.hex
 
-# If you would like the application to load a default ROM file at startup
-# time, use these lines (with the appropriate file names).  The default file
-# name is ignored and can be omitted if the ROM for that model is built in.
+# If you would like the application to load a default ROM file at
+# startup time, use these lines (with the appropriate file names).  If
+# a ROM file is present, it takes precedence over the corresponding
+# built-in ROM.
 
-DEFAULT_ROM = -DDEFAULT_ROM='"$(SHAREDIR)/level2rom.hex"' \
+DEFAULT_ROM = -DDEFAULT_ROM1='"$(SHAREDIR)/level2rom.hex"' \
+	      -DDEFAULT_ROM1X='"$(SHAREDIR)/esfrom.hex"' \
               -DDEFAULT_ROM3='"$(SHAREDIR)/romimage.m3"' \
               -DDEFAULT_ROM4P='"$(SHAREDIR)/romimage.m4p"'
 

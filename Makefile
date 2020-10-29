@@ -1,6 +1,5 @@
 #
 # Makefile for xtrs, the TRS-80 emulator.
-# $Id$
 #
 
 OBJECTS = \
@@ -18,6 +17,7 @@ OBJECTS = \
 	trs_chars.o \
 	trs_printer.o \
 	trs_rom1.o \
+	trs_rom1x.o \
 	trs_rom3.o \
 	trs_rom4p.o \
 	trs_disk.o \
@@ -25,7 +25,8 @@ OBJECTS = \
 	trs_imp_exp.o \
 	trs_hard.o \
 	trs_uart.o \
-	trs_stringy.o
+	trs_stringy.o \
+	common.o
 
 X_OBJECTS = \
 	trs_xinterface.o
@@ -41,7 +42,8 @@ CR_OBJECTS = \
 	load_hex.o
 
 MD_OBJECTS = \
-	mkdisk.o
+	mkdisk.o \
+        common.o
 
 HC_OBJECTS = \
 	cmd.o \
@@ -126,8 +128,11 @@ gxtrs: $(OBJECTS) $(GTK_OBJECTS)
 compile_rom: $(CR_OBJECTS)
 	$(CC) $(LDFLAGS) -o compile_rom $(CR_OBJECTS)
 
-trs_rom1.c: compile_rom $(BUILT_IN_ROM)
-	./compile_rom 1 $(BUILT_IN_ROM) > trs_rom1.c
+trs_rom1.c: compile_rom $(BUILT_IN_ROM1)
+	./compile_rom 1 $(BUILT_IN_ROM1) > trs_rom1.c
+
+trs_rom1x.c: compile_rom $(BUILT_IN_ROM1X)
+	./compile_rom 1x $(BUILT_IN_ROM1X) > trs_rom1x.c
 
 trs_rom3.c: compile_rom $(BUILT_IN_ROM3)
 	./compile_rom 3 $(BUILT_IN_ROM3) > trs_rom3.c

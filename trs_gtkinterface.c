@@ -321,7 +321,8 @@ struct option options[] = {
   {"nomicrolabs",    FALSE, &grafyx_microlabs, FALSE },
   {"debug",	     FALSE, &opt_debug,        TRUE  },
   {"nodebug",        FALSE, &opt_debug,        FALSE },
-  {"romfile",	     TRUE,  NULL,              0     },
+  {"romfile1",	     TRUE,  NULL,              0     },
+  {"romfile1x",	     TRUE,  NULL,              0     },
   {"romfile3",	     TRUE,  NULL,              0     },
   {"romfile4p",      TRUE,  NULL,              0     },
   {"model",          TRUE,  NULL,              0     },
@@ -386,8 +387,10 @@ trs_parse_command_line(int argc, char **argv, int *debug)
       sscanf(optarg, "%u,%u", &scale_x, &scale_y);
     } else if (strcmp(name, "charset") == 0) {
       opt_charset = optarg;
-    } else if (strcmp(name, "romfile") == 0) {
-      romfile = optarg;
+    } else if (strcmp(name, "romfile1") == 0) {
+      romfile1 = optarg;
+    } else if (strcmp(name, "romfile1x") == 0) {
+      romfile1x = optarg;
     } else if (strcmp(name, "romfile3") == 0) {
       romfile3 = optarg;
     } else if (strcmp(name, "romfile4p") == 0) {

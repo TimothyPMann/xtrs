@@ -53,7 +53,8 @@ int trs_model = 1;
 int trs_paused = 1;
 int trs_autodelay = 0;
 char *program_name;
-char *romfile = NULL;
+char *romfile1 = NULL;
+char *romfile1x = NULL;
 char *romfile3 = NULL;
 char *romfile4p = NULL;
 
@@ -68,7 +69,12 @@ static void check_endian(void)
     }
 }
 
-void trs_load_rom(char *filename)
+/*
+ * Note: If there are multiple ROMs, trs_rom_size is set to the ending
+ * address(+1) of the last ROM loaded.  So ROMs must be loaded in
+ * ascending order by address.
+ */
+void trs_load_rom(int address, char *filename)
 {
     FILE *program;
     int c;
@@ -80,14 +86,17 @@ void trs_load_rom(char *filename)
 	fatal(message);
     }
     c = getc(program);
+
     if (c == ':') {
         /* Assume Intel hex format */
         rewind(program);
         trs_rom_size = load_hex(program);
 	fclose(program);
 	return;
-    } else if (c == 1 || c == 5) {
-	/* Assume MODELA/III file */
+    }
+
+    if (c == 1 || c == 5) {
+        /* Assume MODELA/III file */
 	int res;
 	extern Uchar *rom; /*!! fixme*/
 	Uchar loadmap[Z80_ADDRESS_LIMIT];
@@ -104,60 +113,73 @@ void trs_load_rom(char *filename)
 	    fclose(program);
 	    return;
 	} else {
-	    /* Guess it wasn't one */
+	    /* Apparently it wasn't one */
 	    rewind(program);
 	    c = getc(program);
 	}
     }
-    trs_rom_size = 0;
+
+    /* Assume raw binary */
+    trs_rom_size = address;
     while (c != EOF) {
         mem_write_rom(trs_rom_size++, c);
 	c = getc(program);
     }
 }
 
-void trs_load_compiled_rom(int size, unsigned char rom[])
+void trs_load_compiled_rom(int address, int size, unsigned char rom[])
 {
     int i;
     
     trs_rom_size = size;
-    for(i = 0; i < size; ++i)
-    {
+    for (i = address; i < size; i++) {
 	mem_write_rom(i, rom[i]);
     }
 }
 
 void
-trs_load_romfile(void)
+trs_load_romfiles(void)
 {
   struct stat statbuf;
 
   switch (trs_model) {
   case 1:
-#ifdef DEFAULT_ROM
-    if (!romfile) {
-      romfile = DEFAULT_ROM;
+#ifdef DEFAULT_ROM1
+    if (!romfile1) {
+      romfile1 = DEFAULT_ROM1;
     }
 #endif
-    if (romfile != NULL && stat(romfile, &statbuf) == 0) {
-      trs_load_rom(romfile);
+    if (romfile1 != NULL && stat(romfile1, &statbuf) == 0) {
+      trs_load_rom(0, romfile1);
     } else if (trs_rom1_size > 0) {
-      trs_load_compiled_rom(trs_rom1_size, trs_rom1);
+      trs_load_compiled_rom(0, trs_rom1_size, trs_rom1);
     } else {
       fatal("ROM file not specified!");
     }
+
+#ifdef DEFAULT_ROM1X
+    if (!romfile1x) {
+      romfile1x = DEFAULT_ROM1X;
+    }
+#endif
+    if (romfile1x != NULL && stat(romfile1x, &statbuf) == 0) {
+      trs_load_rom(0x3000, romfile1x);
+    } else if (trs_rom1x_size > 0) {
+      trs_load_compiled_rom(0x3000, trs_rom1x_size, trs_rom1x);
+    }
     break;
 
-  case 3: case 4:
+  case 3:
+  case 4:
 #ifdef DEFAULT_ROM3
     if (!romfile3) {
       romfile3 = DEFAULT_ROM3;
     }
 #endif
     if (romfile3 != NULL && stat(romfile3, &statbuf) == 0) {
-      trs_load_rom(romfile3);
+      trs_load_rom(0, romfile3);
     } else if (trs_rom3_size > 0) {
-      trs_load_compiled_rom(trs_rom3_size, trs_rom3);
+      trs_load_compiled_rom(0, trs_rom3_size, trs_rom3);
     } else {
       fatal("ROM file not specified!");
     }
@@ -166,13 +188,13 @@ trs_load_romfile(void)
   default: /* 4P */
 #ifdef DEFAULT_ROM4P
     if (!romfile4p) {
-      romfile = DEFAULT_ROM4P;
+      romfile4p = DEFAULT_ROM4P;
     }
 #endif
     if (romfile4p != NULL && stat(romfile4p, &statbuf) == 0) {
-      trs_load_rom(romfile4p);
+      trs_load_rom(0, romfile4p);
     } else if (trs_rom4p_size > 0) {
-      trs_load_compiled_rom(trs_rom4p_size, trs_rom4p);
+      trs_load_compiled_rom(0, trs_rom4p_size, trs_rom4p);
     } else {
       fatal("ROM file not specified!");
     }
@@ -206,7 +228,7 @@ int main(int argc, char *argv[])
     trs_hard_init();
     stringy_init();
 
-    trs_load_romfile();
+    trs_load_romfiles();
     trs_reset(1);
     if (!debug) {
       /* Run continuously until exit or request to enter debugger */
