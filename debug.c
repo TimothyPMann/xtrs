@@ -82,14 +82,17 @@ Running:\n\
     cont\n\
         Continue execution.\n\
     step\n\
-        Execute one instruction, disallowing all interrupts.\n\
     stepint\n\
-        Execute one instruction, allowing an interrupt afterwards.\n\
+        Execute one instruction, or if the instruction is repeating (such as\n\
+        LDIR), execute only one iteration.  With \"step\", an interrupt is\n\
+        not allowed to occur after the instruction; with \"stepint\", an\n\
+        interrupt is allowed.\n\
     next\n\
     nextint\n\
         Execute one instruction.  If the instruction is a CALL, continue\n\
-        until the return.  Interrupts are always allowed inside the call,\n\
-        but only the nextint form allows an interrupt afterwards.\n\
+        until the return.  If the instruction is repeating (such as LDIR),\n\
+        continue until it finishes.  Interrupts are always allowed during\n\
+        execution, but only \"nextint\" allows an interrupt afterwards.\n\
     reset\n\
         Hard reset the Z80 and devices.\n\
     softreset\n\
@@ -136,8 +139,8 @@ Traps:\n\
         Set a trap to watch specified hex address for changes.\n\
 Miscellaneous:\n\
     assign $<reg> = <value>\n\
-    set $<reg> = <value>\n\
     assign <addr> = <value>\n\
+    set $<reg> = <value>\n\
     set <addr> = <value>\n\
         Change the value of a register, register pair, or memory byte.\n\
     in <port>\n\
@@ -643,7 +646,7 @@ void debug_shell(void)
 
 	    else if(!strcmp(command, "next") || !strcmp(command, "nextint"))
 	    {
-		int is_call = 0, is_rst = 0;
+		int is_call = 0, is_rst = 0, is_rep = 0;
 		switch(mem_read(REG_PC)) {
 		  case 0xCD:	/* call address */
 		    is_call = 1;
@@ -682,6 +685,22 @@ void debug_shell(void)
 		  case 0xFF:
 		    is_rst = 1;
 		    break;
+		  case 0xED:
+		    switch(mem_read(REG_PC+1)) {
+		      case 0xB0: /* ldir */
+		      case 0xB8: /* lddr */
+		      case 0xB1: /* cpir */
+		      case 0xB9: /* cpdr */
+		      case 0xB2: /* inir */
+		      case 0xBA: /* indr */
+		      case 0xB3: /* otir */
+		      case 0xBB: /* otdr */
+			is_rep = 1;
+			break;
+		      default:
+			break;
+		    }
+		    break;
 		  default:
 		    break;
 		}
@@ -690,6 +709,9 @@ void debug_shell(void)
 		    debug_run();
 		} else if (is_rst) {
 		    set_trap((REG_PC + 1) % ADDRESS_SPACE, BREAK_ONCE_FLAG);
+		    debug_run();
+		} else if (is_rep) {
+		    set_trap((REG_PC + 2) % ADDRESS_SPACE, BREAK_ONCE_FLAG);
 		    debug_run();
 		} else {
 		    z80_run((!strcmp(command, "nextint")) ? 0 : -1);
