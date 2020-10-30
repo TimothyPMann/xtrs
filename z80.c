@@ -43,9 +43,8 @@
  * The Z80 emulator should be general and complete enough to be
  * easily adapted to emulate any Z80 machine.  All of the documented
  * Z80 flags and instructions are implemented.  The only documented
- * features we cheat a little on are interrupt handling (modes 0 and 2
- * are not supported) and the refresh register (reading it returns a
- * random number; writing it is ignored).
+ * feature we cheat a little is interrupt handling (modes 0 and 2
+ * are not supported).
  *
  * All of the undocumented instructions, flags, and features listed in
  * http://www.msxnet.org/tech/Z80/z80undoc.txt are implemented too,
@@ -1056,10 +1055,7 @@ static void do_ld_a_r(void)
 
     set = 0;
 
-    /* xtrs doesn't keep an M1 cycle count, so cheat by setting the low
-       7 bits to a random value. */
-    REG_R = (REG_R & 0x80) + ((rand() >> 8) & 0x7F);
-    REG_A = REG_R;
+    REG_A = REG_R7 | (REG_R & 0x7f);
 
     if(REG_A & 0x80)
       set |= SIGN_MASK;
@@ -1389,6 +1385,7 @@ static void do_CB_instruction(void)
     Uchar instruction;
     
     instruction = mem_read(REG_PC++);
+    REG_R++;
     
     switch(instruction)
     {
@@ -2189,6 +2186,7 @@ static void do_indexed_instruction(Ushort *ixp)
     Uchar instruction;
     
     instruction = mem_read(REG_PC++);
+    REG_R++;
     
     switch(instruction)
     {
@@ -2661,6 +2659,7 @@ static void do_indexed_instruction(Ushort *ixp)
 	/* Ignore DD or FD prefix and retry as normal instruction;
 	   this is a correct emulation. [undocumented, timing guessed] */
 	REG_PC--;
+	REG_R--;
 	T_COUNT(4);
 	break;
     }
@@ -2676,7 +2675,8 @@ static int do_ED_instruction(void)
     int debug = 0;
     
     instruction = mem_read(REG_PC++);
-    
+    REG_R++;
+
     switch(instruction)
     {
       case 0x4A:	/* adc hl, bc */
@@ -2768,7 +2768,9 @@ static int do_ED_instruction(void)
 	do_ld_a_r();  T_COUNT(9);
 	break;
       case 0x4F:	/* ld r, a */
-	REG_R = REG_A;  T_COUNT(9);
+	REG_R = REG_A;
+	REG_R7 = REG_A & 0x80;
+        T_COUNT(9);
 	break;
 
       case 0x4B:	/* ld bc, (address) */
@@ -3051,6 +3053,7 @@ int z80_run(int continuous)
 	}
 
 	instruction = mem_read(REG_PC++);
+	REG_R++;
 	
 	switch(instruction)
 	{

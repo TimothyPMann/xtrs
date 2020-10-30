@@ -325,6 +325,7 @@ void debug_print_registers(void)
 	   REG_D, REG_E, REG_PC, REG_DE_PRIME);
     printf("H L: %.2x %.2x    SP: %.4x    HL': %.4x\n",
 	   REG_H, REG_L, REG_SP, REG_HL_PRIME);
+    printf("I R: %.2x %.2x\n", REG_I, REG_R7 | (REG_R & 0x7f));
 
     printf("\nT-state counter: %" TSTATE_T_LEN "    ", z80_state.t_count);
     printf("Delay setting: %d (%s)\n",
@@ -769,6 +770,7 @@ void debug_shell(void)
 			REG_I = value;
 		    } else if(!strcasecmp(regname, "r")) {
 			REG_R = value;
+			REG_R7 = value & 0x80;
 		    } else {
 			printf("Unrecognized register name %s.\n", regname);
 		    }
