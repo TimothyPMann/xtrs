@@ -247,6 +247,7 @@
                         </child>
                       </object>
                     </child>
+                    <!--
                     <child>
                       <object class="GtkMenuItem" id="menuitem35">
                         <property name="visible">True</property>
@@ -273,38 +274,7 @@
                         </child>
                       </object>
                     </child>
-                    <child>
-                      <object class="GtkSeparatorMenuItem" id="&lt;separator&gt;">
-                        <property name="visible">True</property>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkMenuItem" id="menuitem5">
-                        <property name="visible">True</property>
-                        <property name="label" translatable="yes">S_oft reset</property>
-                        <property name="use_underline">True</property>
-                        <signal name="activate" handler="on_reset_menu_item_activate"/>
-                        <accelerator key="F10" signal="activate"/>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkMenuItem" id="menuitem6">
-                        <property name="visible">True</property>
-                        <property name="label" translatable="yes">Hard _reset</property>
-                        <property name="use_underline">True</property>
-                        <signal name="activate" handler="on_hard_reset_menu_item_activate"/>
-                        <accelerator key="F10" modifiers="GDK_SHIFT_MASK" signal="activate"/>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkMenuItem" id="menuitem7">
-                        <property name="visible">True</property>
-                        <property name="label" translatable="yes">Enter _debugger</property>
-                        <property name="use_underline">True</property>
-                        <signal name="activate" handler="on_debugger_menu_item_activate"/>
-                        <accelerator key="F9" signal="activate"/>
-                      </object>
-                    </child>
+                    -->
                     <child>
                       <object class="GtkSeparatorMenuItem" id="separatormenuitem1">
                         <property name="visible">True</property>
@@ -324,6 +294,7 @@
                 </child>
               </object>
             </child>
+            <!--
             <child>
               <object class="GtkMenuItem" id="menuitem2">
                 <property name="visible">True</property>
@@ -352,6 +323,47 @@
                 </child>
               </object>
             </child>
+            -->
+            <child>
+              <object class="GtkMenuItem" id="menuitem38">
+                <property name="visible">True</property>
+                <property name="label" translatable="yes">_Action</property>
+                <property name="use_underline">True</property>
+                <child type="submenu">
+                  <object class="GtkMenu" id="menu8">
+                    <property name="visible">True</property>
+                    <child>
+                      <object class="GtkMenuItem" id="menuitem5">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">S_oft reset</property>
+                        <property name="use_underline">True</property>
+                        <signal name="activate" handler="on_reset_menu_item_activate"/>
+                        <accelerator key="F10" signal="activate"/>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="menuitem6">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">Hard _reset</property>
+                        <property name="use_underline">True</property>
+                        <signal name="activate" handler="on_hard_reset_menu_item_activate"/>
+                        <accelerator key="F10" modifiers="GDK_SHIFT_MASK" signal="activate"/>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="menuitem7">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">Enter _debugger</property>
+                        <property name="use_underline">True</property>
+                        <signal name="activate" handler="on_debugger_menu_item_activate"/>
+                        <accelerator key="F9" signal="activate"/>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <!--
             <child>
               <object class="GtkMenuItem" id="menuitem3">
                 <property name="visible">True</property>
@@ -359,6 +371,7 @@
                 <property name="use_underline">True</property>
               </object>
             </child>
+            -->
             <child>
               <object class="GtkMenuItem" id="menuitem4">
                 <property name="visible">True</property>
