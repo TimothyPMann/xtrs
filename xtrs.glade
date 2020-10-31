@@ -436,10 +436,10 @@
     <property name="transient_for">main_window</property>
     <property name="destroy_with_parent">True</property>
     <property name="type_hint">normal</property>
-    <property name="program_name">xtrs</property>
-    <property name="version">5.0</property>
+    <property name="program_name">gxtrs</property>
+    <!-- <property name="version">5.0</property> -->
     <property name="copyright" translatable="yes">&#xA9; 1992 Clarendon Hill Software
-&#xA9; 1996-2009 Timothy Mann</property>
+&#xA9; 1996-2020 Timothy Mann</property>
     <property name="website">http://tim-mann.org/xtrs.html</property>
     <property name="website_label" translatable="yes">Web page</property>
     <property name="license" translatable="yes">Copyright &#xA9; 1992 Clarendon Hill Software.
