@@ -1572,8 +1572,8 @@ As with floppy and hard drives, use the F7 key to signal a wafer change.
 The emulator supports only interrupt mode 1 of the Z80.
 It will complain if your program enables interrupts after powerup without
 executing an IM 1 instruction first.
-All Model I/III/4/4P software does this, as the built-in peripherals in these
-machines support only IM 1.
+All Model I/III/4/4P software uses IM 1, as the built-in peripherals in these
+machines support only interrupt mode 1.
 The Model I has a 40 Hz heartbeat clock interrupt, while the Model III uses 30
 Hz, and the Model 4/4P can run at either 30 Hz or 60 Hz.
 The emulator has a notion of the absolute time at which each tick is supposed to
