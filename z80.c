@@ -3096,7 +3096,7 @@ int z80_run(int continuous)
 	    x_poll_count--;
 	}
         /* Speed control */
-        if ((i = z80_state.delay)) {
+        if ((i = (z80_state.delay + z80_state.keydelay))) {
 	  while (--i) dummy = i;
 	}
 

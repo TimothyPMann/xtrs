@@ -334,6 +334,7 @@ struct option options[] = {
   {"autodelay",      FALSE, &trs_autodelay,    TRUE  },
   {"noautodelay",    FALSE, &trs_autodelay,    FALSE },
   {"keystretch",     TRUE,  NULL,              0     },
+  {"keydelay",       TRUE,  NULL,              0     },
   {"shiftbracket",   FALSE, &opt_shiftbracket, TRUE  },
   {"noshiftbracket", FALSE, &opt_shiftbracket, FALSE },
   {"diskdir",        TRUE,  NULL,              0     },
@@ -415,6 +416,8 @@ trs_parse_command_line(int argc, char **argv, int *debug)
       z80_state.delay = strtol(optarg, NULL, 0);
     } else if (strcmp(name, "keystretch") == 0) {
       stretch_amount = strtol(optarg, NULL, 0);
+    } else if (strcmp(name, "keydelay") == 0) {
+      trs_keydelay = strtol(optarg, NULL, 0);
     } else if (strcmp(name, "diskdir") == 0) {
       trs_disk_dir = strdup(optarg);
       if (trs_disk_dir[0] == '~' &&

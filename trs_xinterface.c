@@ -14,7 +14,7 @@
  */
 
 /* 
- * Copyright (c) 1996-2020, Timothy P. Mann
+ * Portions copyright (c) 1996-2020, Timothy P. Mann
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -151,6 +151,7 @@ static XrmOptionDescRec opts[] = {
 {"-autodelay",  "*autodelay",   XrmoptionNoArg,         (caddr_t)"on"},
 {"-noautodelay","*autodelay",   XrmoptionNoArg,         (caddr_t)"off"},
 {"-keystretch", "*keystretch",  XrmoptionSepArg,        (caddr_t)NULL},
+{"-keydelay",   "*keydelay",    XrmoptionSepArg,        (caddr_t)NULL},
 {"-microlabs",  "*microlabs",   XrmoptionNoArg,         (caddr_t)"on"},
 {"-nomicrolabs","*microlabs",   XrmoptionNoArg,         (caddr_t)"off"},
 {"-doubler",    "*doubler",     XrmoptionSepArg,        (caddr_t)NULL},
@@ -437,6 +438,11 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
   (void) sprintf(option, "%s%s", program_name, ".delay");
   if (XrmGetResource(x_db, option, "Xtrs.Delay", &type, &value)) {
     z80_state.delay = strtol(value.addr, NULL, 0);
+  }
+
+  (void) sprintf(option, "%s%s", program_name, ".keydelay");
+  if (XrmGetResource(x_db, option, "Xtrs.Keydelay", &type, &value)) {
+    trs_keydelay = strtol(value.addr, NULL, 0);
   }
 
   (void) sprintf(option, "%s%s", program_name, ".keystretch");

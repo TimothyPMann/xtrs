@@ -93,6 +93,7 @@ int dequeue_key(void);
 void clear_key_queue(void);
 void trs_skip_next_kbwait(void);
 extern int stretch_amount;
+extern int trs_keydelay;
 
 void trs_get_event(int wait);
 extern volatile int x_poll_count;

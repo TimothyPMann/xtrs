@@ -331,8 +331,8 @@ void debug_print_registers(void)
     printf("I R: %.2x %.2x\n", REG_I, REG_R7 | (REG_R & 0x7f));
 
     printf("\nT-state counter: %" TSTATE_T_LEN "    ", z80_state.t_count);
-    printf("Delay setting: %d (%s)\n",
-	   z80_state.delay, trs_autodelay ? "auto" : "fixed");
+    printf("Delay setting: %d + %d (%s)\n", z80_state.delay,
+	   z80_state.keydelay, trs_autodelay ? "auto" : "fixed");
 }
 
 

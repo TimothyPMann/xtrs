@@ -731,11 +731,13 @@ KeyTable function_key_table[] = {
 static int keystate[8] = { 0, };
 static int force_shift = TK_Neutral;
 static int joystate = 0;
+static int keys_down = 0;
 
 /* Avoid changing state too fast so keystrokes aren't lost. */
 #define STRETCH_AMOUNT 4000
 static tstate_t key_stretch_timeout;
 int stretch_amount = STRETCH_AMOUNT;
+int trs_keydelay = 0;
 
 void trs_kb_reset(void)
 {
@@ -830,7 +832,7 @@ void trs_xlate_keysym(int keysym)
 
 static void change_keystate(int action)
 {
-    int key_down;
+    int key_down, was_down;
     int i;
 #ifdef KBDEBUG
     debug("change_keystate: action 0x%x\n", action);
@@ -843,6 +845,8 @@ static void change_keystate(int action)
 	    keystate[i] = 0;
 	}
 	force_shift = TK_Neutral;
+	keys_down = 0;
+	z80_state.keydelay = 0;
 	break;
 
       case TK_Neutral:
@@ -854,10 +858,16 @@ static void change_keystate(int action)
 
       default:
 	key_down = TK_DOWN(action);
-	if (key_down) {
-	    keystate[TK_ADDR(action)] |= (1 << TK_DATA(action));
-	} else {
-	    keystate[TK_ADDR(action)] &= ~(1 << TK_DATA(action));
+	was_down = (keystate[TK_ADDR(action)] & (1 << TK_DATA(action))) != 0;
+	if (key_down != was_down) {
+	    if (key_down) {
+		keystate[TK_ADDR(action)] |= (1 << TK_DATA(action));
+		keys_down++;
+	    } else {
+		keystate[TK_ADDR(action)] &= ~(1 << TK_DATA(action));
+		keys_down--;
+	    }
+	    z80_state.keydelay = keys_down ? trs_keydelay : 0;
 	}
     }
 }

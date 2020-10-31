@@ -137,6 +137,7 @@ struct z80_state_struct
 
     /* Speed control.  0 = full speed */
     int delay;
+    int keydelay;  /* extra delay while any keys are pressed */
 
     /* Cyclic T-state counter */
     tstate_t t_count;

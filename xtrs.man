@@ -1655,8 +1655,9 @@ better sound.
 There is no need to use
 .BR xtrs 's
 .B \-autodelay
-flag when running Orchestra-85/90, but you might want to specify a small fixed
-delay to keep from getting excessive key repeat.
+flag when running Orchestra-85/90, but you might want to use
+.B \-keydelay
+to keep from getting excessive key repeat.
 .SS Mouse
 A few Model 4 programs could use a mouse, such as the shareware hi-res
 drawing program
@@ -2034,6 +2035,21 @@ Key transitions that are received during the waiting period or when the Z80
 program is not reading the keyboard are held in a queue.
 The default stretch value is 4000 cycles; it should seldom if ever be necessary
 to change it.
+.TP
+.B \-keydelay \fIkd\fP
+After each Z80 instruction, if any key on the emulated keyboard is
+currently pressed,
+.B xtrs
+busy-waits for an additional
+.I kd
+empty loop iterations beyond what the
+.B \-delay
+option specifies. The default keydelay is 0. Using this option can avoid unwanted
+key repeat in some TRS-80 software without slowing emulation down as much
+as
+.B \-delay
+or
+.BR \-autodelay .
 .TP
 .B \-shiftbracket
 Emulate [, \(rs, ], \(ha and _ as shifted keys, and {, |, }, and \(ti as
