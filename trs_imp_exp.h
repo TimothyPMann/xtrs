@@ -224,6 +224,10 @@
  *         After,  HL = 0 or 1
  *    21 = set truedam flag
  *         Before, HL = 0 or 1
+ *    22 = query keydelay
+ *         After,  HL = keydelay
+ *    23 = set keydelay
+ *         Before,  HL = new keydelay
  *
  * ED3D emt_ftruncate
  *         Before, DE =  fd

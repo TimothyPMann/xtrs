@@ -550,14 +550,20 @@ void do_emt_misc(void)
   case 17:
     trs_disk_doubler = REG_HL;
     break;
+  case 18: // removed; do not reuse
+  case 19: // removed; do not reuse
   case 20:
     REG_HL = trs_disk_truedam;
     break;
   case 21:
     trs_disk_truedam = REG_HL;
     break;
-  case 18: // removed; do not reuse
-  case 19: // removed; do not reuse
+  case 22:
+    REG_HL = trs_keydelay;
+    break;
+  case 23:
+    trs_keydelay = REG_HL;
+    break;
   default:
     error("unsupported function code to emt_misc");
     break;
