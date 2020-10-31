@@ -547,6 +547,7 @@ static void do_cpi(void)
 
 static void do_cpdr(void)
 {
+#ifdef FASTMEM
     int oldcarry = REG_F & CARRY_MASK;
     int a = REG_A, value, result;
     do
@@ -568,10 +569,18 @@ static void do_cpdr(void)
     }
 
     T_COUNT(-5);
+#else
+    do_cpd();
+    if(OVERFLOW_FLAG && !ZERO_FLAG) {
+      REG_PC -= 2;
+      T_COUNT(5);
+    }
+#endif
 }
 
 static void do_cpir(void)
 {
+#ifdef FASTMEM
     int oldcarry = REG_F & CARRY_MASK;
     int a = REG_A, value, result;
     do
@@ -593,6 +602,13 @@ static void do_cpir(void)
     }
 
     T_COUNT(-5);
+#else
+    do_cpi();
+    if(OVERFLOW_FLAG && !ZERO_FLAG) {
+      REG_PC -= 2;
+      T_COUNT(5);
+    }
+#endif
 }
 
 #if 1
@@ -1182,6 +1198,7 @@ static void do_ind(void)
 
 static void do_indr(void)
 {
+#ifdef FASTMEM
     do
     {
 	mem_write(REG_HL, z80_in(REG_C));
@@ -1193,6 +1210,13 @@ static void do_indr(void)
 
     SET_ZERO();
     SET_SUBTRACT();
+#else
+    do_ind();
+    if(!ZERO_FLAG) {
+      REG_PC -= 2;
+      T_COUNT(5);
+    }
+#endif
 }
 
 static void do_ini(void)
@@ -1212,6 +1236,7 @@ static void do_ini(void)
 
 static void do_inir(void)
 {
+#ifdef FASTMEM
     do
     {
 	mem_write(REG_HL, z80_in(REG_C));
@@ -1223,6 +1248,13 @@ static void do_inir(void)
 
     SET_ZERO();
     SET_SUBTRACT();
+#else
+    do_ini();
+    if(!ZERO_FLAG) {
+      REG_PC -= 2;
+      T_COUNT(5);
+    }
+#endif
 }
 
 static int in_with_flags(int port)
@@ -1272,6 +1304,7 @@ static void do_outd(void)
 
 static void do_outdr(void)
 {
+#ifdef FASTMEM
     do
     {
 	z80_out(REG_C, mem_read(REG_HL));
@@ -1283,6 +1316,13 @@ static void do_outdr(void)
 
     SET_ZERO();
     SET_SUBTRACT();
+#else
+    do_outd();
+    if(!ZERO_FLAG) {
+      REG_PC -= 2;
+      T_COUNT(5);
+    }
+#endif
 }
 
 static void do_outi(void)
@@ -1302,6 +1342,7 @@ static void do_outi(void)
 
 static void do_outir(void)
 {
+#ifdef FASTMEM
     do
     {
 	z80_out(REG_C, mem_read(REG_HL));
@@ -1313,6 +1354,13 @@ static void do_outir(void)
 
     SET_ZERO();
     SET_SUBTRACT();
+#else
+    do_outi();
+    if(!ZERO_FLAG) {
+      REG_PC -= 2;
+      T_COUNT(5);
+    }
+#endif
 }
 
 
