@@ -1399,9 +1399,11 @@ static void do_int(void)
     REG_SP -= 2;
     mem_write_word(REG_SP, REG_PC);
     z80_state.iff1 = z80_state.iff2 = 0;
+    REG_R++;
     switch (z80_state.interrupt_mode) {
     case 0:
       /* REG_PC = get_irq_vector() & 0x38; */
+      T_COUNT(13);
       error("interrupt in im0 not supported");
       break;
     case 1:
@@ -1410,6 +1412,7 @@ static void do_int(void)
       break;
     case 2:
       /* REG_PC = REG_I << 8 + get_irq_vector(); */
+      T_COUNT(19);
       error("interrupt in im2 not supported");
       break;
     }
@@ -1421,6 +1424,7 @@ static void do_nmi(void)
     REG_SP -= 2;
     mem_write_word(REG_SP, REG_PC);
     z80_state.iff1 = 0;
+    REG_R++;
     REG_PC = 0x66;
     T_COUNT(11);
 }
@@ -2220,6 +2224,7 @@ static void do_CB_instruction(void)
 	break;
 
       default:
+	/* Not possible; all 256 cases are covered above */
 	disassemble(REG_PC - 2);
 	error("unsupported instruction");
     }
@@ -2948,20 +2953,15 @@ static int do_ED_instruction(void)
 	break;
 
       case 0x45:	/* retn */
+      case 0x55:	/* retn [undocumented] */
+      case 0x5D:	/* retn [undocumented] */
+      case 0x65:	/* retn [undocumented] */
+      case 0x6D:	/* retn [undocumented] */
+      case 0x75:	/* retn [undocumented] */
+      case 0x7D:	/* retn [undocumented] */
 	REG_PC = mem_read_word(REG_SP);
 	REG_SP += 2;
 	z80_state.iff1 = z80_state.iff2;  /* restore the iff state */
-	T_COUNT(14);
-	break;
-
-      case 0x55:	/* ret [undocumented] */
-      case 0x5D:	/* ret [undocumented] */
-      case 0x65:	/* ret [undocumented] */
-      case 0x6D:	/* ret [undocumented] */
-      case 0x75:	/* ret [undocumented] */
-      case 0x7D:	/* ret [undocumented] */
-	REG_PC = mem_read_word(REG_SP);
-	REG_SP += 2;
 	T_COUNT(14);
 	break;
 
@@ -3059,6 +3059,8 @@ static int do_ED_instruction(void)
 	break;
 
       default:
+	/* undocumented no-op */
+	T_COUNT(4);
 	disassemble(REG_PC - 2);
 	error("unsupported instruction");
     }
@@ -4380,6 +4382,7 @@ int z80_run(int continuous)
 	    break;
 	    
 	  default:
+	    /* Not possible; all 256 cases are covered above */
 	    disassemble(REG_PC - 1);
 	    error("unsupported instruction");
 	}
