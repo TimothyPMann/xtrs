@@ -564,6 +564,12 @@ void do_emt_misc(void)
   case 23:
     trs_keydelay = REG_HL;
     break;
+  case 24:
+    REG_HL = trs_lowercase;
+    break;
+  case 25:
+    trs_lowercase = REG_HL;
+    break;
   default:
     error("unsupported function code to emt_misc");
     break;

@@ -228,6 +228,10 @@
  *         After,  HL = keydelay
  *    23 = set keydelay
  *         Before,  HL = new keydelay
+ *    24 = query if lowercase enabled (meaningful only for Model I)
+ *         After,  HL = 0 or 1
+ *    25 = disable/enable lowercase (meaningful only for Model I)
+ *         Before,  HL = 0 or 1
  *
  * ED3D emt_ftruncate
  *         Before, DE =  fd
