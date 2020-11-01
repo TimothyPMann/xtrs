@@ -1856,11 +1856,11 @@ This is the default in Model 4/4P mode, since otherwise there is an annoying
 size switch during every reboot.
 .TP
 .B \-lowercase
-Emulates the extra bit of display memory needed to support
+Emulate the extra bit of display memory needed to support
 lowercase on a Model I. This is the default setting. No effect on other models.
 .TP
 .B \-nolowercase
-Emulates not having a lowercase modification on a Model I. No effect on other models.
+Emulate not having a lowercase modification on a Model I. No effect on other models.
 .TP
 .B \-charset \fIcharset-name\fP
 Select among several sets of built-in character bitmaps.
@@ -2027,9 +2027,7 @@ This is the default.
 .TP
 .B \-keydelay \fIkd\fP
 After each Z80 instruction, if any key on the emulated keyboard is
-currently pressed,
-.B xtrs
-busy-waits for an additional
+currently pressed, busy-wait for an additional
 .I kd
 empty loop iterations beyond what the
 .B \-delay
