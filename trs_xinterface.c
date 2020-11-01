@@ -173,6 +173,8 @@ static XrmOptionDescRec opts[] = {
 {"-noshiftbracket","*shiftbracket",XrmoptionNoArg,      (caddr_t)"off"},
 {"-emtsafe",    "*emtsafe",     XrmoptionNoArg,         (caddr_t)"on"},
 {"-noemtsafe",  "*emtsafe",     XrmoptionNoArg,         (caddr_t)"off"},
+{"-lowercase",  "*lowercase",   XrmoptionNoArg,         (caddr_t)"on"},
+{"-nolowercase","*lowercase",   XrmoptionNoArg,         (caddr_t)"off"},
 };
 
 static int num_opts = (sizeof opts / sizeof opts[0]);
@@ -459,6 +461,15 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
       grafyx_set_microlabs(True);
     } else if (strcmp(value.addr,"off") == 0) {
       grafyx_set_microlabs(False);
+    }
+  }
+
+  (void) sprintf(option, "%s%s", program_name, ".lowercase");
+  if (XrmGetResource(x_db, option, "Xtrs.Lowercase", &type, &value)) {
+    if (strcmp(value.addr,"on") == 0) {
+      trs_lowercase = 1;
+    } else if (strcmp(value.addr,"off") == 0) {
+      trs_lowercase = 0;
     }
   }
 
@@ -1438,14 +1449,12 @@ void trs_screen_write_char(int position, int char_index)
     } 
   } else if (usefont) {
     /* Draw character using a font */
-    if (trs_model == 1) {
-#if !UPPERCASE
+    if (trs_model == 1 && trs_lowercase) {
       /* Emulate Radio Shack lowercase mod.  The replacement character
 	 generator ROM had another copy of the uppercase characters in
 	 the control character positions, to compensate for a bug in the
 	 Level II ROM that stores such values instead of uppercase. */
       if (char_index < 0x20) char_index += 0x40;
-#endif
     }
     if (trs_model > 1 && char_index >= 0xc0 &&
 	(currentmode & (ALTERNATE+INVERSE)) == 0) {

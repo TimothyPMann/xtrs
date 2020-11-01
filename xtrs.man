@@ -1855,6 +1855,13 @@ emulated display mode is 64\(mu16 text or 512\(mu192 graphics.
 This is the default in Model 4/4P mode, since otherwise there is an annoying
 size switch during every reboot.
 .TP
+.B \-lowercase
+Emulates the extra bit of display memory needed to support
+lowercase on a Model I. This is the default setting. No effect on other models.
+.TP
+.B \-nolowercase
+Emulates not having a lowercase modification on a Model I. No effect on other models.
+.TP
 .B \-charset \fIcharset-name\fP
 Select among several sets of built-in character bitmaps.
 Valid values of
@@ -1873,14 +1880,14 @@ with the Radio Shack lowercase modification.
 .B stock
 is the character set in the stock character generator supplied with most
 uppercase-only machines.
-Since
+If you use this character set with the default
 .B xtrs
-currently always emulates the extra bit of display memory needed to support
-lowercase, this character set gives you the authentic, unpleasant effect that
+setting of \-lowercase, you get the authentic, unpleasant effect that
 real Model I users saw when they tried to do homebrew lowercase modifications
 without replacing the character generator: lowercase letters appear at an
 inconsistent height, and if you are using the Level II BASIC ROM display driver,
-uppercase letters are replaced by meaningless symbols.
+uppercase letters are replaced by meaningless symbols.  Using \-nolowercase
+avoids this effect but of course prevents any lowercase letters from being displayed.
 .B early
 is the same as stock, but with the standard ASCII characters [, \(rs, ], and
 \(ha in the positions where most Model I machines had directional arrows.

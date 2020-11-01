@@ -78,6 +78,7 @@ void trs_screen_80x24(int flag);
 void trs_screen_inverse(int flag);
 void trs_screen_scroll(void);
 void trs_screen_refresh(void);
+extern int trs_lowercase;
 
 void trs_reset(int poweron);
 void trs_exit(void);

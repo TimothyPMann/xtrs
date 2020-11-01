@@ -78,6 +78,7 @@ int bank_offset[2];
 #define VIDEO_PAGE_0 0
 #define VIDEO_PAGE_1 1024
 int video_offset = (-VIDEO_START + VIDEO_PAGE_0);
+int trs_lowercase = 1; /* Model I, has lowercase mod */
 int romin = 0; /* Model 4p */
 unsigned short trs_changecount = 0;
 
@@ -322,18 +323,16 @@ void mem_write(int address, int value)
 	    memory[address] = value;
 	} else if (address >= VIDEO_START) {
 	    int vaddr = address + video_offset;
-#if UPPERCASE
 	    /*
 	     * Video write.  Hack here to make up for the missing bit 6
 	     * video ram, emulating the gate in Z30.
 	     */
-	    if (trs_model == 1) {
+	    if (trs_model == 1 && !trs_lowercase) {
 		if(value & 0xa0)
-		  value &= 0xbf;
+		    value &= 0xbf;
 		else
-		  value |= 0x40;
+		    value |= 0x40;
 	    }
-#endif
 	    if (video[vaddr] != value) {
 		video[vaddr] = value;
 		trs_screen_write_char(vaddr, value);

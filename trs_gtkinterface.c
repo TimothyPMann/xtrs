@@ -350,6 +350,8 @@ struct option options[] = {
   {"switches",       TRUE,  NULL,              0     },
   {"emtsafe",        FALSE, &trs_emtsafe,      TRUE  },
   {"noemtsafe",      FALSE, &trs_emtsafe,      FALSE },
+  {"lowercase",      FALSE, &trs_lowercase,    TRUE  },
+  {"nolowercase",    FALSE, &trs_lowercase,    FALSE },
   {NULL, 0, 0, 0}
 };
 
@@ -414,10 +416,10 @@ trs_parse_command_line(int argc, char **argv, int *debug)
       }
     } else if (strcmp(name, "delay") == 0) {
       z80_state.delay = strtol(optarg, NULL, 0);
-    } else if (strcmp(name, "keystretch") == 0) {
-      stretch_amount = strtol(optarg, NULL, 0);
     } else if (strcmp(name, "keydelay") == 0) {
       trs_keydelay = strtol(optarg, NULL, 0);
+    } else if (strcmp(name, "keystretch") == 0) {
+      stretch_amount = strtol(optarg, NULL, 0);
     } else if (strcmp(name, "diskdir") == 0) {
       trs_disk_dir = strdup(optarg);
       if (trs_disk_dir[0] == '~' &&
