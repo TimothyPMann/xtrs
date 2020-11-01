@@ -2018,6 +2018,21 @@ Turn off
 .IR \-autodelay.
 This is the default.
 .TP
+.B \-keydelay \fIkd\fP
+After each Z80 instruction, if any key on the emulated keyboard is
+currently pressed,
+.B xtrs
+busy-waits for an additional
+.I kd
+empty loop iterations beyond what the
+.B \-delay
+option specifies. The default keydelay is 0. Using this option can avoid unwanted
+key repeat in some TRS-80 software without slowing emulation down as much
+as
+.B \-delay
+or
+.BR \-autodelay .
+.TP
 .B \-keystretch \fIcycles\fP
 Fine-tune the keyboard behavior.
 To prevent keystrokes from being lost,
@@ -2035,21 +2050,6 @@ Key transitions that are received during the waiting period or when the Z80
 program is not reading the keyboard are held in a queue.
 The default stretch value is 4000 cycles; it should seldom if ever be necessary
 to change it.
-.TP
-.B \-keydelay \fIkd\fP
-After each Z80 instruction, if any key on the emulated keyboard is
-currently pressed,
-.B xtrs
-busy-waits for an additional
-.I kd
-empty loop iterations beyond what the
-.B \-delay
-option specifies. The default keydelay is 0. Using this option can avoid unwanted
-key repeat in some TRS-80 software without slowing emulation down as much
-as
-.B \-delay
-or
-.BR \-autodelay .
 .TP
 .B \-shiftbracket
 Emulate [, \(rs, ], \(ha and _ as shifted keys, and {, |, }, and \(ti as
