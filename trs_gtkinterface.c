@@ -1003,7 +1003,6 @@ on_hard_reset_menu_item_activate(GtkMenuItem *menuitem,
   trs_reset(1);
 }
 
-//XXX not used
 void
 on_disk_change_menu_item_activate(GtkMenuItem *menuitem,
 				  gpointer user_data)
@@ -1263,16 +1262,6 @@ on_drawing_area_key_press_event(GtkWidget *widget,
   debug("keypress keysym %#x keycode %#x time %#x\n",
 	event->keyval, event->hardware_keycode, event->time);
 #endif
-  switch (keysym) {
-    /* Trap some function keys here */
-    /* XXX Remove this and use an accelerator instead, as F8/F9/F10 do */
-  case GDK_F7:
-    trs_change_all();
-    keysym = 0;
-    break;
-  default:
-    break;
-  }
 
   if ( ((event->state & (GDK_SHIFT_MASK|GDK_LOCK_MASK))
 	== (GDK_SHIFT_MASK|GDK_LOCK_MASK))

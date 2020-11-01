@@ -359,6 +359,15 @@
                         <accelerator key="F9" signal="activate"/>
                       </object>
                     </child>
+                    <child>
+                      <object class="GtkMenuItem" id="menuitem39">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">Signal manual disk _change</property>
+                        <property name="use_underline">True</property>
+                        <signal name="activate" handler="on_disk_change_menu_item_activate"/>
+                        <accelerator key="F7" signal="activate"/>
+                      </object>
+                    </child>
                   </object>
                 </child>
               </object>
