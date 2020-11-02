@@ -229,13 +229,6 @@ typedef struct {
 
 #define JV1_SECPERTRK 10
 
-/* Values for emulated disk image type (emutype) below */
-#define JV1 1 /* compatible with Vavasour Model I emulator */
-#define JV3 3 /* compatible with Vavasour Model III/4 emulator */
-#define DMK 4 /* compatible with Keil Model III/4 emulator */
-#define REAL 100 /* real floppy drive, PC controller */
-#define NONE 0
-
 typedef struct {
   int free_id[4];		  /* first free id, if any, of each size */
   int last_used_id;		  /* last used index */
@@ -917,8 +910,23 @@ trs_disk_set_name(int drive, const char *name)
 int
 trs_disk_create(const char *name)
 {
-  error("XXX not implemented yet; use mkdisk");
-  return ENOTSUP;
+  FILE *f;
+  int ires;
+
+  f = fopen(name, "w");
+  if (f == NULL) {
+      return errno;
+  }
+
+  /*
+   * Default parameters
+   */
+  ires = trs_disk_init_with(f, -1, -1, -1, -1, -1);
+  if (ires < 0) return errno;
+
+  ires = fclose(f);
+  if (ires < 0) return errno;
+  return 0;
 }
 
 static int

@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright (c) 1996-2020, Timothy P. Mann
  *
  * Permission is hereby granted, free of charge, to any person
@@ -45,10 +45,21 @@ int trs_disk_getstep(int unit);
 void trs_disk_setsize(int unit, int value);
 int trs_disk_getsize(int unit);
 
+int trs_disk_init_with(FILE *f, int emutype,
+		       int sides, int density, int eight, int ignden);
+int trs_disk_set_write_prot(FILE *f, int emutype, int writeprot);
+
 extern int trs_disk_doubler;
 extern char* trs_disk_dir;
 extern unsigned short trs_changecount;
 extern int trs_disk_truedam;
+
+/* Values for emulated disk image type (emutype) */
+#define JV1 1 /* compatible with Vavasour Model I emulator */
+#define JV3 3 /* compatible with Vavasour Model III/4 emulator */
+#define DMK 4 /* compatible with Keil Model III/4 emulator */
+#define REAL 100 /* real floppy drive, PC controller */
+#define NONE 0
 
 /* Values for trs_disk_doubler flag word */
 #define TRSDISK_NODOUBLER 0
@@ -78,7 +89,7 @@ extern int trs_disk_truedam;
 #define TRSDISK_DATA    0x37ef
 
 /* FDC port space in Model III */
-#define TRSDISK3_INTERRUPT 0xe4 
+#define TRSDISK3_INTERRUPT 0xe4
 #define TRSDISK3_COMMAND   0xf0  /* writing */
 #define TRSDISK3_STATUS    0xf0  /* reading */
 #define TRSDISK3_TRACK     0xf1

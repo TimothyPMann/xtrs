@@ -261,6 +261,7 @@ extern int mem_block_transfer(Ushort dest, Ushort source, int direction,
 extern int load_hex(); /* returns highest address loaded + 1 */
 extern void debug(const char *fmt, ...);
 extern void error(const char *fmt, ...);
+extern void warning(const char *fmt, ...);
 extern void fatal(const char *fmt, ...);
 extern void z80_out(int port, int value);
 extern int z80_in(int port);

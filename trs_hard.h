@@ -39,6 +39,9 @@ int trs_hard_set_name(int drive, const char *name);
 int trs_hard_create(const char *name);
 int trs_hard_in(int port);
 void trs_hard_out(int port, int value);
+int trs_hard_init_with(FILE *f, int cyl, int sec, int gran, int dir);
+int trs_hard_set_write_prot(FILE *f, int writeprot);
+
 extern char *trs_disk_dir;
 
 /* Sector size is always 256 for TRSDOS/LDOS/etc. */

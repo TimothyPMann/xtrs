@@ -43,7 +43,8 @@ CR_OBJECTS = \
 
 MD_OBJECTS = \
 	mkdisk.o \
-        common.o
+        common.o \
+	error.o
 
 HC_OBJECTS = \
 	cmd.o \

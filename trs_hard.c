@@ -135,8 +135,23 @@ trs_hard_set_name(int drive, const char *name)
 int
 trs_hard_create(const char *name)
 {
-  error("XXX not implemented yet; use mkdisk");
-  return ENOTSUP;
+  FILE *f;
+  int ires;
+
+  f = fopen(name, "w");
+  if (f == NULL) {
+      return errno;
+  }
+
+  /*
+   * Default parameters
+   */
+  ires = trs_hard_init_with(f, -1, -1, -1, -1);
+  if (ires < 0) return errno;
+
+  ires = fclose(f);
+  if (ires < 0) return errno;
+  return 0;
 }
 
 /* Powerup or reset button */
