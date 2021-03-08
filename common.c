@@ -180,6 +180,7 @@ trs_disk_init_with(FILE *f,
     putc(0, f);           /* d: MBZ */
     putc(0, f);           /* e: MBZ */
     putc(0, f);           /* f: MBZ */
+    break;
 
   default:
     errno = EINVAL;
