@@ -743,12 +743,14 @@ void trs_screen_init(void)
   Colormap color_map;
   XColor cdef;
   XGCValues gcvals;
+  Atom wm_delete_window;
   char *fontname = NULL;
   char *widefontname = NULL;
   int len;
 
   screen = DefaultScreen(display);
   color_map = DefaultColormap(display,screen);
+  wm_delete_window = XInternAtom(display, "WM_DELETE_WINDOW", False);
 
   (void) sprintf(option, "%s%s", program_name, ".foreground");
   if (XrmGetResource(x_db, option, "Xtrs.Foreground", &type, &value)) {
@@ -914,6 +916,7 @@ void trs_screen_init(void)
   trs_fix_size(window, OrigWidth, OrigHeight);
   XStoreName(display,window,title);
   XSelectInput(display, window, EVENT_MASK);
+  XSetWMProtocols(display, window, &wm_delete_window, 1);
 
   (void) sprintf(option, "%s%s", program_name, ".iconic"); 
   if (XrmGetResource(x_db, option, "Xtrs.Iconic", &type, &value)) { 
@@ -976,6 +979,7 @@ void trs_get_event(int wait)
   }
 
   do {
+    if (XCheckTypedEvent(display, ClientMessage, &event)) trs_exit();
     if (!XCheckMaskEvent(display, ~0, &event)) return;
 
     switch(event.type) {
