@@ -1743,6 +1743,12 @@ ldos-and-ls-dos-2012-and-beyond-technical-information/
 .I LDOS and LS-DOS: 2012 and Beyond \(em Technical information
 .UE
 by Matthew Reed.
+If needed, you can use the
+.B \-year
+option of
+.B xtrs
+to set the currently emulated year
+to a value that works well with the Z80 operating system you are using.
 .SS Joystick
 Pressing a key on a PC-keyboard-style numeric keypad with
 .B NumLock
@@ -2267,6 +2273,17 @@ This setting is the default.
 .B \-noemtsafe
 The opposite of
 .BR \-emtsafe .
+.TP
+.B \-year \fIy\fP
+If you give this option, when
+.B xtrs
+is emulating a TRS-80 time-of-day clock,
+it sets the year as of the time it starts to
+.I y
+instead of the actual current year.  If you leave
+.B xtrs
+running past midnight on New Year's Eve, the year increments
+by 1 as it should.
 .SH Exit status
 .B
 xtrs

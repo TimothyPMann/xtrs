@@ -45,6 +45,7 @@
 #define _TRS_H
 
 #include "z80.h"
+#include "time.h"
 
 #define NORMAL 0
 #define EXPANDED 1
@@ -144,6 +145,9 @@ void trs_cassette_update(int dummy);
 extern int cassette_default_sample_rate;
 void trs_orch90_out(int chan, int value);
 void trs_cassette_reset(void);
+
+extern time_t trs_timeoffset;
+void trs_inityear(int year);
 
 const char *trs_disk_get_name(int drive);
 int trs_disk_set_name(int drive, const char *newname);

@@ -329,7 +329,7 @@ void do_emt_strerror(void)
 
 void do_emt_time(void)
 {
-  time_t now = time(0);
+  time_t now = time(0) + trs_timeoffset;
   if (REG_A == 1) {
 #if __alpha
     struct tm *loctm = localtime(&now);

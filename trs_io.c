@@ -310,7 +310,7 @@ int z80_in(int port)
     struct tm *time_info;
     time_t time_secs;
 
-    time_secs = time(NULL);
+    time_secs = time(NULL) + trs_timeoffset;
     time_info = localtime(&time_secs);
 
     switch (port & 0x0F) {

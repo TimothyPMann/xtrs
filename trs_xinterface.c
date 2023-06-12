@@ -175,6 +175,7 @@ static XrmOptionDescRec opts[] = {
 {"-noemtsafe",  "*emtsafe",     XrmoptionNoArg,         (XPointer)"off"},
 {"-lowercase",  "*lowercase",   XrmoptionNoArg,         (XPointer)"on"},
 {"-nolowercase","*lowercase",   XrmoptionNoArg,         (XPointer)"off"},
+{"-year",       "*year",        XrmoptionSepArg,        (XPointer)NULL},
 };
 
 static int num_opts = (sizeof opts / sizeof opts[0]);
@@ -585,6 +586,11 @@ int trs_parse_command_line(int argc, char **argv, int *debug)
     }
   } else {
     trs_kb_bracket(trs_model >= 4);
+  }
+
+  (void) sprintf(option, "%s%s", program_name, ".year");
+  if (XrmGetResource(x_db, option, "Xtrs.Year", &type, &value)) {
+    trs_inityear(strtol(value.addr, NULL, 0));
   }
 
   return argc;

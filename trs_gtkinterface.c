@@ -352,6 +352,7 @@ struct option options[] = {
   {"noemtsafe",      FALSE, &trs_emtsafe,      FALSE },
   {"lowercase",      FALSE, &trs_lowercase,    TRUE  },
   {"nolowercase",    FALSE, &trs_lowercase,    FALSE },
+  {"year",           TRUE,  NULL,              0     },
   {NULL, 0, 0, 0}
 };
 
@@ -464,6 +465,8 @@ trs_parse_command_line(int argc, char **argv, int *debug)
       trs_uart_name = strdup(optarg);
     } else if (strcmp(name, "switches") == 0) {
       trs_uart_switches = strtol(optarg, NULL, 0);
+    } else if (strcmp(name, "year") == 0) {
+      trs_inityear(strtol(optarg, NULL, 0));
     }
   }
   if (optind != argc) {

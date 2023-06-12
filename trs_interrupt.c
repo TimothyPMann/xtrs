@@ -67,6 +67,8 @@ static int timer_hz;
 #define CLOCK_MHZ_3 2.02752
 #define CLOCK_MHZ_4 4.05504
 
+time_t trs_timeoffset;
+
 /* Kludge: LDOS hides the date (not time) in a memory area across reboots. */
 /* We put it there on powerup, so LDOS magically knows the date! */
 #define LDOS_MONTH 0x4306
@@ -419,6 +421,27 @@ trs_timer_event(int signo)
   setitimer(ITIMER_REAL, &it, NULL);
 }
 
+/*
+ * Initialize time offset.  This can useful for TRS-80 operating
+ * systems that behave better when the year is within a limited range.
+ */
+void
+trs_inityear(int year)
+{
+  time_t real, fake;
+  struct tm tm;
+
+  if (year == 0) {
+    trs_timeoffset = 0;
+  } else {
+    real = time(NULL);
+    localtime_r(&real, &tm);
+    tm.tm_year = year - 1900;
+    fake = mktime(&tm);
+    trs_timeoffset = fake - real;
+  }
+}
+
 void
 trs_timer_init(void)
 {
@@ -431,7 +454,7 @@ trs_timer_init(void)
       z80_state.clockMHz = CLOCK_MHZ_1;
   } else {
       /* initially... */
-      timer_hz = TIMER_HZ_3;  
+      timer_hz = TIMER_HZ_3;
       z80_state.clockMHz = CLOCK_MHZ_3;
   }
 
@@ -444,7 +467,7 @@ trs_timer_init(void)
   trs_timer_event(SIGALRM);
 
   /* Also initialize the clock in memory - hack */
-  tt = time(NULL);
+  tt = time(NULL) + trs_timeoffset;
   lt = localtime(&tt);
   if (trs_model == 1) {
       mem_write(LDOS_MONTH, (lt->tm_mon + 1) ^ 0x50);

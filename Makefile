@@ -110,7 +110,8 @@ ZMACFLAGS = -h
 	zmac $(ZMACFLAGS) -o $*.hex -x $*.lst $<
 
 .man.txt:
-	nroff -man -c -Tascii $< | colcrt - | cat -s > $*.txt
+#	nroff -man -c -Tascii $< | colcrt - | cat -s > $*.txt
+	man -l $< > $*.txt
 
 .html.txt:
 	html2text -nobs -style pretty $< >$@
