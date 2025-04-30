@@ -58,6 +58,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/stat.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
