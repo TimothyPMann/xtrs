@@ -1,13 +1,15 @@
 Building xtrs
 Tim Mann
-10/27/2020
+10/27/2020, updated 4/29/2025
 
 xtrs and gxtrs compile on typical Linux distributions if you install
-enough packages, except for one dependency: zmac 1.3.  zmac is a Z-80
-cross-assembler.  You can download the version that I use when
-building xtrs from https://tim-mann.org/trs80resources.html.  There
-are newer versions at http://48k.ca/zmac.html and
-https://github.com/sehugg/zmac that I havent tried yet.
+enough packages, except for one dependency: zmac.  zmac is a Z-80
+cross-assembler.  There is an updated version with lots of features at
+http://48k.ca/zmac.html.  I've updated the xtrs Makefile to work with
+that new version, but by changing which definition of ZMACFLAGS is
+commented out, you could go back to the old zmac 1.3 that I used when
+developing xtrs, which you can download from
+https://tim-mann.org/trs80resources.html.
 
 *************************************************************************
 
