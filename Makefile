@@ -92,22 +92,25 @@ CFLAGS += $(DEBUG) $(ENDIAN) $(DEFAULT_ROM) $(READLINE) $(DISKDIR) $(IFLAGS) \
 
 LIBS = $(XLIB) $(READLINELIBS) $(EXTRALIBS)
 
-ZMACFLAGS = -h
+# For original zmac 1.3:
+#ZMACFLAGS = -h -l
+# For George Phillips zmac; see https://github.com/gp48k/zmac
+ZMACFLAGS =
 
 .SUFFIXES: .z80 .cmd .dct .man .txt .hex .html
 
 .z80.cmd:
-	zmac $(ZMACFLAGS) -o $*.hex -x $*.lst $<
+	zmac $(ZMACFLAGS) -o $*.hex $<
 	hex2cmd $*.hex > $*.cmd
 	rm -f $*.hex
 
 .z80.dct:
-	zmac $(ZMACFLAGS) -o $*.hex -x $*.lst $<
+	zmac $(ZMACFLAGS) -o $*.hex $<
 	hex2cmd $*.hex > $*.dct
 	rm -f $*.hex
 
 .z80.hex:
-	zmac $(ZMACFLAGS) -o $*.hex -x $*.lst $<
+	zmac $(ZMACFLAGS) -o $*.hex $<
 
 .man.txt:
 #	nroff -man -c -Tascii $< | colcrt - | cat -s > $*.txt
