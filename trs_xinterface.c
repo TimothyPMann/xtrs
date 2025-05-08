@@ -58,7 +58,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-#include <sys/stat.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
@@ -240,9 +239,6 @@ static int hrg_pixel_height[12];
 static int hrg_enable = 0;
 static int hrg_addr = 0;
 static void hrg_update_char(int position);
-
-/* dummy buffer for stat() call */
-struct stat statbuf;
 
 /* Private routines */
 void bitmap_init(unsigned long foreground, unsigned long background);
