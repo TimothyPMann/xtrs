@@ -1,5 +1,12 @@
 /* umount.ccc -- Misosys C program to unmount an emulated floppy on xtrs */
 
+/* XXX: Assumes the original xtrs method where an emulated floppy
+ * always has the name "diskM-N" where M is the model and N is the
+ * unit number.  This does not work if gxtrs's dialog has been used to
+ * mount a floppy with a name of a different format.  To fix this will
+ * at least require adding an emt that calls trs_disk_set_name.
+ */
+
 /* 
  * Copyright (c) 1998-2008, Timothy P. Mann
  *
