@@ -72,8 +72,11 @@ READLINE = -DREADLINE
 READLINELIBS = -lreadline
 
 # Select debugging symbols (-g) and/or optimization (-O2, etc.)
+# Annoyingly, it seems that -Wdeprecated-declarations gives a warning
+# even if you don't use the deprecated type, and gtk header files
+# deprecated some types.
 
-DEBUG = -O2 -g -Wall -Wextra -Wno-unused-parameter
+DEBUG = -O2 -g -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations
 #DEBUG = -g -DKBDEBUG -DXDEBUG
 #DEBUG = -g
 #DEBUG = -Wall
