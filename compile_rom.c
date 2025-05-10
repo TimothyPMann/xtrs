@@ -103,6 +103,7 @@ static void load_rom(char *filename)
     hex_data(a++, c);
     c = getc(program);
   }
+  fclose(program);
 }
 
 static void write_output(char *which)

@@ -125,6 +125,7 @@ void trs_load_rom(int address, char *filename)
         mem_write_rom(trs_rom_size++, c);
 	c = getc(program);
     }
+    fclose(program);
 }
 
 void trs_load_compiled_rom(int address, int size, unsigned char rom[])
