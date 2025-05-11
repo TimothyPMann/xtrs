@@ -70,14 +70,21 @@ static void check_endian(void)
 }
 
 /*
- * Note: If there are multiple ROMs, trs_rom_size is set to the ending
- * address(+1) of the last ROM loaded.  So ROMs must be loaded in
- * ascending order by address.
+ * Although this ROM loading code supports multiple ROMs, xtrs has an
+ * overall assumption that addresses from 0 up to the end of the
+ * highest-addressed ROM (if any) are all ROM space.  So we set
+ * trs_rom_size to the end of the highest-addressed ROM that has been
+ * seen.  Moreover, we assume we know where the ROMs start -- address
+ * 0 for all except the Model I ESF extension ROM, which starts at
+ * 0x3000.  We don't check if this assumption is violated even in
+ * cases where it's possible to check, such as when the ROM is in
+ * Intel hex format or load module format.
  */
 void trs_load_rom(int address, char *filename)
 {
     FILE *program;
     int c;
+    int rom_end = 0;
 
     if((program = fopen(filename, "r")) == NULL)
     {
@@ -90,51 +97,59 @@ void trs_load_rom(int address, char *filename)
     if (c == ':') {
         /* Assume Intel hex format */
         rewind(program);
-        trs_rom_size = load_hex(program);
+        rom_end = load_hex(program);
 	fclose(program);
 	return;
     }
 
     if (c == 1 || c == 5) {
-        /* Assume MODELA/III file */
+        /* Assume MODELA/III file (load module) */
 	int res;
 	extern Uchar *rom; /*!! fixme*/
 	Uchar loadmap[Z80_ADDRESS_LIMIT];
 	rewind(program);
 	res = load_cmd(program, rom, loadmap, 0, NULL, -1, NULL, NULL, 1);
 	if (res == LOAD_CMD_OK) {
-	    trs_rom_size = Z80_ADDRESS_LIMIT;
-	    while (trs_rom_size > 0) {
-		if (loadmap[--trs_rom_size] != 0) {
-		    trs_rom_size++;
+	    rom_end = Z80_ADDRESS_LIMIT;
+	    while (rom_end > 0) {
+		if (loadmap[--rom_end] != 0) {
+		    rom_end++;
 		    break;
 		}
 	    }
 	    fclose(program);
 	    return;
 	} else {
-	    /* Apparently it wasn't one */
+	    /* Apparently it wasn't one; prepare to fall through to
+             * raw binary case. */
 	    rewind(program);
 	    c = getc(program);
 	}
     }
 
     /* Assume raw binary */
-    trs_rom_size = address;
+    rom_end = address;
     while (c != EOF) {
-        mem_write_rom(trs_rom_size++, c);
+        mem_write_rom(rom_end++, c);
 	c = getc(program);
     }
     fclose(program);
+
+    if (rom_end > trs_rom_size) {
+       trs_rom_size = rom_end;
+    }
 }
 
 void trs_load_compiled_rom(int address, int size, unsigned char rom[])
 {
     int i;
-    
-    trs_rom_size = size;
-    for (i = address; i < size; i++) {
-	mem_write_rom(i, rom[i]);
+
+    for (i = 0; i < size; i++) {
+	mem_write_rom(address + i, rom[i]);
+    }
+
+    if (address + size > trs_rom_size) {
+       trs_rom_size = address + size;
     }
 }
 

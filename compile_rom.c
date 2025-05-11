@@ -41,6 +41,7 @@
 #include "load_cmd.h"
 
 char *program_name;
+static int lowest_address = Z80_ADDRESS_LIMIT;
 static int highest_address = 0;
 static Uchar memory[Z80_ADDRESS_LIMIT];
 static Uchar loadmap[Z80_ADDRESS_LIMIT];
@@ -51,7 +52,9 @@ void hex_data(int address, int value)
   address &= 0xffff;
 
   memory[address] = value;
-  if(highest_address < address)
+  if (lowest_address > address)
+    lowest_address = address;
+  if (highest_address < address)
     highest_address = address;
 }
 
@@ -64,13 +67,12 @@ static void load_rom(char *filename)
 {
   FILE *program;
   int c, a;
-    
-  if((program = fopen(filename, "r")) == NULL)
-    {
-      char message[100];
-      sprintf(message, "could not read %s", filename);
-      fatal(message);
-    }
+
+  if ((program = fopen(filename, "r")) == NULL) {
+    char message[100];
+    sprintf(message, "could not read %s", filename);
+    fatal(message);
+  }
   c = getc(program);
   if (c == ':') {
     /* Assume Intel hex format */
@@ -79,11 +81,18 @@ static void load_rom(char *filename)
     fclose(program);
     return;
   } else if (c == 1 || c == 5) {
-    /* Assume MODELA/III file */
+    /* Assume MODELA/III file (load module format) */
     int res;
     rewind(program);
     res = load_cmd(program, memory, loadmap, 0, NULL, -1, NULL, NULL, 1);
     if (res == LOAD_CMD_OK) {
+      lowest_address = 0;
+      while (lowest_address < Z80_ADDRESS_LIMIT) {
+        if (loadmap[lowest_address] != 0) {
+          break;
+        }
+        lowest_address++;
+      }
       highest_address = Z80_ADDRESS_LIMIT;
       while (highest_address > 0) {
 	if (loadmap[--highest_address] != 0) {
@@ -93,11 +102,13 @@ static void load_rom(char *filename)
       fclose(program);
       return;
     } else {
-      /* Guess it wasn't one */
+      /* Guess it wasn't a load module; prepare to fall into raw
+       * binary case */
       rewind(program);
       c = getc(program);
-    } 
+    }
   }
+  /* Assume raw binary at address 0 */
   a = 0;
   while (c != EOF) {
     hex_data(a++, c);
@@ -110,29 +121,28 @@ static void write_output(char *which)
 {
   int address = 0;
   int i;
-    
-  highest_address++;
+  int size = highest_address - lowest_address + 1;
 
-  printf("int trs_rom%s_size = %d;\n", which, highest_address);
-  printf("unsigned char trs_rom%s[%d] = \n{\n", which, highest_address);
-    
-  while(address < highest_address) 
-    {
-      printf("    ");
-      for(i = 0; i < 8; ++i)
-	{
-	  printf("0x%.2x,", memory[address++]);
+  printf("int trs_rom%s_start = %d;\n", which, lowest_address);
+  printf("int trs_rom%s_size = %d;\n", which, size);
+  printf("unsigned char trs_rom%s[%d] = \n{\n", which, size);
 
-	  if(address == highest_address)
-	    break;
-	}
-      printf("\n");
+  address = lowest_address;
+  while (address <= highest_address) {
+    printf("    ");
+    for (i = 0; i < 8; ++i) {
+      printf("0x%.2x,", memory[address++]);
+      if (address > highest_address)
+        break;
     }
+    printf("\n");
+  }
   printf("};\n");
 }
 
 static void write_norom_output(char *which)
 {
+  printf("int trs_rom%s_start = -1;\n", which);
   printf("int trs_rom%s_size = -1;\n", which);
   printf("unsigned char trs_rom%s[1];\n", which);
 }
@@ -140,21 +150,16 @@ static void write_norom_output(char *which)
 int main(int argc, char *argv[])
 {
   program_name = argv[0];
-  if(argc == 2)
-    {
-      fprintf(stderr,
-        "%s: no specified ROM file, ROM %s will not be built into program.\n",
-	program_name, argv[1]);
-      write_norom_output(argv[1]);
-    }
-  else if(argc != 3)
-    {
-      fprintf(stderr, "Usage: %s model hexfile\n", program_name);
-    }
-  else
-    {
-      load_rom(argv[2]);
-      write_output(argv[1]);
-    }
+  if (argc == 2) {
+    fprintf(stderr,
+      "%s: no specified ROM file, ROM %s will not be built into program.\n",
+            program_name, argv[1]);
+    write_norom_output(argv[1]);
+  } else if(argc != 3) {
+    fprintf(stderr, "Usage: %s model hexfile\n", program_name);
+  } else {
+    load_rom(argv[2]);
+    write_output(argv[1]);
+  }
   return 0;
 }
