@@ -98,8 +98,7 @@ void trs_load_rom(int address, char *filename)
         /* Assume Intel hex format */
         rewind(program);
         rom_end = load_hex(program);
-	fclose(program);
-	return;
+	goto done;
     }
 
     if (c == 1 || c == 5) {
@@ -117,8 +116,7 @@ void trs_load_rom(int address, char *filename)
 		    break;
 		}
 	    }
-	    fclose(program);
-	    return;
+	    goto done;
 	} else {
 	    /* Apparently it wasn't one; prepare to fall through to
              * raw binary case. */
@@ -133,8 +131,9 @@ void trs_load_rom(int address, char *filename)
         mem_write_rom(rom_end++, c);
 	c = getc(program);
     }
-    fclose(program);
 
+ done:
+    fclose(program);
     if (rom_end > trs_rom_size) {
        trs_rom_size = rom_end;
     }
