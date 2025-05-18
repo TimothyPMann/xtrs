@@ -174,6 +174,9 @@ extern int trs_disk_truedam;
 /* These "commands" are peculiar to the Radio Shack Doubler.  They
    are written to the sector register, not the command register!
  */
+#define TRSDISK_RCMDBITS 0xe0
+#define TRSDISK_RSIDE0   0x40
+#define TRSDISK_RSIDE1   0x60
 #define TRSDISK_R1791    0x80
 #define TRSDISK_R1771    0xa0
 #define TRSDISK_NOPRECMP 0xc0

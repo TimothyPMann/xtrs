@@ -1406,8 +1406,16 @@ trs_disk_sector_write(unsigned char data)
     debug("sector_write(0x%02x) pc 0x%04x\n", data, REG_PC);
   }
   if (trs_model == 1 && (trs_disk_doubler & TRSDISK_TANDY)) {
-    switch (data) {
+    switch (data & TRSDISK_RCMDBITS) {
       /* Emulate Radio Shack doubler */
+    case TRSDISK_RSIDE0:
+    case TRSDISK_RSIDE1:
+       /* Nothing for the emulator to do.  In hardware, these commands
+          control a side select flip flop that exists on the board,
+          but its output is not connected. The service manual says it
+          is available for future enhancements but would require
+          changes to the expansion interface. */
+       break;
     case TRSDISK_R1791:
       trs_disk_set_controller(TRSDISK_P1791);
       state.density = 1;
@@ -1418,7 +1426,7 @@ trs_disk_sector_write(unsigned char data)
       break;
     case TRSDISK_NOPRECMP:
     case TRSDISK_PRECMP:
-      /* Nothing for emulator to do */
+      /* Nothing for the emulator to do. */
       break;
     default:
       break;
