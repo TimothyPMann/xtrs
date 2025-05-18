@@ -327,8 +327,8 @@ void mem_write(int address, int value)
 	     * Video write.  Hack here to make up for the missing bit 6
 	     * video ram, emulating the gate in Z30.
 	     */
-	    if (trs_model == 1 && !trs_lowercase) {
-		if(value & 0xa0)
+	    if (!trs_lowercase) {
+		if (value & 0xa0)
 		    value &= 0xbf;
 		else
 		    value |= 0x40;
