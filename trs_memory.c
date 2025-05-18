@@ -62,7 +62,11 @@
 #define VIDEO_START	(0x3c00)
 #define RAM_START	(0x4000)
 #define CASSETTE_SELECT	(0x37E4)
-#define PRINTER_ADDRESS	(0x37E8)
+
+/* Model I printer addresses 0x37E8 to 0x37EB */
+#define PRINTER_1(addr)    (((addr)&~3) == 0x37E8)
+/* Model III/4/4P printer addresses 0x37E8 and 0x37E9 are Read-Only */
+#define PRINTER_3(addr)    (((addr)&~1) == 0x37E8)
 
 /* Interrupt latch register in EI (Model 1) */
 #define TRS_INTLATCH(addr) (((addr)&~3) == 0x37e0)
@@ -251,7 +255,7 @@ int mem_read(int address)
 	if (address == TRSDISK_DATA) return trs_disk_data_read();
 	if (TRS_INTLATCH(address)) return trs_interrupt_latch_read();
 	if (address == TRSDISK_STATUS) return trs_disk_status_read();
-	if (address == PRINTER_ADDRESS)	return trs_printer_read();
+	if (PRINTER_1(address))	return trs_printer_read();
 	if (address == TRSDISK_TRACK) return trs_disk_track_read();
 	if (address == TRSDISK_SECTOR) return trs_disk_sector_read();
 	if (address >= KEYBOARD_START) return trs_kb_mem_read(address);
@@ -259,7 +263,7 @@ int mem_read(int address)
 
       case 0x30: /* Model III */
 	if (address >= RAM_START) return memory[address];
-	if (address == PRINTER_ADDRESS)	return trs_printer_read();
+	if (PRINTER_3(address))	return trs_printer_read();
 	if (address < trs_rom_size) return memory[address];
 	if (address >= VIDEO_START) {
 	  return grafyx_m3_read_byte(address - VIDEO_START);
@@ -271,7 +275,7 @@ int mem_read(int address)
 	if (address >= RAM_START) {
 	    return memory[address + bank_offset[address>>15]];
 	}
-	if (address == PRINTER_ADDRESS) return trs_printer_read();
+	if (PRINTER_3(address)) return trs_printer_read();
 	if (address < trs_rom_size) return rom[address];
 	if (address >= VIDEO_START) {
 	    return video[address + video_offset];
@@ -337,7 +341,7 @@ void mem_write(int address, int value)
 		video[vaddr] = value;
 		trs_screen_write_char(vaddr, value);
 	    }
-	} else if (address == PRINTER_ADDRESS) {
+	} else if (PRINTER_1(address)) {
 	    trs_printer_write(value);
 	} else if (address == CASSETTE_SELECT) {
 	    trs_cassette_select(value);
@@ -364,8 +368,6 @@ void mem_write(int address, int value)
 	      video[vaddr] = value;
 	      trs_screen_write_char(vaddr, value);
 	    }
-	} else if (address == PRINTER_ADDRESS) {
-	    trs_printer_write(value);
 	}
 	break;
 
@@ -380,8 +382,6 @@ void mem_write(int address, int value)
 		video[vaddr] = value;
 		trs_screen_write_char(vaddr, value);
 	    }
-	} else if (address == PRINTER_ADDRESS) {
-	    trs_printer_write(value);
 	}
 	break;
 
