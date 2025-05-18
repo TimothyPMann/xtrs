@@ -413,7 +413,11 @@ int z80_in(int port)
       value = trs_printer_read();
       goto done;
     case 0xFF:
-      value = (modesel ? 0x7f : 0x3f) | trs_cassette_in();
+      /* bit 7: cassette input
+         bit 6: !modesel (wide=0, normal=1)
+         bit 5-0: unused, all read as 1
+      */
+      value = (modesel ? 0x3f : 0x7f) | trs_cassette_in();
       goto done;
     }
 
