@@ -91,6 +91,7 @@ static void hard_format(int cmd);
 static void hard_init(int cmd);
 static void hard_seek(int cmd);
 static int open_drive(int drive);
+static int reopen_drive(int drive);
 static int find_sector(int newstatus);
 static void set_dir_cyl(int cyl);
 
@@ -128,7 +129,7 @@ trs_hard_set_name(int drive, const char *name)
   Drive *d = &state.d[drive];
   if (d->name) free(d->name);
   d->name = name ? strdup(name) : NULL;
-  return open_drive(drive);
+  return reopen_drive(drive);
 }
 
 /* Returns 0 if OK, errno value otherwise. */
@@ -175,7 +176,7 @@ void trs_hard_change_all(void)
   int i;
   state.present = 0; // if no drives, emulate controller not present
   for (i=0; i<TRS_HARD_MAXDRIVES; i++) {
-    if (open_drive(i) == 0) state.present = 1;
+    if (reopen_drive(i) == 0) state.present = 1;
   }
 }
 
@@ -411,18 +412,35 @@ static void hard_seek(int cmd)
   find_sector(TRS_HARD_READY | TRS_HARD_SEEKDONE);
 }
 
-/* 
- * (Re)open the specified drive.
+/*
+ * Reopen the specified drive.
  *
  * 1) If already open, close the file for the drive.
  *
- * 2) Open the file.  If it cannot be opened, return 0 and set the
+ * 2) Call open_drive and return the result.
+ */
+static int reopen_drive(int drive)
+{
+  Drive *d = &state.d[drive];
+
+  if (d->file != NULL) {
+    fclose(d->file);
+    d->file = NULL;
+  }
+
+  return open_drive(drive);
+}
+
+/*
+ * Open the specified drive if not already open.
+ *
+ * 1) Open the file.  If it cannot be opened, return 0 and set the
  * controller error status.
  *
- * 3) Set the hardware write protect status and geometry in the Drive
+ * 2) Set the hardware write protect status and geometry in the Drive
  * structure.
  *
- * 4) Return 0 if OK, -1 if invalid header, errno value otherwise.
+ * 3) Return 0 if OK, -1 if invalid header, errno value otherwise.
  */
 static int open_drive(int drive)
 {
@@ -432,8 +450,7 @@ static int open_drive(int drive)
   int err = 0;
 
   if (d->file != NULL) {
-    fclose(d->file);
-    d->file = NULL;
+    return 0;
   }
   if (d->name == NULL) {
     goto fail;
