@@ -439,19 +439,6 @@ int z80_in(int port)
 	goto done;
       }
       break;
-    case TRS_HARD_WP:      /* 0xC0 */
-    case TRS_HARD_CONTROL: /* 0xC1 */
-    case TRS_HARD_DATA:    /* 0xC8 */ 
-    case TRS_HARD_ERROR:   /* 0xC9 */ /*=TRS_HARD_PRECOMP*/ 
-    case TRS_HARD_SECCNT:  /* 0xCA */
-    case TRS_HARD_SECNUM:  /* 0xCB */
-    case TRS_HARD_CYLLO:   /* 0xCC */
-    case TRS_HARD_CYLHI:   /* 0xCD */
-    case TRS_HARD_SDH:     /* 0xCE */
-    case TRS_HARD_STATUS:  /* 0xCF */ /*=TRS_HARD_COMMAND*/
-      value = trs_hard_in(port);
-      goto done;
-      break;
     case 0xE0:
       value = trs_interrupt_latch_read();
       goto done;
