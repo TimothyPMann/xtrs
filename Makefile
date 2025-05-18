@@ -94,8 +94,12 @@ LIBS = $(XLIB) $(READLINELIBS) $(EXTRALIBS)
 
 # For original zmac 1.3:
 #ZMACFLAGS = -h -l
-# For George Phillips zmac; see https://github.com/gp48k/zmac
-ZMACFLAGS =
+
+# For George Phillips zmac; see https://github.com/gp48k/zmac.  The -P
+# flag isn't really needed, but it's here so that if someone uses zmac
+# 1.3 with these flags, they'll get an error message (because zmac 1.3
+# doesn't have that flag) instead of the wrong thing happening.  Ugh.
+ZMACFLAGS = -P
 
 .SUFFIXES: .z80 .cmd .dct .man .txt .hex .html
 
