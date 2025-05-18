@@ -54,7 +54,6 @@
 static int modesel = 0;     /* Model I */
 static int modeimage = 0x8; /* Model III/4/4p */
 static int ctrlimage = 0;   /* Model 4/4p */
-static int rominimage = 0;  /* Model 4p */
 
 int trs_io_debug_flags = 0;
 
@@ -205,12 +204,11 @@ void z80_out(int port, int value)
       trs_sound_out(value & 1);
       break;
     case 0x9C:
-    case 0x9D: /* !!? */
-    case 0x9E: /* !!? */
-    case 0x9F: /* !!? */
+    case 0x9D:
+    case 0x9E:
+    case 0x9F:
       if (trs_model == 5 /*4p*/) {
-	rominimage = value & 1;
-	mem_romin(rominimage);
+	mem_romin(value & 1);
       }
       break;
     case 0xE0:
@@ -427,15 +425,6 @@ int z80_in(int port)
     case 0x82:
       if (trs_model >= 3) {
 	value = grafyx_read_data();
-	goto done;
-      }
-      break;
-    case 0x9C: /* !!? */
-    case 0x9D: /* !!? */
-    case 0x9E: /* !!? */
-    case 0x9F: /* !!? */
-      if (trs_model == 5 /*4p*/) {
-	value = rominimage;
 	goto done;
       }
       break;
