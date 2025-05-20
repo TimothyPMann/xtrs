@@ -1556,7 +1556,7 @@ void trs_screen_scroll(void)
 void grafyx_write_byte(int x, int y, char byte)
 {
   int i, j;
-  char exp[MAX_SCALE];
+  char exp[MAX_SCALE] = { 0 };
   int screen_x = ((x - grafyx_xoffset + G_XSIZE) % G_XSIZE);
   int screen_y = ((y - grafyx_yoffset + G_YSIZE) % G_YSIZE);
   int on_screen = screen_x < row_chars &&
