@@ -199,7 +199,7 @@ struct {
     { 128,  0 },
     { 1673, 0 },
     { -1,  -1 }
-  }}    
+  }}
 };
 
 /* States and thresholds for conversion to .cas on output */
@@ -282,10 +282,10 @@ put_sample(Uchar sample, int convert, FILE* f)
 #endif
   }
   putc(sample, f);
-}    
+}
 
 /* Get an 8-byte unsigned sample, if necessary converting from a
- * different sample format and/or reducing stereo to mono.  */
+ * different sample format */
 static int
 get_sample(int convert, FILE* f)
 {
@@ -298,7 +298,7 @@ get_sample(int convert, FILE* f)
       ret = getc(f);
       break;
     case AFMT_S16_LE:
-      ret = get_twobyte((Ushort *)&s, cassette_file);      
+      ret = get_twobyte((Ushort *)&s, cassette_file);
       if (ret == EOF) break;
       ret = ((s + 0x8000) >> 8) & 0xff;
       break;
@@ -414,7 +414,7 @@ parse_wav_header(FILE *f)
     cassette_position = wave_data_offset;
   }
   return 0;
-}  
+}
 
 static int
 set_audio_format(FILE *f, int state)
@@ -592,7 +592,6 @@ static int assert_state(int state)
       setbuf(cassette_file, NULL); /* ??hangs on some OSS drivers */
 #if HAVE_OSS
       if (state == SOUND || state == ORCH90) {
-	/*int arg = 0x7fff0008;*/ /* unlimited fragments of size (1 << 8) */
 	int arg = 0x00200008; /* 32 fragments of size (1 << 8) */
 	if (ioctl(fileno(cassette_file), SNDCTL_DSP_SETFRAGMENT, &arg) < 0) {
 	  error("warning: couldn't set sound fragment size: %s",
@@ -606,7 +605,7 @@ static int assert_state(int state)
 	cassette_file = NULL;
 	cassette_state = FAILED;
 	return -1;
-      }	
+      }
     } else if (cassette_format == WAV_FORMAT) {
       cassette_file = fopen(cassette_filename, "r+");
       if (cassette_file == NULL) {
@@ -640,7 +639,7 @@ static int assert_state(int state)
     }
     break;
   }
-    
+
   cassette_state = state;
   return 0;
 }
@@ -682,7 +681,7 @@ transition_out(int value)
     cassette_roundoff_error = delta_us - ddelta_us;
     fprintf(cassette_file, "%d %lu\n", value, delta_us);
     break;
-    
+
   case CPT_FORMAT:
     /* Encode value and delta_us in two bytes if delta_us is small enough.
        Pack bits as ddddddddddddddvv and store this value in little-
@@ -788,7 +787,7 @@ transition_out(int value)
 	}
       }
       break;
-      
+
     case ST_500GOTDAT:
       if (cassette_value == 2 && value == 0) {
 	/* End of data pulse; watch for end of next clock */
@@ -808,7 +807,7 @@ transition_out(int value)
 	cassette_pulsestate = ST_250GOTCLK;
       }
       break;
-      
+
     case ST_250GOTCLK:
       if (cassette_value == 0 && value == 1) {
 	/* Low speed, start of next pulse. */
@@ -825,7 +824,7 @@ transition_out(int value)
 	}
       }
       break;
-      
+
     case ST_250GOTDAT:
       if (cassette_value == 2 && value == 0) {
 	/* End of data pulse; watch for end of next clock */
@@ -889,7 +888,7 @@ transition_in(void)
       ret = 1;
     }
     break;
-    
+
   case CPT_FORMAT:
     c = get_twobyte(&code, cassette_file);
     if (c == -1) break;
@@ -1177,7 +1176,7 @@ trs_orch90_out(int channels, int value)
   }
   if (value != FLUSH &&
       new_left == orch90_left && new_right == orch90_right) return;
-  
+
   sigemptyset(&set);
   sigaddset(&set, SIGALRM);
   sigprocmask(SIG_BLOCK, &set, &oldset);
@@ -1236,7 +1235,7 @@ trs_cassette_update(int dummy)
 	cassette_value = cassette_next;
 	cassette_transition += cassette_delta;
 
-	/* Remember last nonzero value to get hysteresis in 1500 bps 
+	/* Remember last nonzero value to get hysteresis in 1500 bps
 	   zero-crossing detector */
 	if (cassette_value != 0) cassette_lastnonzero = cassette_value;
 
