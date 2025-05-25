@@ -124,7 +124,10 @@ ZMACFLAGS = -P
 	html2text -nobs -style pretty $< >$@
 
 %.man.pdf: %.man
-	groff -Tpdf -man $< > $@
+#	groff -man -Tpdf $< > $@
+	groff -man -Tdvi $< > .tmp_$*.dvi
+	dvipdf .tmp_$*.dvi $@
+	rm -f .tmp_$*.dvi
 
 xtrs: $(OBJECTS) $(X_OBJECTS)
 	$(CC) $(LDFLAGS) -o xtrs $(OBJECTS) $(X_OBJECTS) $(LIBS)

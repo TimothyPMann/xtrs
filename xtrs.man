@@ -183,7 +183,7 @@
 .\" OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 .\" DEALINGS IN THE SOFTWARE.
 .\"
-.TH xtrs 1 2017-04-16 xtrs
+.TH xtrs 1 2025-05-25 xtrs
 .SH Name
 xtrs \- TRS-80 Model I/III/4/4P emulator for the X Window System
 .SH Synopsis
@@ -1602,15 +1602,20 @@ emulates this feature as well.
 Sound support uses the Open Sound System (OSS)
 .I /dev/dsp
 device, available on Linux and many other Unix-like operating systems.
-On a Linux system that uses PulseAudio, use the padsp(1) wrapper; see its
-man page.
-OSS support is compiled in automatically on Linux; if you have OSS on another
+On a Linux system that has ALSA and/or PulseAudio, you may need to use
+a wrapper program like
+.BR aoss (1)
+or
+.BR padsp (1)
+to get OSS compatibility support; see their man pages.
+Sound support is compiled in automatically on Linux; if you have OSS on another
 version of Unix, you'll need to define the symbol
 .B HAVE_OSS
 in the source distribution's
 .I Makefile
 or in
-.IR trs_cassette.c .
+.I trs_cassette.c
+when compiling xtrs.
 Any time TRS-80 software tries to write non-zero values to the cassette port (or
 the Model 4/4P optional sound port) with the cassette motor off, it is assumed
 to be trying to make sounds and

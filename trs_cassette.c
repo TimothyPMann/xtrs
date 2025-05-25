@@ -2,19 +2,19 @@
  * Copyright (C) 1992 Clarendon Hill Software.
  *
  * Permission is granted to any individual or institution to use, copy,
- * or redistribute this software, provided this copyright notice is retained. 
+ * or redistribute this software, provided this copyright notice is retained.
  *
  * This software is provided "as is" without any expressed or implied
  * warranty.  If this software brings on any sort of damage -- physical,
  * monetary, emotional, or brain -- too bad.  You've got no one to blame
- * but yourself. 
+ * but yourself.
  *
  * The software may be modified for your own purposes, but modified versions
  * must retain this notice.
  */
 
-/* 
- * Portions copyright (c) 1996-2020, Timothy P. Mann
+/*
+ * Portions copyright (c) 1996-2025, Timothy P. Mann
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -42,23 +42,21 @@
  *  85/90 sound.  "Game sound" is defined as output to the cassette
  *  port when the cassette motor is off, or output to the Model III/4
  *  sound option card (a 1-bit DAC).
- * 
+ *
  * Compile time option:
  *
  * HAVE_OSS - Set this if you have the Open Sound System (OSS) or an
  * OSS compatibility layer that provides /dev/dsp.  Older Linux
  * systems use OSS as their primary sound API, and some other
  * Unix-like systems have it as well.  Newer Linux systems use ALSA
- * instead, but generally have an OSS compatibility layer.  On Linux
- * systems that use the PulseAudio sound server, use the padsp wrapper
- * program to run xtrs with /dev/dsp support.
+ * instead, but generally have an OSS compatibility layer.
  *
  * Regardless of whether HAVE_OSS is set, cassettes can be
  * read/written from files in various formats, including WAV.
- * 
+ *
  * When HAVE_OSS is set, cassettes can be also read/written directly
  * through your sound input/output device, and both game sound and
- * Orchestra 85/90 sound are sent to the sound output device.  
+ * Orchestra 85/90 sound are sent to the sound output device.
  *
  * Game sound and Orchestra 85/90 sound are disabled if HAVE_OSS is
  * not set.
