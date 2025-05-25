@@ -275,7 +275,7 @@ static void set_trap(int address, int flag)
 
 static void clear_trap(int i)
 {
-    if((i < 0) || (i > MAX_TRAPS) || !trap_table[i].valid)
+    if((i < 0) || (i >= MAX_TRAPS) || !trap_table[i].valid)
     {
 	printf("[%d] is not a valid trap.\n", i);
     }
@@ -909,7 +909,7 @@ void debug_shell(void)
 
 		if(sscanf(input, "%x , %x / ", &start_address, &end_address) == 2)
 		{
-		    print_memory(start_address, end_address - start_address);
+		    print_memory(start_address, end_address - start_address + 1);
 		}
 		else if(sscanf(input, "%x / %x ", &start_address, &num_bytes) == 2)
 		{
