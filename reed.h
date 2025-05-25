@@ -5,8 +5,11 @@
 typedef struct {
   Uchar id1;       /* 0: Identifier #1: 56H */
   Uchar id2;       /* 1: Identifier #2: CBH */
-  Uchar ver;       /* 2: Version of format: 10H = version 1.0 */
-  Uchar cksum;     /* 3: Simple checksum: 
+  Uchar ver;       /* 2: Version of format:
+                         10H = version 1.0, created by Reed emulator or xtrs.
+                         11H = version 1.1, created by Keil emulator.
+                         xtrs assumes 1.1 and 1.0 don't differ significantly. */
+  Uchar cksum;     /* 3: Simple checksum:
 		         To calculate, add together bytes 0 to 31
                          of header (excepting byte 3), then XOR
                          result with 4CH */
@@ -21,7 +24,7 @@ typedef struct {
 		         bit 5 - 0: reserved */
   Uchar flag2;     /* 8: Flags #2: reserved */
   Uchar flag3;     /* 9: Flags #3: reserved */
-  Uchar crtr;      /* 10: Created by: 
+  Uchar crtr;      /* 10: Created by:
 		          14H = HDFORMAT
 		          42H = xtrs mkdisk
                           80H = Cervasio xtrshard port to Vavasour
