@@ -55,7 +55,8 @@ static unsigned char interrupt_mask = 0;
 #define M3_INTRQ_BIT    0x80  /* FDC chip INTRQ line */
 #define M3_MOTOROFF_BIT 0x40  /* FDC motor timed out (stopped) */
 #define M3_RESET_BIT    0x20  /* User pressed Reset button */
-static unsigned char nmi_latch = 1; /* ?? One diagnostic program needs this */
+#define M3_CONSTANT_BIT 0x01  /* Hardwired to true; see Model III schematic */
+static unsigned char nmi_latch = M3_CONSTANT_BIT;
 static unsigned char nmi_mask = M3_RESET_BIT;
 
 #define TIMER_HZ_1 40
@@ -265,7 +266,7 @@ trs_reset_button_interrupt(int state)
 {
   if (trs_model == 1) {
     z80_state.nmi = state;
-  } else {  
+  } else {
     if (state) {
       nmi_latch |= M3_RESET_BIT;
     } else {
@@ -306,7 +307,16 @@ trs_nmi_latch_read(void)
 void
 trs_nmi_mask_write(unsigned char value)
 {
-  nmi_mask = value | M3_RESET_BIT;
+  /*
+   * On real Model III hardware, only bits 7 and 6 of the NMI mask
+   * port exist, and only bits 7, 6, 5, and 0 of the NMI source port
+   * exist.  Although you can read the state of the reset button in
+   * bit 5 of the NMI source port, and bit 0 is hardwired to read as
+   * true, those bits aren't latched in flipflops and don't have
+   * mutable mask bits.  We emulate all bits in both ports as
+   * existing, but prevent software from changing the immutable ones.
+   */
+  nmi_mask = (value & (M3_INTRQ_BIT|M3_MOTOROFF_BIT)) | M3_RESET_BIT;
   z80_state.nmi = (nmi_latch & nmi_mask) != 0;
 #if IDEBUG2
   if (z80_state.nmi && !z80_state.nmi_seen) {
