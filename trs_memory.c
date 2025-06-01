@@ -178,7 +178,7 @@ void trs_reset(int poweron)
 
     trs_cancel_event();
     trs_timer_interrupt(0);
-    if (poweron || trs_model >= 4) {
+    if (poweron || trs_model >= 3) {
         /* Reset processor */
 	z80_reset();
     } else {

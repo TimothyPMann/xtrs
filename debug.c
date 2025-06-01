@@ -96,9 +96,9 @@ Running:\n\
     reset\n\
         Hard reset the Z80 and devices.\n\
     softreset\n\
-        Press the system reset button.  On Model I/III, softreset resets the\n\
-        devices and posts a nonmaskable interrupt to the CPU; on Model 4/4P,\n\
-        softreset is the same as hard reset.\n\
+        Press the system reset button.  On Model I, softreset resets the\n\
+        devices and posts a nonmaskable interrupt to the CPU; on Model\n\
+        III/4/4P, softreset is the same as hard reset.\n\
 Printing:\n\
     dump\n\
         Print the values of the Z80 registers.\n\
