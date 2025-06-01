@@ -154,6 +154,16 @@ void trs_reset(int poweron)
 	z80_out(0x84, 0);
     }
     if (trs_model >= 3) {
+        /*
+         * Workaround for using a MODELA/III image as the ROM for
+         * Model III or Model 4.  On a Model 4P, which such an image
+         * was intended for, the Model 4P boot ROM runs first and sets
+         * 0x405b to a nonzero value if the BREAK key was pressed.  So
+         * we need to zero that location here to prevent a false BREAK
+         * detection.  Ugh.
+         */
+        memory[0x405b] = 0;
+
 	grafyx_write_mode(0);
 	trs_interrupt_mask_write(0);
 	trs_nmi_mask_write(0);
