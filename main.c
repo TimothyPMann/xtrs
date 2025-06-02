@@ -70,15 +70,22 @@ static void check_endian(void)
 }
 
 /*
- * Although this ROM loading code supports multiple ROMs, xtrs has an
- * overall assumption that addresses from 0 up to the end of the
+ * Although the ROM loading code supports multiple ROMs, xtrs has an
+ * overall assumeion that addresses from 0 up to the end of the
  * highest-addressed ROM (if any) are all ROM space.  So we set
  * trs_rom_size to the end of the highest-addressed ROM that has been
- * seen.  Moreover, we assume we know where the ROMs start -- address
- * 0 for all except the Model I ESF extension ROM, which starts at
- * 0x3000.  We don't check if this assumption is violated even in
- * cases where it's possible to check, such as when the ROM is in
- * Intel hex format or load module format.
+ * seen.  We do now check for loading too large a Model 4P boot ROM,
+ * which can happen if someone tries to use a Model III/4 ROM in 4P mode.
+ *
+ * Moreover, we assume we know where the ROMs start -- address 0 for
+ * all except the Model I ESF extension ROM, which starts at 0x3000.
+ * We don't check if this assumption is violated, even in cases where
+ * it's possible to check because the ROM format carries a starting
+ * address, such as with Intel hex format or load module format.
+ */
+
+/*
+ * Load a ROM from an external file.
  */
 void trs_load_rom(int address, char *filename)
 {
@@ -139,6 +146,9 @@ void trs_load_rom(int address, char *filename)
     }
 }
 
+/*
+ * Load a compiled-in ROM.
+ */
 void trs_load_compiled_rom(int address, int size, unsigned char rom[])
 {
     int i;
@@ -212,6 +222,9 @@ trs_load_romfiles(void)
       trs_load_compiled_rom(0, trs_rom4p_size, trs_rom4p);
     } else {
       fatal("ROM file not specified!");
+    }
+    if (trs_rom_size > 0x1000) {
+       fatal("Wrong type of ROM; a Model 4P boot ROM is at most 4KB");
     }
     break;
   }
