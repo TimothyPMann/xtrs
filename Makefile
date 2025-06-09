@@ -117,17 +117,17 @@ ZMACFLAGS = -P
 	zmac $(ZMACFLAGS) -o $*.hex $<
 
 .man.txt:
-#	nroff -man -c -Tascii $< | colcrt - | cat -s > $*.txt
 	man -l $< > $*.txt
+# if needed, you can try this old fashioned alternative:
+#	nroff -man -c -Tascii $< | colcrt - | cat -s > $*.txt
 
 .html.txt:
 	html2text -nobs -style pretty $< >$@
 
 %.man.pdf: %.man
-#	groff -man -Tpdf $< > $@
-	groff -man -Tdvi $< > .tmp_$*.dvi
-	dvipdf .tmp_$*.dvi $@
-	rm -f .tmp_$*.dvi
+	groff -man -Tpdf $< > $@
+# if needed, use this workaround for https://savannah.gnu.org/bugs/?67169:
+#	groff -rU0 -man -Tpdf $< > $@
 
 xtrs: $(OBJECTS) $(X_OBJECTS)
 	$(CC) $(LDFLAGS) -o xtrs $(OBJECTS) $(X_OBJECTS) $(LIBS)
