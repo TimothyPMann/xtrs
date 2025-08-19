@@ -58,7 +58,7 @@ To do:
 Write code for all the RST handlers as in the real 4P ROM, which 
 would allow xtrs to boot a Model III disk when in Model 4P mode.
 This would require considerable work, and isn't planned for any
-time in the forseeable future.
+time in the foreseeable future.
 
 Any questions?
 ==============

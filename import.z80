@@ -33,7 +33,7 @@
 ;; The program tries to determine what DOS it is running on and use
 ;;  the correct FCB end of file convention, but this works only on
 ;;  TRSDOS, LDOS, and NEWDOS/80.  For other DOSes that use the
-;;  NEWDOS/80 convention (such as DOSPLUS), give the -e paramter.
+;;  NEWDOS/80 convention (such as DOSPLUS), give the -e parameter.
 ;; If the tofile parameter is omitted, the last component of the
 ;;  Unix pathname is used, with '.' changed to '/'.  If this is
 ;;  not a legal TRS-80 filename, you get an error message.

@@ -103,7 +103,7 @@ work.  Oops.  Tested on Model I DOSPLUS 3.5.
 
 4.9b -- Sat May 13 11:54:26 PDT 2006 -- Tim Mann
 
-* Bundled in the latest version of Roland Gerlach's CP/M utilties for
+* Bundled in the latest version of Roland Gerlach's CP/M utilities for
 xtrs and their documentation (as of 5/13/2006).
 
 * Added -emtsafe feature to turn off ability for emts to write to
@@ -705,7 +705,7 @@ floppies, and clarified (I hope) DAM documentation in the man page.
 
 * Much improved behavior when accessing a real floppy drive with no
 disk in it.  Previously this would generate a raft of error messages
-to stderr, subsequent accessses to the drive would not work until the
+to stderr, subsequent accesses to the drive would not work until the
 user pressed F7 to reset the error condition, and the TRS-80 program
 would always see the problem as a sector not found or a write fault
 instead of an empty drive.  Now we check whether a disk is present
@@ -938,7 +938,7 @@ increasing the delay caused problems (as noted under 2.5 below).
 
 * Fixed a bug in graphics-only mode. When there is no text overlay,
 graphics should always be 640x240. Graphics should be 512x192 only
-when 64x16 text is actually overlayed. Thanks to Mark McDougall for
+when 64x16 text is actually overlaid. Thanks to Mark McDougall for
 the bug report.
 
 * In the fix for CP/M described under 2.3 below, I increased the delay

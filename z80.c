@@ -774,7 +774,7 @@ static int rrc_byte(int value)
 
 /*
  * Perform the RLA, RLCA, RRA, RRCA instructions.  These set the flags
- * differently than the other rotate instrucitons.
+ * differently than the other rotate instructions.
  */
 static void do_rla(void)
 {

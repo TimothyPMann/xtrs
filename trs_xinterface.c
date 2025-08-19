@@ -951,7 +951,7 @@ void trs_get_event(int wait)
 
   /*
    * Of Enter and Leave events, track which kind we saw last.  X clients
-   * like "unclutter" will sythesize an Enter event on their own.
+   * like "unclutter" will synthesize an Enter event on their own.
    *
    * Historically, xtrs assumed that every Enter would be preceded by a
    * Leave.  When this was not the case, xtrs would clobber the global
@@ -1269,7 +1269,7 @@ boxes_init(int foreground, int background, int width, int height, int expanded)
 }
 
 /* DPL 20000129
- * This routine creates a rescaled charater bitmap, and then
+ * This routine creates a rescaled character bitmap, and then
  * calls XCreateBitmapFromData. It then can be used pretty much
  * as a drop-in replacement for XCreateBitmapFromData. 
  */

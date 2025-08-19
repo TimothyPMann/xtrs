@@ -3229,7 +3229,7 @@ real_seek(void)
   int res, i = 0;
   sigset_t set, oldset;
 
-  /* Always use a recal if going to track 0.  This should help us
+  /* Always use a restore if going to track 0.  This should help us
      recover from confusion about what track the disk is really on.
      I'm still not sure why the confusion sometimes arises. */
   if (d->phytrack == 0) {
