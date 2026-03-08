@@ -402,7 +402,7 @@ static void print_memory(Ushort address, int num_bytes)
 
 static void debug_run(void)
 {
-    void (*old_signal_handler)();
+    void (*old_signal_handler)(int);
     Uchar t;
     Uchar byte;
     int continuous;
